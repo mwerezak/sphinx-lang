@@ -27,7 +27,7 @@ nil;
 ("solo",)  # tuple with one element
 
 # Object
-Person { name: "Bob", age: 13 };
+Person { name = "Bob", age = 13 };
 
 
 # Arithmetic expressions
@@ -68,7 +68,7 @@ false or false; # false.
 true or false;  # true.
 
 # Precendence and grouping
-var average := (min + max) / 2;
+var average = (min + max) / 2;
 
 
 # Statements
@@ -84,17 +84,17 @@ end
 
 # Variables
 
-var imAVariable := "here is my value";
-var iAmNil := nil;  # initializer is required
+var imAVariable = "here is my value";
+var iAmNil = nil;  # initializer is required
 
-var first, second := "abc", "def";  # tuple destructuring
+var first, second = "abc", "def";  # tuple destructuring
 
-var inc := 0;
+var inc = 0;
 inc -= 1;  # arithmetic assignment
 
-var breakfast := "bagels";
+var breakfast = "bagels";
 echo breakfast; # "bagels".
-breakfast := "beignets";
+breakfast = "beignets";
 echo breakfast; # "beignets".
 
 # Control Flow
@@ -113,7 +113,7 @@ else
   "default"
 end
 
-var condExpr := 
+var condExpr = 
   if condition1 then
     "first"
   elif condition2 then
@@ -183,19 +183,19 @@ fun returnFunction()
   return inner;
 end
 
-var fn := returnFunction();
+var fn = returnFunction();
 fn();
 
-var anonFn := fun(x) x + 1 end;
-var a := anonFn(3);
+var anonFn = fun(x) x + 1 end;
+var a = anonFn(3);
 
 # Classes
 
-something.field := 1;
+something.field = 1;
 something.method();
 
 class Breakfast
-  var classvar := 0;
+  var classvar = 0;
 
   # functions whose first parameter is the "self" symbol
   # are automatically converted into builtin method descripter objects
@@ -204,17 +204,14 @@ class Breakfast
   end
   
   # even when created using an anonymous function
-  var serve := fun(self, who)
+  var serve = fun(self, who)
     echo "Enjoy your breakfast, " + who + ".";
   end
-  
-  var __call := 1;
-  
 end
 
 # and even when created outside of a class body.
 # descripters are passed the owning class (and instance, if relevant) when the __get() metamethod is invoked
-Breakfast.cook := fun(self)
+Breakfast.cook = fun(self)
   echo "Eggs a-fryin'!";
 end
 
@@ -225,17 +222,17 @@ var someVariable = Breakfast;
 # Pass it to functions.
 someFunction(Breakfast);
 
-var breakfast := Breakfast {};  # object initializer
+var breakfast = Breakfast {};  # object initializer
 echo breakfast; # "Breakfast instance".
 
 # Instantiation and initialization
 
-var breakfast := Breakfast { meat: "sausage", bread: "sourdough" };
-breakfast.drink := "coffee";
+var breakfast = Breakfast { meat = "sausage", bread = "sourdough" };
+breakfast.drink = "coffee";
 
 
-var a := 0;
-var anonymous := { some: (a := 1), data: 2 };
+var a = 0;
+var anonymous = { some = (a = 1), data = 2 };
 
 class Breakfast
   fun serve(self, who)
@@ -249,12 +246,12 @@ end
 class Breakfast
   # constructor function
   fun new(meat, bread)
-    return Breakfast { meat: meat, bread: bread };
+    return Breakfast { meat = meat, bread = bread };
   end
 
 end
 
-var baconAndToast := Breakfast.new("bacon", "toast");
+var baconAndToast = Breakfast.new("bacon", "toast");
 baconAndToast.serve("Dear Reader");
 # "Enjoy your bacon and toast, Dear Reader."
 
@@ -268,7 +265,7 @@ end
 
 
 # Arrays? Not necessary once library support is implemented
-var arr := [] { "one", "two", "three" };
+var arr = [] { "one", "two", "three" };
 
 # Variadic arguments
 fun variadicFun(normalArg, variadic...)
@@ -278,10 +275,10 @@ fun variadicFun(normalArg, variadic...)
   #end
 end
 
-var things := ("first", "second", "third");
+var things = ("first", "second", "third");
 variadicFun(...things);  # prints "first"
 
-var mylist := List.new("red", "green", "blue");
+var mylist = List.new("red", "green", "blue");
 
 
 # Metamethods
@@ -295,7 +292,7 @@ class Example
       echo args;
   end
   
-  var __eq := fun()
+  var __eq = fun(self, other) true end;
 end
 
 # List of allowed metamethods:
@@ -306,6 +303,17 @@ end
 # __getindex, __setindex, __delindex
 # __get, __set, __del - attribute descriptor protocol
 # __call
+
+# class/instance names with double underscores are reserved for metamethods
+class Example
+  var __notallowed = true;  # error
+  
+  fun __alsonotallowed(self)
+    echo "bad"
+  end
+end
+
+Example.__fail = -3;  # this will result in an error
 
 
 # Multiple inheritance
@@ -326,6 +334,6 @@ class C: A, B end
 
 class D: C, B end
 
-var d := D {};
+var d = D {};
 d.method();  # prints "A.method() called"
 # see also: C3 Linearization

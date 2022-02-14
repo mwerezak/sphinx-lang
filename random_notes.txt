@@ -1,0 +1,4 @@
+- should disallow assigning class or instance members that start with __ that aren't valid metamethods
+	"Error: class or instance members that start with double underscores are reserved for metamethods"
+	
+- initializer is mandatory for all variable definitions
