@@ -68,7 +68,7 @@ false or false; # false.
 true or false;  # true.
 
 # Precendence and grouping
-var average = (min + max) / 2;
+var average := (min + max) / 2;
 
 
 # Statements
@@ -85,7 +85,7 @@ end
 # Variables
 
 var imAVariable := "here is my value";
-var iAmNil;
+var iAmNil := nil;  # initializer is required
 
 var first, second := "abc", "def";  # tuple destructuring
 
@@ -197,25 +197,27 @@ something.method();
 class Breakfast
   var classvar := 0;
 
+  # functions whose first parameter is the "self" symbol
+  # are automatically converted into builtin method descripter objects
   fun cook(self) 
     echo "Eggs a-fryin'!";
   end
   
-  fun serve(self, who)
+  # even when created using an anonymous function
+  var serve := fun(self, who)
     echo "Enjoy your breakfast, " + who + ".";
   end
   
+  var __call := 1;
+  
 end
 
-class Breakfast
-  fun cook(self)
-    echo "Eggs a-fryin'!";
-  end
-
-  fun serve(self, who)
-    echo "Enjoy your breakfast, " + who + ".";
-  end
+# and even when created outside of a class body.
+# descripters are passed the owning class (and instance, if relevant) when the __get() metamethod is invoked
+Breakfast.cook := fun(self)
+  echo "Eggs a-fryin'!";
 end
+
 
 # Store it in variables.
 var someVariable = Breakfast;
@@ -289,9 +291,11 @@ class Example
       get(self, name)
   end
   
-  fun __call(self, ...args)
+  fun __call(self, args...)
       echo args;
   end
+  
+  var __eq := fun()
 end
 
 # List of allowed metamethods:

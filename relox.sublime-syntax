@@ -1,0 +1,340 @@
+%YAML 1.2
+---
+name: ReLox
+file_extensions:
+  - rlo
+scope: source.relox
+
+variables:
+  identifier: \b[[:alpha:]_][[:alnum:]_]*\b # upper and lowercase
+  # path: '({{identifier}}[ ]*\.[ ]*)*{{identifier}}'
+
+contexts:
+  prototype:
+    - include: comments
+
+  main:
+    - include: statements
+
+  statements:
+    - match: \b(end)\b
+      scope: invalid
+    - include: early-expressions
+    - include: misc-statement-keywords
+    - include: blocks
+    - include: while-statements
+    - include: control-flow-keywords
+    - include: late-expressions
+    - match: ';'
+      scope: punctuation.terminator
+
+  expressions:
+    - include: early-expressions
+    - include: late-expressions
+
+  early-expressions:
+    - include: constants
+    - include: reserved-names
+    - include: numbers
+    - include: operators
+    - include: strings
+    - include: tuples
+    - include: parens
+    - include: if-expressions
+
+    # tuple constructor
+    - match: \,
+      scope: punctuation.separator
+
+  late-expressions:
+    - include: variable-defs
+    - include: function-defs
+    - include: function-calls
+    - include: class-defs
+    - include: identifiers
+
+  # other keywords
+  misc-statement-keywords:
+    - match: \b(echo|del)\b
+      scope: keyword.other
+
+  control-flow-keywords:
+    - match: \b(return|break|continue)\b
+      scope: keyword.control
+
+  constants:
+    - match: \b(nil|true|false)\b
+      scope: constant.language
+
+  reserved-names:
+    - match: \b(self|super)\b
+      scope: variable.language
+
+  numbers:
+    # decimal floats
+    - match: \b(\d+(?:\.\d*)?|\.\d+)\b
+      scope: constant.numeric
+    # decimal integers
+    - match: \b(\d+)\b
+      scope: constant.numeric
+    # hex integers
+    - match: \b(0[xX])(\h*)\b
+      scope: constant.numeric
+
+  operators:
+    - match: \+\=|-\=|\*\=|/\=|%\=
+      scope: keyword.operator.arithmetic keyword.operator.assignment
+    - match: '[\+\-/\*%]'
+      scope: keyword.operator.arithmetic
+    - match: '\~\=|&\=|\|\=|\^\=|>>\=|<<\='
+      scope: keyword.operator.bitwise keyword.operator.assignment
+    - match: '[\~\&\|\^]|<<|>>'
+      scope: keyword.operator.bitwise
+    - match: <\=|>\=|\=\=|<|>|!\=
+      scope: keyword.operator.comparison
+    - match: \b(not|and|or)\b
+      scope: keyword.operator.logical
+    - match: \:\=
+      scope: keyword.operator.assignment
+
+  strings:
+    # Strings begin and end with quotes, and use backslashes as an escape
+    # character.
+    - match: \"
+      scope: punctuation.definition.string.begin
+      push: inside_double_string
+    - match: \'
+      scope: punctuation.definition.string.begin
+      push: inside_single_string
+
+  inside_double_string:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.double
+    - match: \"
+      scope: punctuation.definition.string.end
+      pop: true
+    - include: string_escaped_char
+
+  inside_single_string:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.single
+    - match: \'
+      scope: punctuation.definition.string.end
+      pop: true
+    - include: string_escaped_char
+
+  string_escaped_char:
+    - match: \\(?:\\|[nrt\'\"])
+      scope: constant.character.escape
+    - match: \\.
+      scope: invalid
+
+  identifiers:
+    - match: '{{identifier}}'
+      scope: variable.other
+    - match: \.
+      scope: punctuation.accessor
+
+  tuples:
+    - match: \,
+      scope: punctuation.separator
+
+  parens:
+    - match: \(
+      scope: punctuation.section.parens.begin
+      push:
+        - meta_scope: meta.parens
+        - match: \)
+          scope: punctuation.section.parens.end
+          pop: true
+        - include: expressions
+
+  function-calls:
+    - match: (?={{identifier}}\s*\()
+      push:
+        - meta_scope: variable.function
+        - match: '\('
+          scope: punctuation.section.group.begin
+          set: function-arg-list
+
+  function-arg-list:
+    - meta_scope: meta.group
+    - match : \)
+      scope: punctuation.section.group.end
+      pop: true
+    - match: \,
+      scope: punctuation.separator
+      # unpacking operator
+    - match: \.\.\.
+      scope: keyword.operator
+    - include: expressions
+
+  blocks:
+    - match: \b(begin)\b
+      # scope: punctuation.section.block.begin
+      scope: keyword.other
+      push:
+        - meta_scope: meta.block
+        - match: \b(end)\b
+          # scope: punctuation.section.block.end
+          scope: keyword.other
+          pop: true
+        - include: statements
+
+  if-expressions:
+    - match: \b(if)\b
+      scope: keyword.control.conditional
+      push:
+        - match: \b(then)\b
+          scope: keyword.control.conditional
+          set: if-body
+        - include: expressions
+
+  if-body:
+    - meta_scope: meta.block
+    - match: \b(elif)\b
+      scope: keyword.control.conditional
+      set:
+        - match: \b(then)\b
+          scope: keyword.control.conditional
+          set: if-body
+        - include: expressions
+    - match: \b(else)\b
+      scope: keyword.control.conditional
+    - match: \b(end)\b
+      scope: keyword.control.conditional
+      pop: true
+    - include: statements
+
+  while-statements:
+    - match: \b(while)\b
+      scope: keyword.control
+      push:
+        - match: \b(do)\b
+          scope: keyword.control
+          set: while-body
+        - include: expressions
+
+  while-body:
+    - meta_scope: meta.block
+    - match: \b(end)\b
+      scope: keyword.control
+      pop: true
+    - include: statements
+
+  variable-defs:
+    - match: \b(var)\b
+      scope: keyword.declaration.other
+      push:
+        - meta_content_scope: variable.other
+        - match: \:\=
+          scope: keyword.operator.assignment
+          pop: true
+
+  function-defs:
+    - match: \b(fun)\b
+      scope: keyword.declaration.function
+      push:
+        - meta_content_scope: entity.name.function
+        - match: \(
+          scope: punctuation.section.group.begin
+          set: function-param-list
+
+  function-param-list:
+    - meta_scope: meta.group
+    - match : \)
+      scope: punctuation.section.group.end
+      set: function-body
+    - match: \,
+      scope: punctuation.separator
+    - match: \b(self)\b  # method descriptor syntax
+      scope: variable.language
+    - match: '({{identifier}})(\.\.\.)?'
+      captures:
+        1: variable.parameter
+        2: keyword.operator
+
+  function-body:
+    - meta_scope: meta.block
+    - match: \b(end)\b
+      scope: keyword.other
+      pop: true
+    - include: statements
+
+  class-defs:
+    - match: \b(class)\b
+      scope: keyword.declaration.class
+      push:
+        - meta_content_scope: entity.name.class
+        - match: '\:'
+          scope: punctuation.separator
+          set: class-inheritance-list
+        - match: (?=\b(var|fun|end)\b)
+          set: class-body
+
+  class-inheritance-list:
+    - meta_scope: entity.other.inherited-class
+    - match: \,
+      scope: punctuation.separator
+    - match: (?=\b(var|fun|end)\b)
+      set: class-body
+
+  class-body:
+    - match: \b(end)\b
+      scope: keyword.other
+      pop: true
+    - include: class-variable-defs
+    - include: method-defs
+    - include: expressions
+
+  metamethod-names:
+    # arithmetic operators
+    - match: \b(__add|__mul|__sub|__div|__neg|__mod)\b
+      scope: support.function
+    # bitwise operators
+    - match: \b(__and|__or|__xor|__inv|__lshift|__rshift)\b
+      scope: support.function
+    # comparison
+    - match: \b(__le|__lt|__eq|__bool)\b
+      scope: support.function
+    # accessor
+    - match: \b(__getindex|__setindex|__delindex)\b
+      scope: support.function
+    # descriptor
+    - match: \b(__get|__set|__del)\b
+      scope: support.function
+    # misc
+    - match: \b(__call|__tostring)\b
+      scope: support.function
+    # all other "__*" names are reserved for metamethods
+    - match: \b(__\w+)\b
+      scope: invalid
+
+  class-variable-defs:
+    - match: \b(var)\b
+      scope: keyword.declaration.other
+      push:
+        - meta_content_scope: variable.member
+        - include: metamethod-names
+        - match: \:\=
+          scope: keyword.operator.assignment
+          pop: true
+
+  method-defs:
+    - match: \b(fun)\b
+      scope: keyword.declaration.function
+      push:
+        - meta_content_scope: entity.name.function
+        - include: metamethod-names
+        - match: \(
+          scope: punctuation.section.group.begin
+          set: function-param-list
+
+  comments:
+    # Comments begin with a '#' and finish at the end of the line.
+    - match: '#'
+      scope: comment
+      push:
+        - meta_scope: comment
+        - match: $\n?
+          pop: true
