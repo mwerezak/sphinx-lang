@@ -1,0 +1,69 @@
+%YAML 1.2
+---
+# See http://www.sublimetext.com/docs/3/syntax.html
+file_extensions:
+  - calvin
+scope: source.example-c
+
+contexts:
+  # The prototype context is prepended to all contexts but those setting
+  # meta_include_prototype: false.
+  prototype:
+    - include: comments
+
+  main:
+    # The main context is the initial starting point of our syntax.
+    # Include other contexts from here (or specify them directly).
+    - include: keywords
+    - include: numbers
+    - include: strings
+    - include: variables
+
+  keywords:
+    # Keywords are if, else for and while.
+    # Note that blackslashes don't need to be escaped within single quoted
+    # strings in YAML. When using single quoted strings, only single quotes
+    # need to be escaped: this is done by using two single quotes next to each
+    # other.
+    - match: '\b(Make_New_50ml_Volumetric_Flask|Fill_Volumetric_Flask_with_H2O|Make_New_100ml_Beaker|Fill_Empty_100ml_Beaker_with_Standardized_Base|Fill_Empty_100ml_Beaker_with_Standardized_Acid|Fill_Empty_100ml_Beaker_with_Standardized_Buffer|Fill_Empty_100ml_Beaker_with_Unknown_Buffer|Fill_Empty_100ml_Beaker_with_H2O|Clean_And_Dry|Transfer_Soln_with_20ml_Pipette|Transfer_Soln_with_Graduated_Cylinder|Fill_50ml_Buret|Add_Soln_from_Buret|Read_Buret_Volume|Add_Solid_Acid_to_Vessel|Add_One_Drop_of_Indicator|Measure_pH|Observe_Color|Take_Spectrum|Observe_Color_Range|Titrate_Beaker_from_Buret_until_Color_Change|Verbose_Reporting_On|Verbose_Reporting_Off|Observe_Volume|Set_Group_Name|Set_TA_Name)\b'
+      scope: keyword.control.example-c
+
+  numbers:
+    - match: '\b(-)?[0-9.]+\b'
+      scope: constant.numeric.example-c
+
+  strings:
+    # Strings begin and end with quotes, and use backslashes as an escape
+    # character.
+    - match: '"'
+      scope: punctuation.definition.string.begin.example-c
+      push: inside_string
+
+  inside_string:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.double.example-c
+    - match: '\.'
+      scope: constant.character.escape.example-c
+    - match: '"'
+      scope: punctuation.definition.string.end.example-c
+      pop: true
+
+  variables:
+    # Keywords are if, else for and while.
+    # Note that blackslashes don't need to be escaped within single quoted
+    # strings in YAML. When using single quoted strings, only single quotes
+    # need to be escaped: this is done by using two single quotes next to each
+    # other.
+    - match: '\b(to|newName|from|indicator|name|mL|grams|acid|to|of|into|buffer|at)\b'
+      scope: support.type.example-c
+
+
+  comments:
+    # Comments begin with a '//' and finish at the end of the line.
+    - match: '//'
+      scope: punctuation.definition.comment.example-c
+      push:
+        # This is an anonymous context push for brevity.
+        - meta_scope: comment.line.double-slash.example-c
+        - match: $\n?
+          pop: true

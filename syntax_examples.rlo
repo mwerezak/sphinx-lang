@@ -1,0 +1,327 @@
+# Your first Lox program!
+echo "Hello, world!";
+
+# Booleans
+true;  # Not false.
+false; # Not *not* false.
+
+# Numbers
+1234;   # An integer.
+12.34;  # A decimal number.
+0xFACE; # Hexadecimal integer.
+
+# Strings
+"I am a string";
+"";     # The empty string.
+"123";  # self is a string, not a number.
+"a\nb"; # Escape sequences
+'And then she said, "woah."';  # Can be single or double quoted.
+
+# Nil
+nil;
+
+# Tuple
+"abc", 123;
+
+();  # the empty tuple
+("solo",)  # tuple with one element
+
+# Object
+Person { name: "Bob", age: 13 };
+
+
+# Arithmetic expressions
+add + me;
+subtract - me;
+multiply * me;
+divide / me;
+
+# to implement: bitwise, shift, modulo
+(7 ^ 3) << 3;
+0xff | 235;
+3 % 2 == 0;
+
+-negateMe;
+
+# Comparison and equality
+
+less < than;
+lessThan <= orEqual;
+greater > than;
+greaterThan >= orEqual;
+
+1 == 2;         # false.
+"cat" != "dog"; # true.
+
+314 == "pi"; # false.
+123 == "123"; # false.
+
+# Logical operators
+
+not true;  # false.
+not false; # true.
+
+true and false; # false.
+true and true;  # true.
+
+false or false; # false.
+true or false;  # true.
+
+# Precendence and grouping
+var average = (min + max) / 2;
+
+
+# Statements
+
+# Blocks
+# may return a value, or implicitly evaluate to nil
+
+begin
+  echo "One statement.";
+  echo "Two statements."  # implicit return
+end
+
+
+# Variables
+
+var imAVariable := "here is my value";
+var iAmNil;
+
+var first, second := "abc", "def";  # tuple destructuring
+
+var inc := 0;
+inc -= 1;  # arithmetic assignment
+
+var breakfast := "bagels";
+echo breakfast; # "bagels".
+breakfast := "beignets";
+echo breakfast; # "beignets".
+
+# Control Flow
+
+if condition then
+    echo "yes";
+else
+    echo "no";
+end
+
+if condition1 then
+  "first"
+elif condition2 then
+  "second"
+else
+  "default"
+end
+
+var condExpr := 
+  if condition1 then
+    "first"
+  elif condition2 then
+    "second"
+  else
+    "default"
+  end;
+
+var a = 1;
+while a < 10 do
+  echo a;
+  a += 1;
+end
+
+
+# not yet, will use iterators
+#for (var a = 1; a < 10; a = a + 1) do
+#  echo a;
+#end
+
+# iterfunc must return (next_control, ...)
+#for i, ... in iterfunc, invariant, control do
+  # ...
+#end
+
+
+# Functions
+
+makeBreakfast(bacon, eggs, toast);
+makeBreakfast();
+
+fun echoSum(a, b)
+  echo a + b;
+end
+
+fun returnSum(a, b)
+  return a + b;
+end
+
+# Closures
+
+fun addPair(a, b)
+  return a + b;
+end
+
+fun identity(a)
+  return a;
+end
+
+echo identity(addPair)(1, 2); # echos "3".
+
+fun outerFunction()
+  fun localFunction()
+    echo "I'm local!";
+  end
+
+  localFunction();
+end
+
+fun returnFunction()
+  var outside = "outside";
+
+  fun inner()
+    echo outside;
+  end
+
+  return inner;
+end
+
+var fn := returnFunction();
+fn();
+
+var anonFn := fun(x) x + 1 end;
+var a := anonFn(3);
+
+# Classes
+
+something.field := 1;
+something.method();
+
+class Breakfast
+  var classvar := 0;
+
+  fun cook(self) 
+    echo "Eggs a-fryin'!";
+  end
+  
+  fun serve(self, who)
+    echo "Enjoy your breakfast, " + who + ".";
+  end
+  
+end
+
+class Breakfast
+  fun cook(self)
+    echo "Eggs a-fryin'!";
+  end
+
+  fun serve(self, who)
+    echo "Enjoy your breakfast, " + who + ".";
+  end
+end
+
+# Store it in variables.
+var someVariable = Breakfast;
+
+# Pass it to functions.
+someFunction(Breakfast);
+
+var breakfast := Breakfast {};  # object initializer
+echo breakfast; # "Breakfast instance".
+
+# Instantiation and initialization
+
+var breakfast := Breakfast { meat: "sausage", bread: "sourdough" };
+breakfast.drink := "coffee";
+
+
+var a := 0;
+var anonymous := { some: (a := 1), data: 2 };
+
+class Breakfast
+  fun serve(self, who)
+    echo "Enjoy your " + self.meat + " and " +
+        self.bread + ", " + who + ".";
+  end
+
+  # ...
+end
+
+class Breakfast
+  # constructor function
+  fun new(meat, bread)
+    return Breakfast { meat: meat, bread: bread };
+  end
+
+end
+
+var baconAndToast := Breakfast.new("bacon", "toast");
+baconAndToast.serve("Dear Reader");
+# "Enjoy your bacon and toast, Dear Reader."
+
+# Inheritance
+
+class Brunch: Breakfast
+  fun drink()
+    echo "How about a Bloody Mary?";
+  end
+end
+
+
+# Arrays? Not necessary once library support is implemented
+var arr := [] { "one", "two", "three" };
+
+# Variadic arguments
+fun variadicFun(normalArg, variadic...)
+  echo normalArg;
+  #for i, obj in iter(variadic) do
+    # ...
+  #end
+end
+
+var things := ("first", "second", "third");
+variadicFun(...things);  # prints "first"
+
+var mylist := List.new("red", "green", "blue");
+
+
+# Metamethods
+
+class Example
+  fun __getindex(self, name)
+      get(self, name)
+  end
+  
+  fun __call(self, ...args)
+      echo args;
+  end
+end
+
+# List of allowed metamethods:
+#
+# __add, __mul, __sub, __div, __neg, etc...
+# __le, __lt, __eq only, no methamethods for others...
+# __tostring
+# __getindex, __setindex, __delindex
+# __get, __set, __del - attribute descriptor protocol
+# __call
+
+
+# Multiple inheritance
+
+class A
+  fun method(self)
+    echo "A.method() called"
+  end
+end
+
+class B
+  fun method(self)
+    echo "B.method() called"
+  end
+end
+
+class C: A, B end
+
+class D: C, B end
+
+var d := D {};
+d.method();  # prints "A.method() called"
+# see also: C3 Linearization
