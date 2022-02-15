@@ -1,55 +1,6 @@
-// Token Types
+use std::iter::Iterator;
+use crate::lexer::Token;
 
-pub enum Token<'s> {
-    Delim(Delimiter),
-    OpSym(OpSymbol),
-    Keyword(Keyword),
-    
-    StringLiteral(&'s str),
-    IntegerLiteral(u32),
-    FloatLiteral(f32),
-    
-    EOF,
-}
-
-pub enum Delimiter {
-    OpenParen,
-    CloseParen,
-    OpenBrace,
-    CloseBrace,
-    OpenSquare,
-    CloseSquare,
-    Comma,
-    Colon,
-    Semicolon,
-}
-
-pub enum OpSymbol {
-    Add, Sub, Mul, Div, Mod,
-    BitAnd, BitOr, BitXor, LShift, RShift,
-    LT, LE, GT, GE, EQ, NE,
-    And, Or, Not,
-    Assign, Access,
-}
-
-pub enum Keyword {
-    Var, Begin, 
-    If, Then, Elif, Else,
-    For, While, Do,
-    Fun, Class,
-    Self_, Super, True, False, Nil,
-    Echo,
-    End,
-}
-
-// Token Data
-
-// uses lifetime of the source text
-pub struct TokenData<'s> {
-    token: Token<'s>,
-    lexeme: &'s str,
-    lineno: u64,
-}
 
 // Lexer Rules
 
@@ -63,15 +14,6 @@ pub trait LexerRule {
     fn match_state(&self) -> LexerMatch;
     fn feed(&mut self, ch: char) -> LexerMatch;
     fn reset(&mut self);
-}
-
-// Lexer Errors
-
-pub struct LexerError {
-    message: String,
-    filename: String,
-    index: usize,
-    lineno: u64,
 }
 
 // Lexer Builder
@@ -88,16 +30,18 @@ impl LexerBuilder {
     }
     
     pub fn add_rule<R>(&mut self, rule: R) -> &mut Self
-    where R: LexerRule + 'static {
+        where R: LexerRule + 'static 
+    {
         
         self.rules.push(Box::new(rule));
         return self;
     }
     
-    pub fn build(self, filename: &str, source: &str) -> Lexer {
+    pub fn build<S>(self, source: S) -> Lexer<S> 
+        where S: Iterator<Item=char>
+    {
         Lexer { 
-            filename: String::from(filename),
-            source: String::from(source),
+            source,
             current: 0,
             token_start: 0,
             lineno: 1,
@@ -108,21 +52,21 @@ impl LexerBuilder {
 
 // Lexer
 
-pub struct Lexer {
-    filename: String,
-    source: String,
+pub struct Lexer<S> where S: Iterator<Item=char> {
+    source: S,
+    rules: Vec<Box<dyn LexerRule>>,
     
     current: usize,
     token_start: usize,
     lineno: u64,
-    
-    rules: Vec<Box<dyn LexerRule>>,
 }
 
-impl Lexer {
-    // fn next_char(&self) -> Option<char> {
+impl<S> Lexer<S> where S: Iterator<Item=char> {
+    fn current_span(&self) -> Span {
+        Span { index: self.token_start, length: self.current - self.token_start }
+    }
     
-    pub fn next_token(&mut self) -> Result<TokenData<'_>, LexerError> {
+    pub fn next_token(&mut self) -> Result<TokenOut, LexerError> {
         unimplemented!();
         
         // grab the next char, and feed it to all the rules
@@ -140,11 +84,35 @@ impl Lexer {
         
     }
     
-    fn token_data<'s>(&'s self, token: Token<'s>) -> TokenData<'s> {
-        let lexeme = &self.source[self.token_start..self.current];
-        TokenData {
-            token, lexeme, lineno: self.lineno,
+    fn token_data(&self, token: Token) -> TokenOut {
+        TokenOut {
+            token,
+            location: self.current_span(),
+            lineno: self.lineno,
         }
     }
 }
 
+// Token Output
+
+// include only mere character indexes in the output
+// if a lexeme needs to be rendered, the relevant string can be extracted then
+pub struct Span {
+    pub index: usize,
+    pub length: usize,
+}
+
+// uses lifetime of the source text
+pub struct TokenOut {
+    pub token: Token,
+    pub location: Span,
+    pub lineno: u64,
+}
+
+// Lexer Errors
+
+pub struct LexerError {
+    pub message: String,
+    pub location: Span,
+    pub lineno: u64,
+}
