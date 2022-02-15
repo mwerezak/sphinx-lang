@@ -6,8 +6,7 @@ file_extensions:
 scope: source.relox
 
 variables:
-  identifier: \b[[:alpha:]_][[:alnum:]_]*\b # upper and lowercase
-  # path: '({{identifier}}[ ]*\.[ ]*)*{{identifier}}'
+  identifier: \b[a-zA-Z_][a-zA-Z0-9_]*\b # upper and lowercase
 
 contexts:
   prototype:
@@ -41,6 +40,7 @@ contexts:
     - include: tuples
     - include: parens
     - include: if-expressions
+    - include: object-initializer-list
 
     # tuple constructor
     - match: \,
@@ -94,7 +94,7 @@ contexts:
       scope: keyword.operator.comparison
     - match: \b(not|and|or)\b
       scope: keyword.operator.logical
-    - match: \:\=
+    - match: \=
       scope: keyword.operator.assignment
 
   strings:
@@ -227,7 +227,7 @@ contexts:
       scope: keyword.declaration.other
       push:
         - meta_content_scope: variable.other
-        - match: \:\=
+        - match: \=
           scope: keyword.operator.assignment
           pop: true
 
@@ -316,7 +316,7 @@ contexts:
       push:
         - meta_content_scope: variable.member
         - include: metamethod-names
-        - match: \:\=
+        - match: \=
           scope: keyword.operator.assignment
           pop: true
 
@@ -329,6 +329,23 @@ contexts:
         - match: \(
           scope: punctuation.section.group.begin
           set: function-param-list
+
+  object-initializer-list:
+    - match: \{
+      scope: punctuation.section.braces.begin
+      push:
+        - meta_scope: meta.braces
+        - match: \}
+          scope: punctuation.section.braces.end
+          pop: true
+        - match: '({{identifier}})\s*(\:)'
+          captures:
+            1: variable.member
+            2: punctuation.separator
+        - match: \,
+          scope: punctuation.separator
+        - include: expressions
+
 
   comments:
     # Comments begin with a '#' and finish at the end of the line.

@@ -27,7 +27,7 @@ nil;
 ("solo",)  # tuple with one element
 
 # Object
-Person { name = "Bob", age = 13 };
+Person { name: "Bob", age: 13 };
 
 
 # Arithmetic expressions
@@ -227,12 +227,12 @@ echo breakfast; # "Breakfast instance".
 
 # Instantiation and initialization
 
-var breakfast = Breakfast { meat = "sausage", bread = "sourdough" };
+var breakfast = Breakfast { meat: "sausage", bread: "sourdough" };
 breakfast.drink = "coffee";
 
 
 var a = 0;
-var anonymous = { some = (a = 1), data = 2 };
+var anonymous = { some: a = 1, data: 2 };
 
 class Breakfast
   fun serve(self, who)
@@ -246,7 +246,7 @@ end
 class Breakfast
   # constructor function
   fun new(meat, bread)
-    return Breakfast { meat = meat, bread = bread };
+    return Breakfast { meat: meat, bread: bread };
   end
 
 end
@@ -264,7 +264,7 @@ class Brunch: Breakfast
 end
 
 
-# Arrays? Not necessary once library support is implemented
+# Arrays? Not necessary once library support is implemented...
 var arr = [] { "one", "two", "three" };
 
 # Variadic arguments
