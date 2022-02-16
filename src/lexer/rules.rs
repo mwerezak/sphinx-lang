@@ -4,9 +4,8 @@ use crate::lexer::Token;
 
 // Lexer Rules
 
-// TODO rename to MatchResult
 #[derive(Clone, Copy, Debug)]
-pub enum LexerMatch {
+pub enum MatchResult {
     // has not consumed enough characters to produce a valid token, but could if given further correct input
     IncompleteMatch,
     
@@ -19,15 +18,15 @@ pub enum LexerMatch {
 }
 
 pub trait LexerRule {
-    fn current_state(&self) -> LexerMatch;
+    fn current_state(&self) -> MatchResult;
     
     fn reset(&mut self);
     
-    fn feed(&mut self, ch: char) -> LexerMatch;
+    fn feed(&mut self, ch: char) -> MatchResult;
     
     // like feed, but only modifies the LexerRule state if would match
     // return the match state if ch was passed to feed()
-    fn try_match(&mut self, ch: char) -> LexerMatch;
+    fn try_match(&mut self, ch: char) -> MatchResult;
     
     // produce Some(Token) if current state is CompleteMatch, otherwise None
     fn get_token(&self) -> Option<Token>;
@@ -38,7 +37,7 @@ pub trait LexerRule {
 #[derive(Debug)]
 pub struct SingleCharRule {
     target: char,
-    state: LexerMatch,
+    state: MatchResult,
     result: Token,
 }
 
@@ -46,43 +45,43 @@ impl SingleCharRule {
     pub fn new(result: Token, target: char) -> Self {
         SingleCharRule {
             target, result,
-            state: LexerMatch::IncompleteMatch,
+            state: MatchResult::IncompleteMatch,
         }
     }
     
-    fn match_char(&self, ch: char) -> LexerMatch {
-        if let LexerMatch::IncompleteMatch = self.state {
+    fn match_char(&self, ch: char) -> MatchResult {
+        if let MatchResult::IncompleteMatch = self.state {
             if ch == self.target {
-                return LexerMatch::CompleteMatch;
+                return MatchResult::CompleteMatch;
             }
         }
-        return LexerMatch::NoMatch;
+        return MatchResult::NoMatch;
     }
 }
 
 impl LexerRule for SingleCharRule {
-    fn current_state(&self) -> LexerMatch { self.state }
+    fn current_state(&self) -> MatchResult { self.state }
         
-    fn feed(&mut self, ch: char) -> LexerMatch {
+    fn feed(&mut self, ch: char) -> MatchResult {
         self.state = self.match_char(ch);
         return self.state;
     }
     
-    fn try_match(&mut self, ch: char) -> LexerMatch {
+    fn try_match(&mut self, ch: char) -> MatchResult {
         let match_result = self.match_char(ch);
-        if !matches!(match_result, LexerMatch::NoMatch) {
+        if !matches!(match_result, MatchResult::NoMatch) {
             self.state = match_result;
         }
         return match_result;
     }
     
     fn reset(&mut self) {
-        self.state = LexerMatch::IncompleteMatch;
+        self.state = MatchResult::IncompleteMatch;
     }
     
     fn get_token(&self) -> Option<Token> {
         match self.state {
-            LexerMatch::CompleteMatch => Some(self.result.clone()),
+            MatchResult::CompleteMatch => Some(self.result.clone()),
             _ => None,
         }
     }
@@ -94,7 +93,7 @@ impl LexerRule for SingleCharRule {
 pub struct ExactRule {
     target: &'static str,
     result: Token,
-    state: LexerMatch,
+    state: MatchResult,
     chars: Peekable<Chars<'static>>,
 }
 
@@ -104,42 +103,42 @@ impl ExactRule {
         
         ExactRule {
             target, result,
-            state: LexerMatch::IncompleteMatch,
+            state: MatchResult::IncompleteMatch,
             chars: target.chars().peekable(),
         }
     }
 }
 
 impl LexerRule for ExactRule {
-    fn current_state(&self) -> LexerMatch { self.state }
+    fn current_state(&self) -> MatchResult { self.state }
     
     fn reset(&mut self) {
-        self.state = LexerMatch::IncompleteMatch;
+        self.state = MatchResult::IncompleteMatch;
         self.chars = self.target.chars().peekable();
     }
     
-    fn feed(&mut self, ch: char) -> LexerMatch {
-        if let LexerMatch::NoMatch = self.state {
-            return LexerMatch::NoMatch;
+    fn feed(&mut self, ch: char) -> MatchResult {
+        if let MatchResult::NoMatch = self.state {
+            return MatchResult::NoMatch;
         }
         
         self.state = match self.chars.next() {
             Some(this_ch) if ch == this_ch => {
                 if let None = self.chars.peek() {
-                    LexerMatch::CompleteMatch
+                    MatchResult::CompleteMatch
                 } else {
-                    LexerMatch::IncompleteMatch
+                    MatchResult::IncompleteMatch
                 }
             },
-            _ => LexerMatch::NoMatch,
+            _ => MatchResult::NoMatch,
         };
         
         return self.state;
     }
     
-    fn try_match(&mut self, ch: char) -> LexerMatch {
-        if let LexerMatch::NoMatch = self.state {
-            return LexerMatch::NoMatch;
+    fn try_match(&mut self, ch: char) -> MatchResult {
+        if let MatchResult::NoMatch = self.state {
+            return MatchResult::NoMatch;
         }
         
         let match_result = match self.chars.peek() {
@@ -147,14 +146,14 @@ impl LexerRule for ExactRule {
                 
                 self.chars.next();
                 self.state = if let None = self.chars.peek() {
-                    LexerMatch::CompleteMatch
+                    MatchResult::CompleteMatch
                 } else {
-                    LexerMatch::IncompleteMatch
+                    MatchResult::IncompleteMatch
                 };
                 
                 self.state
             },
-            _ => LexerMatch::NoMatch,
+            _ => MatchResult::NoMatch,
         };
         
         return match_result;
@@ -163,7 +162,7 @@ impl LexerRule for ExactRule {
 
     fn get_token(&self) -> Option<Token> {
         match self.state {
-            LexerMatch::CompleteMatch => Some(self.result.clone()),
+            MatchResult::CompleteMatch => Some(self.result.clone()),
             _ => None,
         }
     }

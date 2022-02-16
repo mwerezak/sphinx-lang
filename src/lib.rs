@@ -2,3 +2,4 @@
 
 pub mod lexer;
 pub mod language;
+pub mod frontend;

@@ -1,5 +1,5 @@
 use std::iter::{Iterator, Peekable};
-use crate::lexer::{Token, LexerRule, LexerMatch};
+use crate::lexer::{Token, LexerRule, MatchResult};
 use crate::lexer::{LexerError, LexerErrorType};
 
 
@@ -153,14 +153,14 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             for rule_idx in active.drain(..) {
                 let rule = &mut self.rules[rule_idx];
                 match rule.try_match(next) {
-                    LexerMatch::CompleteMatch => {
+                    MatchResult::CompleteMatch => {
                         next_complete.push(rule_idx);
                         next_active.push(rule_idx);
                     },
-                    LexerMatch::IncompleteMatch => {
+                    MatchResult::IncompleteMatch => {
                         next_active.push(rule_idx);
                     },
-                    LexerMatch::NoMatch => { },
+                    MatchResult::NoMatch => { },
                 };
             }
             
@@ -229,7 +229,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     fn exhaust_rule(&mut self, token_start: usize, rule_idx: usize) -> Result<TokenOut, LexerError> {
         {
             let rule = &mut self.rules[rule_idx];
-            debug_assert!(!matches!(rule.current_state(), LexerMatch::NoMatch));
+            debug_assert!(!matches!(rule.current_state(), MatchResult::NoMatch));
         }
 
         loop {
@@ -242,14 +242,14 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 // println!("({}) next: {:?}", self.current, next);
                 let rule = &mut self.rules[rule_idx];
                 match rule.try_match(next) {
-                    LexerMatch::NoMatch => break,
+                    MatchResult::NoMatch => break,
                     _ => { self.advance(); },
                 }
             }
         }
         
         let rule = &mut self.rules[rule_idx];
-        if let LexerMatch::CompleteMatch = rule.current_state() {
+        if let MatchResult::CompleteMatch = rule.current_state() {
             let token = rule.get_token().unwrap();
             return Ok(self.token_data(token_start, token));
         }

@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::lexer::{LexerBuilder, LexerRule, LexerMatch, Token, TokenOut, Span};
+use crate::lexer::{LexerBuilder, LexerRule, MatchResult, Token, TokenOut, Span};
 use crate::lexer::errors::{LexerError, LexerErrorType};
 
 struct TestRule {
@@ -20,25 +20,25 @@ impl TestRule {
 }
 
 impl LexerRule for TestRule {
-    fn current_state(&self) -> LexerMatch {
+    fn current_state(&self) -> MatchResult {
         if self.buf == self.target {
-            LexerMatch::CompleteMatch
+            MatchResult::CompleteMatch
         } else if self.target.starts_with(&self.buf) {
-            LexerMatch::IncompleteMatch
+            MatchResult::IncompleteMatch
         } else {
-            LexerMatch::NoMatch
+            MatchResult::NoMatch
         }
     }
     
-    fn feed(&mut self, ch: char) -> LexerMatch {
+    fn feed(&mut self, ch: char) -> MatchResult {
         self.buf.push(ch);
         return self.current_state();
     }
     
-    fn try_match(&mut self, ch: char) -> LexerMatch {
+    fn try_match(&mut self, ch: char) -> MatchResult {
         self.buf.push(ch);
         let match_result = self.current_state();
-        if let LexerMatch::NoMatch = match_result {
+        if let MatchResult::NoMatch = match_result {
             self.buf.pop();
         }
         return match_result;
@@ -50,7 +50,7 @@ impl LexerRule for TestRule {
     
     fn get_token(&self) -> Option<Token> {
         match self.current_state() {
-            LexerMatch::NoMatch => None,
+            MatchResult::NoMatch => None,
             _ => Some(self.result.clone()),
         }
     }

@@ -35,8 +35,10 @@ pub enum Token {
     End,
     
     // Literals
+    Identifier(String),
     StringLiteral(String),
     IntegerLiteral(u32),
+    HexIntegerLiteral(u32),
     FloatLiteral(f32),
     
     // End of file
