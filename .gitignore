@@ -1,7 +1,8 @@
 /target
 Cargo.lock
 
-.lox
-.rlo
-.txt
+*.lox
+*.rlo
+*.txt
 *.sublime-workspace
+*.sublime-syntax
