@@ -51,12 +51,20 @@ pub struct Lexer<S> where S: Iterator<Item=char> {
 
 impl<S> Lexer<S> where S: Iterator<Item=char> {
     fn current_span(&self, start_idx: usize) -> Span {
-        Span { index: start_idx, length: self.current - start_idx - 1 }
+        if self.current > start_idx {
+            Span { index: start_idx, length: self.current - start_idx }
+        } else {
+            Span { index: start_idx, length: 0 }
+        }
     }
     
     fn advance(&mut self) -> Option<char> {
         self.current += 1;
-        return self.source.next();
+        let next = self.source.next();
+        if let Some('\n') = next {
+            self.lineno += 1;
+        }
+        return next;
     }
     
     fn peek(&mut self) -> Option<char> {
@@ -72,7 +80,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
         
         // check if we are already at EOF
-        let mut next = match self.peek() {
+        let mut next = match self.advance() {
             Some(ch) => ch,
             None => {
                 return Ok(self.token_data(token_start, Token::EOF));
@@ -126,7 +134,6 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 return Ok(self.token_data(token_start, token));
             }
             
-            
             if next_active.len() == 1 {
                 break;
             }
@@ -144,17 +151,17 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         // if we get here either there is only one rule left, or we hit EOF
         
         if next_active.len() == 1 {
-            let match_idx = complete[0];
+            let match_idx = next_active[0];
             return self.exhaust_rule(token_start, match_idx);
         }
         
-        return Err(self.error(token_start, "ambiguous symbol"));
+        return Err(self.error(token_start, "incomplete symbol"));
     }
     
     fn exhaust_rule(&mut self, token_start: usize, rule_idx: usize) -> Result<TokenOut, LexerError> {
         {
             let rule = &mut self.rules[rule_idx];
-            assert!(!matches!(rule.current_state(), LexerMatch::NoMatch));
+            debug_assert!(!matches!(rule.current_state(), LexerMatch::NoMatch));
         }
 
         loop {
@@ -165,13 +172,15 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             
             {
                 let rule = &mut self.rules[rule_idx];
-                match rule.try_match(next) {
-                    LexerMatch::IncompleteMatch => { },
-                    _ => break,
+                let match_result = rule.try_match(next);
+                
+                if !matches!(match_result, LexerMatch::NoMatch) {
+                    self.advance();
+                }
+                if !matches!(match_result, LexerMatch::IncompleteMatch) {
+                    break;
                 }
             }
-            
-            self.advance();
         }
         
         let rule = &mut self.rules[rule_idx];
@@ -200,12 +209,14 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
 
 // include only mere character indexes in the output
 // if a lexeme needs to be rendered, the relevant string can be extracted then
+#[derive(Debug)]
 pub struct Span {
     pub index: usize,
     pub length: usize,
 }
 
 // uses lifetime of the source text
+#[derive(Debug)]
 pub struct TokenOut {
     pub token: Token,
     pub location: Span,
@@ -214,6 +225,7 @@ pub struct TokenOut {
 
 // Lexer Errors
 
+#[derive(Debug)]
 pub struct LexerError {
     pub message: String,
     pub location: Span,

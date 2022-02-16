@@ -1,5 +1,6 @@
 // Token Types
 
+#[derive(Clone, Debug)]
 pub enum Token {
     Delim(Delimiter),
     OpSym(OpSymbol),
@@ -12,6 +13,7 @@ pub enum Token {
     EOF,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum Delimiter {
     OpenParen,
     CloseParen,
@@ -24,6 +26,7 @@ pub enum Delimiter {
     Semicolon,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum OpSymbol {
     Add, Sub, Mul, Div, Mod,
     BitAnd, BitOr, BitXor, LShift, RShift,
@@ -32,6 +35,7 @@ pub enum OpSymbol {
     Assign, Access,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum Keyword {
     Var, Begin, 
     If, Then, Elif, Else,

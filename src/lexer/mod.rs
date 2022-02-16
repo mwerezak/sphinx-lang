@@ -6,3 +6,5 @@ pub use rules::*;
 
 mod lexer;
 pub use lexer::*;
+
+mod tests;
