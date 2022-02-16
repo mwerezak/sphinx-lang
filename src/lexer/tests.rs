@@ -56,7 +56,7 @@ impl LexerRule for TestRule {
 }
 
 #[test]
-fn test_lexer_matches_simple_token() {
+fn test_lexer_matches_tokens() {
     let source = "foobar";
     
     let rules = vec![
@@ -82,6 +82,36 @@ fn test_lexer_matches_simple_token() {
     assert!(matches!(out, TokenOut {
         token: Token::IntegerLiteral(2),
         location: Span { index: 3, length: 3 },
+        ..
+    }), "{:?}", out);
+}
+
+#[test]
+fn test_lexer_skips_whitespace() {
+    let source = "  foo   bar";
+    
+    let rules = vec![
+        TestRule::new("foo", Token::IntegerLiteral(1)),
+        TestRule::new("bar", Token::IntegerLiteral(2)),
+    ];
+    
+    let mut builder = LexerBuilder::new();
+    for rule in rules.into_iter() {
+        builder.add_rule(rule);
+    }
+    let mut lexer = builder.build(source.chars());
+    
+    let out = lexer.next_token().unwrap();
+    assert!(matches!(out, TokenOut {
+        token: Token::IntegerLiteral(1),
+        location: Span { index: 2, length: 3 },
+        ..
+    }), "{:?}", out);
+    
+    let out = lexer.next_token().unwrap();
+    assert!(matches!(out, TokenOut {
+        token: Token::IntegerLiteral(2),
+        location: Span { index: 8, length: 3 },
         ..
     }), "{:?}", out);
 }
