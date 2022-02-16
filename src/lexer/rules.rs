@@ -51,11 +51,12 @@ impl SingleCharRule {
     }
     
     fn match_char(&self, ch: char) -> LexerMatch {
-        if ch == self.target {
-            LexerMatch::CompleteMatch
-        } else {
-            LexerMatch::NoMatch
+        if let LexerMatch::IncompleteMatch = self.state {
+            if ch == self.target {
+                return LexerMatch::CompleteMatch;
+            }
         }
+        return LexerMatch::NoMatch;
     }
 }
 
@@ -64,7 +65,7 @@ impl LexerRule for SingleCharRule {
         
     fn feed(&mut self, ch: char) -> LexerMatch {
         self.state = self.match_char(ch);
-        self.state
+        return self.state;
     }
     
     fn try_match(&mut self, ch: char) -> LexerMatch {
