@@ -130,7 +130,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
         
         // check if we are already at EOF
-        let mut next = match self.advance() {
+        let mut next = match self.peek() {
             Some(ch) => ch,
             None => {
                 return Ok(self.token_data(token_start, self.current, Token::EOF));
@@ -181,23 +181,28 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 // look at rules that matched the previous char
                 
                 if complete.is_empty() {
-                    return Err(self.error(token_start, self.current-1, "could not parse symbol"));
+                    return Err(self.error(token_start, self.current, "could not parse symbol"));
                 }
                 if complete.len() > 1 {
-                    return Err(self.error(token_start, self.current-1, "ambiguous symbol"));
+                    return Err(self.error(token_start, self.current, "ambiguous symbol"));
                 }
                 
                 let match_idx = complete[0];
                 let matching_rule = &mut self.rules[match_idx];
                 let token = matching_rule.get_token().unwrap();
-                return Ok(self.token_data(token_start, self.current-1, token));
+                return Ok(self.token_data(token_start, self.current, token));
+            
+            } else {
+                
+                // otherwise commit to looking at the current char
+                self.advance();
             }
             
             if next_active.len() == 1 {
                 break;
             }
             
-            next = match self.advance() {
+            next = match self.peek() {
                 Some(ch) => ch,
                 None => break,
             };
@@ -218,6 +223,12 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             let match_idx = next_active[0];
             return self.exhaust_rule(token_start, match_idx);
         }
+        if next_complete.len() == 1 {
+            let match_idx = next_complete[0];
+            let matching_rule = &mut self.rules[match_idx];
+            let token = matching_rule.get_token().unwrap();
+            return Ok(self.token_data(token_start, self.current, token));
+        }
         
         return Err(self.error(token_start, self.current, "unexpected EOF while parsing symbol"));
     }
@@ -235,6 +246,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             };
             
             {
+                // println!("({}) next: {:?}", self.current, next);
                 let rule = &mut self.rules[rule_idx];
                 match rule.try_match(next) {
                     LexerMatch::NoMatch => break,

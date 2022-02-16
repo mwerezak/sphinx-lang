@@ -60,21 +60,21 @@ fn lexer_matches_tokens() {
     let source = "foobar";
     
     let mut lexer = LexerBuilder::new()
-        .add_rule(TestRule::new("foo", Token::IntegerLiteral(1)))
-        .add_rule(TestRule::new("bar", Token::IntegerLiteral(2)))
-        .add_rule(TestRule::new("baz", Token::IntegerLiteral(3)))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(0), "foo"))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "bar"))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "baz"))
         .build(source.chars());
     
     let out = lexer.next_token().unwrap();
     assert!(matches!(out, TokenOut {
-        token: Token::IntegerLiteral(1),
+        token: Token::IntegerLiteral(0),
         location: Span { index: 0, length: 3 },
         lineno: 1,
     }), "unexpected output: {:?}", out);
     
     let out = lexer.next_token().unwrap();
     assert!(matches!(out, TokenOut {
-        token: Token::IntegerLiteral(2),
+        token: Token::IntegerLiteral(1),
         location: Span { index: 3, length: 3 },
         lineno: 1,
     }), "unexpected output: {:?}", out);
@@ -217,6 +217,49 @@ fn rule_substrings_match_correctly() {
     assert!(matches!(out, TokenOut {
         token: Token::EOF,
         location: Span { index: 8, length: 0 },
+        lineno: 1,
+    }), "unexpected output: {:?}", out);
+}
+
+#[test]
+fn rule_substrings_match_correctly2() {
+    let source = "a aab";
+    
+    let mut lexer = LexerBuilder::new()
+        .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), 'a'))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "ab"))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "abc"))
+        .build(source.chars());
+    
+    let out = lexer.next_token().unwrap();
+    println!("out: {:?}", out);
+    assert!(matches!(out, TokenOut {
+        token: Token::IntegerLiteral(0),
+        location: Span { index: 0, length: 1 },
+        lineno: 1,
+    }), "unexpected output: {:?}", out);
+    
+    let out = lexer.next_token().unwrap();
+    println!("out: {:?}", out);
+    assert!(matches!(out, TokenOut {
+        token: Token::IntegerLiteral(0),
+        location: Span { index: 2, length: 1 },
+        lineno: 1,
+    }), "unexpected output: {:?}", out);
+    
+    let out = lexer.next_token().unwrap();
+    println!("out: {:?}", out);
+    assert!(matches!(out, TokenOut {
+        token: Token::IntegerLiteral(1),
+        location: Span { index: 3, length: 2 },
+        lineno: 1,
+    }), "unexpected output: {:?}", out);
+    
+    let out = lexer.next_token().unwrap();
+    println!("out: {:?}", out);
+    assert!(matches!(out, TokenOut {
+        token: Token::EOF,
+        location: Span { index: 5, length: 0 },
         lineno: 1,
     }), "unexpected output: {:?}", out);
 }
