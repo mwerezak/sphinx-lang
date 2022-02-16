@@ -2,19 +2,7 @@
 
 #[derive(Clone, Debug)]
 pub enum Token {
-    Delim(Delimiter),
-    OpSym(OpSymbol),
-    Keyword(Keyword),
-    
-    StringLiteral(String),
-    IntegerLiteral(u32),
-    FloatLiteral(f32),
-    
-    EOF,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum Delimiter {
+    // Delimiters and Separators
     OpenParen,
     CloseParen,
     OpenBrace,
@@ -24,19 +12,19 @@ pub enum Delimiter {
     Comma,
     Colon,
     Semicolon,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum OpSymbol {
-    Add, Sub, Mul, Div, Mod,
-    BitAnd, BitOr, BitXor, LShift, RShift,
-    LT, LE, GT, GE, EQ, NE,
+    
+    // Operator Symbols
+    OpAdd, OpSub, OpMul, OpDiv, OpMod,
+    OpAnd, OpOr, OpXor, OpLShift, OpRShift,
+    
+    OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
+    OpAndAssign, OpOrAssign, OpXorAssign, OpLShiftAssign, OpRShiftAssign,
+    
+    OpLT, OpLE, OpGT, OpGE, OpEQ, OpNE,
+    OpAssign, OpAccess,
+    
+    // Keywords
     And, Or, Not,
-    Assign, Access,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum Keyword {
     Var, Begin, 
     If, Then, Elif, Else,
     For, While, Do,
@@ -44,4 +32,12 @@ pub enum Keyword {
     Self_, Super, True, False, Nil,
     Echo,
     End,
+    
+    // Literals
+    StringLiteral(String),
+    IntegerLiteral(u32),
+    FloatLiteral(f32),
+    
+    // End of file
+    EOF,
 }

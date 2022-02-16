@@ -4,6 +4,35 @@ use crate::lexer::{Token, LexerRule, LexerMatch};
 
 type RuleObj = Box<dyn LexerRule>;
 
+
+// Token Output
+
+// include only mere character indexes in the output
+// if a lexeme needs to be rendered, the relevant string can be extracted then
+#[derive(Debug)]
+pub struct Span {
+    pub index: usize,
+    pub length: usize,
+}
+
+// uses lifetime of the source text
+#[derive(Debug)]
+pub struct TokenOut {
+    pub token: Token,
+    pub location: Span,
+    pub lineno: u64,
+}
+
+// Lexer Errors
+
+#[derive(Debug)]
+pub struct LexerError {
+    pub message: String,
+    pub location: Span,
+    pub lineno: u64,
+}
+
+
 // Lexer Builder
 
 pub struct LexerBuilder {
@@ -39,6 +68,8 @@ impl LexerBuilder {
 }
 
 // Lexer
+
+// TODO operate on bytes, not char?
 
 pub struct Lexer<S> where S: Iterator<Item=char> {
     source: Peekable<S>,
@@ -76,11 +107,20 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     
     fn skip_whitespace(&mut self) {
         loop {
-            let next = self.peek();
-            match next {
+            match self.peek() {
                 None => break,
                 Some(ch) if !ch.is_whitespace() => break,
                 _ => { self.advance(); },
+            }
+        }
+    }
+    
+    fn skip_until_next_line(&mut self) {
+        loop {
+            match self.advance() {
+                None => break,
+                Some('\n') => break,
+                _ => { }
             }
         }
     }
@@ -220,29 +260,3 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
 }
 
-// Token Output
-
-// include only mere character indexes in the output
-// if a lexeme needs to be rendered, the relevant string can be extracted then
-#[derive(Debug)]
-pub struct Span {
-    pub index: usize,
-    pub length: usize,
-}
-
-// uses lifetime of the source text
-#[derive(Debug)]
-pub struct TokenOut {
-    pub token: Token,
-    pub location: Span,
-    pub lineno: u64,
-}
-
-// Lexer Errors
-
-#[derive(Debug)]
-pub struct LexerError {
-    pub message: String,
-    pub location: Span,
-    pub lineno: u64,
-}

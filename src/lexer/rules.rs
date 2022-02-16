@@ -33,7 +33,7 @@ pub struct SingleCharRule {
 }
 
 impl SingleCharRule {
-    pub fn new(target: char, result: Token) -> Self {
+    pub fn new(result: Token, target: char) -> Self {
         SingleCharRule {
             target, result,
             state: LexerMatch::IncompleteMatch,
@@ -79,7 +79,7 @@ impl LexerRule for SingleCharRule {
 
 // Keyword Rules
 
-struct ExactRule {
+pub struct ExactRule {
     target: &'static str,
     result: Token,
     state: LexerMatch,
@@ -87,7 +87,7 @@ struct ExactRule {
 }
 
 impl ExactRule {
-    fn new(target: &'static str, result: Token) -> Self {
+    pub fn new(result: Token, target: &'static str) -> Self {
         debug_assert!(!target.is_empty());
         
         ExactRule {
