@@ -160,7 +160,6 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         let mut next_active = Vec::<usize>::new();
         
         loop {
-            
             for rule_idx in active.drain(..) {
                 let rule = &mut self.rules[rule_idx];
                 match rule.feed(next) {
@@ -198,9 +197,9 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 None => break,
             };
             
-            let (tmp_active, tmp_next_active) = (next_active, active);
-            active = tmp_active;
-            next_active = tmp_next_active;
+            let (swap_active, swap_next_active) = (next_active, active);
+            active = swap_active;
+            next_active = swap_next_active;
         }
         
         // if we get here either there is only one rule left, or we hit EOF

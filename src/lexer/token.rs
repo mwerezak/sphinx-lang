@@ -25,11 +25,12 @@ pub enum Token {
     
     // Keywords
     And, Or, Not,
+    True, False, Nil,
     Var, Begin, 
     If, Then, Elif, Else,
     For, While, Do,
     Fun, Class,
-    Self_, Super, True, False, Nil,
+    Self_, Super,
     Echo,
     End,
     

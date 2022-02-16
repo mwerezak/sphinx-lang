@@ -4,7 +4,7 @@ use crate::lexer::Token;
 
 // Lexer Rules
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum LexerMatch {
     IncompleteMatch,
     CompleteMatch,
@@ -26,6 +26,7 @@ pub trait LexerRule {
 
 // Single Character Rules
 
+#[derive(Debug)]
 pub struct SingleCharRule {
     target: char,
     state: LexerMatch,
@@ -79,6 +80,7 @@ impl LexerRule for SingleCharRule {
 
 // Keyword Rules
 
+#[derive(Debug)]
 pub struct ExactRule {
     target: &'static str,
     result: Token,
