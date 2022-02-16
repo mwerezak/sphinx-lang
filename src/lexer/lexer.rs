@@ -3,9 +3,6 @@ use crate::lexer::{Token, LexerRule, MatchResult};
 use crate::lexer::{LexerError, LexerErrorType};
 
 
-type RuleObj = Box<dyn LexerRule>;
-
-
 // Token Output
 
 // include only mere character indexes in the output
@@ -27,7 +24,7 @@ pub struct TokenOut {
 // Lexer Builder
 
 pub struct LexerBuilder {
-    rules: Vec<RuleObj>,
+    rules: Vec<Box<dyn LexerRule>>,
 }
 
 impl LexerBuilder {
@@ -41,6 +38,15 @@ impl LexerBuilder {
         where R: LexerRule + 'static 
     {
         self.rules.push(Box::new(rule));
+        return self;
+    }
+    
+    pub fn add_rules<I, R>(mut self, rules: I) -> Self
+        where I: Iterator<Item=R>, R: LexerRule + 'static
+    {
+        for rule in rules {
+            self.rules.push(Box::new(rule));
+        }
         return self;
     }
     
@@ -63,7 +69,7 @@ impl LexerBuilder {
 
 pub struct Lexer<S> where S: Iterator<Item=char> {
     source: Peekable<S>,
-    rules: Vec<RuleObj>,
+    rules: Vec<Box<dyn LexerRule>>,
     
     current: usize, // one ahead of current char
     lineno: u64,

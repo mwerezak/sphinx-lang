@@ -1,5 +1,4 @@
-use crate::lexer::LexerBuilder;
-use crate::lexer::Token;
+use crate::lexer::{LexerBuilder, Token};
 use crate::lexer::{SingleCharRule, ExactRule};
 
 

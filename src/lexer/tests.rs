@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::lexer::{LexerBuilder, LexerRule, MatchResult, Token, TokenOut, Span};
+use crate::lexer::{LexerBuilder, Token, TokenOut, Span};
 use crate::lexer::errors::{LexerError, LexerErrorType};
 
 
