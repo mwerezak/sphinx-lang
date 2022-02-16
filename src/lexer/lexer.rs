@@ -1,5 +1,6 @@
 use std::iter::{Iterator, Peekable};
 use crate::lexer::{Token, LexerRule, LexerMatch};
+use crate::lexer::{LexerError, LexerErrorType};
 
 
 type RuleObj = Box<dyn LexerRule>;
@@ -22,17 +23,6 @@ pub struct TokenOut {
     pub location: Span,
     pub lineno: u64,
 }
-
-// Lexer Errors
-
-// TODO error type enum
-#[derive(Debug)]
-pub struct LexerError {
-    pub message: String,
-    pub location: Span,
-    pub lineno: u64,
-}
-
 
 // Lexer Builder
 
@@ -181,10 +171,15 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 // look at rules that matched the previous char
                 
                 if complete.is_empty() {
-                    return Err(self.error(token_start, "could not parse symbol"));
+                    self.advance(); // commit to accepting this char as bad
+                    return Err(self.error(token_start, LexerErrorType::NoMatchingRule));
                 }
+                
+                // falling back to the rules which matched completely on the previous char
+                // do not advance the lexer as we will revisit the current char on the next pass
+                
                 if complete.len() > 1 {
-                    return Err(self.error(token_start, "ambiguous symbol"));
+                    return Err(self.error(token_start, LexerErrorType::AmbiguousMatch));
                 }
                 
                 let match_idx = complete[0];
@@ -192,11 +187,9 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 let token = matching_rule.get_token().unwrap();
                 return Ok(self.token_data(token_start, token));
             
-            } else {
-                
-                // otherwise commit to looking at the current char
-                self.advance();
             }
+            
+            self.advance();  // commit to accepting this char as good
             
             if next_active.len() == 1 {
                 break;
@@ -230,7 +223,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             return Ok(self.token_data(token_start, token));
         }
         
-        return Err(self.error(token_start, "unexpected EOF while parsing symbol"));
+        return Err(self.error(token_start, LexerErrorType::UnexpectedEOF));
     }
     
     fn exhaust_rule(&mut self, token_start: usize, rule_idx: usize) -> Result<TokenOut, LexerError> {
@@ -261,7 +254,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             return Ok(self.token_data(token_start, token));
         }
         
-        return Err(self.error(token_start, "unexpected EOF while parsing symbol"));
+        return Err(self.error(token_start, LexerErrorType::UnexpectedEOF));
     }
     
     fn current_span(&self, start_idx: usize) -> Span {
@@ -280,12 +273,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
     }
     
-    fn error(&self, token_start: usize, message: &str) -> LexerError {
-        LexerError {
-            message: String::from(message),
-            location: self.current_span(token_start),
-            lineno: self.lineno,
-        }
+    fn error(&self, token_start: usize, etype: LexerErrorType) -> LexerError {
+        LexerError::new(etype, self.current_span(token_start), self.lineno)
     }
 }
 
