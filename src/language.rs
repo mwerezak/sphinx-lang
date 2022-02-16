@@ -4,9 +4,7 @@ use crate::lexer::{SingleCharRule, ExactRule};
 
 
 pub fn create_default_lexer_rules() -> LexerBuilder {
-    let mut builder = LexerBuilder::new();
-    
-    builder
+    LexerBuilder::new()
     .add_rule(SingleCharRule::new(Token::OpenParen,   '('))
     .add_rule(SingleCharRule::new(Token::CloseParen,  ')'))
     .add_rule(SingleCharRule::new(Token::OpenBrace,   '{'))
@@ -71,8 +69,4 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(ExactRule::new(Token::Super,            "super"))
     .add_rule(ExactRule::new(Token::Echo,             "echo"))
     .add_rule(ExactRule::new(Token::End,              "end"))
-    
-    ;
-    
-    return builder;
 }

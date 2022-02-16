@@ -46,10 +46,9 @@ impl LexerBuilder {
         }
     }
     
-    pub fn add_rule<R>(&mut self, rule: R) -> &mut Self
+    pub fn add_rule<R>(mut self, rule: R) -> Self
         where R: LexerRule + 'static 
     {
-        
         self.rules.push(Box::new(rule));
         return self;
     }
