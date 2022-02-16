@@ -59,6 +59,9 @@ impl LexerBuilder {
             
             current: 0,
             lineno: 1,
+            
+            active:   [Vec::new(), Vec::new()],
+            complete: [Vec::new(), Vec::new()],
         }
     }
 }
@@ -73,8 +76,12 @@ pub struct Lexer<S> where S: Iterator<Item=char> {
     
     current: usize, // one ahead of current char
     lineno: u64,
+    
+    // internal state used by next_token(). 
+    // putting these here instead to avoid unnecessary allocations
+    active:   [Vec<usize>; 2],
+    complete: [Vec<usize>; 2],
 }
-
 
 impl<S> Lexer<S> where S: Iterator<Item=char> {
     
@@ -97,41 +104,38 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
     
     fn skip_whitespace(&mut self) {
-        loop {
-            match self.peek() {
-                None => break,
-                Some(ch) if !ch.is_whitespace() => break,
-                _ => { self.advance(); },
-            }
+        let mut next = self.peek();
+        while next.is_some() && next.unwrap().is_whitespace() {
+            self.advance();
+            next = self.peek();
         }
     }
     
     fn skip_until_next_line(&mut self) {
-        loop {
-            match self.advance() {
-                None => break,
-                Some('\n') => break,
-                _ => { }
-            }
+        let mut next = self.advance();
+        while next.is_some() && next.unwrap() != '\n' {
+            next = self.advance();
         }
     }
     
-    pub fn next_token(&mut self) -> Result<TokenOut, LexerError> {
-        self.skip_whitespace();
-        
-        //starting a new token
-        let token_start = self.current;
+    fn reset_rules(&mut self) {
         for rule in self.rules.iter_mut() {
             rule.reset();
         }
         
-        // check if we are already at EOF
-        let mut next = match self.peek() {
-            Some(ch) => ch,
-            None => {
-                return Ok(self.token_data(token_start, Token::EOF));
-            },
-        };
+        for idx in 0..2 {
+            self.active[idx].clear();
+            self.complete[idx].clear();
+        }
+    }
+    
+    pub fn next_token(&mut self) -> Result<TokenOut, LexerError> {
+        
+        self.skip_whitespace();
+        
+        //starting a new token
+        let token_start = self.current;
+        self.reset_rules();
         
         // grab the next char, and feed it to all the rules
         // any rules that no longer match are discarded
@@ -146,82 +150,90 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         //    any rules that match completely are moved to a separate Vec for the next iteration
         //    advance current to the next char
         
-        let mut active: Vec<usize> = (0..self.rules.len()).collect();
-        let mut next_active = Vec::<usize>::new();
+        // check if we are already at EOF
+        let mut next = match self.peek() {
+            Some(ch) => ch,
+            None => {
+                return Ok(self.token_data(token_start, Token::EOF));
+            },
+        };
         
-        let mut complete = Vec::<usize>::new();
-        let mut next_complete = Vec::<usize>::new();
+        self.active[0].extend(0..self.rules.len());
         
         loop {
-            // println!("({}) next: {:?}", self.current, next);
-            // println!("({}) active: {:?}", self.current, active);
             
-            for rule_idx in active.drain(..) {
-                let rule = &mut self.rules[rule_idx];
-                match rule.try_match(next) {
-                    MatchResult::CompleteMatch => {
-                        next_complete.push(rule_idx);
+            // need to split the body of this loop into two blocks in order to keep the borrow checker happy...
+            
+            {
+                let (active, next_active) = split_array_pair_mut(&mut self.active);
+                let (complete, next_complete) = split_array_pair_mut(&mut self.complete);
+                
+                // println!("({}) next: {:?}", self.current, next);
+                // println!("({}) active: {:?}", self.current, active);
+                
+                next_active.clear();
+                next_complete.clear();
+                
+                for &rule_idx in active.iter() {
+                    let rule = &mut self.rules[rule_idx];
+                    let match_result = rule.try_match(next);
+                    
+                    if match_result.is_match() {
                         next_active.push(rule_idx);
-                    },
-                    MatchResult::IncompleteMatch => {
-                        next_active.push(rule_idx);
-                    },
-                    MatchResult::NoMatch => { },
-                };
+                        
+                        if match_result.is_complete_match() {
+                            next_complete.push(rule_idx);
+                        }
+                    }
+                }
+                
+                
+                // println!("({}) next_active: {:?}", self.current, next_active);
+                // println!("({}) complete: {:?}", self.current, complete);
+                
+                if next_active.is_empty() && !complete.is_empty() {
+                    // look at rules that matched the previous char
+                    // falling back to the rules which matched completely on the previous char
+                    // do not advance the lexer as we will revisit the current char on the next pass
+                    
+                    if complete.len() > 1 {
+                        return Err(self.error(token_start, LexerErrorType::AmbiguousMatch));
+                    }
+                    
+                    let match_idx = complete[0];
+                    let matching_rule = &mut self.rules[match_idx];
+                    let token = matching_rule.get_token().unwrap();
+                    return Ok(self.token_data(token_start, token));
+                
+                }
             }
             
-            // println!("({}) next_active: {:?}", self.current, next_active);
-            // println!("({}) complete: {:?}", self.current, complete);
+            // commit to accepting this char (and therefore consuming it)
+            self.advance();
             
-            if next_active.is_empty() {
-                // look at rules that matched the previous char
+            {
+                let next_active = &self.active[1];
                 
-                if complete.is_empty() {
-                    self.advance(); // commit to accepting this char as bad
+                if next_active.is_empty() {
                     return Err(self.error(token_start, LexerErrorType::NoMatchingRule));
+                } 
+                if next_active.len() == 1 {
+                    let match_idx = next_active[0];
+                    return self.exhaust_rule(token_start, match_idx);
                 }
                 
-                // falling back to the rules which matched completely on the previous char
-                // do not advance the lexer as we will revisit the current char on the next pass
+                next = match self.peek() {
+                    Some(ch) => ch,
+                    None => break,
+                };
                 
-                if complete.len() > 1 {
-                    return Err(self.error(token_start, LexerErrorType::AmbiguousMatch));
-                }
-                
-                let match_idx = complete[0];
-                let matching_rule = &mut self.rules[match_idx];
-                let token = matching_rule.get_token().unwrap();
-                return Ok(self.token_data(token_start, token));
-            
+                // swap cycles
+                self.active.swap(0, 1);
+                self.complete.swap(0, 1);
             }
-            
-            self.advance();  // commit to accepting this char as good
-            
-            if next_active.len() == 1 {
-                break;
-            }
-            
-            next = match self.peek() {
-                Some(ch) => ch,
-                None => break,
-            };
-            
-            let (swap_active, swap_next_active) = (next_active, active);
-            active = swap_active;
-            next_active = swap_next_active;
-            
-            let (swap_complete, swap_next_complete) = (next_complete, complete);
-            complete = swap_complete;
-            next_complete = swap_next_complete;
-            next_complete.clear();
         }
         
-        // if we get here either there is only one rule left, or we hit EOF
-        
-        if next_active.len() == 1 {
-            let match_idx = next_active[0];
-            return self.exhaust_rule(token_start, match_idx);
-        }
+        let next_complete = &self.complete[1];
         if next_complete.len() == 1 {
             let match_idx = next_complete[0];
             let matching_rule = &mut self.rules[match_idx];
@@ -284,3 +296,11 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
 }
 
+
+// Helpers
+
+fn split_array_pair_mut<T>(pair: &mut [T; 2]) -> (&mut T, &mut T) {
+    let (first, rest) = pair.split_first_mut().unwrap();
+    let second = &mut rest[0];
+    (first, second)
+}

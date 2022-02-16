@@ -3,7 +3,7 @@ use std::iter::Peekable;
 use crate::lexer::Token;
 
 
-// Lexer Rules
+// Match Result
 
 #[derive(Clone, Copy, Debug)]
 pub enum MatchResult {
@@ -17,6 +17,25 @@ pub enum MatchResult {
     // not a match for the characters that have been given, should remain in this state until reset
     NoMatch,
 }
+
+impl MatchResult {
+    pub fn is_match(&self) -> bool {
+        match self {
+            MatchResult::IncompleteMatch | MatchResult::CompleteMatch => true,
+            MatchResult::NoMatch => false,
+        }
+    }
+    
+    pub fn is_complete_match(&self) -> bool {
+        if let MatchResult::CompleteMatch = self { true } else { false }
+    }
+    
+    pub fn is_incomplete_match(&self) -> bool {
+        if let MatchResult::IncompleteMatch = self { true } else { false }
+    }
+}
+
+// Lexer Rules
 
 pub trait LexerRule {
     fn current_state(&self) -> MatchResult;

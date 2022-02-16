@@ -41,6 +41,7 @@ pub enum Token {
     HexIntegerLiteral(u32),
     FloatLiteral(f32),
     
-    // End of file
+    // Misc
+    Comment,
     EOF,
 }
