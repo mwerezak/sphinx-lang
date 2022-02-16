@@ -1,4 +1,4 @@
-# Your first Lox program!
+# Your first ReLox program!
 echo "Hello, world!";
 
 # Booleans
