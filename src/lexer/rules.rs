@@ -4,10 +4,17 @@ use crate::lexer::Token;
 
 // Lexer Rules
 
+// TODO rename to MatchResult
 #[derive(Clone, Copy, Debug)]
 pub enum LexerMatch {
+    // has not consumed enough characters to produce a valid token, but could if given further correct input
     IncompleteMatch,
+    
+    // has consumed enough characters to produce a valid token, may still yet accept further correct input
+    // should either remain in this state, or drop to the NoMatch state if incorrect input given
     CompleteMatch,
+    
+    // not a match for the characters that have been given, should remain in this state until reset
     NoMatch,
 }
 

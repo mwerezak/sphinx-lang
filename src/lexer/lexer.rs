@@ -25,6 +25,7 @@ pub struct TokenOut {
 
 // Lexer Errors
 
+// TODO error type enum
 #[derive(Debug)]
 pub struct LexerError {
     pub message: String,
@@ -80,19 +81,14 @@ pub struct Lexer<S> where S: Iterator<Item=char> {
 
 
 impl<S> Lexer<S> where S: Iterator<Item=char> {
-    fn current_span(&self, start_idx: usize) -> Span {
-        if self.current > start_idx {
-            Span { index: start_idx, length: self.current - start_idx }
-        } else {
-            Span { index: start_idx, length: 0 }
-        }
-    }
     
     fn advance(&mut self) -> Option<char> {
-        self.current += 1;
         let next = self.source.next();
-        if let Some('\n') = next {
-            self.lineno += 1;
+        if let Some(ch) = next {
+            self.current += 1;
+            if ch == '\n' {
+                self.lineno += 1;
+            }
         }
         return next;
     }
@@ -137,7 +133,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         let mut next = match self.advance() {
             Some(ch) => ch,
             None => {
-                return Ok(self.token_data(token_start, Token::EOF));
+                return Ok(self.token_data(token_start, self.current, Token::EOF));
             },
         };
         
@@ -154,16 +150,21 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         //    any rules that match completely are moved to a separate Vec for the next iteration
         //    advance current to the next char
         
-        let mut complete = Vec::<usize>::new();
         let mut active: Vec<usize> = (0..self.rules.len()).collect();
         let mut next_active = Vec::<usize>::new();
         
+        let mut complete = Vec::<usize>::new();
+        let mut next_complete = Vec::<usize>::new();
+        
         loop {
+            // println!("({}) next: {:?}", self.current, next);
+            // println!("({}) active: {:?}", self.current, active);
+            
             for rule_idx in active.drain(..) {
                 let rule = &mut self.rules[rule_idx];
-                match rule.feed(next) {
+                match rule.try_match(next) {
                     LexerMatch::CompleteMatch => {
-                        complete.push(rule_idx);
+                        next_complete.push(rule_idx);
                         next_active.push(rule_idx);
                     },
                     LexerMatch::IncompleteMatch => {
@@ -173,18 +174,23 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 };
             }
             
+            // println!("({}) next_active: {:?}", self.current, next_active);
+            // println!("({}) complete: {:?}", self.current, complete);
+            
             if next_active.is_empty() {
+                // look at rules that matched the previous char
+                
                 if complete.is_empty() {
-                    return Err(self.error(token_start, "could not parse symbol"));
+                    return Err(self.error(token_start, self.current-1, "could not parse symbol"));
                 }
                 if complete.len() > 1 {
-                    return Err(self.error(token_start, "ambiguous symbol"));
+                    return Err(self.error(token_start, self.current-1, "ambiguous symbol"));
                 }
                 
                 let match_idx = complete[0];
                 let matching_rule = &mut self.rules[match_idx];
                 let token = matching_rule.get_token().unwrap();
-                return Ok(self.token_data(token_start, token));
+                return Ok(self.token_data(token_start, self.current-1, token));
             }
             
             if next_active.len() == 1 {
@@ -199,6 +205,11 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             let (swap_active, swap_next_active) = (next_active, active);
             active = swap_active;
             next_active = swap_next_active;
+            
+            let (swap_complete, swap_next_complete) = (next_complete, complete);
+            complete = swap_complete;
+            next_complete = swap_next_complete;
+            next_complete.clear();
         }
         
         // if we get here either there is only one rule left, or we hit EOF
@@ -208,7 +219,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             return self.exhaust_rule(token_start, match_idx);
         }
         
-        return Err(self.error(token_start, "unexpected EOF while parsing symbol"));
+        return Err(self.error(token_start, self.current, "unexpected EOF while parsing symbol"));
     }
     
     fn exhaust_rule(&mut self, token_start: usize, rule_idx: usize) -> Result<TokenOut, LexerError> {
@@ -225,34 +236,42 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             
             {
                 let rule = &mut self.rules[rule_idx];
-                let match_result = rule.try_match(next);
-                
-                if !matches!(match_result, LexerMatch::NoMatch) {
-                    self.advance();
-                }
-                if !matches!(match_result, LexerMatch::IncompleteMatch) {
-                    break;
+                match rule.try_match(next) {
+                    LexerMatch::NoMatch => break,
+                    _ => { self.advance(); },
                 }
             }
         }
         
         let rule = &mut self.rules[rule_idx];
-        let token = rule.get_token().unwrap();
-        return Ok(self.token_data(token_start, token));
+        if let LexerMatch::CompleteMatch = rule.current_state() {
+            let token = rule.get_token().unwrap();
+            return Ok(self.token_data(token_start, self.current, token));
+        }
+        
+        return Err(self.error(token_start, self.current, "unexpected EOF while parsing symbol"));
     }
     
-    fn token_data(&self, token_start: usize, token: Token) -> TokenOut {
+    fn current_span(&self, start_idx: usize, cur_idx: usize) -> Span {
+        if cur_idx > start_idx {
+            Span { index: start_idx, length: cur_idx - start_idx }
+        } else {
+            Span { index: start_idx, length: 0 }
+        }
+    }
+    
+    fn token_data(&self, token_start: usize, current: usize, token: Token) -> TokenOut {
         TokenOut {
             token,
-            location: self.current_span(token_start),
+            location: self.current_span(token_start, current),
             lineno: self.lineno,
         }
     }
     
-    fn error(&self, token_start: usize, message: &str) -> LexerError {
+    fn error(&self, token_start: usize, current: usize, message: &str) -> LexerError {
         LexerError {
             message: String::from(message),
-            location: self.current_span(token_start),
+            location: self.current_span(token_start, current),
             lineno: self.lineno,
         }
     }
