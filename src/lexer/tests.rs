@@ -3,58 +3,6 @@
 use crate::lexer::{LexerBuilder, LexerRule, MatchResult, Token, TokenOut, Span};
 use crate::lexer::errors::{LexerError, LexerErrorType};
 
-struct TestRule {
-    buf: String,
-    target: String,
-    result: Token,
-}
-
-impl TestRule {
-    fn new(target: &str, result: Token) -> Self {
-        TestRule {
-            result,
-            target: String::from(target),
-            buf: String::new(),
-        }
-    }
-}
-
-impl LexerRule for TestRule {
-    fn current_state(&self) -> MatchResult {
-        if self.buf == self.target {
-            MatchResult::CompleteMatch
-        } else if self.target.starts_with(&self.buf) {
-            MatchResult::IncompleteMatch
-        } else {
-            MatchResult::NoMatch
-        }
-    }
-    
-    fn feed(&mut self, ch: char) -> MatchResult {
-        self.buf.push(ch);
-        return self.current_state();
-    }
-    
-    fn try_match(&mut self, ch: char) -> MatchResult {
-        self.buf.push(ch);
-        let match_result = self.current_state();
-        if let MatchResult::NoMatch = match_result {
-            self.buf.pop();
-        }
-        return match_result;
-    }
-    
-    fn reset(&mut self) {
-        self.buf.clear();
-    }
-    
-    fn get_token(&self) -> Option<Token> {
-        match self.current_state() {
-            MatchResult::NoMatch => None,
-            _ => Some(self.result.clone()),
-        }
-    }
-}
 
 #[test]
 fn lexer_matches_tokens_1() {
@@ -93,8 +41,8 @@ fn lexer_skips_whitespace() {
     let source = "  foo   bar";
     
     let mut lexer = LexerBuilder::new()
-        .add_rule(TestRule::new("foo", Token::IntegerLiteral(1)))
-        .add_rule(TestRule::new("bar", Token::IntegerLiteral(2)))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "foo"))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "bar"))
         .build(source.chars());
     
     let out = lexer.next_token().unwrap();
@@ -117,8 +65,8 @@ fn lexer_tracks_line_numbers() {
     let source = " \nfoo \n\n  bar";
     
     let mut lexer = LexerBuilder::new()
-        .add_rule(TestRule::new("foo", Token::IntegerLiteral(1)))
-        .add_rule(TestRule::new("bar", Token::IntegerLiteral(2)))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "foo"))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "bar"))
         .build(source.chars());
     
     let out = lexer.next_token().unwrap();
