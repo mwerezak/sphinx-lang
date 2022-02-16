@@ -1,3 +1,4 @@
 #![allow(dead_code)]
 
-mod lexer;
+pub mod lexer;
+pub mod language;

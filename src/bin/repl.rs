@@ -1,5 +1,8 @@
 use clap::{App, Arg};
 
+use interpreter::language;
+use interpreter::lexer::{TokenOut, Token};
+
 fn main() {
     let app = App::new("repl")
         .version("0.0")
@@ -21,4 +24,17 @@ fn main() {
         );
         
     let args = app.get_matches();
+    
+    if let Some(s) = args.value_of("cmd") {
+        let mut lexer = language::create_default_lexer_rules().build(s.chars());
+        
+        loop {
+            let out = lexer.next_token();
+            println!("{:?}", out);
+            
+            if let Ok(TokenOut { token: Token::EOF, .. }) = out {
+                break;
+            }
+        }
+    }
 }
