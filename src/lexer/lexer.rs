@@ -69,7 +69,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     
     fn peek(&mut self) -> Option<char> {
         match self.source.peek() {
-            Some(ch) => Some(*ch),
+            Some(&ch) => Some(ch),
             None => None,
         }
     }
