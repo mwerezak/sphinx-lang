@@ -301,7 +301,7 @@ end
 # __le, __lt, __eq only, no methamethods for others...
 # __tostring
 # __getindex, __setindex, __delindex
-# __get, __set, __del - attribute descriptor protocol
+# __get, __set, __del - attribute descriptor protocol  TODO make descriptors a special builtin type?
 # __call
 
 # class/instance names with double underscores are reserved for metamethods
