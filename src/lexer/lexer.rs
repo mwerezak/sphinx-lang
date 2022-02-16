@@ -68,10 +68,25 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
     
     fn peek(&mut self) -> Option<char> {
-        self.source.peek().map(|ch| *ch)
+        match self.source.peek() {
+            Some(ch) => Some(*ch),
+            None => None,
+        }
+    }
+    
+    fn skip_whitespace(&mut self) {
+        loop {
+            let next = self.peek();
+            match next {
+                None => break,
+                Some(ch) if !ch.is_whitespace() => break,
+                _ => { self.advance(); },
+            }
+        }
     }
     
     pub fn next_token(&mut self) -> Result<TokenOut, LexerError> {
+        self.skip_whitespace();
         
         //starting a new token
         let token_start = self.current;
@@ -155,7 +170,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             return self.exhaust_rule(token_start, match_idx);
         }
         
-        return Err(self.error(token_start, "incomplete symbol"));
+        return Err(self.error(token_start, "unexpected EOF while parsing symbol"));
     }
     
     fn exhaust_rule(&mut self, token_start: usize, rule_idx: usize) -> Result<TokenOut, LexerError> {
