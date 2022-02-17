@@ -1,6 +1,8 @@
 use std::iter::{Iterator, Peekable};
+use crate::language;
 use crate::lexer::{Token, LexerError, LexerErrorType};
 use crate::lexer::rules::{LexerRule, MatchResult};
+use crate::lexer::rules::{LineCommentRule, BlockCommentRule};
 
 
 // Token Output
@@ -23,15 +25,34 @@ pub struct TokenOut {
 
 // Lexer Builder
 
+#[derive(Debug, Clone, Copy)]
+struct LexerOptions {
+    skip_comments: bool,
+}
+
 pub struct LexerBuilder {
     rules: Vec<Box<dyn LexerRule>>,
+    options: LexerOptions,
 }
 
 impl LexerBuilder {
     pub fn new() -> Self {
         LexerBuilder {
             rules: Vec::new(),
+            options: LexerOptions {
+                skip_comments: true,
+            }
         }
+    }
+    
+    fn set_options(mut self, options: LexerOptions) -> Self {
+        self.options = options;
+        return self;
+    }
+    
+    pub fn set_skip_comments(mut self, skip_comments: bool) -> Self {
+        self.options.skip_comments = skip_comments;
+        return self;
     }
     
     pub fn add_rule<R>(mut self, rule: R) -> Self
@@ -55,6 +76,7 @@ impl LexerBuilder {
     {
         Lexer { 
             source: source.peekable(),
+            options: self.options,
             rules: self.rules,
             
             current: 0,
@@ -72,6 +94,7 @@ impl LexerBuilder {
 
 pub struct Lexer<S> where S: Iterator<Item=char> {
     source: Peekable<S>,
+    options: LexerOptions,
     rules: Vec<Box<dyn LexerRule>>,
     
     current: usize, // one ahead of current char
@@ -111,13 +134,45 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
     }
     
-    fn skip_until_next_line(&mut self) {
-        let mut next = self.advance();
-        while next.is_some() && next.unwrap() != '\n' {
-            next = self.advance();
+    fn skip_comments(&mut self) -> bool {
+        let line_rule = LineCommentRule::new(language::COMMENT_CHAR);
+        let block_rule = BlockCommentRule::new(language::NESTED_COMMENT_START, language::NESTED_COMMENT_END);
+        
+        let mut line = Some(line_rule);
+        let mut block = Some(block_rule);
+        
+        self.skip_whitespace();
+        
+        let start_pos = self.current;
+        loop {
+            let next = match self.peek() {
+                Some(ch) => ch,
+                None => break,
+            };
+            
+            if let Some(rule) = line.as_mut() {
+                if !rule.try_match(next).is_match() {
+                    line = None;
+                }
+            }
+            
+            if let Some(rule) = block.as_mut() {
+                if !rule.try_match(next).is_match() {
+                    block = None;
+                }
+            }
+            
+            if line.is_none() && block.is_none() {
+                break;
+            }
+            
+            self.advance();
         }
+        
+        // continue skipping if we are at not at EOF and we advanced
+        return self.peek().is_some() && self.current > start_pos;
     }
-    
+
     fn reset_rules(&mut self) {
         for rule in self.rules.iter_mut() {
             rule.reset();
@@ -130,6 +185,10 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
     
     pub fn next_token(&mut self) -> Result<TokenOut, LexerError> {
+        
+        if self.options.skip_comments {
+            while self.skip_comments() { }
+        }
         
         self.skip_whitespace();
         
