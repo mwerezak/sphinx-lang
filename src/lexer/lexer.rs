@@ -141,8 +141,6 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         let mut line = Some(line_rule);
         let mut block = Some(block_rule);
         
-        self.skip_whitespace();
-        
         let start_pos = self.current;
         loop {
             let next = match self.peek() {
@@ -186,11 +184,13 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     
     pub fn next_token(&mut self) -> Result<TokenOut, LexerError> {
         
-        if self.options.skip_comments {
-            while self.skip_comments() { }
-        }
-        
         self.skip_whitespace();
+        
+        if self.options.skip_comments {
+            while self.skip_comments() {
+                self.skip_whitespace();
+            }
+        }
         
         //starting a new token
         let token_start = self.current;
