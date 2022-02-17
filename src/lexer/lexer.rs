@@ -135,6 +135,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         
         //starting a new token
         let token_start = self.current;
+        let token_line = self.lineno;
         self.reset_rules();
         
         // grab the next char, and feed it to all the rules
@@ -154,7 +155,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         let mut next = match self.peek() {
             Some(ch) => ch,
             None => {
-                return Ok(self.token_data(token_start, Token::EOF));
+                return Ok(self.token_data(Token::EOF, token_start, token_line));
             },
         };
         
@@ -197,13 +198,13 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     // do not advance the lexer as we will revisit the current char on the next pass
                     
                     if complete.len() > 1 {
-                        return Err(self.error(token_start, LexerErrorType::AmbiguousMatch));
+                        return Err(self.error(LexerErrorType::AmbiguousMatch, token_start));
                     }
                     
                     let match_idx = complete[0];
                     let matching_rule = &mut self.rules[match_idx];
                     let token = matching_rule.get_token().unwrap();
-                    return Ok(self.token_data(token_start, token));
+                    return Ok(self.token_data(token, token_start, token_line));
                 
                 }
             }
@@ -215,11 +216,11 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 let next_active = &self.active[1];
                 
                 if next_active.is_empty() {
-                    return Err(self.error(token_start, LexerErrorType::NoMatchingRule));
+                    return Err(self.error(LexerErrorType::NoMatchingRule, token_start));
                 } 
                 if next_active.len() == 1 {
                     let match_idx = next_active[0];
-                    return self.exhaust_rule(token_start, match_idx);
+                    return self.exhaust_rule(match_idx, token_start, token_line);
                 }
                 
                 next = match self.peek() {
@@ -238,13 +239,13 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             let match_idx = next_complete[0];
             let matching_rule = &mut self.rules[match_idx];
             let token = matching_rule.get_token().unwrap();
-            return Ok(self.token_data(token_start, token));
+            return Ok(self.token_data(token, token_start, token_line));
         }
         
-        return Err(self.error(token_start, LexerErrorType::UnexpectedEOF));
+        return Err(self.error(LexerErrorType::UnexpectedEOF, token_start));
     }
     
-    fn exhaust_rule(&mut self, token_start: usize, rule_idx: usize) -> Result<TokenOut, LexerError> {
+    fn exhaust_rule(&mut self, rule_idx: usize, token_start: usize, token_line: u64) -> Result<TokenOut, LexerError> {
         {
             let rule = &mut self.rules[rule_idx];
             debug_assert!(!matches!(rule.current_state(), MatchResult::NoMatch));
@@ -269,10 +270,10 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         let rule = &mut self.rules[rule_idx];
         if let MatchResult::CompleteMatch = rule.current_state() {
             let token = rule.get_token().unwrap();
-            return Ok(self.token_data(token_start, token));
+            return Ok(self.token_data(token, token_start, token_line));
         }
         
-        return Err(self.error(token_start, LexerErrorType::UnexpectedEOF));
+        return Err(self.error(LexerErrorType::UnexpectedEOF, token_start));
     }
     
     fn current_span(&self, start_idx: usize) -> Span {
@@ -283,15 +284,15 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         return Span { index: start_idx, length };
     }
     
-    fn token_data(&self, token_start: usize, token: Token) -> TokenOut {
+    fn token_data(&self, token: Token, token_start: usize, token_line: u64) -> TokenOut {
         TokenOut {
             token,
             location: self.current_span(token_start),
-            lineno: self.lineno,
+            lineno: token_line,
         }
     }
     
-    fn error(&self, token_start: usize, etype: LexerErrorType) -> LexerError {
+    fn error(&self, etype: LexerErrorType, token_start: usize) -> LexerError {
         LexerError::new(etype, self.current_span(token_start), self.lineno)
     }
 }
