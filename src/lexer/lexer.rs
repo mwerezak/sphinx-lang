@@ -119,11 +119,16 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         return next;
     }
     
+    // these have to be &mut self because they can mutate the source iterator
     fn peek(&mut self) -> Option<char> {
         match self.source.peek() {
             Some(&ch) => Some(ch),
             None => None,
         }
+    }
+    
+    pub fn at_eof(&mut self) -> bool {
+        self.source.peek().is_none()
     }
     
     fn skip_whitespace(&mut self) {
@@ -168,7 +173,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
         
         // continue skipping if we are at not at EOF and we advanced
-        return self.peek().is_some() && self.current > start_pos;
+        return !self.at_eof() && self.current > start_pos;
     }
 
     fn reset_rules(&mut self) {
@@ -332,7 +337,10 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             return Ok(self.token_data(token, token_start, token_line));
         }
         
-        return Err(self.error(LexerErrorType::UnexpectedEOF, token_start));
+        if self.at_eof() {
+            return Err(self.error(LexerErrorType::UnexpectedEOF, token_start));
+        }
+        return Err(self.error(LexerErrorType::NoMatchingRule, token_start));
     }
     
     fn current_span(&self, start_idx: usize) -> Span {
