@@ -387,23 +387,29 @@ fn lexer_error_ambiguous_match() {
 fn lexer_text_comments() {
     let source = r#"foo #bar
     
+      #   #{ 
+    
+    baz #{ }  #
+    
+        #{ nest}#
+# {
     #
-    # baz bad foo boo
+    # baz bad foo boo }# bar
     
     "#;
     
     let mut lexer = LexerBuilder::new()
-        .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "foo"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "bar"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(3), "baz"))
-        .add_rule(CommentRule::new('#'))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(0), "foo"))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "bar"))
+        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "baz"))
+        .add_rule(LineCommentRule::new('#'))
+        .add_rule(BlockCommentRule::new("#{", "}#"))
         .build(source.chars());
     
     let out = lexer.next_token().unwrap();
     println!("out: {:?}", out);
     assert!(matches!(out, TokenOut {
-        token: Token::IntegerLiteral(1),
+        token: Token::IntegerLiteral(0),
         location: Span { index: 0, length: 3 },
         lineno: 1,
     }));
@@ -420,23 +426,39 @@ fn lexer_text_comments() {
     println!("out: {:?}", out);
     assert!(matches!(out, TokenOut {
         token: Token::Comment,
-        location: Span { index: 18, length: 2 },
+        location: Span { index: 20, length: 8 },
         lineno: 3,
     }));
     
     let out = lexer.next_token().unwrap();
     println!("out: {:?}", out);
     assert!(matches!(out, TokenOut {
+        token: Token::IntegerLiteral(2),
+        location: Span { index: 37, length: 3 },
+        lineno: 5,
+    }));
+    
+    let out = lexer.next_token().unwrap();
+    println!("out: {:?}", out);
+    assert!(matches!(out, TokenOut {
         token: Token::Comment,
-        location: Span { index: 24, length: 18 },
-        lineno: 4,
+        location: Span { index: 41, length: 65 },
+        lineno: 5,
+    }));
+    
+    let out = lexer.next_token().unwrap();
+    println!("out: {:?}", out);
+    assert!(matches!(out, TokenOut {
+        token: Token::IntegerLiteral(1),
+        location: Span { index: 107, length: 3 },
+        lineno: 10,
     }));
     
     let out = lexer.next_token().unwrap();
     println!("out: {:?}", out);
     assert!(matches!(out, TokenOut {
         token: Token::EOF,
-        location: Span { index: 51, length: 0 },
-        lineno: 6,
+        location: Span { index: 120, length: 0 },
+        lineno: 12,
     }));
 }

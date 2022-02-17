@@ -38,15 +38,15 @@ impl MatchResult {
 // Helper struct to match an exact string
 
 #[derive(Debug, Clone)]
-struct StrMatcher {
-    target: &'static str,
+struct StrMatcher<'a> {
+    target: &'a str,
     state: MatchResult,
-    chars: Chars<'static>,
+    chars: Chars<'a>,
     peek: VecDeque<Option<char>>,
 }
 
-impl StrMatcher {
-    pub fn new(target: &'static str) -> Self {
+impl<'a> StrMatcher<'a> {
+    pub fn new(target: &'a str) -> Self {
         StrMatcher {
             target,
             state: MatchResult::IncompleteMatch,
@@ -55,13 +55,18 @@ impl StrMatcher {
         }
     }
     
-    pub fn target(&self) -> &'static str { self.target }
+    pub fn target(&self) -> &'a str { self.target }
     pub fn last_match(&self) -> MatchResult { self.state }
     
     pub fn reset(&mut self) {
         self.state = MatchResult::IncompleteMatch;
         self.chars = self.target.chars();
         self.peek.clear();
+    }
+    
+    pub fn reset_target(&mut self, target: &'a str) {
+        self.target = target;
+        self.reset();
     }
     
     fn peek_nth(&mut self, n: usize) -> Option<char> {
@@ -182,7 +187,7 @@ impl LexerRule for SingleCharRule {
 #[derive(Debug)]
 pub struct ExactRule {
     result: Token,
-    matcher: StrMatcher,
+    matcher: StrMatcher<'static>,
 }
 
 impl ExactRule {
@@ -220,7 +225,7 @@ impl LexerRule for ExactRule {
 // Special-Purpose Rules
 
 #[derive(Debug)]
-pub struct CommentRule {
+pub struct LineCommentRule {
     // (start, end)
     // start -> if the comment has started
     // end   -> if the comment has ended
@@ -228,9 +233,9 @@ pub struct CommentRule {
     comment: char
 }
 
-impl CommentRule {
+impl LineCommentRule {
     pub fn new(comment: char) -> Self {
-        CommentRule { comment, state: (false, false) }
+        LineCommentRule { comment, state: (false, false) }
     }
     
     fn match_state(&self, state: (bool, bool)) -> MatchResult {
@@ -265,7 +270,7 @@ impl CommentRule {
     }
 }
 
-impl LexerRule for CommentRule {
+impl LexerRule for LineCommentRule {
     fn reset(&mut self) {
         self.state = (false, false);
     }
@@ -283,6 +288,82 @@ impl LexerRule for CommentRule {
         }
         
         return match_result;
+    }
+    
+    // produce Some(Token) if current state is CompleteMatch, otherwise None
+    fn get_token(&self) -> Option<Token> {
+        if self.current_state().is_complete_match() {
+            return Some(Token::Comment);
+        }
+        return None;
+    }
+}
+
+pub struct BlockCommentRule {
+    nestlevel: u32,
+    start: StrMatcher<'static>,
+    end: StrMatcher<'static>,
+}
+
+impl BlockCommentRule {
+    pub fn new(start: &'static str, end: &'static str) -> Self {
+        BlockCommentRule {
+            nestlevel: 0,
+            start: StrMatcher::new(start),
+            end: StrMatcher::new(end),
+        }
+    }
+}
+
+impl LexerRule for BlockCommentRule {
+    fn reset(&mut self) {
+        self.nestlevel = 0;
+        self.start.reset();
+        self.end.reset();
+    }
+    
+    fn current_state(&self) -> MatchResult {
+        if self.nestlevel > 0 {
+            return MatchResult::IncompleteMatch;
+        }
+        if self.end.last_match().is_complete_match() {
+            return MatchResult::CompleteMatch;
+        }
+        return self.start.last_match();
+    }
+    
+    fn try_match(&mut self, next: char) -> MatchResult {
+
+        let start_result = self.start.try_match(next);
+        if start_result.is_complete_match() {
+            self.nestlevel += 1;
+            self.start.reset();
+            return MatchResult::IncompleteMatch;
+        }
+        
+        if self.nestlevel > 0 {
+            let end_result = self.end.try_match(next);
+            if end_result.is_complete_match() {
+                self.nestlevel -= 1;
+                
+                if self.nestlevel > 0 {
+                    self.end.reset();
+                } else {
+                    return MatchResult::CompleteMatch;
+                }
+            }
+            
+            if !start_result.is_match() {
+                self.start.reset();
+            }
+            if !end_result.is_match() {
+                self.end.reset();
+            }
+            
+            return MatchResult::IncompleteMatch;
+        }
+        
+        return start_result;
     }
     
     // produce Some(Token) if current state is CompleteMatch, otherwise None
