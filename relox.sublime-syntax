@@ -348,10 +348,19 @@ contexts:
 
 
   comments:
+    # Block comments
+    - match: \#\{
+      scope: punctuation.definition.comment
+      push:
+        - meta_scope: comment.block
+        - match: \}\#
+          pop: true
+        - include: comments
+
     # Comments begin with a '#' and finish at the end of the line.
     - match: '#'
-      scope: comment
+      scope: punctuation.definition.comment
       push:
-        - meta_scope: comment
+        - meta_scope: comment.line
         - match: $\n?
           pop: true
