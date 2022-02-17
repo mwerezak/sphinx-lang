@@ -121,8 +121,6 @@ pub trait LexerRule {
     
     fn current_state(&self) -> MatchResult;
     
-    fn feed(&mut self, next: char) -> MatchResult;
-    
     // like feed, but only modifies the LexerRule state if would match
     // return the match state if ch was passed to feed()
     fn try_match(&mut self, next: char) -> MatchResult;
@@ -162,11 +160,6 @@ impl LexerRule for SingleCharRule {
     }
     
     fn current_state(&self) -> MatchResult { self.state }
-    
-    fn feed(&mut self, next: char) -> MatchResult {
-        self.state = self.peek(next);
-        return self.state;
-    }
     
     fn try_match(&mut self, next: char) -> MatchResult {
         let match_result = self.peek(next);
@@ -210,10 +203,6 @@ impl LexerRule for ExactRule {
     
     fn current_state(&self) -> MatchResult {
         self.matcher.last_match()
-    }
-    
-    fn feed(&mut self, next: char) -> MatchResult {
-        self.matcher.update_match(next)
     }
     
     fn try_match(&mut self, next: char) -> MatchResult {
@@ -283,11 +272,6 @@ impl LexerRule for CommentRule {
     
     fn current_state(&self) -> MatchResult {
         self.match_state(self.state)
-    }
-    
-    fn feed(&mut self, next: char) -> MatchResult {
-        self.state = self.next_state(self.state, next);
-        return self.current_state();
     }
     
     fn try_match(&mut self, next: char) -> MatchResult {

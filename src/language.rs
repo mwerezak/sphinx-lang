@@ -1,6 +1,10 @@
 use crate::lexer::{LexerBuilder, Token};
 use crate::lexer::rules::*;
 
+pub static COMMENT_CHAR: char = '#';
+
+pub static NESTED_COMMENT_START: &'static str = "#{";
+pub static NESTED_COMMENT_END:   &'static str = "}#";
 
 pub fn create_default_lexer_rules() -> LexerBuilder {
     LexerBuilder::new()
@@ -68,6 +72,4 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(ExactRule::new(Token::Super,            "super"))
     .add_rule(ExactRule::new(Token::Echo,             "echo"))
     .add_rule(ExactRule::new(Token::End,              "end"))
-    
-    .add_rule(CommentRule::new(                       '#'))
 }
