@@ -1,5 +1,5 @@
 use std::str::Chars;
-use std::iter::Peekable;
+use std::collections::VecDeque;
 use crate::lexer::Token;
 
 
@@ -34,6 +34,85 @@ impl MatchResult {
         if let MatchResult::IncompleteMatch = self { true } else { false }
     }
 }
+
+// Helper struct to match an exact string
+
+#[derive(Debug, Clone)]
+struct StrMatcher {
+    target: &'static str,
+    state: MatchResult,
+    chars: Chars<'static>,
+    peek: VecDeque<Option<char>>,
+}
+
+impl StrMatcher {
+    pub fn new(target: &'static str) -> Self {
+        StrMatcher {
+            target,
+            state: MatchResult::IncompleteMatch,
+            chars: target.chars(),
+            peek: VecDeque::new(),
+        }
+    }
+    
+    pub fn target(&self) -> &'static str { self.target }
+    pub fn last_match(&self) -> MatchResult { self.state }
+    
+    pub fn reset(&mut self) {
+        self.state = MatchResult::IncompleteMatch;
+        self.chars = self.target.chars();
+        self.peek.clear();
+    }
+    
+    fn peek_nth(&mut self, n: usize) -> Option<char> {
+        while self.peek.len() < n + 1 {
+            self.peek.push_back(self.chars.next());
+        }
+        return self.peek[n];
+    }
+    
+    fn advance(&mut self) -> Option<char> {
+        match self.peek.pop_front() {
+            Some(o) => o,
+            None => self.chars.next()
+        }
+    }
+    
+    pub fn peek_match(&mut self, next: char) -> MatchResult {
+        // if the match already failed, don't bother looking at any further input
+        if !self.state.is_match() {
+            return MatchResult::NoMatch;
+        }
+        
+        match self.peek_nth(0) {
+            Some(this_ch) if this_ch == next => {
+                if self.peek_nth(1).is_none() {
+                    MatchResult::CompleteMatch
+                } else {
+                    MatchResult::IncompleteMatch
+                }
+            },
+            _ => MatchResult::NoMatch,
+        }
+    }
+    
+    pub fn update_match(&mut self, next: char) -> MatchResult {
+        self.state = self.peek_match(next);
+        self.advance();
+        return self.state;
+    }
+    
+    pub fn try_match(&mut self, next: char) -> MatchResult {
+        let match_result = self.peek_match(next);
+        if match_result.is_match() {
+            self.state = match_result;
+            self.advance();
+        }
+        return match_result;
+    }
+    
+}
+
 
 // Lexer Rules
 
@@ -109,10 +188,8 @@ impl LexerRule for SingleCharRule {
 
 #[derive(Debug)]
 pub struct ExactRule {
-    target: &'static str,
     result: Token,
-    state: MatchResult,
-    chars: Peekable<Chars<'static>>,
+    matcher: StrMatcher,
 }
 
 impl ExactRule {
@@ -120,65 +197,31 @@ impl ExactRule {
         debug_assert!(!target.is_empty());
         
         ExactRule {
-            target, result,
-            state: MatchResult::IncompleteMatch,
-            chars: target.chars().peekable(),
+            result,
+            matcher: StrMatcher::new(target),
         }
     }
 }
 
 impl LexerRule for ExactRule {
     fn reset(&mut self) {
-        self.state = MatchResult::IncompleteMatch;
-        self.chars = self.target.chars().peekable();
+        self.matcher.reset();
     }
     
-    fn current_state(&self) -> MatchResult { self.state }
+    fn current_state(&self) -> MatchResult {
+        self.matcher.last_match()
+    }
     
     fn feed(&mut self, next: char) -> MatchResult {
-        // if the match already failed, don't bother looking at any further input
-        if !self.state.is_match() {
-            return MatchResult::NoMatch;
-        }
-        
-        self.state = match self.chars.next() {
-            Some(this_ch) if next == this_ch => {
-                if self.chars.peek().is_none() {
-                    MatchResult::CompleteMatch
-                } else {
-                    MatchResult::IncompleteMatch
-                }
-            },
-            _ => MatchResult::NoMatch,
-        };
-        
-        return self.state;
+        self.matcher.update_match(next)
     }
     
     fn try_match(&mut self, next: char) -> MatchResult {
-        if !self.state.is_match() {
-            return MatchResult::NoMatch;
-        }
-        
-        match self.chars.peek() {
-            Some(&this_ch) if next == this_ch => {
-                
-                self.chars.next();
-                if self.chars.peek().is_none() {
-                    self.state = MatchResult::CompleteMatch
-                } else {
-                    self.state = MatchResult::IncompleteMatch
-                };
-                
-                self.state
-            },
-            _ => MatchResult::NoMatch,
-        }
+        self.matcher.try_match(next)
     }
     
-
     fn get_token(&self) -> Option<Token> {
-        if self.state.is_complete_match() {
+        if self.current_state().is_complete_match() {
             return Some(self.result.clone());
         }
         return None;
