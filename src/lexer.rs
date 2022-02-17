@@ -1,8 +1,8 @@
 mod token;
 pub use token::*;
 
-mod rules;
-pub use rules::*;
+pub mod rules;
+pub use rules::MatchResult;
 
 mod lexer;
 pub use lexer::*;

@@ -1,6 +1,6 @@
 use std::iter::{Iterator, Peekable};
-use crate::lexer::{Token, LexerRule, MatchResult};
-use crate::lexer::{LexerError, LexerErrorType};
+use crate::lexer::{Token, LexerError, LexerErrorType};
+use crate::lexer::rules::{LexerRule, MatchResult};
 
 
 // Token Output

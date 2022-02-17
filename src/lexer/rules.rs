@@ -38,15 +38,15 @@ impl MatchResult {
 // Lexer Rules
 
 pub trait LexerRule {
-    fn current_state(&self) -> MatchResult;
-    
     fn reset(&mut self);
     
-    fn feed(&mut self, ch: char) -> MatchResult;
+    fn current_state(&self) -> MatchResult;
+    
+    fn feed(&mut self, next: char) -> MatchResult;
     
     // like feed, but only modifies the LexerRule state if would match
     // return the match state if ch was passed to feed()
-    fn try_match(&mut self, ch: char) -> MatchResult;
+    fn try_match(&mut self, next: char) -> MatchResult;
     
     // produce Some(Token) if current state is CompleteMatch, otherwise None
     fn get_token(&self) -> Option<Token>;
@@ -69,41 +69,39 @@ impl SingleCharRule {
         }
     }
     
-    fn match_char(&self, ch: char) -> MatchResult {
-        if let MatchResult::IncompleteMatch = self.state {
-            if ch == self.target {
-                return MatchResult::CompleteMatch;
-            }
+    fn peek(&self, next: char) -> MatchResult {
+        if self.state.is_incomplete_match() && next == self.target {
+            return MatchResult::CompleteMatch;
         }
         return MatchResult::NoMatch;
     }
 }
 
 impl LexerRule for SingleCharRule {
+    fn reset(&mut self) {
+        self.state = MatchResult::IncompleteMatch;
+    }
+    
     fn current_state(&self) -> MatchResult { self.state }
-        
-    fn feed(&mut self, ch: char) -> MatchResult {
-        self.state = self.match_char(ch);
+    
+    fn feed(&mut self, next: char) -> MatchResult {
+        self.state = self.peek(next);
         return self.state;
     }
     
-    fn try_match(&mut self, ch: char) -> MatchResult {
-        let match_result = self.match_char(ch);
-        if !matches!(match_result, MatchResult::NoMatch) {
+    fn try_match(&mut self, next: char) -> MatchResult {
+        let match_result = self.peek(next);
+        if match_result.is_match() {
             self.state = match_result;
         }
         return match_result;
     }
     
-    fn reset(&mut self) {
-        self.state = MatchResult::IncompleteMatch;
-    }
-    
     fn get_token(&self) -> Option<Token> {
-        match self.state {
-            MatchResult::CompleteMatch => Some(self.result.clone()),
-            _ => None,
+        if self.state.is_complete_match() {
+            return Some(self.result.clone());
         }
+        return None;
     }
 }
 
@@ -130,21 +128,22 @@ impl ExactRule {
 }
 
 impl LexerRule for ExactRule {
-    fn current_state(&self) -> MatchResult { self.state }
-    
     fn reset(&mut self) {
         self.state = MatchResult::IncompleteMatch;
         self.chars = self.target.chars().peekable();
     }
     
-    fn feed(&mut self, ch: char) -> MatchResult {
-        if let MatchResult::NoMatch = self.state {
+    fn current_state(&self) -> MatchResult { self.state }
+    
+    fn feed(&mut self, next: char) -> MatchResult {
+        // if the match already failed, don't bother looking at any further input
+        if !self.state.is_match() {
             return MatchResult::NoMatch;
         }
         
         self.state = match self.chars.next() {
-            Some(this_ch) if ch == this_ch => {
-                if let None = self.chars.peek() {
+            Some(this_ch) if next == this_ch => {
+                if self.chars.peek().is_none() {
                     MatchResult::CompleteMatch
                 } else {
                     MatchResult::IncompleteMatch
@@ -156,34 +155,114 @@ impl LexerRule for ExactRule {
         return self.state;
     }
     
-    fn try_match(&mut self, ch: char) -> MatchResult {
-        if let MatchResult::NoMatch = self.state {
+    fn try_match(&mut self, next: char) -> MatchResult {
+        if !self.state.is_match() {
             return MatchResult::NoMatch;
         }
         
-        let match_result = match self.chars.peek() {
-            Some(&this_ch) if ch == this_ch => {
+        match self.chars.peek() {
+            Some(&this_ch) if next == this_ch => {
                 
                 self.chars.next();
-                self.state = if let None = self.chars.peek() {
-                    MatchResult::CompleteMatch
+                if self.chars.peek().is_none() {
+                    self.state = MatchResult::CompleteMatch
                 } else {
-                    MatchResult::IncompleteMatch
+                    self.state = MatchResult::IncompleteMatch
                 };
                 
                 self.state
             },
             _ => MatchResult::NoMatch,
-        };
-        
-        return match_result;
+        }
     }
     
 
     fn get_token(&self) -> Option<Token> {
-        match self.state {
-            MatchResult::CompleteMatch => Some(self.result.clone()),
-            _ => None,
+        if self.state.is_complete_match() {
+            return Some(self.result.clone());
         }
+        return None;
+    }
+}
+
+// Special-Purpose Rules
+
+#[derive(Debug)]
+pub struct CommentRule {
+    // (start, end)
+    // start -> if the comment has started
+    // end   -> if the comment has ended
+    state: (bool, bool),
+    comment: char
+}
+
+impl CommentRule {
+    pub fn new(comment: char) -> Self {
+        CommentRule { comment, state: (false, false) }
+    }
+    
+    fn match_state(&self, state: (bool, bool)) -> MatchResult {
+        match state {
+            (_, false) => MatchResult::CompleteMatch,
+            (true, _)  => MatchResult::CompleteMatch,
+            (false, true) => MatchResult::NoMatch,
+        }
+    }
+    
+    fn next_state(&self, state: (bool, bool), next: char) -> (bool, bool) {
+        let (start, end) = state;
+        
+        // looking for initial comment char
+        if !start {
+            if next != self.comment {
+                return (false, true);
+            }
+            return (true, false);
+        }
+        
+        // looking for end of comment
+        if start && !end {
+            if next == '\n' {
+                return (true, true);
+            }
+            return (true, false);
+        }
+        
+        // complete comment - anything else will not match
+        return (false, true);
+    }
+}
+
+impl LexerRule for CommentRule {
+    fn reset(&mut self) {
+        self.state = (false, false);
+    }
+    
+    fn current_state(&self) -> MatchResult {
+        self.match_state(self.state)
+    }
+    
+    fn feed(&mut self, next: char) -> MatchResult {
+        self.state = self.next_state(self.state, next);
+        return self.current_state();
+    }
+    
+    fn try_match(&mut self, next: char) -> MatchResult {
+        let state = self.next_state(self.state, next);
+        let match_result = self.match_state(state);
+        
+        if match_result.is_match() {
+            self.state = state;
+        }
+        
+        return match_result;
+    }
+    
+    // produce Some(Token) if current state is CompleteMatch, otherwise None
+    fn get_token(&self) -> Option<Token> {
+        if self.current_state().is_complete_match() {
+            return Some(Token::Comment);
+        }
+        return None;
     }
 }
