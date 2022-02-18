@@ -37,7 +37,7 @@ pub enum Token {
     // Literals
     Identifier(String),
     StringLiteral(String),
-    IntegerLiteral(u32),
+    IntegerLiteral(i32),
     FloatLiteral(f32),
     
     // Misc

@@ -64,3 +64,50 @@ impl LexerRule for IdentifierRule {
         return None;
     }
 }
+
+// Plain Integer Literals
+
+pub struct IntegerLiteralRule {
+    buf: String,
+}
+
+impl IntegerLiteralRule {
+    pub fn new() -> Self {
+        IntegerLiteralRule { buf: String::new() }
+    }
+}
+
+impl LexerRule for IntegerLiteralRule {
+    fn reset(&mut self) {
+        self.buf.clear();
+    }
+    
+    fn current_state(&self) -> MatchResult {
+        if self.buf.is_empty() {
+            MatchResult::IncompleteMatch
+        } else {
+            MatchResult::CompleteMatch
+        }
+    }
+    
+    fn try_match(&mut self, _prev: Option<char>, next: char) -> MatchResult {
+        if next.is_ascii_digit() {
+            self.buf.push(next);
+            return MatchResult::CompleteMatch;
+        }
+        return MatchResult::NoMatch;
+    }
+    
+    fn get_token(&self) -> Option<Token> {
+        if self.current_state().is_complete_match() {
+            let value = self.buf.parse::<i32>()
+                .unwrap_or_else(|err| { 
+                    panic!("could not extract i32 from \"{}\": {:?}", self.buf, err); 
+                });
+            
+            return Some(Token::IntegerLiteral(value));
+        }
+        return None;
+    }
+    
+}

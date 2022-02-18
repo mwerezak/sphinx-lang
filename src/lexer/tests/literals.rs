@@ -27,19 +27,19 @@ fn lexer_test_identifiers() {
     assert_token_sequence!(lexer,
     
         token if s == "valid" => {
-            token: Token::Identifier(ref s),
+            token: Token::Identifier(s),
             location: Span { length: 5, .. },
             ..
         } "valid",
 
         token if s == "_also" => {
-            token: Token::Identifier(ref s),
+            token: Token::Identifier(s),
             location: Span { length: 5, .. },
             ..
         } "_also",
 
         token if s == "asd2_32df_s3" => {
-            token: Token::Identifier(ref s),
+            token: Token::Identifier(s),
             location: Span { length: 12, .. },
             ..
         } "asd2_32df_s3",
@@ -51,7 +51,7 @@ fn lexer_test_identifiers() {
         } "reserved",
 
         token if s == "both" => {
-            token: Token::Identifier(ref s),
+            token: Token::Identifier(s),
             location: Span { length: 4, .. },
             ..
         } "both",
@@ -63,7 +63,7 @@ fn lexer_test_identifiers() {
         } "+",
         
         token if s == "valid2" => {
-            token: Token::Identifier(ref s),
+            token: Token::Identifier(s),
             location: Span { length: 6, .. },
             ..
         } "valid2",
@@ -87,7 +87,7 @@ fn lexer_test_identifiers() {
         } "0no - o",
 
         token if s == "_0valid" => {
-            token: Token::Identifier(ref s),
+            token: Token::Identifier(s),
             location: Span { length: 7, .. },
             ..
         } "_0valid",
@@ -108,7 +108,6 @@ use crate::lexer::rules::keywords::KeywordRule;
 fn lexer_test_keywords_and_identifiers() {
     let source = " k   _k  9k k9 ";
     
-    // kind of contrived...
     let mut lexer = LexerBuilder::new()
         .add_rule(KeywordRule::new(Token::Fun, "k"))
         .add_rule(IdentifierRule::new(["k"]))
@@ -123,7 +122,7 @@ fn lexer_test_keywords_and_identifiers() {
         } "k",
         
         token if s == "_k" => {
-            token: Token::Identifier(ref s),
+            token: Token::Identifier(s),
             location: Span { length: 2, .. },
             ..
         } "_k",
@@ -141,10 +140,28 @@ fn lexer_test_keywords_and_identifiers() {
         } "9k.2",
         
         token if s == "k9" => {
-            token: Token::Identifier(ref s),
+            token: Token::Identifier(s),
             location: Span { length: 2, .. },
             ..
         } "k9",
     );
 
+}
+
+
+#[test]
+fn lexer_test_simple_integer_literals() {
+    let source = " 01123 x ";
+    
+    let mut lexer = LexerBuilder::new()
+        .add_rule(IntegerLiteralRule::new())
+        .build(source.chars());
+    
+    assert_token_sequence!(lexer,
+        token if x == 1123 => {
+            token: Token::IntegerLiteral(x),
+            location: Span { length: 5, .. },
+            ..
+        } "01123"
+    );
 }
