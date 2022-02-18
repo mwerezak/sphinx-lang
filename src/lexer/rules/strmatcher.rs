@@ -11,6 +11,7 @@ pub struct StrMatcher<'a> {
     state: MatchResult,
     chars: Chars<'a>,
     peek: VecDeque<Option<char>>,
+    count: usize, // track how far have we advanced through the target
 }
 
 impl<'a> StrMatcher<'a> {
@@ -20,16 +21,19 @@ impl<'a> StrMatcher<'a> {
             state: MatchResult::IncompleteMatch,
             chars: target.chars(),
             peek: VecDeque::new(),
+            count: 0,
         }
     }
     
     pub fn target(&self) -> &'a str { self.target }
     pub fn last_match(&self) -> MatchResult { self.state }
+    pub fn count(&self) -> usize { self.count }
     
     pub fn reset(&mut self) {
         self.state = MatchResult::IncompleteMatch;
         self.chars = self.target.chars();
         self.peek.clear();
+        self.count = 0;
     }
     
     pub fn reset_target(&mut self, target: &'a str) {
@@ -45,6 +49,7 @@ impl<'a> StrMatcher<'a> {
     }
     
     fn advance(&mut self) -> Option<char> {
+        self.count += 1;
         match self.peek.pop_front() {
             Some(o) => o,
             None => self.chars.next()

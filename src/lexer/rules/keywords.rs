@@ -1,5 +1,5 @@
 use crate::lexer::Token;
-use super::{MatchResult, LexerRule};
+use super::{MatchResult, LexerRule, CharClass};
 use super::strmatcher::StrMatcher;
 
 
@@ -9,7 +9,6 @@ use super::strmatcher::StrMatcher;
 pub struct KeywordRule {
     result: Token,
     matcher: StrMatcher<'static>,
-    first: bool,
 }
 
 impl KeywordRule {
@@ -19,7 +18,6 @@ impl KeywordRule {
         KeywordRule {
             result,
             matcher: StrMatcher::new(target),
-            first: true,
         }
     }
 }
@@ -27,7 +25,6 @@ impl KeywordRule {
 impl LexerRule for KeywordRule {
     fn reset(&mut self) {
         self.matcher.reset();
-        self.first = true;
     }
     
     fn current_state(&self) -> MatchResult {
@@ -35,19 +32,17 @@ impl LexerRule for KeywordRule {
     }
     
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
-        if self.first {
-            if let Some(ch) = prev {
-                if ch == '_' || ch.is_ascii_alphanumeric() {
-                    return MatchResult::NoMatch; // must start first char at word boundary
-                }
+        if self.matcher.count() == 0 {
+            let at_word_boundary = match prev {
+                Some(ch) => !ch.is_word_alphanumeric(),
+                None => true,
+            };
+            if !at_word_boundary {
+                return MatchResult::NoMatch; // must start first char at word boundary
             }
         }
         
-        let match_result = self.matcher.try_match(next);
-        if match_result.is_match() {
-            self.first = false;
-        }
-        return match_result;
+        self.matcher.try_match(next)
     }
     
     fn get_token(&self) -> Option<Token> {

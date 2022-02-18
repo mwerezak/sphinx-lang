@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use crate::lexer::Token;
-use super::{MatchResult, LexerRule};
+use super::{MatchResult, LexerRule, CharClass};
 
 // Identifiers
 
@@ -40,20 +40,13 @@ impl LexerRule for IdentifierRule {
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
         let valid = 
             if self.buf.is_empty() {
-                let word_boundary = match prev {
-                    Some(ch) if ch == '_' || ch.is_ascii_alphanumeric() => false,
-                    _ => true,
+                let at_word_boundary = match prev {
+                    Some(ch) => !ch.is_word_alphanumeric(),
+                    None => true,
                 };
-                
-                match next {
-                    '_' | 'a'..='z' | 'A'..='Z' if word_boundary => true,
-                    _ => false,
-                }
+                at_word_boundary && next.is_word_ascii_alphabetic()
             } else {
-                match next {
-                    '_' | 'a'..='z' | 'A'..='Z' | '0'..='9'  => true,
-                    _ => false,
-                }
+                next.is_word_ascii_alphanumeric()
             };
         
         if valid {

@@ -9,6 +9,33 @@ pub mod comments;
 pub use general::*;
 
 
+// Helpers
+
+trait CharClass {
+    // alphabetic/alphanumeric + '_'
+    fn is_word_alphanumeric(&self) -> bool;
+    fn is_word_alphabetic(&self) -> bool;
+    fn is_word_ascii_alphanumeric(&self) -> bool;
+    fn is_word_ascii_alphabetic(&self) -> bool;
+}
+
+impl CharClass for char {
+    fn is_word_alphanumeric(&self) -> bool {
+        *self == '_' || self.is_alphanumeric()
+    }
+
+    fn is_word_alphabetic(&self) -> bool {
+        *self == '_' || self.is_alphabetic()
+    }
+
+    fn is_word_ascii_alphanumeric(&self) -> bool {
+        *self == '_' || self.is_ascii_alphanumeric()
+    }
+
+    fn is_word_ascii_alphabetic(&self) -> bool {
+        *self == '_' || self.is_ascii_alphabetic()
+    }
+}
 
 // Match Result
 
