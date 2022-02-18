@@ -23,14 +23,6 @@ fn lexer_test_identifiers() {
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
         .build(source.chars());
     
-    // let token = lexer.next_token().unwrap();
-    // println!("{:?}", token);
-    // assert!(matches!(token, 
-    //     TokenMeta {
-    //         token: Token::Identifier(ref s),
-    //         ..
-    //     } if s == "isvalid"
-    // ));
     
     assert_token_sequence!(lexer,
     
