@@ -337,21 +337,3 @@ fn lexer_error_invalid_token() {
     
     );
 }
-
-#[test]
-fn lexer_error_ambiguous_match() {
-    let source = " + ";
-    
-    // kind of contrived...
-    let mut lexer = LexerBuilder::new()
-        .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
-        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "+"))
-        .build(source.chars());
-    
-    assert_next_token!(lexer, error {
-        etype: LexerErrorType::AmbiguousMatch,
-        location: Span { index: 1, length: 1 },
-        lineno: 1,
-    });
-
-}

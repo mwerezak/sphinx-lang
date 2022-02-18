@@ -10,8 +10,6 @@ fn lexer_test_identifiers() {
     let source = r#"
         valid _also asd2_32df_s3
         
-        reserved
-        
         both+valid2
         
         0no _0valid 
@@ -19,7 +17,7 @@ fn lexer_test_identifiers() {
     "#;
     
     let mut lexer = LexerBuilder::new()
-        .add_rule(IdentifierRule::new(["reserved"]))
+        .add_rule(IdentifierRule::new())
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
         .build(source.chars());
     
@@ -44,12 +42,6 @@ fn lexer_test_identifiers() {
             ..
         } "asd2_32df_s3",
         
-        error => {
-            etype: LexerErrorType::NoMatchingRule,
-            location: Span { length: 8, .. },
-            ..
-        } "reserved",
-
         token if s == "both" => {
             token: Token::Identifier(s),
             location: Span { length: 4, .. },
@@ -110,7 +102,7 @@ fn lexer_test_keywords_and_identifiers() {
     
     let mut lexer = LexerBuilder::new()
         .add_rule(KeywordRule::new(Token::Fun, "k"))
-        .add_rule(IdentifierRule::new(["k"]))
+        .add_rule(IdentifierRule::new())
         .build(source.chars());
     
     assert_token_sequence!(lexer,

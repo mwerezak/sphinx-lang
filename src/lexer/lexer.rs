@@ -55,6 +55,8 @@ impl LexerBuilder {
         return self;
     }
     
+    // Note, the order that rules are added determines priority
+    
     pub fn add_rule<R>(mut self, rule: R) -> Self
         where R: LexerRule + 'static 
     {
@@ -270,11 +272,14 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     // falling back to the rules which matched completely on the previous char
                     // do not advance the lexer as we will revisit the current char on the next pass
                     
-                    if complete.len() > 1 {
-                        return Err(self.error(LexerErrorType::AmbiguousMatch, token_start));
-                    }
+                    // if there is more than one complete rule, the lowest index takes priority!
+                    let match_idx =
+                        if complete.len() == 1 {
+                            complete[0]
+                        } else {
+                            *complete.iter().min().unwrap()
+                        };
                     
-                    let match_idx = complete[0];
                     let matching_rule = &mut self.rules[match_idx];
                     let token = matching_rule.get_token().unwrap();
                     return Ok(self.token_data(token, token_start, token_line));

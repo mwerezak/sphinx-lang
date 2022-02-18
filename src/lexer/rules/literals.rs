@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use crate::lexer::Token;
 use crate::lexer::rules::{MatchResult, LexerRule, CharClass};
 use crate::lexer::rules::strmatcher::StrMatcher;
@@ -8,17 +7,11 @@ use crate::lexer::rules::strmatcher::StrMatcher;
 #[derive(Debug)]
 pub struct IdentifierRule {
     buf: String,
-    reserved: HashSet<&'static str>,
 }
 
 impl IdentifierRule {
-    pub fn new<I>(reserved: I) -> Self 
-        where I: IntoIterator<Item=&'static str>
-    {
-        IdentifierRule {
-            buf: String::new(),
-            reserved: HashSet::from_iter(reserved),
-        }
+    pub fn new() -> Self {
+        IdentifierRule { buf: String::new() }
     }
 }
 
@@ -30,8 +23,6 @@ impl LexerRule for IdentifierRule {
     
     fn current_state(&self) -> MatchResult { 
         if self.buf.is_empty() {
-            MatchResult::IncompleteMatch
-        } else if self.reserved.contains(self.buf.as_str()) {
             MatchResult::IncompleteMatch
         } else {
             MatchResult::CompleteMatch
