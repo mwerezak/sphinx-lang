@@ -89,8 +89,8 @@ impl BlockCommentRule {
     pub fn new(start: &'static str, end: &'static str) -> Self {
         BlockCommentRule {
             nestlevel: 0,
-            start: StrMatcher::new(start),
-            end: StrMatcher::new(end),
+            start: StrMatcher::case_sensitive(start),
+            end: StrMatcher::case_sensitive(end),
         }
     }
 }

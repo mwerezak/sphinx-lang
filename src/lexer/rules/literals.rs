@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use crate::lexer::Token;
-use super::{MatchResult, LexerRule, CharClass};
+use crate::lexer::rules::{MatchResult, LexerRule, CharClass};
+use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Identifiers
 
@@ -111,3 +112,4 @@ impl LexerRule for IntegerLiteralRule {
     }
     
 }
+

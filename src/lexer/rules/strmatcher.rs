@@ -8,29 +8,40 @@ use crate::lexer::rules::MatchResult;
 #[derive(Debug, Clone)]
 pub struct StrMatcher<'a> {
     target: &'a str,
-    state: MatchResult,
+    ignore_ascii_case: bool,
+    
     chars: Chars<'a>,
     peek: VecDeque<Option<char>>,
+    
+    last_result: MatchResult,
     count: usize, // track how far have we advanced through the target
 }
 
 impl<'a> StrMatcher<'a> {
-    pub fn new(target: &'a str) -> Self {
+    pub fn new(target: &'a str, ignore_ascii_case: bool) -> Self {
         StrMatcher {
             target,
-            state: MatchResult::IncompleteMatch,
+            ignore_ascii_case,
+            
             chars: target.chars(),
             peek: VecDeque::new(),
+            
+            last_result: MatchResult::IncompleteMatch,
             count: 0,
         }
     }
+    pub fn case_sensitive(target: &'a str) -> Self { StrMatcher::new(target, false) }
+    pub fn case_insensitive(target: &'a str) -> Self { StrMatcher::new(target, true) }
+    
     
     pub fn target(&self) -> &'a str { self.target }
-    pub fn last_match_result(&self) -> MatchResult { self.state }
+    pub fn ignore_ascii_case(&self) -> bool { self.ignore_ascii_case }
+    
+    pub fn last_match_result(&self) -> MatchResult { self.last_result }
     pub fn count(&self) -> usize { self.count }
     
     pub fn reset(&mut self) {
-        self.state = MatchResult::IncompleteMatch;
+        self.last_result = MatchResult::IncompleteMatch;
         self.chars = self.target.chars();
         self.peek.clear();
         self.count = 0;
@@ -58,7 +69,7 @@ impl<'a> StrMatcher<'a> {
     
     pub fn peek_match(&mut self, next: char) -> MatchResult {
         // if the match already failed, don't bother looking at any further input
-        if !self.state.is_match() {
+        if !self.last_result.is_match() {
             return MatchResult::NoMatch;
         }
         
@@ -75,15 +86,15 @@ impl<'a> StrMatcher<'a> {
     }
     
     pub fn update_match(&mut self, next: char) -> MatchResult {
-        self.state = self.peek_match(next);
+        self.last_result = self.peek_match(next);
         self.advance();
-        return self.state;
+        return self.last_result;
     }
     
     pub fn try_match(&mut self, next: char) -> MatchResult {
         let match_result = self.peek_match(next);
         if match_result.is_match() {
-            self.state = match_result;
+            self.last_result = match_result;
             self.advance();
         }
         return match_result;

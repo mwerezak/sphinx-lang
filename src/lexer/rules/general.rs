@@ -62,7 +62,7 @@ impl MultiCharRule {
     pub fn new(result: Token, target: &'static str) -> Self {
         MultiCharRule {
             result,
-            matcher: StrMatcher::new(target),
+            matcher: StrMatcher::case_sensitive(target),
         }
     }
 }

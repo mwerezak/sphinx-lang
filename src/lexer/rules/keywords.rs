@@ -17,7 +17,7 @@ impl KeywordRule {
         
         KeywordRule {
             result,
-            matcher: StrMatcher::new(target),
+            matcher: StrMatcher::case_sensitive(target),
         }
     }
 }
