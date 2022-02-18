@@ -26,7 +26,7 @@ impl<'a> StrMatcher<'a> {
     }
     
     pub fn target(&self) -> &'a str { self.target }
-    pub fn last_match(&self) -> MatchResult { self.state }
+    pub fn last_match_result(&self) -> MatchResult { self.state }
     pub fn count(&self) -> usize { self.count }
     
     pub fn reset(&mut self) {

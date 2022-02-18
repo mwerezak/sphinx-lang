@@ -28,7 +28,7 @@ impl LexerRule for KeywordRule {
     }
     
     fn current_state(&self) -> MatchResult {
-        self.matcher.last_match()
+        self.matcher.last_match_result()
     }
     
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
