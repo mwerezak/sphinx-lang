@@ -2,6 +2,7 @@ use crate::lexer::Token;
 
 pub mod strmatcher;
 pub mod general;
+pub mod literals;
 pub mod comments;
 
 pub use general::*;
