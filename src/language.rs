@@ -52,6 +52,7 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(MultiCharRule::new(Token::OpModAssign,      "%="))
     .add_rule(MultiCharRule::new(Token::OpAndAssign,      "&="))
     .add_rule(MultiCharRule::new(Token::OpOrAssign,       "|="))
+    .add_rule(MultiCharRule::new(Token::OpXorAssign,       "^="))
     .add_rule(MultiCharRule::new(Token::OpLShiftAssign,   "<<="))
     .add_rule(MultiCharRule::new(Token::OpRShiftAssign,   ">>="))
     
@@ -59,7 +60,6 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(MultiCharRule::new(Token::OpRShift,         ">>"))
     
     // Keywords
-    
     .add_rule(KeywordRule::new(Token::And,                "and"))
     .add_rule(KeywordRule::new(Token::Or,                 "or"))
     .add_rule(KeywordRule::new(Token::Not,                "not"))
@@ -83,7 +83,6 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(KeywordRule::new(Token::End,                "end"))
     
     // Identifiers and literals
-    
     .add_rule(IdentifierRule::new())
     .add_rule(IntegerLiteralRule::new())
     .add_rule(HexIntegerLiteralRule::new())

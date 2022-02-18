@@ -109,8 +109,8 @@ echo breakfast; # "bagels".
 breakfast = "beignets";
 echo breakfast; # "beignets".
 
-var c = 0;
-var a = var b = c = 1;  # chaining (assignment is right associative)
+var b = 0;
+var a = b += var c = 1;  # chaining (assignment is right associative)
 
 del a;  # drop a variable from the current scope
 
