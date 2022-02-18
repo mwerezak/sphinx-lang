@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::lexer::Token;
 use super::{MatchResult, LexerRule};
 
@@ -6,11 +7,17 @@ use super::{MatchResult, LexerRule};
 #[derive(Debug)]
 pub struct IdentifierRule {
     buf: String,
+    reserved: HashSet<&'static str>,
 }
 
 impl IdentifierRule {
-    pub fn new() -> Self {
-        IdentifierRule { buf: String::new() }
+    pub fn new<I>(reserved: I) -> Self 
+        where I: IntoIterator<Item=&'static str>
+    {
+        IdentifierRule {
+            buf: String::new(),
+            reserved: HashSet::from_iter(reserved),
+        }
     }
 }
 
@@ -22,6 +29,8 @@ impl LexerRule for IdentifierRule {
     
     fn current_state(&self) -> MatchResult { 
         if self.buf.is_empty() {
+            MatchResult::IncompleteMatch
+        } else if self.reserved.contains(self.buf.as_str()) {
             MatchResult::IncompleteMatch
         } else {
             MatchResult::CompleteMatch
@@ -36,10 +45,15 @@ impl LexerRule for IdentifierRule {
                     _ => true,
                 };
                 
-                word_boundary && (next == '_' || next.is_ascii_alphabetic())
-                
+                match next {
+                    '_' | 'a'..='z' | 'A'..='Z' if word_boundary => true,
+                    _ => false,
+                }
             } else {
-                next == '_' || next.is_ascii_alphanumeric()
+                match next {
+                    '_' | 'a'..='z' | 'A'..='Z' | '0'..='9'  => true,
+                    _ => false,
+                }
             };
         
         if valid {

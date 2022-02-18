@@ -60,8 +60,6 @@ pub struct MultiCharRule {
 
 impl MultiCharRule {
     pub fn new(result: Token, target: &'static str) -> Self {
-        debug_assert!(!target.is_empty());
-        
         MultiCharRule {
             result,
             matcher: StrMatcher::new(target),

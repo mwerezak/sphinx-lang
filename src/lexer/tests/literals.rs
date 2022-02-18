@@ -10,6 +10,8 @@ fn lexer_test_identifiers() {
     let source = r#"
         valid _also asd2_32df_s3
         
+        reserved
+        
         both+valid2
         
         0no _0valid 
@@ -17,7 +19,7 @@ fn lexer_test_identifiers() {
     "#;
     
     let mut lexer = LexerBuilder::new()
-        .add_rule(IdentifierRule::new())
+        .add_rule(IdentifierRule::new(["reserved"]))
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
         .build(source.chars());
     
@@ -35,69 +37,122 @@ fn lexer_test_identifiers() {
         token if s == "valid" => {
             token: Token::Identifier(ref s),
             location: Span { length: 5, .. },
-            lineno: 2,
+            ..
         } "valid",
 
         token if s == "_also" => {
             token: Token::Identifier(ref s),
             location: Span { length: 5, .. },
-            lineno: 2,
+            ..
         } "_also",
 
         token if s == "asd2_32df_s3" => {
             token: Token::Identifier(ref s),
             location: Span { length: 12, .. },
-            lineno: 2,
+            ..
         } "asd2_32df_s3",
+        
+        error => {
+            etype: LexerErrorType::NoMatchingRule,
+            location: Span { length: 8, .. },
+            ..
+        } "reserved",
 
         token if s == "both" => {
             token: Token::Identifier(ref s),
             location: Span { length: 4, .. },
-            lineno: 4,
+            ..
         } "both",
         
         token => {
             token: Token::IntegerLiteral(0),
             location: Span { length: 1, .. },
-            lineno: 4,
+            ..
         } "+",
         
         token if s == "valid2" => {
             token: Token::Identifier(ref s),
             location: Span { length: 6, .. },
-            lineno: 4,
+            ..
         } "valid2",
         
         error => {
             etype: LexerErrorType::NoMatchingRule,
             location: Span { length: 1, .. },
-            lineno: 6,
+            ..
         } "0no - 0",
         
         error => {
             etype: LexerErrorType::NoMatchingRule,
             location: Span { length: 1, .. },
-            lineno: 6,
+            ..
         } "0no - n",
 
         error => {
             etype: LexerErrorType::NoMatchingRule,
             location: Span { length: 1, .. },
-            lineno: 6,
+            ..
         } "0no - o",
 
         token if s == "_0valid" => {
             token: Token::Identifier(ref s),
             location: Span { length: 7, .. },
-            lineno: 6,
+            ..
         } "_0valid",
 
         token => {
             token: Token::EOF,
             location: Span { length: 0, .. },
-            lineno: 8,
+            ..
         } "EOF",
     
+    );
+
+}
+
+use crate::lexer::rules::keywords::KeywordRule;
+
+#[test]
+fn lexer_test_keywords_and_identifiers() {
+    let source = " k   _k  9k k9 ";
+    
+    // kind of contrived...
+    let mut lexer = LexerBuilder::new()
+        .add_rule(KeywordRule::new(Token::Fun, "k"))
+        .add_rule(IdentifierRule::new(["k"]))
+        .build(source.chars());
+    
+    assert_token_sequence!(lexer,
+    
+        token => {
+            token: Token::Fun,
+            location: Span { length: 1, .. },
+            ..
+        } "k",
+        
+        token if s == "_k" => {
+            token: Token::Identifier(ref s),
+            location: Span { length: 2, .. },
+            ..
+        } "_k",
+        
+        error => {
+            etype: LexerErrorType::NoMatchingRule,
+            location: Span { length: 1, .. },
+            ..
+        } "9k.1",
+        
+        error => {
+            etype: LexerErrorType::NoMatchingRule,
+            location: Span { length: 1, .. },
+            ..
+        } "9k.2",
+        
+        token if s == "k9" => {
+            token: Token::Identifier(ref s),
+            location: Span { length: 2, .. },
+            ..
+        } "k9",
     );
 
 }

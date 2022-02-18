@@ -1,10 +1,12 @@
 use crate::lexer::{LexerBuilder, Token};
-use crate::lexer::rules::*;
+use crate::lexer::rules::{SingleCharRule, MultiCharRule};
+use crate::lexer::rules::keywords::KeywordRule;
 
 pub static COMMENT_CHAR: char = '#';
 
 pub static NESTED_COMMENT_START: &'static str = "#{";
 pub static NESTED_COMMENT_END:   &'static str = "}#";
+
 
 pub fn create_default_lexer_rules() -> LexerBuilder {
     LexerBuilder::new()
@@ -43,33 +45,33 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(MultiCharRule::new(Token::OpLShiftAssign,   "<<="))
     .add_rule(MultiCharRule::new(Token::OpRShiftAssign,   ">>="))
     
-    .add_rule(SingleCharRule::new(Token::OpLT,        '<'))
-    .add_rule(SingleCharRule::new(Token::OpGT,        '>'))
+    .add_rule(SingleCharRule::new(Token::OpLT,            '<'))
+    .add_rule(SingleCharRule::new(Token::OpGT,            '>'))
     
     .add_rule(MultiCharRule::new(Token::OpLE,             "<="))
     .add_rule(MultiCharRule::new(Token::OpGE,             ">="))
     .add_rule(MultiCharRule::new(Token::OpEQ,             "=="))
     .add_rule(MultiCharRule::new(Token::OpNE,             "!="))
     
-    .add_rule(MultiCharRule::new(Token::And,              "and"))
-    .add_rule(MultiCharRule::new(Token::Or,               "or"))
-    .add_rule(MultiCharRule::new(Token::Not,              "not"))
-    .add_rule(MultiCharRule::new(Token::True,             "true"))
-    .add_rule(MultiCharRule::new(Token::False,            "false"))
-    .add_rule(MultiCharRule::new(Token::Nil,              "nil"))
-    .add_rule(MultiCharRule::new(Token::Var,              "var"))
-    .add_rule(MultiCharRule::new(Token::Begin,            "begin"))
-    .add_rule(MultiCharRule::new(Token::If,               "if"))
-    .add_rule(MultiCharRule::new(Token::Then,             "then"))
-    .add_rule(MultiCharRule::new(Token::Elif,             "elif"))
-    .add_rule(MultiCharRule::new(Token::Else,             "else"))
-    .add_rule(MultiCharRule::new(Token::For,              "for"))
-    .add_rule(MultiCharRule::new(Token::While,            "while"))
-    .add_rule(MultiCharRule::new(Token::Do,               "do"))
-    .add_rule(MultiCharRule::new(Token::Fun,              "fun"))
-    .add_rule(MultiCharRule::new(Token::Class,            "class"))
-    .add_rule(MultiCharRule::new(Token::Self_,            "self"))
-    .add_rule(MultiCharRule::new(Token::Super,            "super"))
-    .add_rule(MultiCharRule::new(Token::Echo,             "echo"))
-    .add_rule(MultiCharRule::new(Token::End,              "end"))
+    .add_rule(KeywordRule::new(Token::And,                "and"))
+    .add_rule(KeywordRule::new(Token::Or,                 "or"))
+    .add_rule(KeywordRule::new(Token::Not,                "not"))
+    .add_rule(KeywordRule::new(Token::True,               "true"))
+    .add_rule(KeywordRule::new(Token::False,              "false"))
+    .add_rule(KeywordRule::new(Token::Nil,                "nil"))
+    .add_rule(KeywordRule::new(Token::Var,                "var"))
+    .add_rule(KeywordRule::new(Token::Begin,              "begin"))
+    .add_rule(KeywordRule::new(Token::If,                 "if"))
+    .add_rule(KeywordRule::new(Token::Then,               "then"))
+    .add_rule(KeywordRule::new(Token::Elif,               "elif"))
+    .add_rule(KeywordRule::new(Token::Else,               "else"))
+    .add_rule(KeywordRule::new(Token::For,                "for"))
+    .add_rule(KeywordRule::new(Token::While,              "while"))
+    .add_rule(KeywordRule::new(Token::Do,                 "do"))
+    .add_rule(KeywordRule::new(Token::Fun,                "fun"))
+    .add_rule(KeywordRule::new(Token::Class,              "class"))
+    .add_rule(KeywordRule::new(Token::Self_,              "self"))
+    .add_rule(KeywordRule::new(Token::Super,              "super"))
+    .add_rule(KeywordRule::new(Token::Echo,               "echo"))
+    .add_rule(KeywordRule::new(Token::End,                "end"))
 }
