@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use crate::lexer::{LexerBuilder, Token, TokenMeta, Span};
 use crate::lexer::rules::ExactRule;
 use crate::lexer::rules::comments::*;
@@ -28,45 +30,45 @@ fn lexer_test_comments() {
     
     assert_token_sequence!(lexer,
     
-        token {
+        token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 0, length: 3 },
+            location: Span { length: 3, .. },
             lineno: 1,
         } "foo",
         
-        token {
+        token => {
             token: Token::Comment,
-            location: Span { index: 4, length: 5 },
+            location: Span { length: 5, .. },
             lineno: 1,
         } "#bar",
         
-        token {
+        token => {
             token: Token::Comment,
-            location: Span { index: 20, length: 8 },
+            location: Span { length: 8, .. },
             lineno: 3,
         } "#   #{{",
         
-        token {
+        token => {
             token: Token::IntegerLiteral(2),
-            location: Span { index: 37, length: 3 },
+            location: Span { length: 3, .. },
             lineno: 5,
         } "baz",
         
-        token {
+        token => {
             token: Token::Comment,
-            location: Span { index: 41, length: 65 },
+            location: Span { length: 65, .. },
             lineno: 5,
         } "multiline comment block",
     
-        token {
+        token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 107, length: 3 },
+            location: Span { length: 3, .. },
             lineno: 10,
         } "bar",
     
-        token {
+        token => {
             token: Token::EOF,
-            location: Span { index: 120, length: 0 },
+            location: Span { length: 0, .. },
             lineno: 12,
         } "EOF",
     
@@ -99,27 +101,27 @@ fn lexer_test_skip_comments() {
     
     assert_token_sequence!(lexer,
     
-        token {
+        token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 0, length: 3 },
+            location: Span { length: 3, .. },
             lineno: 1,
         } "foo",
         
-        token {
+        token => {
             token: Token::IntegerLiteral(2),
-            location: Span { index: 37, length: 3 },
+            location: Span { length: 3, .. },
             lineno: 5,
         } "baz",
         
-        token {
+        token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 107, length: 3 },
+            location: Span { length: 3, .. },
             lineno: 10,
         } "bar",
         
-        token {
+        token => {
             token: Token::EOF,
-            location: Span { index: 120, length: 0 },
+            location: Span { length: 0, .. },
             lineno: 12,
         } "EOF",
     
