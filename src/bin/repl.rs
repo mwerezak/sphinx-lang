@@ -1,7 +1,7 @@
 use clap::{App, Arg};
 
 use interpreter::language;
-use interpreter::lexer::{TokenOut, Token};
+use interpreter::lexer::{TokenMeta, Token};
 
 fn main() {
     let app = App::new("repl")
@@ -32,7 +32,7 @@ fn main() {
             let out = lexer.next_token();
             println!("{:?}", out);
             
-            if let Ok(TokenOut { token: Token::EOF, .. }) = out {
+            if let Ok(TokenMeta { token: Token::EOF, .. }) = out {
                 break;
             }
         }

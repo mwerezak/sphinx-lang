@@ -8,7 +8,7 @@ macro_rules! assert_next_token {
         let token = $lexer.next_token().unwrap();
         
         println!("token: {:?}", token);
-        assert!(matches!(token, TokenOut $token_body) $(, $msg )?)
+        assert!(matches!(token, TokenMeta $token_body) $(, $msg )?)
     };
     
     // assert_next_token!(<lexer>, error { <match body> }, "failure message")
