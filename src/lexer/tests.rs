@@ -1,9 +1,8 @@
 #![cfg(test)]
 
-use crate::lexer::{LexerBuilder, Token, TokenOut, Span};
-use crate::lexer::errors::{LexerError, LexerErrorType};
-use crate::lexer::rules::*;
-
+use super::{LexerBuilder, Token, TokenOut, Span};
+use super::errors::{LexerError, LexerErrorType};
+use super::rules::comments::*;
 
 #[test]
 fn lexer_matches_tokens_1() {

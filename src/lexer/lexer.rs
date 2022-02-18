@@ -1,8 +1,8 @@
 use std::iter::{Iterator, Peekable};
 use crate::language;
-use crate::lexer::{Token, LexerError, LexerErrorType};
-use crate::lexer::rules::{LexerRule, MatchResult};
-use crate::lexer::rules::{LineCommentRule, BlockCommentRule};
+use super::{Token, LexerError, LexerErrorType};
+use super::rules::{LexerRule, MatchResult};
+use super::rules::comments::{LineCommentRule, BlockCommentRule};
 
 
 // Token Output

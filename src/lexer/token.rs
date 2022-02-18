@@ -38,7 +38,6 @@ pub enum Token {
     Identifier(String),
     StringLiteral(String),
     IntegerLiteral(u32),
-    HexIntegerLiteral(u32),
     FloatLiteral(f32),
     
     // Misc
