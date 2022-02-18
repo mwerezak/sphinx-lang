@@ -1,57 +1,25 @@
 use crate::lexer::{LexerBuilder, Token};
 use crate::lexer::rules::{SingleCharRule, MultiCharRule};
 use crate::lexer::rules::keywords::KeywordRule;
+use crate::lexer::rules::literals::{IdentifierRule};
 
 pub static COMMENT_CHAR: char = '#';
 
 pub static NESTED_COMMENT_START: &'static str = "#{";
 pub static NESTED_COMMENT_END:   &'static str = "}#";
 
+// strings that cannot be used as valid identifiers
+pub const RESERVED_WORDS: [&str; 21] = [
+    "and", "or", "not", "true", "false", "nil", "var", "begin", 
+    "if", "then", "elif", "else", "for", "while", "do", "fun", 
+    "class", "self", "super", "echo", "end",
+];
+
 
 pub fn create_default_lexer_rules() -> LexerBuilder {
     LexerBuilder::new()
-    .add_rule(SingleCharRule::new(Token::OpenParen,   '('))
-    .add_rule(SingleCharRule::new(Token::CloseParen,  ')'))
-    .add_rule(SingleCharRule::new(Token::OpenBrace,   '{'))
-    .add_rule(SingleCharRule::new(Token::CloseBrace,  '}'))
-    .add_rule(SingleCharRule::new(Token::OpenSquare,  '['))
-    .add_rule(SingleCharRule::new(Token::CloseSquare, ']'))
-    .add_rule(SingleCharRule::new(Token::Comma,       ','))
-    .add_rule(SingleCharRule::new(Token::Colon,       ':'))
-    .add_rule(SingleCharRule::new(Token::Semicolon,   ';'))
-
-    .add_rule(SingleCharRule::new(Token::OpAssign,    '='))
-    .add_rule(SingleCharRule::new(Token::OpAccess,    '.'))
     
-    .add_rule(SingleCharRule::new(Token::OpAdd,       '+'))
-    .add_rule(SingleCharRule::new(Token::OpSub,       '-'))
-    .add_rule(SingleCharRule::new(Token::OpMul,       '*'))
-    .add_rule(SingleCharRule::new(Token::OpDiv,       '/'))
-    .add_rule(SingleCharRule::new(Token::OpMod,       '%'))
-    .add_rule(SingleCharRule::new(Token::OpAnd,       '&'))
-    .add_rule(SingleCharRule::new(Token::OpOr,        '|'))
-    .add_rule(SingleCharRule::new(Token::OpXor,       '^'))
-    
-    .add_rule(MultiCharRule::new(Token::OpLShift,         "<<"))
-    .add_rule(MultiCharRule::new(Token::OpRShift,         ">>"))
-    
-    .add_rule(MultiCharRule::new(Token::OpAddAssign,      "+="))
-    .add_rule(MultiCharRule::new(Token::OpSubAssign,      "-="))
-    .add_rule(MultiCharRule::new(Token::OpMulAssign,      "*="))
-    .add_rule(MultiCharRule::new(Token::OpDivAssign,      "/="))
-    .add_rule(MultiCharRule::new(Token::OpModAssign,      "%="))
-    .add_rule(MultiCharRule::new(Token::OpAndAssign,      "&="))
-    .add_rule(MultiCharRule::new(Token::OpOrAssign,       "|="))
-    .add_rule(MultiCharRule::new(Token::OpLShiftAssign,   "<<="))
-    .add_rule(MultiCharRule::new(Token::OpRShiftAssign,   ">>="))
-    
-    .add_rule(SingleCharRule::new(Token::OpLT,            '<'))
-    .add_rule(SingleCharRule::new(Token::OpGT,            '>'))
-    
-    .add_rule(MultiCharRule::new(Token::OpLE,             "<="))
-    .add_rule(MultiCharRule::new(Token::OpGE,             ">="))
-    .add_rule(MultiCharRule::new(Token::OpEQ,             "=="))
-    .add_rule(MultiCharRule::new(Token::OpNE,             "!="))
+    .add_rule(IdentifierRule::new(RESERVED_WORDS))
     
     .add_rule(KeywordRule::new(Token::And,                "and"))
     .add_rule(KeywordRule::new(Token::Or,                 "or"))
@@ -74,4 +42,48 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(KeywordRule::new(Token::Super,              "super"))
     .add_rule(KeywordRule::new(Token::Echo,               "echo"))
     .add_rule(KeywordRule::new(Token::End,                "end"))
+    
+    .add_rule(SingleCharRule::new(Token::OpAdd,           '+'))
+    .add_rule(SingleCharRule::new(Token::OpSub,           '-'))
+    .add_rule(SingleCharRule::new(Token::OpMul,           '*'))
+    .add_rule(SingleCharRule::new(Token::OpDiv,           '/'))
+    .add_rule(SingleCharRule::new(Token::OpMod,           '%'))
+    .add_rule(SingleCharRule::new(Token::OpAnd,           '&'))
+    .add_rule(SingleCharRule::new(Token::OpOr,            '|'))
+    .add_rule(SingleCharRule::new(Token::OpXor,           '^'))
+    
+    .add_rule(SingleCharRule::new(Token::OpLT,            '<'))
+    .add_rule(SingleCharRule::new(Token::OpGT,            '>'))
+    
+    .add_rule(MultiCharRule::new(Token::OpLE,             "<="))
+    .add_rule(MultiCharRule::new(Token::OpGE,             ">="))
+    .add_rule(MultiCharRule::new(Token::OpEQ,             "=="))
+    .add_rule(MultiCharRule::new(Token::OpNE,             "!="))
+    
+    .add_rule(MultiCharRule::new(Token::OpAddAssign,      "+="))
+    .add_rule(MultiCharRule::new(Token::OpSubAssign,      "-="))
+    .add_rule(MultiCharRule::new(Token::OpMulAssign,      "*="))
+    .add_rule(MultiCharRule::new(Token::OpDivAssign,      "/="))
+    .add_rule(MultiCharRule::new(Token::OpModAssign,      "%="))
+    .add_rule(MultiCharRule::new(Token::OpAndAssign,      "&="))
+    .add_rule(MultiCharRule::new(Token::OpOrAssign,       "|="))
+    .add_rule(MultiCharRule::new(Token::OpLShiftAssign,   "<<="))
+    .add_rule(MultiCharRule::new(Token::OpRShiftAssign,   ">>="))
+    
+    .add_rule(MultiCharRule::new(Token::OpLShift,         "<<"))
+    .add_rule(MultiCharRule::new(Token::OpRShift,         ">>"))
+    
+    .add_rule(SingleCharRule::new(Token::OpAssign,        '='))
+    .add_rule(SingleCharRule::new(Token::OpAccess,        '.'))
+    
+    .add_rule(SingleCharRule::new(Token::OpenParen,       '('))
+    .add_rule(SingleCharRule::new(Token::CloseParen,      ')'))
+    .add_rule(SingleCharRule::new(Token::OpenBrace,       '{'))
+    .add_rule(SingleCharRule::new(Token::CloseBrace,      '}'))
+    .add_rule(SingleCharRule::new(Token::OpenSquare,      '['))
+    .add_rule(SingleCharRule::new(Token::CloseSquare,     ']'))
+    .add_rule(SingleCharRule::new(Token::Comma,           ','))
+    .add_rule(SingleCharRule::new(Token::Colon,           ':'))
+    .add_rule(SingleCharRule::new(Token::Semicolon,       ';'))
+
 }

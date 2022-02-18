@@ -3,6 +3,8 @@ use super::{MatchResult, LexerRule};
 use super::strmatcher::StrMatcher;
 
 
+// Similar to MultiCharRule but also ensures that the token starts at a word boundary
+
 #[derive(Debug)]
 pub struct KeywordRule {
     result: Token,
