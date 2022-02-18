@@ -149,8 +149,9 @@ impl LexerRule for HexIntegerLiteralRule {
         if next.is_ascii_hexdigit() {
             self.buf.push(next);
             return MatchResult::CompleteMatch;
+        } else {
+            return MatchResult::NoMatch;
         }
-        return MatchResult::NoMatch;
     }
     
     fn get_token(&self) -> Option<Token> {

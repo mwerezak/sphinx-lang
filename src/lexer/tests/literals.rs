@@ -159,6 +159,7 @@ fn lexer_test_integer_literals() {
         .build(source.chars());
     
     assert_token_sequence!(lexer,
+        
         token if n == 1123 => {
             token: Token::IntegerLiteral(n),
             location: Span { length: 5, .. },

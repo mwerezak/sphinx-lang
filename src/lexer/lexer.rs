@@ -261,10 +261,10 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     }
                 }
                 
-                
                 // println!("({}) next_active: {:?}", self.current, next_active);
                 // println!("({}) complete: {:?}", self.current, complete);
                 
+                // Only care about complete rules if next_active is empty ("rule of maximal munch")
                 if next_active.is_empty() && !complete.is_empty() {
                     // look at rules that matched the previous char
                     // falling back to the rules which matched completely on the previous char
