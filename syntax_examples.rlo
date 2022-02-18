@@ -3,8 +3,10 @@
    #{   Nesting!   }#
 }#
 
+# TODO semicolon elision rules
+
 # Your first ReLox program!
-echo "Hello, world!";
+echo "Hello, world!";  # print() function will be available later once there is a builtin library
 
 # Booleans
 true;  # Not false.
@@ -76,18 +78,23 @@ true or false;  # true.
 var average = (min + max) / 2;
 
 
-# Statements
-
 # Blocks
-# may return a value, or implicitly evaluate to nil
 
 begin
   echo "One statement.";
-  echo "Two statements."  # implicit return
+  echo "Two statements.";
+  "Result value."
+end
+
+begin
+  if condition then
+    break "Early exit"  # can break out of blocks early if you want
+  end
+  "Fallback value."
 end
 
 
-# Variables
+# Variable declaration and assignment
 
 var imAVariable = "here is my value";
 var iAmNil = nil;  # initializer is required
@@ -102,7 +109,14 @@ echo breakfast; # "bagels".
 breakfast = "beignets";
 echo breakfast; # "beignets".
 
+var c = 0;
+var a = var b = c = 1;  # chaining (assignment is right associative)
+
+del a;  # drop a variable from the current scope
+
 # Control Flow
+# branching constructs are expressions
+# looping constructs are statements - in fact, they are the only non-expression statements in ReLox
 
 if condition then
     echo "yes";
@@ -127,12 +141,22 @@ var condExpr =
     "default"
   end;
 
+# loops support both break and continue statements
+
 var a = 1;
 while a < 10 do
+  if exitcond then 
+    break;
+  end
+  if skipcond then 
+    continue;
+  end
+
   echo a;
   a += 1;
 end
 
+# for loops TBD
 
 # not yet, will use iterators
 #for (var a = 1; a < 10; a = a + 1) do
@@ -235,6 +259,7 @@ echo breakfast; # "Breakfast instance".
 var breakfast = Breakfast { meat: "sausage", bread: "sourdough" };
 breakfast.drink = "coffee";
 
+del breakfast.bread;  # remove an object member
 
 var a = 0;
 var anonymous = { some: a = 1, data: 2 };
@@ -342,3 +367,5 @@ class D: C, B end
 var d = D {};
 d.method();  # prints "A.method() called"
 # see also: C3 Linearization
+
+
