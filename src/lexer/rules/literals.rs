@@ -101,7 +101,7 @@ impl LexerRule for IntegerLiteralRule {
     
     fn get_token(&self) -> Option<Token> {
         if self.current_state().is_complete_match() {
-            let value = self.buf.parse::<i32>()
+            let value = i32::from_str_radix(self.buf.as_str(), 10)
                 .unwrap_or_else(|err| { 
                     panic!("could not extract i32 from \"{}\": {:?}", self.buf, err); 
                 });
@@ -113,3 +113,56 @@ impl LexerRule for IntegerLiteralRule {
     
 }
 
+pub struct HexIntegerLiteralRule {
+    buf: String,
+    prefix: StrMatcher<'static>,
+}
+
+impl HexIntegerLiteralRule {
+    pub fn new() -> Self {
+        HexIntegerLiteralRule {
+            buf: String::new(),
+            prefix: StrMatcher::case_insensitive("0x"),
+        }
+    }
+}
+
+impl LexerRule for HexIntegerLiteralRule {
+    fn reset(&mut self) {
+        self.buf.clear();
+        self.prefix.reset();
+    }
+    
+    fn current_state(&self) -> MatchResult {
+        if self.buf.is_empty() {
+            MatchResult::IncompleteMatch
+        } else {
+            self.prefix.last_match_result()
+        }
+    }
+    
+    fn try_match(&mut self, _prev: Option<char>, next: char) -> MatchResult {
+        if !self.prefix.last_match_result().is_complete_match() {
+            return self.prefix.try_match(next);
+        }
+        
+        if next.is_ascii_hexdigit() {
+            self.buf.push(next);
+            return MatchResult::CompleteMatch;
+        }
+        return MatchResult::NoMatch;
+    }
+    
+    fn get_token(&self) -> Option<Token> {
+        if self.current_state().is_complete_match() {
+            let value = i32::from_str_radix(self.buf.as_str(), 16)
+                .unwrap_or_else(|err| { 
+                    panic!("could not extract i32 from \"{}\": {:?}", self.buf, err); 
+                });
+            
+            return Some(Token::IntegerLiteral(value));
+        }
+        return None;
+    }
+    
+}

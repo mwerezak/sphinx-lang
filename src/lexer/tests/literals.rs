@@ -150,18 +150,38 @@ fn lexer_test_keywords_and_identifiers() {
 
 
 #[test]
-fn lexer_test_simple_integer_literals() {
-    let source = " 01123 x ";
+fn lexer_test_integer_literals() {
+    let source = " 01123 xA  0xFACE ";
     
     let mut lexer = LexerBuilder::new()
         .add_rule(IntegerLiteralRule::new())
+        .add_rule(HexIntegerLiteralRule::new())
         .build(source.chars());
     
     assert_token_sequence!(lexer,
-        token if x == 1123 => {
-            token: Token::IntegerLiteral(x),
+        token if n == 1123 => {
+            token: Token::IntegerLiteral(n),
             location: Span { length: 5, .. },
             ..
-        } "01123"
+        } "01123",
+        
+        error => {
+            etype: LexerErrorType::NoMatchingRule,
+            location: Span { length: 1, .. },
+            ..
+        } "x",
+        
+        error => {
+            etype: LexerErrorType::NoMatchingRule,
+            location: Span { length: 1, .. },
+            ..
+        } "A",
+        
+        token if n == 0xFACE => {
+            token: Token::IntegerLiteral(n),
+            location: Span { length: 6, .. },
+            ..
+        } "0xFACE",
+        
     );
 }
