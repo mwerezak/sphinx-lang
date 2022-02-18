@@ -1,4 +1,4 @@
-use crate::lexer::{LexerBuilder, Token, TokenOut, Span};
+use crate::lexer::{LexerBuilder, Token, TokenMeta, Span};
 use crate::lexer::rules::ExactRule;
 use crate::lexer::rules::comments::*;
 

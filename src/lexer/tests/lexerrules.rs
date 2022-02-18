@@ -1,4 +1,4 @@
-use crate::lexer::{LexerBuilder, Token, TokenOut, Span};
+use crate::lexer::{LexerBuilder, Token, TokenMeta, Span};
 use crate::lexer::errors::{LexerError, LexerErrorType};
 
 #[test]

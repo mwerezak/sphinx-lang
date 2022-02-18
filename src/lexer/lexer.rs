@@ -8,16 +8,16 @@ use super::rules::comments::{LineCommentRule, BlockCommentRule};
 // Token Output
 
 // include only mere character indexes in the output
-// if a lexeme needs to be rendered, the relevant string can be extracted then
+// if a lexeme needs to be rendered (e.g. for error messages), 
+// the relevant string can be extracted from the source then
 #[derive(Debug)]
 pub struct Span {
     pub index: usize,
     pub length: usize,
 }
 
-// uses lifetime of the source text
 #[derive(Debug)]
-pub struct TokenOut {
+pub struct TokenMeta {
     pub token: Token,
     pub location: Span,
     pub lineno: u64,
@@ -187,7 +187,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
     }
     
-    pub fn next_token(&mut self) -> Result<TokenOut, LexerError> {
+    pub fn next_token(&mut self) -> Result<TokenMeta, LexerError> {
         
         self.skip_whitespace();
         
@@ -309,7 +309,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         return Err(self.error(LexerErrorType::UnexpectedEOF, token_start));
     }
     
-    fn exhaust_rule(&mut self, rule_idx: usize, token_start: usize, token_line: u64) -> Result<TokenOut, LexerError> {
+    fn exhaust_rule(&mut self, rule_idx: usize, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
         {
             let rule = &mut self.rules[rule_idx];
             debug_assert!(!matches!(rule.current_state(), MatchResult::NoMatch));
@@ -351,8 +351,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         return Span { index: start_idx, length };
     }
     
-    fn token_data(&self, token: Token, token_start: usize, token_line: u64) -> TokenOut {
-        TokenOut {
+    fn token_data(&self, token: Token, token_start: usize, token_line: u64) -> TokenMeta {
+        TokenMeta {
             token,
             location: self.current_span(token_start),
             lineno: token_line,
