@@ -5,19 +5,19 @@ macro_rules! assert_next_token {
     // assert_next_token!(<lexer>, token { <match body> } [if <guard>] , "failure message")
     ( $lexer:expr, token $token_body:tt $( if $guard:expr )? $(, $msg:expr )? ) => {
         
-        let token = $lexer.next_token().unwrap();
+        let out = $lexer.next_token();
         
-        println!("token: {:?}", token);
-        assert!(matches!(token, TokenMeta $token_body $( if $guard)? ) $(, $msg )?)
+        println!("{:?}", out);
+        assert!(matches!(out.unwrap(), TokenMeta $token_body $( if $guard)? ) $(, $msg )?)
     };
     
     // assert_next_token!(<lexer>, error { <match body> }, "failure message")
     ( $lexer:expr, error $error_body:tt $( if $guard:expr )? $(, $msg:expr )? ) => {
         
-        let error = $lexer.next_token().unwrap_err();
+        let out = $lexer.next_token();
         
-        println!("error: {:?}", error);
-        assert!(matches!(error, LexerError $error_body $( if $guard)? ) $(, $msg )?)
+        println!("{:?}", out);
+        assert!(matches!(out.unwrap_err(), LexerError $error_body $( if $guard)? ) $(, $msg )?)
     };
 }
 

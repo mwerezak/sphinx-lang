@@ -78,6 +78,7 @@ impl LexerBuilder {
             source: source.peekable(),
             options: self.options,
             rules: self.rules,
+            last: None,
             
             current: 0,
             lineno: 1,
@@ -99,6 +100,7 @@ pub struct Lexer<S> where S: Iterator<Item=char> {
     
     current: usize, // one ahead of current char
     lineno: u64,
+    last: Option<char>,
     
     // internal state used by next_token(). 
     // putting these here instead to avoid unnecessary allocations
@@ -108,7 +110,8 @@ pub struct Lexer<S> where S: Iterator<Item=char> {
 
 impl<S> Lexer<S> where S: Iterator<Item=char> {
     
-    fn advance(&mut self) -> Option<char> {
+    fn advance(&mut self) -> (Option<char>, Option<char>) {
+        self.last = self.peek_next();
         let next = self.source.next();
         if let Some(ch) = next {
             self.current += 1;
@@ -116,11 +119,15 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 self.lineno += 1;
             }
         }
-        return next;
+        return (self.last, next);
     }
     
     // these have to be &mut self because they can mutate the source iterator
-    fn peek(&mut self) -> Option<char> {
+    fn peek(&mut self) -> (Option<char>, Option<char>) {
+        (self.last, self.peek_next())
+    }
+    
+    fn peek_next(&mut self) -> Option<char> {
         match self.source.peek() {
             Some(&ch) => Some(ch),
             None => None,
@@ -132,10 +139,10 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
     
     fn skip_whitespace(&mut self) {
-        let mut next = self.peek();
+        let mut next = self.peek_next();
         while next.is_some() && next.unwrap().is_whitespace() {
             self.advance();
-            next = self.peek();
+            next = self.peek_next();
         }
     }
     
@@ -148,19 +155,20 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         
         let start_pos = self.current;
         loop {
-            let next = match self.peek() {
+            let (prev, next) = self.peek();
+            let next = match next {
                 Some(ch) => ch,
                 None => break,
             };
             
             if let Some(rule) = line.as_mut() {
-                if !rule.try_match(next).is_match() {
+                if !rule.try_match(prev, next).is_match() {
                     line = None;
                 }
             }
             
             if let Some(rule) = block.as_mut() {
-                if !rule.try_match(next).is_match() {
+                if !rule.try_match(prev, next).is_match() {
                     block = None;
                 }
             }
@@ -216,7 +224,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         //    advance current to the next char
         
         // check if we are already at EOF
-        let mut next = match self.peek() {
+        let (mut prev, next) = self.peek();
+        let mut next = match next {
             Some(ch) => ch,
             None => {
                 return Ok(self.token_data(Token::EOF, token_start, token_line));
@@ -241,7 +250,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 
                 for &rule_idx in active.iter() {
                     let rule = &mut self.rules[rule_idx];
-                    let match_result = rule.try_match(next);
+                    let match_result = rule.try_match(prev, next);
                     
                     if match_result.is_match() {
                         next_active.push(rule_idx);
@@ -287,7 +296,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     return self.exhaust_rule(match_idx, token_start, token_line);
                 }
                 
-                next = match self.peek() {
+                prev = Some(next);
+                next = match self.peek_next() {
                     Some(ch) => ch,
                     None => break,
                 };
@@ -316,7 +326,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
 
         loop {
-            let next = match self.peek() {
+            let (prev, next) = self.peek();
+            let next = match next {
                 Some(ch) => ch,
                 None => break,
             };
@@ -324,7 +335,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             {
                 // println!("({}) next: {:?}", self.current, next);
                 let rule = &mut self.rules[rule_idx];
-                match rule.try_match(next) {
+                match rule.try_match(prev, next) {
                     MatchResult::NoMatch => break,
                     _ => { self.advance(); },
                 }

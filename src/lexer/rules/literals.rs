@@ -26,15 +26,19 @@ impl LexerRule for IdentifierRule {
         }
     }
     
-    fn try_match(&mut self, next: char) -> MatchResult {
-        let valid = match next {
-            '_' | 'a'..='z' | 'A'..='Z' => true,
-            
-            // not valid for first character
-            '0'..='9' if !self.buf.is_empty() => true,
-            
-            _ => false,
-        };
+    fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
+        let valid = 
+            if self.buf.is_empty() {
+                let word_boundary = match prev {
+                    Some(ch) if ch == '_' || ch.is_ascii_alphanumeric() => false,
+                    _ => true,
+                };
+                
+                word_boundary && (next == '_' || next.is_ascii_alphabetic())
+                
+            } else {
+                next == '_' || next.is_ascii_alphanumeric()
+            };
         
         if valid {
             self.buf.push(next);

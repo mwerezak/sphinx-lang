@@ -34,7 +34,7 @@ impl LexerRule for SingleCharRule {
     
     fn current_state(&self) -> MatchResult { self.state }
     
-    fn try_match(&mut self, next: char) -> MatchResult {
+    fn try_match(&mut self, _prev: Option<char>, next: char) -> MatchResult {
         let match_result = self.peek(next);
         if match_result.is_match() {
             self.state = match_result;
@@ -78,7 +78,7 @@ impl LexerRule for ExactRule {
         self.matcher.last_match()
     }
     
-    fn try_match(&mut self, next: char) -> MatchResult {
+    fn try_match(&mut self, _prev: Option<char>, next: char) -> MatchResult {
         self.matcher.try_match(next)
     }
     

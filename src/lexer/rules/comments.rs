@@ -59,7 +59,7 @@ impl LexerRule for LineCommentRule {
         self.match_state(self.state)
     }
     
-    fn try_match(&mut self, next: char) -> MatchResult {
+    fn try_match(&mut self, _prev: Option<char>, next: char) -> MatchResult {
         let state = self.next_state(self.state, next);
         let match_result = self.match_state(state);
         
@@ -112,7 +112,7 @@ impl LexerRule for BlockCommentRule {
         return self.start.last_match();
     }
     
-    fn try_match(&mut self, next: char) -> MatchResult {
+    fn try_match(&mut self, _prev: Option<char>, next: char) -> MatchResult {
 
         let start_result = self.start.try_match(next);
         if start_result.is_complete_match() {

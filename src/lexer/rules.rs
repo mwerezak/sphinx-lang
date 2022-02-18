@@ -50,7 +50,7 @@ pub trait LexerRule {
     
     // like feed, but only modifies the LexerRule state if would match
     // return the match state if ch was passed to feed()
-    fn try_match(&mut self, next: char) -> MatchResult;
+    fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult;
     
     // produce Some(Token) if current state is CompleteMatch, otherwise None
     fn get_token(&self) -> Option<Token>;

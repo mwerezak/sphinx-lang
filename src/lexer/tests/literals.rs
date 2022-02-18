@@ -12,7 +12,7 @@ fn lexer_test_identifiers() {
         
         both+valid2
         
-        0not _0valid 
+        0no _0valid 
         
     "#;
     
@@ -72,7 +72,19 @@ fn lexer_test_identifiers() {
             etype: LexerErrorType::NoMatchingRule,
             location: Span { length: 1, .. },
             lineno: 6,
-        } "0not",
+        } "0no - 0",
+        
+        error => {
+            etype: LexerErrorType::NoMatchingRule,
+            location: Span { length: 1, .. },
+            lineno: 6,
+        } "0no - n",
+
+        error => {
+            etype: LexerErrorType::NoMatchingRule,
+            location: Span { length: 1, .. },
+            lineno: 6,
+        } "0no - o",
 
         token if s == "_0valid" => {
             token: Token::Identifier(ref s),
