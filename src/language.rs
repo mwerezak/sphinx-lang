@@ -1,7 +1,8 @@
 use crate::lexer::{LexerBuilder, Token};
 use crate::lexer::rules::{SingleCharRule, MultiCharRule};
 use crate::lexer::rules::keywords::KeywordRule;
-use crate::lexer::rules::literals::{IdentifierRule};
+use crate::lexer::rules::literals::{IdentifierRule, IntegerLiteralRule, HexIntegerLiteralRule};
+
 
 pub static COMMENT_CHAR: char = '#';
 
@@ -20,6 +21,8 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     LexerBuilder::new()
     
     .add_rule(IdentifierRule::new(RESERVED_WORDS))
+    .add_rule(IntegerLiteralRule::new())
+    .add_rule(HexIntegerLiteralRule::new())
     
     .add_rule(KeywordRule::new(Token::And,                "and"))
     .add_rule(KeywordRule::new(Token::Or,                 "or"))
