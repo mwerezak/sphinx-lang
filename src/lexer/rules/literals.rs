@@ -1,6 +1,8 @@
 use crate::lexer::Token;
 use super::{MatchResult, LexerRule};
 
+// Identifiers
+
 #[derive(Debug)]
 pub struct IdentifierRule {
     buf: String,

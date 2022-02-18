@@ -50,26 +50,26 @@ impl LexerRule for SingleCharRule {
     }
 }
 
-// Keyword Rules
+// Multi Character Rules
 
 #[derive(Debug)]
-pub struct ExactRule {
+pub struct MultiCharRule {
     result: Token,
     matcher: StrMatcher<'static>,
 }
 
-impl ExactRule {
+impl MultiCharRule {
     pub fn new(result: Token, target: &'static str) -> Self {
         debug_assert!(!target.is_empty());
         
-        ExactRule {
+        MultiCharRule {
             result,
             matcher: StrMatcher::new(target),
         }
     }
 }
 
-impl LexerRule for ExactRule {
+impl LexerRule for MultiCharRule {
     fn reset(&mut self) {
         self.matcher.reset();
     }

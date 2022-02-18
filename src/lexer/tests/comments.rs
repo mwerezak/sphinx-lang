@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate::lexer::{LexerBuilder, Token, TokenMeta, Span};
-use crate::lexer::rules::ExactRule;
+use crate::lexer::rules::MultiCharRule;
 use crate::lexer::rules::comments::*;
 
 #[test]
@@ -21,9 +21,9 @@ fn lexer_test_comments() {
     
     let mut lexer = LexerBuilder::new()
         .set_skip_comments(false)  // we're testing them, after all!
-        .add_rule(ExactRule::new(Token::IntegerLiteral(0), "foo"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "bar"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "baz"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(0), "foo"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "bar"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "baz"))
         .add_rule(LineCommentRule::new('#'))
         .add_rule(BlockCommentRule::new("#{", "}#"))
         .build(source.chars());
@@ -92,9 +92,9 @@ fn lexer_test_skip_comments() {
     
     let mut lexer = LexerBuilder::new()
         .set_skip_comments(true)
-        .add_rule(ExactRule::new(Token::IntegerLiteral(0), "foo"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "bar"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "baz"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(0), "foo"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "bar"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "baz"))
         .add_rule(LineCommentRule::new('#'))
         .add_rule(BlockCommentRule::new("#{", "}#"))
         .build(source.chars());

@@ -8,9 +8,9 @@ fn lexer_matches_tokens_1() {
     let source = "foobar";
     
     let mut lexer = LexerBuilder::new()
-        .add_rule(ExactRule::new(Token::IntegerLiteral(0), "foo"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "bar"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "baz"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(0), "foo"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "bar"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "baz"))
         .build(source.chars());
     
     assert_token_sequence!(lexer,
@@ -39,8 +39,8 @@ fn lexer_skips_whitespace() {
     let source = "  foo   bar";
     
     let mut lexer = LexerBuilder::new()
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "foo"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "bar"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "foo"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "bar"))
         .build(source.chars());
     
     assert_token_sequence!(lexer,
@@ -64,8 +64,8 @@ fn lexer_tracks_line_numbers() {
     let source = " \nfoo \n\n  bar";
     
     let mut lexer = LexerBuilder::new()
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "foo"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "bar"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "foo"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "bar"))
         .build(source.chars());
     
     assert_token_sequence!(lexer,
@@ -86,7 +86,7 @@ fn lexer_tracks_line_numbers() {
 }
 
 
-use crate::lexer::rules::{SingleCharRule, ExactRule};
+use crate::lexer::rules::{SingleCharRule, MultiCharRule};
 
 
 #[test]
@@ -140,8 +140,8 @@ fn rule_substring_tokens_match_1() {
     
     let mut lexer = LexerBuilder::new()
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), 'a'))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "ab"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "abc"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "ab"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "abc"))
         .build(source.chars());
     
     assert_token_sequence!(lexer,
@@ -180,8 +180,8 @@ fn rule_substring_tokens_match_2() {
     
     let mut lexer = LexerBuilder::new()
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), 'a'))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "ab"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "abc"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "ab"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "abc"))
         .build(source.chars());
     
     assert_token_sequence!(lexer,
@@ -220,7 +220,7 @@ fn rule_substring_tokens_match_eof() {
     
     let mut lexer = LexerBuilder::new()
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "+="))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "+="))
         .build(source.chars());
     
     assert_token_sequence!(lexer,
@@ -252,9 +252,9 @@ fn lexer_test_matches_tokens_2() {
     
     let mut lexer = LexerBuilder::new()
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "or"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "and"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(3), "+="))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "or"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "and"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(3), "+="))
         .build(source.chars());
     
     assert_token_sequence!(lexer,
@@ -292,9 +292,9 @@ fn lexer_error_invalid_token() {
     
     let mut lexer = LexerBuilder::new()
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "foo"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(2), "bar"))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(3), "baz"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "foo"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "bar"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(3), "baz"))
         .build(source.chars());
     
     assert_token_sequence!(lexer,
@@ -345,7 +345,7 @@ fn lexer_error_ambiguous_match() {
     // kind of contrived...
     let mut lexer = LexerBuilder::new()
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
-        .add_rule(ExactRule::new(Token::IntegerLiteral(1), "+"))
+        .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "+"))
         .build(source.chars());
     
     assert_next_token!(lexer, error {
