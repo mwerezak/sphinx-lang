@@ -1,0 +1,82 @@
+(* 
+    Syntactic Grammer Definition
+
+
+    Notes:
+
+    Operator precendence in order from strong to weak binding
+    (left associative unless otherwise specified)
+     
+     0:  .
+     1:  (unary -) not                      (right associative)
+     2:  * / %
+     3:  + - 
+     4:  << >>
+     5:  & 
+     6:  ^ 
+     7:  | 
+     8:  < > <= >= == !=                    (not associative, require grouping)
+     9:  and 
+    10:  or
+    
+    Are these really operators? No
+    11:  = += -= *= /= %= &= |= ^= <<= >>=  (right associative)
+    12:  ,
+*)
+
+
+
+(*** Expressions ***)
+
+primary ::= lvalue | call | "(" expression ")" ;
+
+lvalue ::= IDENTIFIER | subscript | access ;  (* so called because they can appear on the left side of assignment, see below *)
+subscript ::= primary "[" expression "]" ;
+access ::= primary "." IDENTIFIER ;
+
+expression ::= LITERAL 
+             | primary
+             | op-expression
+             | if-expression
+             | assignment-expression 
+             | tuple-constructor
+             | object-constructor
+             | function-def
+             | class-def ;
+
+
+(*** Binary and Unary Operators ***)
+
+(* these special cases escape the general operator production below *)
+operand[0]  ::= primary ;
+operand[1]  ::= unary ;
+operand[8]  ::= comparison ;
+
+(* OPERATOR[N] refers to different levels in the operator precedence table *)
+operand[N]  ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
+
+(* right associative *)
+unary ::= ( "-" | "not" ) unary | primary ;
+
+(* not associative *)
+comparison ::= operand[N-1] ( "<" | ">" | "<=" | ">=" | "==" | "!=" ) operand[N-1] ;
+
+(* top-level operator expression *)
+op-expression ::= operand[10];
+
+
+(*** Assignment ***)
+
+(* right associative *)
+assignment-expression ::= lvalue ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) assignment | expression ;
+
+assignment-statement ::= lvalue-list  "=" expression-list ;
+lvalue-list ::= lvalue ( "," lvalue )* ;
+expression-list ::= expression ( "," expression )* ;
+
+(*** Constructors ***)
+
+tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
+
+object-constructor ::= ( primary )? "{" member-initializer ( "," member-initializer )* "}" ;
+member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;  (* initializers can assign to members or index *)

@@ -1,0 +1,101 @@
+%YAML 1.2
+---
+# See http://www.sublimetext.com/docs/3/syntax.html
+file_extensions:
+  - bnf
+scope: source
+
+contexts:
+  prototype:
+    - include: comments
+
+  main:
+    - include: production
+
+  comments:
+    - match: \(\*
+      scope: punctuation.definition.comment
+      push:
+        - meta_scope: comment.block
+        - match: \*\)
+          pop: true
+
+  production:
+    - include: production-head
+    - match: ::\=
+      scope: keyword.operator.assignment
+      set: production-body
+
+  production-head:
+    - match: \b([-\w]+)\b
+      scope: entity.name.function
+    - include: subscripts
+
+  production-body:
+    - match: ;
+      scope: punctuation.terminator
+      pop: true
+    - include: symbol-list
+    - match: \)
+      scope: invalid
+
+  symbol-list:
+    - match: \||\+|\*|\?
+      scope: keyword.operator
+    - match: \.\.\.?
+      scope: constant.other
+    - include: groups
+    - include: terminals
+    - include: terminal-classes
+    - include: nonterminals
+
+  nonterminals:
+    - match: \b([-\w]+)\b
+      scope: variable
+    - include: subscripts
+
+  terminal-classes:
+    - match: \b([[:upper:]]+)\b
+      scope: constant.other
+    - include: subscripts
+
+  terminals:
+    - match: '"'
+      scope: punctuation.definition.string.begin
+      push:
+        - meta_scope: string.quoted.double
+        - match: \\"
+          scope: constant.character.escape
+        - match: '"'
+          scope: punctuation.definition.string.end
+          pop: true
+    - match: \'
+      scope: punctuation.definition.string.begin
+      push:
+        - meta_scope: string.quoted.single
+        - match: \\\'
+          scope: constant.character.escape
+        - match: \'
+          scope: punctuation.definition.string.end
+          pop: true
+
+  groups:
+    - match: \(
+      scope: punctuation.section.group.begin
+      push:
+        - meta_scope: meta.group
+        - match: \)
+          scope: punctuation.section.group.end
+          pop: true
+        - include: symbol-list
+
+  subscripts:
+    - match: \[
+      scope: punctuation.section.brackets.begin
+      push:
+        - meta_scope: meta.brackets
+        - match: \]
+          scope: punctuation.section.brackets.end
+          pop: true
+        - match: \b(\w+)\b
+          scope: variable.parameter

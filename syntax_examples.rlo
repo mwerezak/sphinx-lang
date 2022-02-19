@@ -30,6 +30,7 @@ nil;
 # Tuple
 "abc", 123;
 
+# parens are only required for these special cases
 ();  # the empty tuple
 ("solo",)  # tuple with one element
 
@@ -62,6 +63,10 @@ greaterThan >= orEqual;
 
 314 == "pi"; # false.
 123 == "123"; # false.
+
+# booleans are not implicitly integers (but all expressions do have a "truth" value)
+true == 1; # false
+
 
 # Logical operators
 
@@ -294,9 +299,6 @@ class Brunch: Breakfast
 end
 
 
-# Arrays? Not necessary once library support is implemented...
-var arr = [] { "one", "two", "three" };
-
 # Variadic arguments
 fun variadicFun(normalArg, variadic...)
   echo normalArg;
@@ -306,16 +308,16 @@ fun variadicFun(normalArg, variadic...)
 end
 
 var things = ("first", "second", "third");
-variadicFun(...things);  # prints "first"
+variadicFun(...things);  # prints "first"  TODO iterator protocol
 
-var mylist = List.new("red", "green", "blue");
+var mylist = list.new("red", "green", "blue");
 
 
 # Metamethods
 
 class Example
-  fun __getindex(self, name)
-      get(self, name)
+  fun __setindex(self, index)
+      echo index
   end
   
   fun __call(self, args...)
@@ -324,6 +326,9 @@ class Example
   
   var __eq = fun(self, other) true end;
 end
+
+var ex = Example { [0] = "first", [1] = "second" }
+ex[2] = "third" 
 
 # List of allowed metamethods:
 #
