@@ -35,7 +35,7 @@ nil;
 ("solo",)  # tuple with one element
 
 # Object
-Person { name = "Bob", age = 13 };
+Person { name: "Bob", age: 13 };
 
 # Arithmetic expressions
 add + me;
@@ -114,7 +114,8 @@ breakfast = "beignets";
 echo breakfast; # "beignets".
 
 var b = 0;
-var a = b += var c = 1;  # chaining (assignment is right associative)
+var c = 1;
+var a = b += c = var d = 1;  # chaining assignment (right associative)
 
 del a;  # drop a variable from the current scope
 
@@ -162,16 +163,34 @@ end
 
 # for loops TBD
 
-# not yet, will use iterators
+# don't like this, will use iterators
 #for (var a = 1; a < 10; a = a + 1) do
 #  echo a;
 #end
 
-# iterfunc must return (next_control, ...)
-#for i, ... in iterfunc, invariant, control do
-  # ...
-#end
+#{
+  lua style? e.g...
 
+  # iterfunc must accept a (i, invariant) and return (next_i, ...)
+  for i, ... in iterfunc, invariant, i0 do
+    ...
+  end
+  
+  then with an iter_ctor() that returns the required 3-tuple you could do:
+  
+  for i, ... in iter_ctor() do
+    ...
+  end  
+
+  ALTERNATIVELY,
+  
+  python style?
+  iter is an object with __next() metamethod
+  
+  for item in iter do
+    ...
+  end
+}#
 
 # Functions
 
@@ -261,7 +280,7 @@ echo breakfast; # "Breakfast instance".
 # Instantiation and initialization
 
 # originally initializers used { name: value }, but I want to reserve colons for future type hinting
-var breakfast = Breakfast { meat = "sausage", bread = "sourdough" };
+var breakfast = Breakfast { meat: "sausage", bread: "sourdough" };
 breakfast.drink = "coffee";
 
 del breakfast.bread;  # remove an object member
@@ -281,7 +300,7 @@ end
 class Breakfast
   # constructor function
   fun new(meat, bread)
-    return Breakfast { meat = meat, bread = bread };
+    return Breakfast { meat: meat, bread: bread };
   end
 
 end
@@ -302,15 +321,38 @@ end
 # Variadic arguments
 fun variadicFun(normalArg, variadic...)
   echo normalArg;
-  #for i, obj in iter(variadic) do
-    # ...
-  #end
+  
+  ## TODO figure out how for loops will work then redo this example
+  var i = 0
+  while i < variadic.len do
+    echo variadic[i]
+    i += 1
+  end
 end
 
-var things = ("first", "second", "third");
-variadicFun(...things);  # prints "first"  TODO iterator protocol
+variadicFun("red", "blue", "green")  # prints "red" then "blue" then "green"
 
-var mylist = list.new("red", "green", "blue");
+var mylist = list.new("red", "green", "blue");  # important use case: constructor functions for collection types
+
+# Argument unpacking
+
+var things = ("second", "third");
+variadicFun("first", ...things)  # prints "first" then "second"
+variadicFun(...things);  # prints "second" then "third"
+
+# Named Arguments TBD
+#{
+fun example(positionalArg, :namedArg) 
+  if namedArg then
+    echo positionalArg
+  end
+end
+
+example("otter", namedArg: true);
+
+# arguments to function calls must happen in this order
+anotherFunc("positional", ...unpackArgs, namedArg: "named");
+}#
 
 
 # Metamethods
@@ -327,7 +369,7 @@ class Example
   var __eq = fun(self, other) true end;
 end
 
-var ex = Example { [0] = "first", [1] = "second" }
+var ex = Example { [0]: "first", [1]: "second" }
 ex[2] = "third" 
 
 # List of allowed metamethods:
