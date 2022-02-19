@@ -257,15 +257,15 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 next_active.clear();
                 next_complete.clear();
                 
-                for &rule_idx in active.iter() {
-                    let rule = &mut self.rules[rule_idx];
+                for &rule_id in active.iter() {
+                    let rule = &mut self.rules[rule_id];
                     let match_result = rule.try_match(prev, next);
                     
                     if match_result.is_match() {
-                        next_active.push(rule_idx);
+                        next_active.push(rule_id);
                         
                         if match_result.is_complete_match() {
-                            next_complete.push(rule_idx);
+                            next_complete.push(rule_id);
                         }
                     }
                 }
@@ -280,14 +280,14 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     // do not advance the lexer as we will revisit the current char on the next pass
                     
                     // if there is more than one complete rule, the lowest index takes priority!
-                    let match_idx =
+                    let rule_id =
                         if complete.len() == 1 {
                             complete[0]
                         } else {
                             *complete.iter().min().unwrap()
                         };
                     
-                    let matching_rule = &mut self.rules[match_idx];
+                    let matching_rule = &mut self.rules[rule_id];
                     let token = matching_rule.get_token().unwrap();
                     return Ok(self.token_data(token, token_start, token_line));
                 
@@ -304,8 +304,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     return Err(self.error(LexerErrorType::NoMatchingRule, token_start));
                 } 
                 if next_active.len() == 1 {
-                    let match_idx = next_active[0];
-                    return self.exhaust_rule(match_idx, token_start, token_line);
+                    let rule_id = next_active[0];
+                    return self.exhaust_rule(rule_id, token_start, token_line);
                 }
                 
                 prev = Some(next);
@@ -322,8 +322,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         
         let next_complete = &self.complete[1];
         if next_complete.len() == 1 {
-            let match_idx = next_complete[0];
-            let matching_rule = &mut self.rules[match_idx];
+            let rule_id = next_complete[0];
+            let matching_rule = &mut self.rules[rule_id];
             let token = matching_rule.get_token().unwrap();
             return Ok(self.token_data(token, token_start, token_line));
         }
@@ -331,9 +331,9 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         return Err(self.error(LexerErrorType::UnexpectedEOF, token_start));
     }
     
-    fn exhaust_rule(&mut self, rule_idx: usize, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
+    fn exhaust_rule(&mut self, rule_id: usize, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
         {
-            let rule = &mut self.rules[rule_idx];
+            let rule = &mut self.rules[rule_id];
             debug_assert!(!matches!(rule.current_state(), MatchResult::NoMatch));
         }
 
@@ -346,7 +346,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             
             {
                 // println!("({}) next: {:?}", self.current, next);
-                let rule = &mut self.rules[rule_idx];
+                let rule = &mut self.rules[rule_id];
                 match rule.try_match(prev, next) {
                     MatchResult::NoMatch => break,
                     _ => { self.advance(); },
@@ -354,7 +354,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             }
         }
         
-        let rule = &mut self.rules[rule_idx];
+        let rule = &mut self.rules[rule_id];
         if let MatchResult::CompleteMatch = rule.current_state() {
             let token = rule.get_token().unwrap();
             return Ok(self.token_data(token, token_start, token_line));
