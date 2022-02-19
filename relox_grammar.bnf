@@ -1,5 +1,9 @@
 (* 
     Syntactic Grammer Definition
+    
+    Notation is homebrew BNF (see bnf.sublime-syntax for highlighting).
+    
+    I plan to implement a recursive descent parser, so care needs to be taken to avoid any left recursion in the grammar.
 *)
 
 
@@ -43,18 +47,16 @@ expression ::= LITERAL
 *)
 
 (* these special cases escape the general operator production below *)
-operand[0] ::= primary ;
 operand[1] ::= unary ;
 operand[8] ::= comparison ;
 
 (* OPERATOR[N] refers to the symbols in different levels of the operator precedence table above *)
 operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
 
-(* right associative *)
+(* right associative, and terminates the operand[N] stack using primary *)
 unary ::= ( "-" | "not" ) unary | primary ;
 
-(* not associative *)
-comparison ::= operand[N-1] ( "<" | ">" | "<=" | ">=" | "==" | "!=" ) operand[N-1] ;
+comparison ::= operand[7] OPERATOR[8] operand[7] ; (* not associative *)
 
 (* top-level operator expression *)
 op-expression ::= operand[10];
