@@ -1,27 +1,5 @@
 (* 
     Syntactic Grammer Definition
-
-
-    Notes:
-
-    Operator precendence in order from strong to weak binding
-    (left associative unless otherwise specified)
-     
-     0:  .
-     1:  (unary -) not                      (right associative)
-     2:  * / %
-     3:  + - 
-     4:  << >>
-     5:  & 
-     6:  ^ 
-     7:  | 
-     8:  < > <= >= == !=                    (not associative, require grouping)
-     9:  and 
-    10:  or
-    
-    Are these really operators? No
-    11:  = += -= *= /= %= &= |= ^= <<= >>=  (right associative)
-    12:  ,
 *)
 
 
@@ -47,13 +25,30 @@ expression ::= LITERAL
 
 (*** Binary and Unary Operators ***)
 
-(* these special cases escape the general operator production below *)
-operand[0]  ::= primary ;
-operand[1]  ::= unary ;
-operand[8]  ::= comparison ;
+(*
+    Operator precendence in order from strong to weak binding
+    (left associative unless otherwise specified)
+     
+     1:  (unary -) not          (right associative)
+     2:  * / %
+     3:  + - 
+     4:  << >>
+     5:  & 
+     6:  ^ 
+     7:  | 
+     8:  < > <= >= == !=        (not associative, require grouping)
+     9:  and 
+    10:  or
 
-(* OPERATOR[N] refers to different levels in the operator precedence table *)
-operand[N]  ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
+*)
+
+(* these special cases escape the general operator production below *)
+operand[0] ::= primary ;
+operand[1] ::= unary ;
+operand[8] ::= comparison ;
+
+(* OPERATOR[N] refers to the symbols in different levels of the operator precedence table above *)
+operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
 
 (* right associative *)
 unary ::= ( "-" | "not" ) unary | primary ;
@@ -68,7 +63,7 @@ op-expression ::= operand[10];
 (*** Assignment ***)
 
 (* 
-    The "var" keyword creates the variable in local scope, otherwise the global scope is searched for an 
+    The "var" keyword creates the variable in current scope, otherwise the global scope is searched for an 
     existing variable if cannot be not found locally. If it still can't be found, then the assignment is an error.
     
     Assignment statements support sequence destructuring, assignment expressions do not.
