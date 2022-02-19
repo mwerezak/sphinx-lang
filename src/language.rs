@@ -4,6 +4,10 @@ use crate::lexer::rules::keywords::KeywordRule;
 use crate::lexer::rules::literals::{IdentifierRule, IntegerLiteralRule, HexIntegerLiteralRule};
 
 
+pub type IntType = i32;    // internal representation for integers
+pub type FloatType = f32;  // internal representation for floats
+
+
 pub static COMMENT_CHAR: char = '#';
 
 pub static NESTED_COMMENT_START: &'static str = "#{";

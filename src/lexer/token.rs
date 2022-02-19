@@ -1,3 +1,5 @@
+use crate::language;
+
 // Token Types
 
 #[derive(Clone, Debug)]
@@ -38,8 +40,8 @@ pub enum Token {
     // Literals
     Identifier(String),
     StringLiteral(String),
-    IntegerLiteral(i32),
-    FloatLiteral(f32),
+    IntegerLiteral(language::IntType),
+    FloatLiteral(language::FloatType),
     
     // Misc
     Comment,
