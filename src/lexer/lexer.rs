@@ -58,22 +58,19 @@ impl LexerBuilder {
     // Note, the order that rules are added determines priority
     
     pub fn add_rule<R>(mut self, rule: R) -> Self
-        where R: LexerRule + 'static 
-    {
+    where R: LexerRule + 'static {
         self.rules.push(Box::new(rule));
         return self;
     }
     
     pub fn insert_rule<R>(mut self, index: usize, rule: R) -> Self
-        where R: LexerRule + 'static 
-    {
+    where R: LexerRule + 'static {
         self.rules.insert(index, Box::new(rule));
         return self;
     }
     
     pub fn add_rules<I, R>(mut self, rules: I) -> Self
-        where I: Iterator<Item=R>, R: LexerRule + 'static
-    {
+    where I: Iterator<Item=R>, R: LexerRule + 'static {
         for rule in rules {
             self.rules.push(Box::new(rule));
         }
@@ -81,8 +78,7 @@ impl LexerBuilder {
     }
     
     pub fn build<S>(self, source: S) -> Lexer<S> 
-        where S: Iterator<Item=char>
-    {
+    where S: Iterator<Item=char> {
         Lexer { 
             source: source.peekable(),
             options: self.options,
