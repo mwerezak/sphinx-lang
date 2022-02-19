@@ -67,11 +67,20 @@ op-expression ::= operand[10];
 
 (*** Assignment ***)
 
-(* right associative *)
-assignment-expression ::= lvalue ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) assignment | expression ;
+(* 
+    The "var" keyword creates the variable in local scope, otherwise the global scope is searched for an 
+    existing variable if cannot be not found locally. If it still can't be found, then the assignment is an error.
+    
+    Assignment statements support sequence destructuring, assignment expressions do not.
+*)
 
-assignment-statement ::= lvalue-list  "=" expression-list ;
-lvalue-list ::= lvalue ( "," lvalue )* ;
+(* right associative *)
+assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) assignment | expression ;
+assignment-target ::= ( "var" )? lvalue ; 
+
+assignment-statement ::= target-list  "=" expression-list ;
+target-list ::= assignment-target ( "," assignment-target )* ;
+
 expression-list ::= expression ( "," expression )* ;
 
 (*** Constructors ***)
