@@ -1,6 +1,5 @@
 use std::fmt;
 use crate::language;
-use crate::parser::ast::AstNode;
 
 
 // Identifiers
@@ -17,8 +16,6 @@ impl Identifier {
         Identifier { ident: s.to_string() }
     }
 }
-
-impl AstNode for Identifier { }
 
 impl fmt::Display for Identifier {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
@@ -39,8 +36,6 @@ impl IntLiteral {
         IntLiteral { value }
     }
 }
-
-impl AstNode for IntLiteral { }
 
 impl fmt::Display for IntLiteral {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {

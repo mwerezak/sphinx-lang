@@ -1,5 +1,5 @@
-pub mod ast;
+pub mod expr;
+pub mod primary;
 pub mod binop;
-pub mod literals;
 
 mod tests;

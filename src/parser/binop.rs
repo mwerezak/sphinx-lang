@@ -1,5 +1,4 @@
 use std::fmt;
-use crate::parser::ast::{AstNode, AstNodeObj};
 
 // Binary Operator
 
@@ -81,22 +80,4 @@ impl fmt::Display for BinaryOp {
     }
 }
 
-// Binary Operator Expressions
-#[derive(Debug)]
-pub struct BinaryOpExpr(BinaryOp, AstNodeObj, AstNodeObj);
 
-impl BinaryOpExpr {
-    pub fn new<A, B>(op: BinaryOp, a: A, b: B) -> Self 
-    where A: AstNode + 'static, B: AstNode + 'static {
-        BinaryOpExpr(op, Box::new(a), Box::new(b))
-    }
-}
-
-
-impl AstNode for BinaryOpExpr { }
-
-impl fmt::Display for BinaryOpExpr {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "({} {} {})", self.0, self.1, self.2)
-    }
-}
