@@ -1,10 +1,6 @@
 use std::fmt;
 use crate::parser::ast::{AstNode, AstNodeObj};
 
-pub trait Operator: fmt::Display {
-    fn precedence_level(&self) -> i8;
-}
-
 // Binary Operator
 
 #[derive(Clone, Copy, Debug)]
@@ -37,8 +33,8 @@ pub enum BinaryOp {
     Or,
 }
 
-impl Operator for BinaryOp {
-    fn precedence_level(&self) -> i8 {
+impl BinaryOp {
+    pub fn precedence_level(&self) -> i8 {
         match self {
             BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 2,
             
