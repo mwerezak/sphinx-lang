@@ -10,13 +10,23 @@
 
 (*** Expressions ***)
 
-(*** Access and Indexing ***)
 
+(* Original left-recursive version
 primary ::= LITERAL | lvalue | call | "(" expression ")" ;
-
 lvalue ::= IDENTIFIER | subscript | access ;  (* so called because they can appear on the left side of assignment, see below *)
 subscript ::= primary "[" expression "]" ;
-access ::= primary "." IDENTIFIER ;
+access ::= primary "." IDENTIFIER ; 
+*)
+
+(* New non-left-recursive version *)
+atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
+primary ::= atom ( access | subscript | invocation )* ;
+subscript ::= "[" expression "]" ;
+access ::= "." IDENTIFIER ;
+invocation ::= "(" ... ")" ;  (* WIP *)
+
+lvalue ::= IDENTIFIER | primary subscript | primary access ;  (* so called because they can appear on the left side of assignment, see Access below *)
+
 
 expression ::= primary
              | op-expression
