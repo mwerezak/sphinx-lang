@@ -1,5 +1,5 @@
 [package]
-name = "interpreter"
+name = "rlo-interpreter"
 version = "0.1.0"
 edition = "2021"
 
@@ -13,3 +13,4 @@ name = "repl"
 
 [dependencies]
 clap = { version = "3.0" }
+string-interner = { version = "0.14" }

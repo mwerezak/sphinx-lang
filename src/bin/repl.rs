@@ -1,7 +1,7 @@
 use clap::{App, Arg};
 
-use interpreter::language;
-use interpreter::lexer::{TokenMeta, Token};
+use rlo_interpreter::language;
+use rlo_interpreter::lexer::{TokenMeta, Token};
 
 fn main() {
     let app = App::new("repl")
