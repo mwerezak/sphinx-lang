@@ -10,14 +10,15 @@
 
 (*** Expressions ***)
 
-primary ::= lvalue | call | "(" expression ")" ;
+(*** Access and Indexing ***)
+
+primary ::= LITERAL | lvalue | call | "(" expression ")" ;
 
 lvalue ::= IDENTIFIER | subscript | access ;  (* so called because they can appear on the left side of assignment, see below *)
 subscript ::= primary "[" expression "]" ;
 access ::= primary "." IDENTIFIER ;
 
-expression ::= LITERAL 
-             | primary
+expression ::= primary
              | op-expression
              | if-expression
              | assignment-expression 
@@ -75,10 +76,15 @@ op-expression ::= operand[10];
 assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) assignment | expression ;
 assignment-target ::= ( "var" )? lvalue ; 
 
-assignment-statement ::= target-list  "=" expression-list ;
-target-list ::= assignment-target ( "," assignment-target )* ;
+assignment-statement ::= assignment-target-list  "=" expression-list ;
+assignment-target-list ::= assignment-target ( "," assignment-target )* ;
 
 expression-list ::= expression ( "," expression )* ;
+
+
+(*** Function/Method Calls ***)
+
+
 
 (*** Constructors ***)
 

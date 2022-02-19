@@ -161,32 +161,36 @@ while a < 10 do
   a += 1;
 end
 
+do
+  var cond = example()
+while cond;
+
 # for loops TBD
 
-# don't like this, will use iterators
-#for (var a = 1; a < 10; a = a + 1) do
-#  echo a;
-#end
+# C-style for loop
+# for var i ; i < 10 ; i+1 do
+# end
 
 #{
-  lua style? e.g...
+  iterator-based for loops
+  
+  # Option 1. Lua style e.g...
 
   # iterfunc must accept a (i, invariant) and return (next_i, ...)
   for i, ... in iterfunc, invariant, i0 do
     ...
   end
   
-  then with an iter_ctor() that returns the required 3-tuple you could do:
+  # then with an iter_ctor() that returns the required 3-tuple you would do:
   
   for i, ... in iter_ctor() do
     ...
   end  
 
-  ALTERNATIVELY,
   
-  python style?
-  iter is an object with __next() metamethod
+  # Option 2. Python style...
   
+  # iter is an object with __next() metamethod
   for item in iter do
     ...
   end
@@ -378,6 +382,7 @@ ex[2] = "third"
 # __le, __lt, __eq only, no methamethods for others...
 # __tostring
 # __getindex, __setindex, __delindex
+# __exit  - for context managers
 # __get, __set, __del - attribute descriptor protocol  TODO make descriptors a special builtin type?
 # __call
 
