@@ -39,6 +39,7 @@ contexts:
     - include: strings
     - include: tuples
     - include: parens
+    - include: subscripts
     - include: if-expressions
     - include: object-initializer-list
 
@@ -146,6 +147,16 @@ contexts:
         - meta_scope: meta.parens
         - match: \)
           scope: punctuation.section.parens.end
+          pop: true
+        - include: expressions
+
+  subscripts:
+    - match: \[
+      scope: punctuation.section.brackets.begin
+      push:
+        - meta_scope: meta.brackets
+        - match: \]
+          scope: punctuation.section.brackets.end
           pop: true
         - include: expressions
 
@@ -333,19 +344,29 @@ contexts:
   object-initializer-list:
     - match: \{
       scope: punctuation.section.braces.begin
-      push:
-        - meta_scope: meta.braces
-        - match: \}
-          scope: punctuation.section.braces.end
-          pop: true
-        - match: '({{identifier}})\s*(\:)'
-          captures:
-            1: variable.member
-            2: punctuation.separator
-        - match: \,
-          scope: punctuation.separator
-        - include: expressions
+      push: object-initializer-lvalue
 
+  object-initializer-lvalue:
+    - meta_scope: meta.braces
+    - match: \}
+      scope: punctuation.section.braces.end
+      pop: true
+    - match: =
+      scope: punctuation.separator
+      set: object-initializer-rvalue
+    - match: '{{identifier}}'
+      scope: variable.member
+    - include: subscripts
+
+  object-initializer-rvalue:
+    - meta_scope: meta.braces
+    - match: \}
+      scope: punctuation.section.braces.end
+      pop: true
+    - match: \,
+      scope: punctuation.separator
+      set: object-initializer-lvalue
+    - include: expressions
 
   comments:
     # Block comments
