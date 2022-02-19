@@ -9,7 +9,9 @@ use crate::parser::expr::Expr;
 
 #[derive(Debug)]
 pub enum Atom {
+    Nil,
     Identifier(Identifier),
+    BoolLiteral(bool),
     IntLiteral(language::IntType),
     FloatLiteral(language::FloatType),
     Group(Box<Expr>)
