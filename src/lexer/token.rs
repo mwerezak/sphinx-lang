@@ -12,6 +12,7 @@ pub enum Token {
     Comma,
     Colon,
     Semicolon,
+    Ellipsis,
     
     // Operator Symbols
     OpAdd, OpSub, OpMul, OpDiv, OpMod,
