@@ -78,7 +78,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     }
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
-    fn parse_atom(&mut self) -> Result<Atom, ParserError> { 
+    pub fn parse_atom(&mut self) -> Result<Atom, ParserError> { 
         
         let next = self.advance()?;
         

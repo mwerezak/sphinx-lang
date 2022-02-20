@@ -1,13 +1,12 @@
 mod token;
-pub use token::*;
+mod lexer;
+mod errors;
 
 pub mod rules;
 pub use rules::MatchResult;
 
-mod lexer;
+pub use token::*;
 pub use lexer::*;
-
-mod errors;
 pub use errors::*;
 
 mod tests;
