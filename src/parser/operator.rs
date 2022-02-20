@@ -1,6 +1,13 @@
 use std::fmt;
 
-// Binary Operator
+// Unary Operators
+
+#[derive(Clone, Copy, Debug)]
+pub enum UnaryOp {
+    Neg, Pos, Not,
+}
+
+// Binary Operators
 
 #[derive(Clone, Copy, Debug)]
 pub enum BinaryOp {

@@ -1,34 +1,49 @@
 // Recursive descent parser
 
 use std::iter::Peekable;
-use crate::lexer::{TokenMeta, Token};
+use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::parser::expr::Expr;
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::errors::*;
 
-pub struct Parser<T> where T: Iterator<Item=TokenMeta> {
+pub struct Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     tokens: Peekable<T>,
 }
 
-impl<T> Parser<T> where T: Iterator<Item=TokenMeta> {
+impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     pub fn new(tokens: T) -> Self {
         Parser { tokens: tokens.peekable() }
     }
     
     // should never actually exhaust self.tokens since we will hit EOF first.
     fn advance(&mut self) -> Result<TokenMeta, ParserError> {
-        match self.tokens.next() {
-            Some(tok) => Ok(tok),
+        let result = match self.tokens.next() {
+            Some(inner_result) => Ok(inner_result),
             None => Err(ParserError::new(ErrorKind::RanOutOfTokens)),
-        }
+        };
+        
+        result?.map_err(|err| ParserError::caused_by(Box::new(err), ErrorKind::LexerError))
     }
     
-    fn peek(&mut self) -> Result<&TokenMeta, ParserError> {
-        match self.tokens.peek() {
-            Some(tok) => Ok(tok),
-            None => Err(ParserError::new(ErrorKind::RanOutOfTokens)),
-        }
-    }
+    // fn peek(&mut self) -> Result<&TokenMeta, ParserError> {
+    //     {
+    //         let result = match self.tokens.peek() {
+    //             Some(result) => result,  // this is a reference to a result
+    //             None => {
+    //                 return Err(ParserError::new(ErrorKind::RanOutOfTokens));
+    //             }
+    //         };
+            
+
+    //         if result.is_ok() {
+    //             return Ok(result.as_ref().unwrap());
+    //         }
+    //     }
+        
+    //     // in case of an error, we will need to take ownership, so we have to advance
+    //     // discard result (which is a ref anyways) and return the actual thing
+    //     return Err(self.advance().unwrap_err());
+    // }
     
     /*** Expression Parsing ***/
     
@@ -95,7 +110,27 @@ impl<T> Parser<T> where T: Iterator<Item=TokenMeta> {
         
     }
     
-    fn parse_binop() { unimplemented!() }
+    /*
+        Binary operator syntax:
+        
+        operand[1] ::= unary ;
+        operand[8] ::= comparison ;
+        operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
+    */
+    fn parse_binop(&mut self) -> Result<Expr, ParserError> {
+        unimplemented!()
+    }
     
+    
+    
+    fn parse_unary(&mut self) -> Result<Expr, ParserError> {
+        unimplemented!()
+    }
+    
+    
+    // Discards tokens until we reach a statement boundary
+    fn synchronize_stmt(&mut self) {
+        unimplemented!()
+    }
 
 }

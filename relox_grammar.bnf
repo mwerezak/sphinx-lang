@@ -65,7 +65,7 @@ operand[8] ::= comparison ;
 operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
 
 (* right associative, and terminates the operand[N] stack using primary *)
-unary ::= ( "-" | "not" ) unary | primary ;
+unary ::= ( "-" | "+" | "not" ) unary | primary ;
 
 comparison ::= operand[7] OPERATOR[8] operand[7] ; (* not associative *)
 
