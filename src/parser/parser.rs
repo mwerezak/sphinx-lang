@@ -25,25 +25,14 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         result?.map_err(|err| ParserError::caused_by(Box::new(err), ErrorKind::LexerError))
     }
     
-    // fn peek(&mut self) -> Result<&TokenMeta, ParserError> {
-    //     {
-    //         let result = match self.tokens.peek() {
-    //             Some(result) => result,  // this is a reference to a result
-    //             None => {
-    //                 return Err(ParserError::new(ErrorKind::RanOutOfTokens));
-    //             }
-    //         };
-            
-
-    //         if result.is_ok() {
-    //             return Ok(result.as_ref().unwrap());
-    //         }
-    //     }
-        
-    //     // in case of an error, we will need to take ownership, so we have to advance
-    //     // discard result (which is a ref anyways) and return the actual thing
-    //     return Err(self.advance().unwrap_err());
-    // }
+    // peeking can only produce an Option because in order to emit a ParserError we would
+    // need to take ownership of the underlying LexerError, which would require advancing() the parser.
+    fn peek(&mut self) -> Option<&TokenMeta> {
+        match self.tokens.peek() {
+            Some(&Ok(ref token)) => Some(token),
+            _ => None,
+        }
+    }
     
     /*** Expression Parsing ***/
     

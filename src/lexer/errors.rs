@@ -5,7 +5,7 @@ use crate::lexer::Span;
 
 // Lexer Errors
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum ErrorKind {
     NoMatchingRule,
     UnexpectedEOF,
