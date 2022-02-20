@@ -1,29 +1,17 @@
 use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::parser::expr::Expr;
 use crate::parser::primary::{Primary, Atom};
+use crate::parser::operator::BinaryOp;
 use crate::parser::errors::*;
 
 
+pub struct TokenSpan {
+    start: Box<TokenMeta>,
+    end: Option<Box<TokenMeta>>,
+}
+
+
 // Recursive descent parser
-
-// macro_rules! expect_token {
-//     () => {};
-// }
-
-// fn expect_token(token: TokenMeta, )
-
-
-// // a "smart pointer" produced when peeking at the next token
-// // provides convenience methods to accept() and consome the token
-// struct Peek<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-//     parser: &'a mut Parser<T>,
-// }
-
-// impl<'a, T> std::ops::Deref for Peek<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-//     type Target = &'a TokenMeta;
-//     fn deref(&self) -> &Self::Target;
-// }
-
 
 pub struct Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     tokens: T,
@@ -58,7 +46,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         // while advancing the token iterator and taking ownership of the ParserError in the other
         // otherwise the borrow checker will have a heart attack over the immutable borrow in &mut self.
         if self.next.as_ref().unwrap().is_ok() {
-            Ok(self.next.as_ref().unwrap().as_ref().unwrap())
+            Ok(self.next.as_ref().unwrap().as_ref().unwrap()) // yes, the repetition is required
         } else {
             Err(self.advance().unwrap_err())
         }
@@ -71,19 +59,84 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     
         expression ::= primary
                      | op-expression
-                     | if-expression
                      | assignment-expression 
-                     | tuple-constructor
                      | object-constructor
+                     | if-expression
                      | function-def
-                     | class-def ;
+                     | class-def
+                     | tuple-constructor ;
+                     
+        Note: because determining if the expression is an assignment-expression or an object-constructor
+        requires consuming a primary expression, check for unary operators first
     */
     fn parse_expr(&mut self) -> Result<Expr, ParserError> { unimplemented!() }
     
-    fn parse_primary_or_assignment_expr(&mut self) -> Result<Expr, ParserError> {
+    /*
+        Assignment Expression syntax:
         
+        assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
+        assignment-target ::= ( "var" )? lvalue ; 
+    */
+    
+    fn parse_assignment_expr_from_primary(&mut self, primary: Primary) -> Result<Expr, ParserError> {
         
-        unimplemented!()
+        let assignment = self.peek_next_assignment_op()?;
+
+        if let Some(op) = assignment {
+            // if this is an assignment then primary needs to be an lvalue
+            let next = self.advance().unwrap(); // consume the "=" token
+            if !primary.is_lvalue() {
+                return Err(ParserError::invalid_assignment_lhs(next))
+            }
+            
+            let rhs_expr = self.parse_expr()?;
+            
+            Ok(Expr::assignment(primary, op, rhs_expr, false))
+            
+        } else {
+            
+            Ok(Expr::Primary(primary))
+        }
+    }
+    
+    // should only be called if the next token is "var"
+    fn parse_var_decl_assignment_expr(&mut self) -> Result<Expr, ParserError> {
+        let next = self.advance().unwrap(); // consume the "var"
+        debug_assert!(matches!(next.token, Token::Var));
+        
+        let primary = self.parse_primary()?;
+        if !primary.is_lvalue() {
+            return Err(ParserError::invalid_assignment_lhs(next));
+        }
+        
+        let assign_op = self.peek_next_assignment_op()?;
+        if !assign_op.is_some() {
+            return Err(ParserError::unexpected_token(self.advance().unwrap(), Expect::ParseVarAssignmentExpr));
+        }
+        
+        let rhs_expr = self.parse_expr()?;
+        Ok(Expr::assignment(primary, assign_op.unwrap(), rhs_expr, true))
+    }
+    
+    // Helper to see if the next token is an assignment operator and if so, which one it is.
+    fn peek_next_assignment_op(&mut self) -> Result<Option<Option<BinaryOp>>, ParserError> {
+        let next = self.peek()?;
+        let op = match next.token {
+            Token::OpAssign    => None,
+            Token::OpAddAssign => Some(BinaryOp::Add),
+            Token::OpSubAssign => Some(BinaryOp::Sub),
+            Token::OpMulAssign => Some(BinaryOp::Mul),
+            Token::OpDivAssign => Some(BinaryOp::Div),
+            Token::OpModAssign => Some(BinaryOp::Mod),
+            Token::OpAndAssign => Some(BinaryOp::BitAnd),
+            Token::OpOrAssign  => Some(BinaryOp::BitOr),
+            Token::OpXorAssign => Some(BinaryOp::BitXor),
+            Token::OpLShiftAssign => Some(BinaryOp::LShift),
+            Token::OpRShiftAssign => Some(BinaryOp::RShift),
+            
+            _ => return Ok(None),
+        };
+        return Ok(Some(op))
     }
     
     /*
@@ -94,7 +147,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         access ::= "." IDENTIFIER ;
         invocation ::= "(" ... ")" ;  (* WIP *)
     */
-    fn parse_primary(&mut self) -> Result<Primary, ParserError> { 
+    pub fn parse_primary(&mut self) -> Result<Primary, ParserError> { 
         let mut primary = Primary::new(self.parse_atom()?);
         
         loop {
@@ -138,7 +191,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     }
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
-    pub fn parse_atom(&mut self) -> Result<Atom, ParserError> { 
+    fn parse_atom(&mut self) -> Result<Atom, ParserError> { 
         
         // The nice thing about parsing an atom is that it definitely will consume the next token
         let next = self.advance()?;

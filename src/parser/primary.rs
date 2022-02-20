@@ -7,7 +7,7 @@ use crate::parser::expr::Expr;
 
 // Primary Expressions
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Atom {
     Nil,
     Identifier(Name),
@@ -32,14 +32,14 @@ impl Atom {
 }
 
 // These are the highest precedence operations in the language
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PrimaryOp {
     Access(Name),
     Index(Box<Expr>),
     Invoke,  // TODO
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Primary {
     atom: Atom,
     ops: Vec<PrimaryOp>,

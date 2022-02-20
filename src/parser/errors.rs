@@ -6,10 +6,14 @@ use crate::lexer::TokenMeta;
 pub enum Expect {
     ParseAtom,
     ParseGroupCloseParen,
-    ParseAccessIdentifier,
+    ParseAccessIdentifier,    // expected an identifier following a "."
     ParseIndexingCloseSquare,
+    ParseVarAssignmentExpr,   // expected an assignment following "var" in an expression
 }
 
+// TODO use TokenSpan to identify affected area instead of TokenMeta in ErrorKind...
+
+// Box any owned TokenMeta to prevent bloat
 #[derive(Clone, Debug)]
 pub enum ErrorKind {
     RanOutOfTokens,
@@ -18,6 +22,8 @@ pub enum ErrorKind {
         found: Box<TokenMeta>,
         expected: Expect,
     },
+    
+    InvalidAssignmentLHS{ assign: Box<TokenMeta> },
 }
 
 #[derive(Debug)]
@@ -43,6 +49,12 @@ impl ParserError {
         ParserError::new(ErrorKind::UnexpectedToken {
             expected,
             found: Box::new(found),
+        })
+    }
+    
+    pub fn invalid_assignment_lhs(assign: TokenMeta) -> Self {
+        ParserError::new(ErrorKind::InvalidAssignmentLHS {
+            assign: Box::new(assign),
         })
     }
     
