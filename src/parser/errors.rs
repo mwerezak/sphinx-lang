@@ -1,10 +1,13 @@
 use std::fmt;
 use std::error::Error;
-use crate::lexer::{TokenMeta, Token};
+use crate::lexer::TokenMeta;
 
 #[derive(Clone, Copy, Debug)]
-pub enum TokenClass {
-    Atom,
+pub enum Expect {
+    ParseAtom,
+    ParseGroupCloseParen,
+    ParseAccessIdentifier,
+    ParseIndexingCloseSquare,
 }
 
 #[derive(Clone, Debug)]
@@ -13,11 +16,7 @@ pub enum ErrorKind {
     LexerError,
     UnexpectedToken {
         found: Box<TokenMeta>,
-        expected: Token,
-    },
-    UnexpectedTokenClass {
-        found: Box<TokenMeta>,
-        expected: TokenClass,
+        expected: Expect,
     },
 }
 
@@ -40,16 +39,9 @@ impl ParserError {
         }
     }
     
-    pub fn unexpected_token(found: TokenMeta, expected: Token) -> Self {
+    pub fn unexpected_token(found: TokenMeta, expected: Expect) -> Self {
         ParserError::new(ErrorKind::UnexpectedToken {
             expected,
-            found: Box::new(found),
-        })
-    }
-    
-    pub fn unexpected_token_class(found: TokenMeta, expected: TokenClass) -> Self {
-        ParserError::new(ErrorKind::UnexpectedTokenClass {
-            expected, 
             found: Box::new(found),
         })
     }

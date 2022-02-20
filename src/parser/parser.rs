@@ -6,6 +6,25 @@ use crate::parser::errors::*;
 
 // Recursive descent parser
 
+// macro_rules! expect_token {
+//     () => {};
+// }
+
+// fn expect_token(token: TokenMeta, )
+
+
+// // a "smart pointer" produced when peeking at the next token
+// // provides convenience methods to accept() and consome the token
+// struct Peek<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+//     parser: &'a mut Parser<T>,
+// }
+
+// impl<'a, T> std::ops::Deref for Peek<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+//     type Target = &'a TokenMeta;
+//     fn deref(&self) -> &Self::Target;
+// }
+
+
 pub struct Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     tokens: T,
     next: Option<Result<TokenMeta, ParserError>>
@@ -45,7 +64,6 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
     }
     
-    
     /*** Expression Parsing ***/
     
     /*
@@ -77,47 +95,83 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         invocation ::= "(" ... ")" ;  (* WIP *)
     */
     fn parse_primary(&mut self) -> Result<Primary, ParserError> { 
-        let atom = self.parse_atom();
+        let mut primary = Primary::new(self.parse_atom()?);
         
         loop {
-            let next = self.peek()?;
-            
+            match self.peek()?.token {
+                
+                // access ::= "." IDENTIFIER ;
+                Token::OpAccess => {
+                    self.advance().unwrap();
+                    let next = self.advance()?;
+                    if let Token::Identifier(name) = next.token {
+                        primary.push_access(name.as_str());
+                    } else {
+                        return Err(ParserError::unexpected_token(next, Expect::ParseAccessIdentifier));
+                    }
+                },
+                
+                // subscript ::= "[" expression "]" ;
+                Token::OpenSquare => {
+                    self.advance().unwrap();
+                    
+                    let index_expr = self.parse_expr()?;
+                    
+                    let next = self.advance()?;
+                    if matches!(next.token, Token::CloseSquare) {
+                        primary.push_indexing(index_expr);
+                    } else {
+                        return Err(ParserError::unexpected_token(next, Expect::ParseIndexingCloseSquare));
+                    }
+                }
+                
+                // invocation ::= "(" ... ")" ;  (* WIP *)
+                Token::OpenParen => {
+                    unimplemented!()
+                }
+                
+                _ => break,
+            };
         }
     
-        unimplemented!()
+        Ok(primary)
     }
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
     pub fn parse_atom(&mut self) -> Result<Atom, ParserError> { 
         
+        // The nice thing about parsing an atom is that it definitely will consume the next token
         let next = self.advance()?;
-        
-        match next.token {
+        let atom = match next.token {
             // LITERAL
-            Token::Nil => Ok(Atom::Nil),
-            Token::True => Ok(Atom::BooleanLiteral(true)),
-            Token::False => Ok(Atom::BooleanLiteral(false)),
-            Token::IntegerLiteral(value) => Ok(Atom::IntegerLiteral(value)),
-            Token::FloatLiteral(value) => Ok(Atom::FloatLiteral(value)),
+            Token::Nil => Atom::Nil,
+            Token::True => Atom::BooleanLiteral(true),
+            Token::False => Atom::BooleanLiteral(false),
+            Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
+            Token::FloatLiteral(value) => Atom::FloatLiteral(value),
             // TODO string literals
             
             // IDENTIFIER
-            Token::Identifier(name) => Ok(Atom::identifier(name.as_str())),
+            Token::Identifier(name) => Atom::identifier(name.as_str()),
             
             // "(" expression ")"
             Token::OpenParen => {
-                let inner = self.parse_expr()?;
+                let inner_expr = self.parse_expr()?;
                 
                 let next = self.advance()?;
-                match next.token {
-                    Token::CloseParen => Ok(Atom::group(inner)),
-                    _ => Err(ParserError::unexpected_token(next, Token::CloseParen))
+                if !matches!(next.token, Token::CloseParen) {
+                    return Err(ParserError::unexpected_token(next, Expect::ParseGroupCloseParen));
                 }
+                
+                Atom::group(inner_expr)
             },
             
-            _ => Err(ParserError::unexpected_token_class(next, TokenClass::Atom))
-        }
+            _ => { 
+                return Err(ParserError::unexpected_token(next,  Expect::ParseAtom))
+            },
+        };
         
+        Ok(atom)
     }
     
     /*

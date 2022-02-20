@@ -71,6 +71,14 @@ impl Primary {
             }
         }
     }
+    
+    pub fn push_access(&mut self, name: &str) {
+        self.ops.push(PrimaryOp::Access(Name::new(name)))
+    }
+    
+    pub fn push_indexing(&mut self, expr: Expr) {
+        self.ops.push(PrimaryOp::Index(Box::new(expr)))
+    }
 }
 
 
