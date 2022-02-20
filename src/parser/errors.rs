@@ -7,7 +7,7 @@ pub enum TokenClass {
     Atom,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ErrorKind {
     RanOutOfTokens,
     LexerError,

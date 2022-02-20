@@ -1,22 +1,23 @@
-// Recursive descent parser
-
-use std::iter::Peekable;
 use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::parser::expr::Expr;
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::errors::*;
 
+
+// Recursive descent parser
+
 pub struct Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    tokens: Peekable<T>,
+    tokens: T,
+    next: Option<Result<TokenMeta, ParserError>>
 }
 
 impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     pub fn new(tokens: T) -> Self {
-        Parser { tokens: tokens.peekable() }
+        Parser { tokens, next: None, }
     }
     
-    // should never actually exhaust self.tokens since we will hit EOF first.
-    fn advance(&mut self) -> Result<TokenMeta, ParserError> {
+    fn next_result(&mut self) -> Result<TokenMeta, ParserError> {
+        // Running out of tokens is not normal since we should always read an EOF token first
         let result = match self.tokens.next() {
             Some(inner_result) => Ok(inner_result),
             None => Err(ParserError::new(ErrorKind::RanOutOfTokens)),
@@ -25,14 +26,25 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         result?.map_err(|err| ParserError::caused_by(Box::new(err), ErrorKind::LexerError))
     }
     
-    // peeking can only produce an Option because in order to emit a ParserError we would
-    // need to take ownership of the underlying LexerError, which would require advancing() the parser.
-    fn peek(&mut self) -> Option<&TokenMeta> {
-        match self.tokens.peek() {
-            Some(&Ok(ref token)) => Some(token),
-            _ => None,
+    fn advance(&mut self) -> Result<TokenMeta, ParserError> {
+        self.next.take().unwrap_or_else(|| self.next_result())
+    }
+    
+    fn peek(&mut self) -> Result<&TokenMeta, ParserError> {
+        if self.next.is_none() {
+            self.next = Some(self.next_result());
+        }
+        
+        // This craziness is needed to finagle a reference in one branch 
+        // while advancing the token iterator and taking ownership of the ParserError in the other
+        // otherwise the borrow checker will have a heart attack over the immutable borrow in &mut self.
+        if self.next.as_ref().unwrap().is_ok() {
+            Ok(self.next.as_ref().unwrap().as_ref().unwrap())
+        } else {
+            Err(self.advance().unwrap_err())
         }
     }
+    
     
     /*** Expression Parsing ***/
     
@@ -50,6 +62,11 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     */
     fn parse_expr(&mut self) -> Result<Expr, ParserError> { unimplemented!() }
     
+    fn parse_primary_or_assignment_expr(&mut self) -> Result<Expr, ParserError> {
+        
+        
+        unimplemented!()
+    }
     
     /*
         Primary expression syntax:
@@ -60,8 +77,12 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         invocation ::= "(" ... ")" ;  (* WIP *)
     */
     fn parse_primary(&mut self) -> Result<Primary, ParserError> { 
-        
         let atom = self.parse_atom();
+        
+        loop {
+            let next = self.peek()?;
+            
+        }
     
         unimplemented!()
     }

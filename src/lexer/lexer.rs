@@ -10,14 +10,14 @@ use crate::lexer::rules::comments::{LineCommentRule, BlockCommentRule};
 // include only mere character indexes in the output
 // if a lexeme needs to be rendered (e.g. for error messages), 
 // the relevant string can be extracted from the source then
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Span {
     pub index: usize,
     pub length: usize,
     pub lineno: u64,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TokenMeta {
     pub token: Token,
     pub location: Span,
