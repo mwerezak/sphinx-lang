@@ -1,22 +1,22 @@
-use std::num::ParseIntError;
+use std::error::Error;
 use crate::lexer::Span;
+
 
 // Lexer Errors
 
 #[derive(Debug)]
-pub enum ErrorType {
+pub enum LexerErrorKind {
     NoMatchingRule,
     UnexpectedEOF,
-    ParseIntError(ParseIntError),
+    CouldNotReadToken(Box<dyn Error>),  // kludge
 }
 
 #[derive(Debug)]
 pub struct LexerError {
-    pub etype: ErrorType,
+    pub kind: LexerErrorKind,
     pub location: Span,
-    pub lineno: u64,
 }
 
-pub struct TokenError {
-    pub etype: ErrorType,
-}
+
+// invalid token"),
+// "unexpected EOF")

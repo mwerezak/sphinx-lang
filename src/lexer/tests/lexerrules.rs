@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate::lexer::{LexerBuilder, Token, TokenMeta, Span};
-use crate::lexer::errors::{LexerError, ErrorType};
+use crate::lexer::errors::{LexerError, LexerErrorKind};
 
 #[test]
 fn lexer_matches_tokens_1() {
@@ -16,20 +16,17 @@ fn lexer_matches_tokens_1() {
     assert_token_sequence!(lexer,
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 0, length: 3 },
-            lineno: 1,
+            location: Span { index: 0, length: 3, lineno: 1 },
         } "foo",
         
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 3, length: 3 },
-            lineno: 1,
+            location: Span { index: 3, length: 3, lineno: 1 },
         } "bar",
         
         token => {
             token: Token::EOF,
-            location: Span { index: 6, length: 0 },
-            lineno: 1,
+            location: Span { index: 6, length: 0, lineno: 1 },
         } "EOF",
     );
 }
@@ -46,14 +43,12 @@ fn lexer_skips_whitespace() {
     assert_token_sequence!(lexer,
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 2, length: 3 },
-            lineno: 1,
+            location: Span { index: 2, length: 3, lineno: 1 },
         } "foo",
         
         token => {
             token: Token::IntegerLiteral(2),
-            location: Span { index: 8, length: 3 },
-            lineno: 1,
+            location: Span { index: 8, length: 3, lineno: 1 },
         } "bar",
     );
 }
@@ -72,14 +67,12 @@ fn lexer_tracks_line_numbers() {
         
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 2, length: 3 },
-            lineno: 2,
+            location: Span { index: 2, length: 3, lineno: 2 },
         } "foo",
         
         token => {
             token: Token::IntegerLiteral(2),
-            location: Span { index: 10, length: 3 },
-            lineno: 4,
+            location: Span { index: 10, length: 3, lineno: 4 },
         } "bar",
     );
     
@@ -103,32 +96,27 @@ fn single_char_rule_matches_chars_and_dont_match_invalid() {
         
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 0, length: 1 },
-            lineno: 1,
+            location: Span { index: 0, length: 1, lineno: 1 },
         } "a",
         
         token => {
             token: Token::IntegerLiteral(2),
-            location: Span { index: 2, length: 1 },
-            lineno: 1,
+            location: Span { index: 2, length: 1, lineno: 1 },
         } "b",
         
         token => {
             token: Token::IntegerLiteral(3),
-            location: Span { index: 3, length: 1 },
-            lineno: 1,
+            location: Span { index: 3, length: 1, lineno: 1 },
         } "c",
         
         error => {
-            etype: ErrorType::NoMatchingRule,
-            location: Span { index: 4, length: 1 },
-            lineno: 1,
+            kind: LexerErrorKind::NoMatchingRule,
+            location: Span { index: 4, length: 1, lineno: 1 },
         } "d",
         
         token => {
             token: Token::EOF,
-            location: Span { index: 5, length: 0 },
-            lineno: 1,
+            location: Span { index: 5, length: 0, lineno: 1 },
         } "EOF",
     );
     
@@ -148,26 +136,22 @@ fn rule_substring_tokens_match_1() {
         
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 0, length: 1 },
-            lineno: 1,
+            location: Span { index: 0, length: 1, lineno: 1 },
         } "a",
         
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 2, length: 2 },
-            lineno: 1,
+            location: Span { index: 2, length: 2, lineno: 1 },
         } "ab",
         
         token => {
             token: Token::IntegerLiteral(2),
-            location: Span { index: 5, length: 3 },
-            lineno: 1,
+            location: Span { index: 5, length: 3, lineno: 1 },
         } "abc",
         
         token => {
             token: Token::EOF,
-            location: Span { index: 8, length: 0 },
-            lineno: 1,
+            location: Span { index: 8, length: 0, lineno: 1 },
         } "EOF"
         
     );
@@ -188,26 +172,22 @@ fn rule_substring_tokens_match_2() {
         
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 0, length: 1 },
-            lineno: 1,
+            location: Span { index: 0, length: 1, lineno: 1 },
         } "a.1",
         
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 2, length: 1 },
-            lineno: 1,
+            location: Span { index: 2, length: 1, lineno: 1 },
         } "a.2",
         
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 3, length: 2 },
-            lineno: 1,
+            location: Span { index: 3, length: 2, lineno: 1 },
         } "ab",
         
         token => {
             token: Token::EOF,
-            location: Span { index: 5, length: 0 },
-            lineno: 1,
+            location: Span { index: 5, length: 0, lineno: 1 },
         } "EOF"
         
     );
@@ -227,20 +207,17 @@ fn rule_substring_tokens_match_eof() {
     
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 0, length: 1 },
-            lineno: 1,
+            location: Span { index: 0, length: 1, lineno: 1 },
         },
         
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 3, length: 1 },
-            lineno: 2,
+            location: Span { index: 3, length: 1, lineno: 2 },
         },
         
         token => {
             token: Token::EOF,
-            location: Span { index: 4, length: 0 },
-            lineno: 2,
+            location: Span { index: 4, length: 0, lineno: 2 },
         } "EOF"
     
     );
@@ -261,26 +238,22 @@ fn lexer_test_matches_tokens_2() {
     
         token => {
             token: Token::IntegerLiteral(2),
-            location: Span { index: 0, length: 3 },
-            lineno: 1,
+            location: Span { index: 0, length: 3, lineno: 1 },
         } "and",
         
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 4, length: 1 },
-            lineno: 1,
+            location: Span { index: 4, length: 1, lineno: 1 },
         } "+",
         
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 5, length: 2 },
-            lineno: 1,
+            location: Span { index: 5, length: 2, lineno: 1 },
         } "or",
         
         token => {
             token: Token::EOF,
-            location: Span { index: 8, length: 0 },
-            lineno: 1,
+            location: Span { index: 8, length: 0, lineno: 1 },
         } "EOF"
     
     );
@@ -301,38 +274,32 @@ fn lexer_error_invalid_token() {
     
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { index: 0, length: 3 },
-            lineno: 1,
+            location: Span { index: 0, length: 3, lineno: 1 },
         } "foo",
         
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { index: 4, length: 1 },
-            lineno: 1,
+            location: Span { index: 4, length: 1, lineno: 1 },
         } "+",
         
         token => {
             token: Token::IntegerLiteral(2),
-            location: Span { index: 5, length: 3 },
-            lineno: 1,
+            location: Span { index: 5, length: 3, lineno: 1 },
         } "bar",
         
         error => {
-            etype: ErrorType::NoMatchingRule,
-            location: Span { index: 9, length: 3 },
-            lineno: 1,
+            kind: LexerErrorKind::NoMatchingRule,
+            location: Span { index: 9, length: 3, lineno: 1 },
         } "bad",
         
         token => {
             token: Token::IntegerLiteral(3),
-            location: Span { index: 13, length: 3 },
-            lineno: 1,
+            location: Span { index: 13, length: 3, lineno: 1 },
         } "baz",
         
         token => {
             token: Token::EOF,
-            location: Span { index: 16, length: 0 },
-            lineno: 1,
+            location: Span { index: 16, length: 0, lineno: 1 },
         } "EOF",
     
     );

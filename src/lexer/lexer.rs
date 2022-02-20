@@ -1,6 +1,6 @@
 use std::iter::{Iterator, Peekable};
 use crate::language;
-use crate::lexer::{Token, ErrorType, LexerError};
+use crate::lexer::{Token, LexerErrorKind, LexerError};
 use crate::lexer::rules::{LexerRule, MatchResult};
 use crate::lexer::rules::comments::{LineCommentRule, BlockCommentRule};
 
@@ -14,13 +14,13 @@ use crate::lexer::rules::comments::{LineCommentRule, BlockCommentRule};
 pub struct Span {
     pub index: usize,
     pub length: usize,
+    pub lineno: u64,
 }
 
 #[derive(Debug)]
 pub struct TokenMeta {
     pub token: Token,
     pub location: Span,
-    pub lineno: u64,
 }
 
 // Lexer Builder
@@ -285,7 +285,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     
                     let matching_rule = &mut self.rules[rule_id];
                     let token = matching_rule.get_token()
-                        .map_err(|err| self.error(err.etype, token_start))?;
+                        .map_err(|err| self.token_error(err, token_start))?;
                     
                     return Ok(self.token_data(token, token_start, token_line));
                 
@@ -299,7 +299,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 let next_active = &self.active[1];
                 
                 if next_active.is_empty() {
-                    return Err(self.error(ErrorType::NoMatchingRule, token_start));
+                    return Err(self.error(LexerErrorKind::NoMatchingRule, token_start));
                 } 
                 if next_active.len() == 1 {
                     let rule_id = next_active[0];
@@ -323,12 +323,12 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             let rule_id = next_complete[0];
             let matching_rule = &mut self.rules[rule_id];
             let token = matching_rule.get_token()
-                .map_err(|err| self.error(err.etype, token_start))?;
+                .map_err(|err| self.token_error(err, token_start))?;
             
             return Ok(self.token_data(token, token_start, token_line));
         }
         
-        return Err(self.error(ErrorType::UnexpectedEOF, token_start));
+        return Err(self.error(LexerErrorKind::UnexpectedEOF, token_start));
     }
     
     fn exhaust_rule(&mut self, rule_id: usize, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
@@ -357,39 +357,41 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         let rule = &mut self.rules[rule_id];
         if let MatchResult::CompleteMatch = rule.current_state() {
             let token = rule.get_token()
-                .map_err(|err| self.error(err.etype, token_start))?;
+                .map_err(|err| self.token_error(err, token_start))?;
             
             return Ok(self.token_data(token, token_start, token_line));
         }
         
         if self.at_eof() {
-            return Err(self.error(ErrorType::UnexpectedEOF, token_start));
+            return Err(self.error(LexerErrorKind::UnexpectedEOF, token_start));
         }
-        return Err(self.error(ErrorType::NoMatchingRule, token_start));
-    }
-    
-    fn current_span(&self, start_idx: usize) -> Span {
-        let length = if self.current > start_idx { 
-            self.current - start_idx 
-        } else { 0 };
-        
-        return Span { index: start_idx, length };
+        return Err(self.error(LexerErrorKind::NoMatchingRule, token_start));
     }
     
     fn token_data(&self, token: Token, token_start: usize, token_line: u64) -> TokenMeta {
         TokenMeta {
             token,
-            location: self.current_span(token_start),
-            lineno: token_line,
+            location: Span {
+                index: token_start,
+                length: token_length(token_start, self.current),
+                lineno: token_line,
+            }
         }
     }
     
-    fn error(&self, etype: ErrorType, token_start: usize) -> LexerError {
+    fn error(&self, kind: LexerErrorKind, token_start: usize) -> LexerError {
         LexerError {
-            etype,
-            location: self.current_span(token_start),
-            lineno: self.lineno,
+            kind,
+            location: Span {
+                index: token_start,
+                length: token_length(token_start, self.current),
+                lineno: self.lineno,
+            }
         }
+    }
+    
+    fn token_error(&self, err: Box<dyn std::error::Error>, token_start: usize) -> LexerError {
+        self.error(LexerErrorKind::CouldNotReadToken(err), token_start)
     }
 }
 
@@ -400,4 +402,10 @@ fn split_array_pair_mut<T>(pair: &mut [T; 2]) -> (&mut T, &mut T) {
     let (first, rest) = pair.split_first_mut().unwrap();
     let second = &mut rest[0];
     (first, second)
+}
+
+fn token_length(start_idx: usize, end_idx: usize) -> usize {
+    if end_idx > start_idx { 
+        end_idx - start_idx 
+    } else { 0 }
 }

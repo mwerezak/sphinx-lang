@@ -32,44 +32,37 @@ fn lexer_test_comments() {
     
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { length: 3, .. },
-            lineno: 1,
+            location: Span { length: 3, lineno: 1, .. },
         } "foo",
         
         token => {
             token: Token::Comment,
-            location: Span { length: 5, .. },
-            lineno: 1,
+            location: Span { length: 5, lineno: 1, .. },
         } "#bar",
         
         token => {
             token: Token::Comment,
-            location: Span { length: 8, .. },
-            lineno: 3,
+            location: Span { length: 8, lineno: 3, .. },
         } "#   #{{",
         
         token => {
             token: Token::IntegerLiteral(2),
-            location: Span { length: 3, .. },
-            lineno: 5,
+            location: Span { length: 3, lineno: 5, .. },
         } "baz",
         
         token => {
             token: Token::Comment,
-            location: Span { length: 65, .. },
-            lineno: 5,
+            location: Span { length: 65, lineno: 5, .. },
         } "multiline comment block",
     
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { length: 3, .. },
-            lineno: 10,
+            location: Span { length: 3, lineno: 10, .. },
         } "bar",
     
         token => {
             token: Token::EOF,
-            location: Span { length: 0, .. },
-            lineno: 12,
+            location: Span { length: 0, lineno: 12, .. },
         } "EOF",
     
     );
@@ -103,26 +96,22 @@ fn lexer_test_skip_comments() {
     
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { length: 3, .. },
-            lineno: 1,
+            location: Span { length: 3, lineno: 1, .. },
         } "foo",
         
         token => {
             token: Token::IntegerLiteral(2),
-            location: Span { length: 3, .. },
-            lineno: 5,
+            location: Span { length: 3, lineno: 5, .. },
         } "baz",
         
         token => {
             token: Token::IntegerLiteral(1),
-            location: Span { length: 3, .. },
-            lineno: 10,
+            location: Span { length: 3, lineno: 10, .. },
         } "bar",
         
         token => {
             token: Token::EOF,
-            location: Span { length: 0, .. },
-            lineno: 12,
+            location: Span { length: 0, lineno: 12, .. },
         } "EOF",
     
     );

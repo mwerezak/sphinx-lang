@@ -1,5 +1,3 @@
-use crate::lexer::{Token, TokenError};
-
 pub mod strmatcher;
 pub mod general;
 pub mod literals;
@@ -8,6 +6,9 @@ pub mod comments;
 
 pub use general::*;
 
+
+use std::error::Error;
+use crate::lexer::Token;
 
 // Helpers
 
@@ -70,6 +71,7 @@ impl MatchResult {
 }
 
 // Lexer Rules
+type TokenError = Box<dyn Error + 'static>;  // kludge
 
 pub trait LexerRule {
     fn reset(&mut self);

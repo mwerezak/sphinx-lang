@@ -1,6 +1,6 @@
 use crate::language;
-use crate::lexer::{Token, TokenError, ErrorType};
-use crate::lexer::rules::{MatchResult, LexerRule, CharClass};
+use crate::lexer::{Token, LexerErrorKind};
+use crate::lexer::rules::{MatchResult, LexerRule, CharClass, TokenError};
 use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Identifiers
@@ -97,9 +97,7 @@ impl LexerRule for IntegerLiteralRule {
             Ok(value) => Ok(Token::IntegerLiteral(value)),
             
             // most likely the value overflowed language::IntType
-            Err(err) => Err(TokenError {
-                etype: ErrorType::ParseIntError(err),
-            }),
+            Err(err) => Err(Box::new(err)),
         }
     }
     
@@ -154,9 +152,7 @@ impl LexerRule for HexIntegerLiteralRule {
             Ok(value) => Ok(Token::IntegerLiteral(value)),
             
             // most likely the value overflowed language::IntType
-            Err(err) => Err(TokenError {
-                etype: ErrorType::ParseIntError(err),
-            }),
+            Err(err) => Err(Box::new(err)),
         }
     }
     

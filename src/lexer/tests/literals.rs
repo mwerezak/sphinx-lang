@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::lexer::{LexerBuilder, Token, TokenMeta, LexerError, ErrorType, Span};
+use crate::lexer::{LexerBuilder, Token, TokenMeta, LexerError, LexerErrorKind, Span};
 use crate::lexer::rules::SingleCharRule;
 use crate::lexer::rules::literals::*;
 
@@ -61,19 +61,19 @@ fn lexer_test_identifiers() {
         } "valid2",
         
         error => {
-            etype: ErrorType::NoMatchingRule,
+            kind: LexerErrorKind::NoMatchingRule,
             location: Span { length: 1, .. },
             ..
         } "0no - 0",
         
         error => {
-            etype: ErrorType::NoMatchingRule,
+            kind: LexerErrorKind::NoMatchingRule,
             location: Span { length: 1, .. },
             ..
         } "0no - n",
 
         error => {
-            etype: ErrorType::NoMatchingRule,
+            kind: LexerErrorKind::NoMatchingRule,
             location: Span { length: 1, .. },
             ..
         } "0no - o",
@@ -120,13 +120,13 @@ fn lexer_test_keywords_and_identifiers() {
         } "_k",
         
         error => {
-            etype: ErrorType::NoMatchingRule,
+            kind: LexerErrorKind::NoMatchingRule,
             location: Span { length: 1, .. },
             ..
         } "9k.1",
         
         error => {
-            etype: ErrorType::NoMatchingRule,
+            kind: LexerErrorKind::NoMatchingRule,
             location: Span { length: 1, .. },
             ..
         } "9k.2",
@@ -159,13 +159,13 @@ fn lexer_test_integer_literals() {
         } "01123",
         
         error => {
-            etype: ErrorType::NoMatchingRule,
+            kind: LexerErrorKind::NoMatchingRule,
             location: Span { length: 1, .. },
             ..
         } "x",
         
         error => {
-            etype: ErrorType::NoMatchingRule,
+            kind: LexerErrorKind::NoMatchingRule,
             location: Span { length: 1, .. },
             ..
         } "A",
