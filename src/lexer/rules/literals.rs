@@ -1,5 +1,5 @@
 use crate::language;
-use crate::lexer::{Token, LexerErrorKind};
+use crate::lexer::{Token, ErrorKind};
 use crate::lexer::rules::{MatchResult, LexerRule, CharClass, TokenError};
 use crate::lexer::rules::strmatcher::StrMatcher;
 

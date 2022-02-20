@@ -5,7 +5,7 @@ use crate::lexer::Span;
 // Lexer Errors
 
 #[derive(Debug)]
-pub enum LexerErrorKind {
+pub enum ErrorKind {
     NoMatchingRule,
     UnexpectedEOF,
     CouldNotReadToken(Box<dyn Error>),  // kludge
@@ -13,7 +13,7 @@ pub enum LexerErrorKind {
 
 #[derive(Debug)]
 pub struct LexerError {
-    pub kind: LexerErrorKind,
+    pub kind: ErrorKind,
     pub location: Span,
 }
 

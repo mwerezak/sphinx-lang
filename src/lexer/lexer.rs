@@ -1,6 +1,6 @@
 use std::iter::{Iterator, Peekable};
 use crate::language;
-use crate::lexer::{Token, LexerErrorKind, LexerError};
+use crate::lexer::{Token, ErrorKind, LexerError};
 use crate::lexer::rules::{LexerRule, MatchResult};
 use crate::lexer::rules::comments::{LineCommentRule, BlockCommentRule};
 
@@ -299,7 +299,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 let next_active = &self.active[1];
                 
                 if next_active.is_empty() {
-                    return Err(self.error(LexerErrorKind::NoMatchingRule, token_start));
+                    return Err(self.error(ErrorKind::NoMatchingRule, token_start));
                 } 
                 if next_active.len() == 1 {
                     let rule_id = next_active[0];
@@ -328,7 +328,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             return Ok(self.token_data(token, token_start, token_line));
         }
         
-        return Err(self.error(LexerErrorKind::UnexpectedEOF, token_start));
+        return Err(self.error(ErrorKind::UnexpectedEOF, token_start));
     }
     
     fn exhaust_rule(&mut self, rule_id: usize, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
@@ -363,9 +363,9 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
         
         if self.at_eof() {
-            return Err(self.error(LexerErrorKind::UnexpectedEOF, token_start));
+            return Err(self.error(ErrorKind::UnexpectedEOF, token_start));
         }
-        return Err(self.error(LexerErrorKind::NoMatchingRule, token_start));
+        return Err(self.error(ErrorKind::NoMatchingRule, token_start));
     }
     
     fn token_data(&self, token: Token, token_start: usize, token_line: u64) -> TokenMeta {
@@ -379,7 +379,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
     }
     
-    fn error(&self, kind: LexerErrorKind, token_start: usize) -> LexerError {
+    fn error(&self, kind: ErrorKind, token_start: usize) -> LexerError {
         LexerError {
             kind,
             location: Span {
@@ -391,7 +391,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
     
     fn token_error(&self, err: Box<dyn std::error::Error>, token_start: usize) -> LexerError {
-        self.error(LexerErrorKind::CouldNotReadToken(err), token_start)
+        self.error(ErrorKind::CouldNotReadToken(err), token_start)
     }
 }
 
