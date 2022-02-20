@@ -54,6 +54,23 @@ impl Primary {
     where I: Iterator<Item=PrimaryOp> {
         Primary { atom, ops: ops.collect() }
     }
+    
+    /*
+        Check if this primary expression is also an lvalue.
+        
+        lvalue ::= IDENTIFIER | primary subscript | primary access ;
+    */
+    pub fn is_lvalue(&self) -> bool {
+        // if there are no primary ops, then we are in the IDENTIFIER branch
+        if self.ops.is_empty() {
+            matches!(self.atom, Atom::Identifier(..))
+        } else {
+            match self.ops.last().unwrap() {
+                PrimaryOp::Access(..) | PrimaryOp::Index(..) => true,
+                _ => false,
+            }
+        }
+    }
 }
 
 
