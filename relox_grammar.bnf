@@ -44,7 +44,7 @@ expression ::= primary
     Operator precendence in order from strong to weak binding
     (left associative unless otherwise specified)
      
-     1:  (unary -) not          (right associative)
+     1:  (unary -) (unary +) not          (right associative)
      2:  * / %
      3:  + - 
      4:  << >>
