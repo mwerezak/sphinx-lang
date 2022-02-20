@@ -48,7 +48,7 @@ contexts:
       scope: punctuation.separator
 
   late-expressions:
-    - include: variable-defs
+    # - include: variable-defs
     - include: function-defs
     - include: function-calls
     - include: class-defs
@@ -131,6 +131,8 @@ contexts:
       scope: invalid
 
   identifiers:
+    - match: \b(var)\b
+      scope: keyword.declaration.other
     - match: '{{identifier}}'
       scope: variable.other
     - match: \.
@@ -218,6 +220,7 @@ contexts:
     - include: statements
 
   while-statements:
+    # normal while loops
     - match: \b(while)\b
       scope: keyword.control
       push:
@@ -225,6 +228,15 @@ contexts:
           scope: keyword.control
           set: while-body
         - include: expressions
+    # do-while loops
+    - match: \b(do)\b
+      scope: keyword.control
+      push:
+        - meta_scope: meta.block
+        - match: \b(while)\b
+          scope: keyword.control
+          pop: true
+        - include: statements
 
   while-body:
     - meta_scope: meta.block
@@ -233,14 +245,14 @@ contexts:
       pop: true
     - include: statements
 
-  variable-defs:
-    - match: \b(var)\b
-      scope: keyword.declaration.other
-      push:
-        - meta_content_scope: variable.other
-        - match: \=
-          scope: keyword.operator.assignment
-          pop: true
+  # variable-defs:
+  #   - match: \b(var)\b
+  #     scope: keyword.declaration.other
+  #     push:
+  #       - meta_content_scope: variable.other
+  #       - match: \=
+  #         scope: keyword.operator.assignment
+  #         pop: true
 
   function-defs:
     - match: \b(fun)\b

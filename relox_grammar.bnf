@@ -29,11 +29,11 @@ lvalue ::= IDENTIFIER | primary subscript | primary access ;  (* so called becau
 
 
 expression ::= primary
-             | op-expression
-             | if-expression
              | assignment-expression 
+             | op-expression
              | tuple-constructor
              | object-constructor
+             | if-expression
              | function-def
              | class-def ;
 
@@ -67,7 +67,7 @@ operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
 (* right associative, and terminates the operand[N] stack using primary *)
 unary ::= ( "-" | "+" | "not" ) unary | primary ;
 
-comparison ::= operand[7] OPERATOR[8] operand[7] ; (* not associative *)
+comparison ::= operand[7] ( OPERATOR[8] operand[7] )? ; (* not associative *)
 
 (* top-level operator expression *)
 op-expression ::= operand[10];

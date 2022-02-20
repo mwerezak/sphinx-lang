@@ -119,6 +119,11 @@ var a = b += c = var d = 1;  # chaining assignment (right associative)
 
 del a;  # drop a variable from the current scope
 
+# assigment expressions bind weaker than operator expressions
+3 * b += c    # Error, assignment target is not an lvalue
+3 * (b += c)  # Ok
+
+
 # Control Flow
 # branching constructs are expressions
 # looping constructs are statements - in fact, they are the only non-expression statements in ReLox
@@ -145,6 +150,19 @@ var condExpr =
   else
     "default"
   end;
+  
+# if-expressions and assigment expressions
+
+var a, var b = (1, 2)
+
+# This is not allowed, otherwise anytime an identifier is encountered
+# it would be ambiguous whether you want to lookup the value of a variable
+# or use it as an assignment target
+if cond then a else b end += 1  # error, found if-expression, expected assignment target on LHS of assignment
+
+# You have to do this
+if cond then a += 1 else b += 1 end  # works
+
 
 # loops support both break and continue statements
 
