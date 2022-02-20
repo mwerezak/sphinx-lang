@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate::lexer::{LexerBuilder, Token, TokenMeta, Span};
-use crate::lexer::errors::{LexerError, LexerErrorType};
+use crate::lexer::errors::{LexerError, ErrorType};
 
 #[test]
 fn lexer_matches_tokens_1() {
@@ -120,7 +120,7 @@ fn single_char_rule_matches_chars_and_dont_match_invalid() {
         } "c",
         
         error => {
-            etype: LexerErrorType::NoMatchingRule,
+            etype: ErrorType::NoMatchingRule,
             location: Span { index: 4, length: 1 },
             lineno: 1,
         } "d",
@@ -318,7 +318,7 @@ fn lexer_error_invalid_token() {
         } "bar",
         
         error => {
-            etype: LexerErrorType::NoMatchingRule,
+            etype: ErrorType::NoMatchingRule,
             location: Span { index: 9, length: 3 },
             lineno: 1,
         } "bad",

@@ -1,6 +1,6 @@
-use crate::lexer::Token;
-use super::{MatchResult, LexerRule};
-use super::strmatcher::StrMatcher;
+use crate::lexer::{Token, TokenError};
+use crate::lexer::rules::{MatchResult, LexerRule};
+use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Special-Purpose Rules
 
@@ -71,11 +71,9 @@ impl LexerRule for LineCommentRule {
     }
     
     // produce Some(Token) if current state is CompleteMatch, otherwise None
-    fn get_token(&self) -> Option<Token> {
-        if self.current_state().is_complete_match() {
-            return Some(Token::Comment);
-        }
-        return None;
+    fn get_token(&self) -> Result<Token, TokenError> {
+        debug_assert!(self.current_state().is_complete_match());
+        Ok(Token::Comment)
     }
 }
 
@@ -147,10 +145,8 @@ impl LexerRule for BlockCommentRule {
     }
     
     // produce Some(Token) if current state is CompleteMatch, otherwise None
-    fn get_token(&self) -> Option<Token> {
-        if self.current_state().is_complete_match() {
-            return Some(Token::Comment);
-        }
-        return None;
+    fn get_token(&self) -> Result<Token, TokenError> {
+        debug_assert!(self.current_state().is_complete_match());
+        Ok(Token::Comment)
     }
 }

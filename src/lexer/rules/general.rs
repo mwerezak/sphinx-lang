@@ -1,6 +1,7 @@
-use crate::lexer::Token;
-use super::{MatchResult, LexerRule};
-use super::strmatcher::StrMatcher;
+use crate::lexer::{Token, TokenError};
+use crate::lexer::rules::{MatchResult, LexerRule};
+use crate::lexer::rules::strmatcher::StrMatcher;
+
 
 // Single Character Rules
 
@@ -42,11 +43,9 @@ impl LexerRule for SingleCharRule {
         return match_result;
     }
     
-    fn get_token(&self) -> Option<Token> {
-        if self.state.is_complete_match() {
-            return Some(self.result.clone());
-        }
-        return None;
+    fn get_token(&self) -> Result<Token, TokenError> {
+        debug_assert!(self.current_state().is_complete_match());
+        Ok(self.result.clone())
     }
 }
 
@@ -80,10 +79,8 @@ impl LexerRule for MultiCharRule {
         self.matcher.try_match(next)
     }
     
-    fn get_token(&self) -> Option<Token> {
-        if self.current_state().is_complete_match() {
-            return Some(self.result.clone());
-        }
-        return None;
+    fn get_token(&self) -> Result<Token, TokenError> {
+        debug_assert!(self.current_state().is_complete_match());
+        Ok(self.result.clone())
     }
 }

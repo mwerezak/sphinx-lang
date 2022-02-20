@@ -1,4 +1,5 @@
-use crate::lexer::Token;
+use crate::language;
+use crate::lexer::{Token, TokenError, ErrorType};
 use crate::lexer::rules::{MatchResult, LexerRule, CharClass};
 use crate::lexer::rules::strmatcher::StrMatcher;
 
@@ -49,11 +50,9 @@ impl LexerRule for IdentifierRule {
         }
     }
     
-    fn get_token(&self) -> Option<Token> {
-        if self.current_state().is_complete_match() {
-            return Some(Token::Identifier(self.buf.clone()));
-        }
-        return None;
+    fn get_token(&self) -> Result<Token, TokenError> {
+        debug_assert!(self.current_state().is_complete_match());
+        Ok(Token::Identifier(self.buf.clone()))
     }
 }
 
@@ -90,16 +89,18 @@ impl LexerRule for IntegerLiteralRule {
         return MatchResult::NoMatch;
     }
     
-    fn get_token(&self) -> Option<Token> {
-        if self.current_state().is_complete_match() {
-            let value = i32::from_str_radix(self.buf.as_str(), 10)
-                .unwrap_or_else(|err| { 
-                    panic!("could not extract i32 from \"{}\": {:?}", self.buf, err); 
-                });
+    fn get_token(&self) -> Result<Token, TokenError> {
+        debug_assert!(self.current_state().is_complete_match());
+        
+        let conversion = language::IntType::from_str_radix(self.buf.as_str(), 10);
+        match conversion {
+            Ok(value) => Ok(Token::IntegerLiteral(value)),
             
-            return Some(Token::IntegerLiteral(value));
+            // most likely the value overflowed language::IntType
+            Err(err) => Err(TokenError {
+                etype: ErrorType::ParseIntError(err),
+            }),
         }
-        return None;
     }
     
 }
@@ -145,16 +146,18 @@ impl LexerRule for HexIntegerLiteralRule {
         }
     }
     
-    fn get_token(&self) -> Option<Token> {
-        if self.current_state().is_complete_match() {
-            let value = i32::from_str_radix(self.buf.as_str(), 16)
-                .unwrap_or_else(|err| { 
-                    panic!("could not extract i32 from \"{}\": {:?}", self.buf, err); 
-                });
+    fn get_token(&self) -> Result<Token, TokenError> {
+        debug_assert!(self.current_state().is_complete_match());
+        
+        let conversion = language::IntType::from_str_radix(self.buf.as_str(), 16);
+        match conversion {
+            Ok(value) => Ok(Token::IntegerLiteral(value)),
             
-            return Some(Token::IntegerLiteral(value));
+            // most likely the value overflowed language::IntType
+            Err(err) => Err(TokenError {
+                etype: ErrorType::ParseIntError(err),
+            }),
         }
-        return None;
     }
     
 }

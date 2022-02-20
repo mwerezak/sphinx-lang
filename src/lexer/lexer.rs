@@ -1,8 +1,8 @@
 use std::iter::{Iterator, Peekable};
 use crate::language;
-use super::{Token, LexerError, LexerErrorType};
-use super::rules::{LexerRule, MatchResult};
-use super::rules::comments::{LineCommentRule, BlockCommentRule};
+use crate::lexer::{Token, ErrorType, LexerError};
+use crate::lexer::rules::{LexerRule, MatchResult};
+use crate::lexer::rules::comments::{LineCommentRule, BlockCommentRule};
 
 
 // Token Output
@@ -284,7 +284,9 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                         };
                     
                     let matching_rule = &mut self.rules[rule_id];
-                    let token = matching_rule.get_token().unwrap();
+                    let token = matching_rule.get_token()
+                        .map_err(|err| self.error(err.etype, token_start))?;
+                    
                     return Ok(self.token_data(token, token_start, token_line));
                 
                 }
@@ -297,7 +299,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 let next_active = &self.active[1];
                 
                 if next_active.is_empty() {
-                    return Err(self.error(LexerErrorType::NoMatchingRule, token_start));
+                    return Err(self.error(ErrorType::NoMatchingRule, token_start));
                 } 
                 if next_active.len() == 1 {
                     let rule_id = next_active[0];
@@ -320,11 +322,13 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         if next_complete.len() == 1 {
             let rule_id = next_complete[0];
             let matching_rule = &mut self.rules[rule_id];
-            let token = matching_rule.get_token().unwrap();
+            let token = matching_rule.get_token()
+                .map_err(|err| self.error(err.etype, token_start))?;
+            
             return Ok(self.token_data(token, token_start, token_line));
         }
         
-        return Err(self.error(LexerErrorType::UnexpectedEOF, token_start));
+        return Err(self.error(ErrorType::UnexpectedEOF, token_start));
     }
     
     fn exhaust_rule(&mut self, rule_id: usize, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
@@ -352,14 +356,16 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         
         let rule = &mut self.rules[rule_id];
         if let MatchResult::CompleteMatch = rule.current_state() {
-            let token = rule.get_token().unwrap();
+            let token = rule.get_token()
+                .map_err(|err| self.error(err.etype, token_start))?;
+            
             return Ok(self.token_data(token, token_start, token_line));
         }
         
         if self.at_eof() {
-            return Err(self.error(LexerErrorType::UnexpectedEOF, token_start));
+            return Err(self.error(ErrorType::UnexpectedEOF, token_start));
         }
-        return Err(self.error(LexerErrorType::NoMatchingRule, token_start));
+        return Err(self.error(ErrorType::NoMatchingRule, token_start));
     }
     
     fn current_span(&self, start_idx: usize) -> Span {
@@ -378,8 +384,12 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
     }
     
-    fn error(&self, etype: LexerErrorType, token_start: usize) -> LexerError {
-        LexerError::new(etype, self.current_span(token_start), self.lineno)
+    fn error(&self, etype: ErrorType, token_start: usize) -> LexerError {
+        LexerError {
+            etype,
+            location: self.current_span(token_start),
+            lineno: self.lineno,
+        }
     }
 }
 

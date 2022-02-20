@@ -1,4 +1,4 @@
-use crate::lexer::Token;
+use crate::lexer::{Token, TokenError};
 
 pub mod strmatcher;
 pub mod general;
@@ -80,6 +80,8 @@ pub trait LexerRule {
     // return the match state if ch was passed to feed()
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult;
     
-    // produce Some(Token) if current state is CompleteMatch, otherwise None
-    fn get_token(&self) -> Option<Token>;
+    // should always panic if current_state() is not MatchResult::CompleteMatch
+    // and produce an error if the Token could not be produced for some other reason
+    // e.g. attempting to read an integer literal that overflows
+    fn get_token(&self) -> Result<Token, TokenError>;
 }
