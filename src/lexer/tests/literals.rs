@@ -3,6 +3,7 @@
 use crate::lexer::{LexerBuilder, Token, TokenMeta, LexerError, ErrorKind, Span};
 use crate::lexer::rules::SingleCharRule;
 use crate::lexer::rules::literals::*;
+use crate::lexer::rules::keywords::KeywordRule;
 
 
 #[test]
@@ -94,8 +95,6 @@ fn lexer_test_identifiers() {
 
 }
 
-use crate::lexer::rules::keywords::KeywordRule;
-
 #[test]
 fn lexer_test_keywords_and_identifiers() {
     let source = " k   _k  9k k9 ";
@@ -138,6 +137,30 @@ fn lexer_test_keywords_and_identifiers() {
         } "k9",
     );
 
+}
+
+#[test]
+fn lexer_test_keyword_at_eof() {
+    let source = " k";
+    let mut lexer = LexerBuilder::new()
+        .add_rule(KeywordRule::new(Token::Fun, "k"))
+        .add_rule(IdentifierRule::new())
+        .build(source.chars());
+        
+    assert_token_sequence!(lexer,
+        
+        token => {
+            token: Token::Fun,
+            location: Span { length: 1, index: 1, .. },
+            ..
+        } "k",
+        
+        token => {
+            token: Token::EOF,
+            location: Span { length: 0, index: 2, .. },
+        } "eof",
+        
+    );
 }
 
 

@@ -96,7 +96,7 @@ impl LexerBuilder {
 
 // Lexer
 
-// TODO operate on bytes, not char?
+type RuleID = usize;
 
 pub struct Lexer<S> where S: Iterator<Item=char> {
     source: Peekable<S>,
@@ -109,11 +109,13 @@ pub struct Lexer<S> where S: Iterator<Item=char> {
     
     // internal state used by next_token(). 
     // putting these here instead to avoid unnecessary allocations
-    active:   [Vec<usize>; 2],
-    complete: [Vec<usize>; 2],
+    active:   [Vec<RuleID>; 2],
+    complete: [Vec<RuleID>; 2],
 }
 
 impl<S> Lexer<S> where S: Iterator<Item=char> {
+    const THIS: usize = 0;
+    const NEXT: usize = 1;
     
     fn advance(&mut self) -> (Option<char>, Option<char>) {
         self.last = self.peek_next();
@@ -237,7 +239,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             },
         };
         
-        self.active[0].extend(0..self.rules.len());
+        // generate rule ids
+        self.active[Self::THIS].extend(0..self.rules.len());
         
         loop {
             
@@ -249,6 +252,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 
                 // println!("({}) next: {:?}", self.current, next);
                 // println!("({}) active: {:?}", self.current, active);
+                // println!("({}) complete: {:?}", self.current, complete);
                 
                 next_active.clear();
                 next_complete.clear();
@@ -267,7 +271,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 }
                 
                 // println!("({}) next_active: {:?}", self.current, next_active);
-                // println!("({}) complete: {:?}", self.current, complete);
+                // println!("({}) next_complete: {:?}", self.current, next_complete);
+                
                 
                 // Only care about complete rules if next_active is empty ("rule of maximal munch")
                 if next_active.is_empty() && !complete.is_empty() {
@@ -276,13 +281,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     // do not advance the lexer as we will revisit the current char on the next pass
                     
                     // if there is more than one complete rule, the lowest index takes priority!
-                    let rule_id =
-                        if complete.len() == 1 {
-                            complete[0]
-                        } else {
-                            *complete.iter().min().unwrap()
-                        };
-                    
+                    let rule_id = *complete.iter().min().unwrap();
                     let matching_rule = &mut self.rules[rule_id];
                     let token = matching_rule.get_token()
                         .map_err(|err| self.token_error(err, token_start))?;
@@ -296,7 +295,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             self.advance();
             
             {
-                let next_active = &self.active[1];
+                let next_active = &self.active[Self::NEXT];
                 
                 if next_active.is_empty() {
                     return Err(self.error(ErrorKind::NoMatchingRule, token_start));
@@ -318,9 +317,11 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             }
         }
         
-        let next_complete = &self.complete[1];
-        if next_complete.len() == 1 {
-            let rule_id = next_complete[0];
+        let next_complete = &self.complete[Self::NEXT];
+        if !next_complete.is_empty() {
+            
+            // if there is more than one complete rule, the lowest index takes priority!
+            let rule_id = *next_complete.iter().min().unwrap();
             let matching_rule = &mut self.rules[rule_id];
             let token = matching_rule.get_token()
                 .map_err(|err| self.token_error(err, token_start))?;
@@ -331,7 +332,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         return Err(self.error(ErrorKind::UnexpectedEOF, token_start));
     }
     
-    fn exhaust_rule(&mut self, rule_id: usize, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
+    fn exhaust_rule(&mut self, rule_id: RuleID, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
         {
             let rule = &mut self.rules[rule_id];
             debug_assert!(!matches!(rule.current_state(), MatchResult::NoMatch));
@@ -396,6 +397,13 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         };
         LexerError::caused_by(err, ErrorKind::CouldNotReadToken, location)
     }
+}
+
+
+impl<S> Iterator for Lexer<S> where S: Iterator<Item=char> {
+    type Item = Result<TokenMeta, LexerError>;
+    
+    fn next(&mut self) -> Option<Self::Item> { Some(self.next_token()) }
 }
 
 
