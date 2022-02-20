@@ -380,18 +380,21 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
     
     fn error(&self, kind: ErrorKind, token_start: usize) -> LexerError {
-        LexerError {
-            kind,
-            location: Span {
-                index: token_start,
-                length: token_length(token_start, self.current),
-                lineno: self.lineno,
-            }
-        }
+        let location = Span {
+            index: token_start,
+            length: token_length(token_start, self.current),
+            lineno: self.lineno,
+        };
+        LexerError::new(kind, location)
     }
     
     fn token_error(&self, err: Box<dyn std::error::Error>, token_start: usize) -> LexerError {
-        self.error(ErrorKind::CouldNotReadToken(err), token_start)
+        let location = Span {
+            index: token_start,
+            length: token_length(token_start, self.current),
+            lineno: self.lineno,
+        };
+        LexerError::caused_by(err, ErrorKind::CouldNotReadToken, location)
     }
 }
 

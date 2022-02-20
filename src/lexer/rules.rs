@@ -71,7 +71,7 @@ impl MatchResult {
 }
 
 // Lexer Rules
-type TokenError = Box<dyn Error + 'static>;  // kludge
+type TokenError = Box<dyn Error + 'static>;
 
 pub trait LexerRule {
     fn reset(&mut self);

@@ -112,6 +112,7 @@ fn single_char_rule_matches_chars_and_dont_match_invalid() {
         error => {
             kind: ErrorKind::NoMatchingRule,
             location: Span { index: 4, length: 1, lineno: 1 },
+            ..
         } "d",
         
         token => {
@@ -290,6 +291,7 @@ fn lexer_error_invalid_token() {
         error => {
             kind: ErrorKind::NoMatchingRule,
             location: Span { index: 9, length: 3, lineno: 1 },
+            ..
         } "bad",
         
         token => {
