@@ -3,90 +3,96 @@
    #{   Nesting!   }#
 }#
 
-# TODO semicolon elision rules
-
 # Your first ReLox program!
-echo "Hello, world!";  # print() function will be available later once there is a builtin library
+echo "Hello, world!"  # print() function will be available later once there is a builtin library
+
+# Semicolons are optional.
+"One Stmt"; "Two Stmt"
+
+# Like Lua, the syntax has been chosen to ensure that 
+# the end of a statement can always be inferred without
+# needing to be whitespace-sensitive.
+
 
 # Booleans
-true;  # Not false.
-false; # Not *not* false.
+true  # Not false.
+false # Not *not* false.
 
 # Numbers
-1234;   # An integer.
-12.34;  # A decimal number.
-0xFACE; # Hexadecimal integer.
+1234   # An integer.
+12.34  # A decimal number.
+0xFACE # Hexadecimal integer.
 
 # Strings
-"I am a string";
-"";     # The empty string.
-"123";  # self is a string, not a number.
-"a\nb"; # Escape sequences
-'And then she said, "woah."';  # Can be single or double quoted.
+"I am a string"
+""     # The empty string.
+"123"  # self is a string, not a number.
+"a\nb" # Escape sequences
+'And then she said, "woah."'  # Can be single or double quoted.
 
 # Nil
-nil;
+nil
 
 # Tuple
-"abc", 123;
+"abc", 123
 
 # parens are only required for these special cases
-();  # the empty tuple
+()  # the empty tuple
 ("solo",)  # tuple with one element
 
 # Object
-Person { name: "Bob", age: 13 };
+Person { name: "Bob", age: 13 }
 
 # Arithmetic expressions
-add + me;
-subtract - me;
-multiply * me;
-divide / me;
+add + me
+subtract - me
+multiply * me
+divide / me
 
 # to implement: bitwise, shift, modulo
-(7 ^ 3) << 3;
-0xff | 235;
-3 % 2 == 0;
+(7 ^ 3) << 3
+0xff | 235
+3 % 2 == 0
 
--negateMe;
+-negateMe
 
 # Comparison and equality
 
-less < than;
-lessThan <= orEqual;
-greater > than;
-greaterThan >= orEqual;
+less < than
+lessThan <= orEqual
+greater > than
+greaterThan >= orEqual
 
-1 == 2;         # false.
-"cat" != "dog"; # true.
+1 == 2         # false.
+"cat" != "dog" # true.
 
-314 == "pi"; # false.
-123 == "123"; # false.
+314 == "pi" # false.
+123 == "123" # false.
 
 # booleans are not implicitly integers (but all expressions do have a "truth" value)
-true == 1; # false
+true == 1 # false
 
 
 # Logical operators
 
-not true;  # false.
-not false; # true.
+not true  # false.
+not false # true.
 
-true and false; # false.
-true and true;  # true.
+true and false # false.
+true and true  # true.
 
-false or false; # false.
-true or false;  # true.
+false or false # false.
+true or false  # true.
 
 # Precendence and grouping
-var average = (min + max) / 2;
+var average = (min + max) / 2
 
 
 # Blocks
 
 begin
-  echo "One statement.";
-  echo "Two statements.";
+  echo "One statement."
+  echo "Two statements."
   "Result value."
 end
 
@@ -100,24 +106,24 @@ end
 
 # Variable declaration and assignment
 
-var imAVariable = "here is my value";
-var iAmNil = nil;  # initializer is required
+var imAVariable = "here is my value"
+var iAmNil = nil  # initializer is required
 
-var first, second = "abc", "def";  # tuple destructuring
+var first, second = "abc", "def"  # tuple destructuring
 
-var inc = 0;
-inc -= 1;  # arithmetic assignment
+var inc = 0
+inc -= 1  # arithmetic assignment
 
-var breakfast = "bagels";
-echo breakfast; # "bagels".
-breakfast = "beignets";
-echo breakfast; # "beignets".
+var breakfast = "bagels"
+echo breakfast # "bagels".
+breakfast = "beignets"
+echo breakfast # "beignets".
 
-var b = 0;
-var c = 1;
-var a = b += c = var d = 1;  # chaining assignment (right associative)
+var b = 0
+var c = 1
+var a = b += c = var d = 1  # chaining assignment (right associative)
 
-del a;  # drop a variable from the current scope
+del a  # drop a variable from the current scope
 
 # assigment expressions bind weaker than operator expressions
 3 * b += c    # Error, assignment target is not an lvalue
@@ -129,9 +135,9 @@ del a;  # drop a variable from the current scope
 # looping constructs are statements - in fact, they are the only non-expression statements in ReLox
 
 if condition then
-    echo "yes";
+    echo "yes"
 else
-    echo "no";
+    echo "no"
 end
 
 if condition1 then
@@ -149,7 +155,7 @@ var condExpr =
     "second"
   else
     "default"
-  end;
+  end
   
 # if-expressions and assigment expressions
 
@@ -166,27 +172,27 @@ if cond then a += 1 else b += 1 end  # works
 
 # loops support both break and continue statements
 
-var a = 1;
+var a = 1
 while a < 10 do
   if exitcond then 
-    break;
+    break
   end
   if skipcond then 
-    continue;
+    continue
   end
 
-  echo a;
-  a += 1;
+  echo a
+  a += 1
 end
 
 do
   var cond = example()
-while cond;
+while cond
 
 # for loops TBD
 
 # C-style for loop
-# for var i ; i < 10 ; i+1 do
+# for var i , i < 10 , i+1 do
 # end
 
 #{
@@ -216,104 +222,104 @@ while cond;
 
 # Functions
 
-makeBreakfast(bacon, eggs, toast);
-makeBreakfast();
+makeBreakfast(bacon, eggs, toast)
+makeBreakfast()
 
 fun echoSum(a, b)
-  echo a + b;
+  echo a + b
 end
 
 fun returnSum(a, b)
-  return a + b;
+  return a + b
 end
 
 # Closures
 
 fun addPair(a, b)
-  return a + b;
+  return a + b
 end
 
 fun identity(a)
-  return a;
+  return a
 end
 
-echo identity(addPair)(1, 2); # echos "3".
+echo identity(addPair)(1, 2) # echos "3".
 
 fun outerFunction()
   fun localFunction()
-    echo "I'm local!";
+    echo "I'm local!"
   end
 
-  localFunction();
+  localFunction()
 end
 
 fun returnFunction()
-  var outside = "outside";
+  var outside = "outside"
 
   fun inner()
-    echo outside;
+    echo outside
   end
 
-  return inner;
+  return inner
 end
 
-var fn = returnFunction();
-fn();
+var fn = returnFunction()
+fn()
 
-var anonFn = fun(x) x + 1 end;
-var a = anonFn(3);
+var anonFn = fun(x) x + 1 end
+var a = anonFn(3)
 
 # Classes
 
-something.field = 1;
-something.method();
+something.field = 1
+something.method()
 
 class Breakfast
-  var classvar = 0;
+  var classvar = 0
 
   # functions whose first parameter is the "self" symbol
   # are automatically converted into builtin method descripter objects
   fun cook(self) 
-    echo "Eggs a-fryin'!";
+    echo "Eggs a-fryin'!"
   end
   
   # even when created using an anonymous function
   var serve = fun(self, who)
-    echo "Enjoy your breakfast, " + who + ".";
+    echo "Enjoy your breakfast, " + who + "."
   end
 end
 
 # and even when created outside of a class body.
 # descripters are passed the owning class (and instance, if relevant) when the __get() metamethod is invoked
 Breakfast.cook = fun(self)
-  echo "Eggs a-fryin'!";
+  echo "Eggs a-fryin'!"
 end
 
 
 # Store it in variables.
-var someVariable = Breakfast;
+var someVariable = Breakfast
 
 # Pass it to functions.
-someFunction(Breakfast);
+someFunction(Breakfast)
 
-var breakfast = Breakfast {};  # object initializer
-echo breakfast; # "Breakfast instance".
+var breakfast = Breakfast {}  # object initializer
+echo breakfast # "Breakfast instance".
 
 # Instantiation and initialization
 
 # originally initializers used { name: value }, but I want to reserve colons for future type hinting
-var breakfast = Breakfast { meat: "sausage", bread: "sourdough" };
-breakfast.drink = "coffee";
+var breakfast = Breakfast { meat: "sausage", bread: "sourdough" }
+breakfast.drink = "coffee"
 
-del breakfast.bread;  # remove an object member
+del breakfast.bread  # remove an object member
 
-var a = 0;
-var anonymous = { some = a = 1, data = 2 };
+var a = 0
+var anonymous = { some = a = 1, data = 2 }
 
 class Breakfast
   fun serve(self, who)
     echo "Enjoy your " + self.meat + " and " +
-        self.bread + ", " + who + ".";
+        self.bread + ", " + who + "."
   end
 
   # ...
@@ -322,27 +328,27 @@ end
 class Breakfast
   # constructor function
   fun new(meat, bread)
-    return Breakfast { meat: meat, bread: bread };
+    return Breakfast { meat: meat, bread: bread }
   end
 
 end
 
-var baconAndToast = Breakfast.new("bacon", "toast");
-baconAndToast.serve("Dear Reader");
+var baconAndToast = Breakfast.new("bacon", "toast")
+baconAndToast.serve("Dear Reader")
 # "Enjoy your bacon and toast, Dear Reader."
 
 # Inheritance
 
 class Brunch: Breakfast
   fun drink()
-    echo "How about a Bloody Mary?";
+    echo "How about a Bloody Mary?"
   end
 end
 
 
 # Variadic arguments
 fun variadicFun(normalArg, variadic...)
-  echo normalArg;
+  echo normalArg
   
   ## TODO figure out how for loops will work then redo this example
   var i = 0
@@ -354,13 +360,13 @@ end
 
 variadicFun("red", "blue", "green")  # prints "red" then "blue" then "green"
 
-var mylist = list.new("red", "green", "blue");  # important use case: constructor functions for collection types
+var mylist = list.new("red", "green", "blue")  # important use case: constructor functions for collection types
 
 # Argument unpacking
 
-var things = ("second", "third");
+var things = ("second", "third")
 variadicFun("first", ...things)  # prints "first" then "second"
-variadicFun(...things);  # prints "second" then "third"
+variadicFun(...things)  # prints "second" then "third"
 
 # Named Arguments TBD
 #{
@@ -370,10 +376,10 @@ fun example(positionalArg, :namedArg)
   end
 end
 
-example("otter", namedArg: true);
+example("otter", namedArg: true)
 
 # arguments to function calls must happen in this order
-anotherFunc("positional", ...unpackArgs, namedArg: "named");
+anotherFunc("positional", ...unpackArgs, namedArg: "named")
 }#
 
 
@@ -385,10 +391,10 @@ class Example
   end
   
   fun __call(self, args...)
-      echo args;
+      echo args
   end
   
-  var __eq = fun(self, other) true end;
+  var __eq = fun(self, other) true end
 end
 
 var ex = Example { [0]: "first", [1]: "second" }
@@ -406,14 +412,14 @@ ex[2] = "third"
 
 # class/instance names with double underscores are reserved for metamethods
 class Example
-  var __notallowed = true;  # error
+  var __notallowed = true  # error
   
   fun __alsonotallowed(self)
     echo "bad"
   end
 end
 
-Example.__fail = -3;  # this will result in an error
+Example.__fail = -3  # this will result in an error
 
 
 # Multiple inheritance
@@ -434,8 +440,8 @@ class C: A, B end
 
 class D: C, B end
 
-var d = D {};
-d.method();  # prints "A.method() called"
+var d = D {}
+d.method()  # prints "A.method() called"
 # see also: C3 Linearization
 
 

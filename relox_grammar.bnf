@@ -27,15 +27,16 @@ invocation ::= "(" ... ")" ;  (* WIP *)
 
 lvalue ::= IDENTIFIER | primary subscript | primary access ;  (* so called because they can appear on the left side of assignment, see Access below *)
 
-
-expression ::= primary
-             | assignment-expression 
-             | op-expression
-             | tuple-constructor
-             | object-constructor
-             | if-expression
-             | function-def
-             | class-def ;
+                                        (* Notes for parser implemention: *)
+expression ::= primary                  (* technically made redundant by binop-expression, included here for clarity *)
+             | binop-expression         (* starts with a primary *)
+             | assignment-expression    (* starts with a primary or "var" *)
+             | object-constructor       (* starts with a primary followed by "{" *)  (* at this level and above, we need to grab the next primary *)
+             | unary-expression         (* starts with an unary operator *)
+             | if-expression            (* starts with "if" keyword *)
+             | function-def             (* starts with "fun" keyword *)
+             | class-def                (* starts with "class" keyword *)
+             | tuple-constructor ;      (* indicated by comma after expression *)
 
 
 (*** Binary and Unary Operators ***)
@@ -58,19 +59,19 @@ expression ::= primary
 *)
 
 (* these special cases escape the general operator production below *)
-operand[1] ::= unary ;
-operand[8] ::= comparison ;
+binary[1] ::= primary ; (* terminates the binop precedence stack *)
+binary[8] ::= comparison ;
 
 (* OPERATOR[N] refers to the symbols in different levels of the operator precedence table above *)
-operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
+binary[N] ::= binary[N-1] ( OPERATOR[N] binary[N-1] )* ;
 
-(* right associative, and terminates the operand[N] stack using primary *)
-unary ::= ( "-" | "+" | "not" ) unary | primary ;
-
-comparison ::= operand[7] ( OPERATOR[8] operand[7] )? ; (* not associative *)
+comparison ::= binary[7] ( OPERATOR[8] binary[7] )? ; (* not associative *)
 
 (* top-level operator expression *)
-op-expression ::= operand[10];
+binop-expression ::= binary[10] ;
+
+(* right associative *)
+unary-expression ::= ( "-" | "+" | "not" ) unary | primary ;
 
 
 (*** Assignment ***)
@@ -83,7 +84,7 @@ op-expression ::= operand[10];
 *)
 
 (* right associative *)
-assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) assignment | expression ;
+assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
 assignment-target ::= ( "var" )? lvalue ; 
 
 assignment-statement ::= assignment-target-list  "=" expression-list ;
@@ -98,6 +99,7 @@ expression-list ::= expression ( "," expression )* ;
 
 (*** Constructors ***)
 
+(* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
 tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
 
 object-constructor ::= ( primary )? "{" member-initializer ( "," member-initializer )* "}" ;
