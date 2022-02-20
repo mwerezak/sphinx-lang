@@ -98,6 +98,18 @@ impl LexerBuilder {
 
 type RuleID = usize;
 
+fn split_array_pair_mut<T>(pair: &mut [T; 2]) -> (&mut T, &mut T) {
+    let (first, rest) = pair.split_first_mut().unwrap();
+    let second = &mut rest[0];
+    (first, second)
+}
+
+fn token_length(start_idx: usize, end_idx: usize) -> usize {
+    if end_idx > start_idx { 
+        end_idx - start_idx 
+    } else { 0 }
+}
+
 pub struct Lexer<S> where S: Iterator<Item=char> {
     source: Peekable<S>,
     options: LexerOptions,
@@ -111,6 +123,12 @@ pub struct Lexer<S> where S: Iterator<Item=char> {
     // putting these here instead to avoid unnecessary allocations
     active:   [Vec<RuleID>; 2],
     complete: [Vec<RuleID>; 2],
+}
+
+impl<S> Iterator for Lexer<S> where S: Iterator<Item=char> {
+    type Item = Result<TokenMeta, LexerError>;
+    
+    fn next(&mut self) -> Option<Self::Item> { Some(self.next_token()) }
 }
 
 impl<S> Lexer<S> where S: Iterator<Item=char> {
@@ -397,26 +415,4 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         };
         LexerError::caused_by(err, ErrorKind::CouldNotReadToken, location)
     }
-}
-
-
-impl<S> Iterator for Lexer<S> where S: Iterator<Item=char> {
-    type Item = Result<TokenMeta, LexerError>;
-    
-    fn next(&mut self) -> Option<Self::Item> { Some(self.next_token()) }
-}
-
-
-// Helpers
-
-fn split_array_pair_mut<T>(pair: &mut [T; 2]) -> (&mut T, &mut T) {
-    let (first, rest) = pair.split_first_mut().unwrap();
-    let second = &mut rest[0];
-    (first, second)
-}
-
-fn token_length(start_idx: usize, end_idx: usize) -> usize {
-    if end_idx > start_idx { 
-        end_idx - start_idx 
-    } else { 0 }
 }
