@@ -3,7 +3,7 @@ use crate::parser::expr::Expr;
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::operator::BinaryOp;
 use crate::parser::structs::{ObjectConstructor, TupleConstructor};
-use crate::parser::errors::{ParserError, ErrorKind, ErrorContext};
+use crate::parser::errors::{ParserError, ErrorKind, ErrorContext, ContextTag};
 use crate::parser::debug::DebugMeta;
 
 
@@ -29,10 +29,10 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
         // Running out of tokens is not normal since we should always read an EOF token first
         let result = match self.tokens.next() {
             Some(inner_result) => Ok(inner_result),
-            None => Err(ParserError::new(ErrorKind::RanOutOfTokens)),
+            None => Err(ParserError::new(ErrorKind::RanOutOfTokens, ContextTag::Token)),
         };
         
-        result?.map_err(|err| ParserError::caused_by(Box::new(err), ErrorKind::LexerError))
+        result?.map_err(|err| ParserError::caused_by(Box::new(err), ErrorKind::LexerError, ContextTag::Token))
     }
     
     fn advance(&mut self) -> Result<TokenMeta, ParserError> {
@@ -56,7 +56,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     // temporary top level, will change when statement parsing is added
     pub fn next_expr(&mut self) -> Result<Expr, (ParserError, DebugMeta)> { 
-        let mut ctx = ErrorContext::new();
+        let mut ctx = ErrorContext::new(ContextTag::Expr);
         
         match self.parse_expr(&mut ctx) {
             Ok(expr) => {
@@ -80,18 +80,18 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
         Expression syntax:
     
         expression ::= primary
-                     | op-expression
                      | assignment-expression 
+                     | binary-expression
+                     | unary-expression
+                     | object-constructor
                      | if-expression
                      | function-def
                      | class-def
                      | tuple-constructor ;
                      
-        Note: because determining if the expression is an assignment-expression or an object-constructor
-        requires consuming a primary expression, check for unary operators first
     */
     fn parse_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> { 
-        ctx.push();
+        ctx.push(ContextTag::Expr);
         
         let next = self.peek()?;
         ctx.set_start(&next);
@@ -104,12 +104,37 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             Token::Var => unimplemented!(),
             _ => {
                 // at this point, we need to parse a primary expression to see if this is an object constructor
-                
+                self.parse_primary_expr(ctx)?;
                 unimplemented!()
             }
         };
         
         unimplemented!() 
+    }
+    
+    fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
+        unimplemented!()
+    }
+    
+    /*
+        Binary operator syntax:
+        
+        operand[1] ::= unary ;
+        operand[8] ::= comparison ;
+        operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
+    */
+    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
+        unimplemented!()
+    }
+    
+    
+    /*
+        Unary operator syntax:
+        
+        unary-expression ::= ( "-" | "+" | "not" ) unary | primary ;
+    */
+    fn parse_unary_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
+        unimplemented!()
     }
     
     
@@ -131,7 +156,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.set_end(&self.advance().unwrap()); 
             
             if !primary.is_lvalue() {
-                return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS))
+                return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS, ctx.context()))
             }
             
             let rhs_expr = self.parse_expr(ctx)?;
@@ -146,7 +171,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     // should only be called if the next token is "var"
     fn parse_var_decl_assignment_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
-        ctx.push();
+        ctx.push(ContextTag::AssignmentExpr);
         
         let next = self.advance().unwrap(); // consume the "var"
         ctx.set_start(&next);
@@ -155,13 +180,13 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         let primary = self.parse_primary(ctx)?;
         if !primary.is_lvalue() {
-            return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS));
+            return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS, ctx.context()));
         }
         
         let assign_op = self.peek_next_assignment_op()?;
         if assign_op.is_none() {
             ctx.set_end(self.peek().unwrap());
-            return Err(ParserError::new(ErrorKind::ExpectedVarAssignment));
+            return Err(ParserError::new(ErrorKind::ExpectedAssignmentExpr, ctx.context()));
         }
         
         let rhs_expr = self.parse_expr(ctx)?;
@@ -200,7 +225,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     */
     fn parse_object_constructor(&mut self, ctx: &mut ErrorContext) -> Result<ObjectConstructor, ParserError> {
-        ctx.push();
+        ctx.push(ContextTag::ObjectCtor);
         
         unimplemented!();
         
@@ -217,7 +242,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
         object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
     */
     fn parse_primary(&mut self, ctx: &mut ErrorContext) -> Result<Primary, ParserError> { 
-        ctx.push();
+        ctx.push(ContextTag::PrimaryExpr);
         
         let mut primary = Primary::new(self.parse_atom(ctx)?);
         
@@ -226,7 +251,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                 
                 // access ::= "." IDENTIFIER ;
                 Token::OpAccess => {
-                    ctx.push();
+                    ctx.push(ContextTag::MemberAccess);
                     ctx.set_start(&self.advance().unwrap());
                     
                     let next = self.advance()?;
@@ -235,7 +260,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     if let Token::Identifier(name) = next.token {
                         primary.push_access(name.as_str());
                     } else {
-                        return Err(ParserError::new(ErrorKind::ExpectedAccessIdentifier));
+                        return Err(ParserError::new(ErrorKind::ExpectedIdentifier, ctx.context()));
                     }
                     
                     ctx.pop_extend();
@@ -243,7 +268,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                 
                 // subscript ::= "[" expression "]" ;
                 Token::OpenSquare => {
-                    ctx.push();
+                    ctx.push(ContextTag::IndexAccess);
                     ctx.set_start(&self.advance().unwrap());
                     
                     let index_expr = self.parse_expr(ctx)?;
@@ -254,7 +279,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     if matches!(next.token, Token::CloseSquare) {
                         primary.push_indexing(index_expr);
                     } else {
-                        return Err(ParserError::new(ErrorKind::ExpectedIndexingClose));
+                        return Err(ParserError::new(ErrorKind::ExpectedCloseSquare, ctx.context()));
                     }
                     
                     ctx.pop_extend();
@@ -267,7 +292,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                 
                 // object-constructor ::= "{" ...
                 Token::OpenBrace => {
-                    ctx.push();
+                    ctx.push(ContextTag::ObjectCtor);
                     ctx.set_start(&self.advance().unwrap());
                     
                     let obj_ctor = self.parse_object_constructor(ctx)?;
@@ -278,7 +303,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     if matches!(next.token, Token::CloseParen) {
                         primary.push_construct(obj_ctor);
                     } else {
-                        return Err(ParserError::new(ErrorKind::ExpectedObjectCtorClose));
+                        return Err(ParserError::new(ErrorKind::ExpectedCloseBrace, ctx.context()));
                     }
                     
                     ctx.pop_extend();
@@ -294,7 +319,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
     fn parse_atom(&mut self, ctx: &mut ErrorContext) -> Result<Atom, ParserError> { 
-        ctx.push();
+        ctx.push(ContextTag::Atom);
         
         let next = self.advance()?;
         ctx.set_start(&next);
@@ -320,36 +345,19 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                 ctx.set_end(&next);
                 
                 if !matches!(next.token, Token::CloseParen) {
-                    return Err(ParserError::new(ErrorKind::ExpectedGroupClose));
+                    return Err(ParserError::new(ErrorKind::ExpectedCloseParen, ctx.context()));
                 }
                 
                 return Ok(Atom::group(inner_expr))
             },
             
             _ => { 
-                return Err(ParserError::new(ErrorKind::ExpectedAtom))
+                return Err(ParserError::new(ErrorKind::ExpectedAtom, ctx.context()))
             },
         };
         
         ctx.pop_extend();
         Ok(atom)
-    }
-    
-    /*
-        Binary operator syntax:
-        
-        operand[1] ::= unary ;
-        operand[8] ::= comparison ;
-        operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
-    */
-    fn parse_binop(&mut self) -> Result<Expr, ParserError> {
-        unimplemented!()
-    }
-    
-    
-    
-    fn parse_unary(&mut self) -> Result<Expr, ParserError> {
-        unimplemented!()
     }
     
     

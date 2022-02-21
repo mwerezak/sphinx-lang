@@ -3,38 +3,52 @@ use std::error::Error;
 use crate::lexer::{Span, TokenMeta};
 use crate::parser::debug::DebugMeta;
 
-
-// Box any owned TokenMeta to prevent bloat
+// Specifies the actual error that occurred
 #[derive(Clone, Copy, Debug)]
 pub enum ErrorKind {
     RanOutOfTokens,
     LexerError,
-    ExpectedExpr,
+    ExpectedExpr,   // expected the start of an expression
     ExpectedAtom,
-    ExpectedGroupClose,
-    ExpectedIndexingClose,
-    ExpectedObjectCtorClose,
-    ExpectedAccessIdentifier,  // expected an identifier following a "."
-    ExpectedVarAssignment,     // expected an assignment following "var"
-    InvalidAssignmentLHS,
+    ExpectedCloseParen,
+    ExpectedCloseSquare,
+    ExpectedCloseBrace,
+    ExpectedIdentifier,
+    ExpectedAssignmentExpr, // expected an assignment expression
+    InvalidAssignmentLHS,   // the LHS of an assignment was not a valid lvalue
 }
+
+// Provide information about the type of syntactic construct from which the error originated
+#[derive(Clone, Copy, Debug)]
+pub enum ContextTag {
+    Token,  // errors retrieving the actual tokens
+    Expr,
+    PrimaryExpr,
+    MemberAccess,
+    IndexAccess,
+    ObjectCtor,
+    AssignmentExpr,
+    Atom,
+}
+
 
 #[derive(Debug)]
 pub struct ParserError {
     kind: ErrorKind,
+    context: ContextTag,
     cause: Option<Box<dyn Error>>,
 }
 
 impl ParserError {
-    pub fn new(kind: ErrorKind) -> Self {
+    pub fn new(kind: ErrorKind, context: ContextTag) -> Self {
         ParserError {
-            kind, cause: None,
+            kind, context, cause: None,
         }
     }
     
-    pub fn caused_by(error: Box<dyn Error>, kind: ErrorKind) -> Self {
+    pub fn caused_by(error: Box<dyn Error>, kind: ErrorKind, context: ContextTag) -> Self {
         ParserError {
-            kind, cause: Some(error),
+            kind, context, cause: Some(error),
         }
     }
     
@@ -53,9 +67,6 @@ impl fmt::Display for ParserError {
     }
 }
 
-
-
-
 // Structures used by the parser for error handling and synchronization (when I get there)
 
 pub struct ErrorContext {
@@ -63,14 +74,14 @@ pub struct ErrorContext {
 }
 
 impl ErrorContext {
-    pub fn new() -> Self {
-        ErrorContext { stack: vec![ ContextFrame::new() ] }
+    pub fn new(base: ContextTag) -> Self {
+        ErrorContext { stack: vec![ ContextFrame::new(base) ] }
     }
     
     pub fn frame(&self) -> &ContextFrame { self.stack.last().unwrap() }
     pub fn frame_mut(&mut self) -> &mut ContextFrame { self.stack.last_mut().unwrap() }
     
-    pub fn push(&mut self) { self.stack.push(ContextFrame::new()) }
+    pub fn push(&mut self, tag: ContextTag) { self.stack.push(ContextFrame::new(tag)) }
     
     pub fn pop(&mut self) -> ContextFrame { 
         debug_assert!(self.stack.len() > 1);
@@ -85,18 +96,15 @@ impl ErrorContext {
         self.frame_mut().extend(frame);
     }
     
-    pub fn reset(&mut self) { 
-        self.stack.clear();
-        self.push();
-    }
-    
     // for convenience
+    pub fn context(&self) -> ContextTag { self.frame().context() }
     pub fn set_start(&mut self, token: &TokenMeta) { self.frame_mut().set_start(token) }
     pub fn set_end(&mut self, token: &TokenMeta) { self.frame_mut().set_end(token) }
     pub fn set_span(&mut self, start: &TokenMeta, end: &TokenMeta) { self.frame_mut().set_span(start, end) }
 }
 
 pub struct ContextFrame {
+    tag: ContextTag,
     start: Option<Span>,
     end: Option<Span>,
 }
@@ -110,7 +118,9 @@ fn span_lt(first: &Span, second: &Span) -> bool { first.index < second.index }
 // }
 
 impl ContextFrame {
-    pub fn new() -> Self { ContextFrame { start: None, end: None } }
+    pub fn new(tag: ContextTag) -> Self { ContextFrame { tag, start: None, end: None } }
+    
+    pub fn context(&self) -> ContextTag { self.tag }
     
     pub fn set_start(&mut self, token: &TokenMeta) { 
         self.start.replace(token.span.clone()); 
