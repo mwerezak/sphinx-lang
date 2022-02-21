@@ -85,7 +85,7 @@ unary-expression ::= ( "-" | "+" | "not" ) unary | primary ;
 *)
 
 (* right associative *)
-assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
+assignment-expression ::= assignment-target ( ASSIGNMENT_OPERATOR assignment-target )* ASSIGNMENT_OPERATOR expression ;
 assignment-target ::= ( "var" )? lvalue ; 
 
 assignment-statement ::= assignment-target-list  "=" expression-list ;
