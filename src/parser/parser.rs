@@ -2,7 +2,8 @@ use crate::lexer::{TokenMeta, Token, LexerError, Span};
 use crate::parser::expr::Expr;
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::operator::BinaryOp;
-use crate::parser::errors::*;
+use crate::parser::errors::{ParserError, ErrorKind};
+use crate::parser::debug::DebugMeta;
 
 
 
@@ -17,7 +18,7 @@ impl ErrorContext {
         ErrorContext { stack: vec![ ContextFrame::new() ] }
     }
     
-    pub fn is_empty(&self) -> bool { self.stack.is_empty() }
+    pub fn frame(&self) -> &ContextFrame { self.stack.last().unwrap() }
     pub fn frame_mut(&mut self) -> &mut ContextFrame { self.stack.last_mut().unwrap() }
     
     pub fn push(&mut self) { self.stack.push(ContextFrame::new()) }
@@ -48,8 +49,8 @@ impl ErrorContext {
 }
 
 struct ContextFrame {
-    pub start: Option<Span>,
-    pub end: Option<Span>,
+    start: Option<Span>,
+    end: Option<Span>,
 }
 
 impl ContextFrame {
@@ -69,22 +70,43 @@ impl ContextFrame {
     }
     
     pub fn extend(&mut self, other: &ContextFrame) {
-        if let Some(span) = other.end {
-            self.end.replace(span);
+        if let (None, Some(span)) = (self.start, other.start) {
+            self.start.replace(span);
+        }
+        
+        if let Some(other_span) = other.end {
+            if let Some(self_span) = self.end {
+                if other_span.end_index() > self_span.end_index() {
+                    self.end.replace(other_span);
+                }
+            } else {
+                self.end.replace(other_span);
+            }
+            
+        }
+    }
+    
+    pub fn dbg_info<'n>(&self, file: &'n str) -> DebugMeta<'n> {
+        DebugMeta {
+            file,
+            start: self.start,
+            end: self.end,
         }
     }
 }
 
 // Recursive descent parser
 
-pub struct Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+pub struct Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+    name: &'n str,
     tokens: T,
     next: Option<Result<TokenMeta, ParserError>>,
 }
 
-impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    pub fn new(tokens: T) -> Self {
+impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+    pub fn new(name: &'n str, tokens: T) -> Self {
         Parser { 
+            name,
             tokens, 
             next: None, 
         }
@@ -119,6 +141,25 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
     }
     
+    pub fn next_expr(&mut self) -> Result<Expr, (ParserError, DebugMeta)> { 
+        let ctx = ErrorContext::new();
+        
+        match self.parse_expr(&mut ctx) {
+            Ok(expr) => {
+                // grab debugging info from the current context and attach it to the result
+            },
+            Err(err) => {
+                // grab debugging info from the current context 
+                // and return it with the error after synchronizing
+                
+                return Err((err, ctx.frame().dbg_info(self.name))); // TODO synchronize
+            },
+        }
+        
+        
+        unimplemented!()
+    }
+    
     /*** Expression Parsing ***/
     
     /*
@@ -127,7 +168,6 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         expression ::= primary
                      | op-expression
                      | assignment-expression 
-                     | object-constructor
                      | if-expression
                      | function-def
                      | class-def
@@ -136,12 +176,28 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         Note: because determining if the expression is an assignment-expression or an object-constructor
         requires consuming a primary expression, check for unary operators first
     */
-    pub fn parse_expr(&mut self) -> Result<Expr, ParserError> { 
-        let ctx = ErrorContext::new();
+    fn parse_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> { 
+        ctx.push();
         
+        let next = self.peek()?;
+        ctx.set_start(&next);
+        
+        let expr = match next.token {
+            Token::Class => unimplemented!(),
+            Token::Fun => unimplemented!(),
+            Token::If => unimplemented!(),
+            Token::OpenBrace => unimplemented!(), // anonymous object constructor
+            Token::Var => unimplemented!(),
+            _ => {
+                // at this point, we need to parse a primary expression to see if this is an object constructor
+                
+                unimplemented!()
+            }
+        };
         
         unimplemented!() 
     }
+    
     
     /*
         Assignment Expression syntax:
@@ -150,7 +206,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         assignment-target ::= ( "var" )? lvalue ; 
     */
     
-    fn parse_assignment_expr_from_primary(&mut self, primary: Primary, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
+    fn parse_assignment_expr(&mut self, primary: Primary, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
         
         let assignment = self.peek_next_assignment_op()?;
 
@@ -164,7 +220,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
                 return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS))
             }
             
-            let rhs_expr = self.parse_expr()?;
+            let rhs_expr = self.parse_expr(ctx)?;
             
             Ok(Expr::assignment(primary, op, rhs_expr, false))
             
@@ -176,7 +232,11 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     
     // should only be called if the next token is "var"
     fn parse_var_decl_assignment_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
+        ctx.push();
+        
         let next = self.advance().unwrap(); // consume the "var"
+        ctx.set_start(&next);
+        
         debug_assert!(matches!(next.token, Token::Var));
         
         let primary = self.parse_primary(ctx)?;
@@ -186,10 +246,13 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         
         let assign_op = self.peek_next_assignment_op()?;
         if assign_op.is_none() {
+            ctx.set_end(self.peek().unwrap());
             return Err(ParserError::new(ErrorKind::ExpectedVarAssignment));
         }
         
-        let rhs_expr = self.parse_expr()?;
+        let rhs_expr = self.parse_expr(ctx)?;
+        
+        ctx.pop_extend();
         Ok(Expr::assignment(primary, assign_op.unwrap(), rhs_expr, true))
     }
     
@@ -224,7 +287,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         invocation ::= "(" ... ")" ;  (* WIP *)
     */
     fn parse_primary(&mut self, ctx: &mut ErrorContext) -> Result<Primary, ParserError> { 
-        
+        ctx.push();
         
         let mut primary = Primary::new(self.parse_atom(ctx)?);
         
@@ -253,7 +316,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
                     ctx.push();
                     ctx.set_start(&self.advance().unwrap());
                     
-                    let index_expr = self.parse_expr()?;
+                    let index_expr = self.parse_expr(ctx)?;
                     
                     let next = self.advance()?;
                     ctx.set_end(&next);
@@ -276,11 +339,13 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
             };
         }
     
+        ctx.pop_extend();
         Ok(primary)
     }
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
     fn parse_atom(&mut self, ctx: &mut ErrorContext) -> Result<Atom, ParserError> { 
+        ctx.push();
         
         let next = self.advance()?;
         ctx.set_start(&next);
@@ -300,7 +365,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
             // "(" expression ")"
             Token::OpenParen => {
                 
-                let inner_expr = self.parse_expr()?;
+                let inner_expr = self.parse_expr(ctx)?;
                 
                 let next = self.advance()?;
                 ctx.set_end(&next);
@@ -317,6 +382,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
             },
         };
         
+        ctx.pop_extend();
         Ok(atom)
     }
     
@@ -342,5 +408,4 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     fn synchronize_stmt(&mut self) {
         unimplemented!()
     }
-
 }

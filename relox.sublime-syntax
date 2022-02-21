@@ -41,7 +41,7 @@ contexts:
     - include: parens
     - include: subscripts
     - include: if-expressions
-    - include: object-initializer-list
+    - include: object-initializers
 
     # tuple constructor
     - match: \,
@@ -353,7 +353,7 @@ contexts:
           scope: punctuation.section.group.begin
           set: function-param-list
 
-  object-initializer-list:
+  object-initializers:
     - match: \{
       scope: punctuation.section.braces.begin
       push: object-initializer-lvalue

@@ -302,19 +302,19 @@ var someVariable = Breakfast
 # Pass it to functions.
 someFunction(Breakfast)
 
-var breakfast = Breakfast {}  # object initializer
+var breakfast = new Breakfast {}  # object initializer
 echo breakfast # "Breakfast instance".
 
 # Instantiation and initialization
 
 # originally initializers used { name: value }, but I want to reserve colons for future type hinting
-var breakfast = Breakfast { meat: "sausage", bread: "sourdough" }
+var breakfast = new Breakfast { meat: "sausage", bread: "sourdough" }
 breakfast.drink = "coffee"
 
 del breakfast.bread  # remove an object member
 
 var a = 0
-var anonymous = { some = a = 1, data = 2 }
+var anonymous = new { some = a = 1, data = 2 }
 
 class Breakfast
   fun serve(self, who)
@@ -328,7 +328,7 @@ end
 class Breakfast
   # constructor function
   fun new(meat, bread)
-    return Breakfast { meat: meat, bread: bread }
+    return new Breakfast { meat: meat, bread: bread }
   end
 
 end
@@ -404,10 +404,9 @@ ex[2] = "third"
 #
 # __add, __mul, __sub, __div, __neg, etc...
 # __le, __lt, __eq only, no methamethods for others...
-# __tostring
 # __getindex, __setindex, __delindex
+# __tostring
 # __exit  - for context managers
-# __get, __set, __del - attribute descriptor protocol  TODO make descriptors a special builtin type?
 # __call
 
 # class/instance names with double underscores are reserved for metamethods

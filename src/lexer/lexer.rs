@@ -17,6 +17,11 @@ pub struct Span {
     pub lineno: u64,
 }
 
+impl Span {
+    pub fn start_index(&self) -> usize { self.index }
+    pub fn end_index(&self) -> usize { self.index + self.length }
+}
+
 #[derive(Clone, Debug)]
 pub struct TokenMeta {
     pub token: Token,

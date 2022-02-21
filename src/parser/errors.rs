@@ -7,6 +7,7 @@ use std::error::Error;
 pub enum ErrorKind {
     RanOutOfTokens,
     LexerError,
+    ExpectedExpr,
     ExpectedAtom,
     ExpectedGroupClose,
     ExpectedIndexingClose,

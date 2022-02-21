@@ -20,7 +20,7 @@ access ::= primary "." IDENTIFIER ;
 
 (* New non-left-recursive version *)
 atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
-primary ::= atom ( access | subscript | invocation )* ;
+primary ::= atom ( access | subscript | invocation | object-constructor )* ;
 subscript ::= "[" expression "]" ;
 access ::= "." IDENTIFIER ;
 invocation ::= "(" ... ")" ;  (* WIP *)
@@ -30,8 +30,7 @@ lvalue ::= IDENTIFIER | primary subscript | primary access ;  (* so called becau
                                         (* Notes for parser implemention: *)
 expression ::= primary                  (* technically made redundant by binop-expression, included here for clarity *)
              | binop-expression         (* starts with a primary *)
-             | assignment-expression    (* starts with a primary or "var" *)
-             | object-constructor       (* starts with a primary followed by "{" *)  (* at this level and above, we need to grab the next primary *)
+             | assignment-expression    (* starts with a primary or "var" *)  (* at this level and above, we need to grab the next primary *)
              | unary-expression         (* starts with an unary operator *)
              | if-expression            (* starts with "if" keyword *)
              | function-def             (* starts with "fun" keyword *)
@@ -102,5 +101,5 @@ expression-list ::= expression ( "," expression )* ;
 (* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
 tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
 
-object-constructor ::= ( primary )? "{" member-initializer ( "," member-initializer )* "}" ;
+object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
 member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;  (* initializers can assign to members or index *)
