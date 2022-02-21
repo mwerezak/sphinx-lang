@@ -1,99 +1,12 @@
-use crate::lexer::{TokenMeta, Token, LexerError, Span};
+use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::parser::expr::Expr;
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::operator::BinaryOp;
-use crate::parser::errors::{ParserError, ErrorKind};
+use crate::parser::structs::{ObjectConstructor, TupleConstructor};
+use crate::parser::errors::{ParserError, ErrorKind, ErrorContext};
 use crate::parser::debug::DebugMeta;
 
 
-
-// Structures used by the parser for error handling and synchronization (when I get there)
-
-struct ErrorContext {
-    stack: Vec<ContextFrame>,
-}
-
-impl ErrorContext {
-    pub fn new() -> Self {
-        ErrorContext { stack: vec![ ContextFrame::new() ] }
-    }
-    
-    pub fn frame(&self) -> &ContextFrame { self.stack.last().unwrap() }
-    pub fn frame_mut(&mut self) -> &mut ContextFrame { self.stack.last_mut().unwrap() }
-    
-    pub fn push(&mut self) { self.stack.push(ContextFrame::new()) }
-    
-    pub fn pop(&mut self) -> ContextFrame { 
-        debug_assert!(self.stack.len() > 1);
-        self.stack.pop().unwrap()
-    }
-    
-    // pops the current context frame and merges it by updating the end span
-    pub fn pop_extend(&mut self) -> ContextFrame {
-        debug_assert!(self.stack.len() > 1);
-        let frame = self.pop();
-        self.frame_mut().extend(&frame);
-        
-        frame
-    }
-    
-    pub fn reset(&mut self) { 
-        self.stack.clear();
-        self.push();
-    }
-    
-    // for convenience
-    pub fn set_start(&mut self, token: &TokenMeta) { self.frame_mut().set_start(token) }
-    pub fn set_end(&mut self, token: &TokenMeta) { self.frame_mut().set_end(token) }
-    pub fn set_span(&mut self, start: &TokenMeta, end: &TokenMeta) { self.frame_mut().set_span(start, end) }
-}
-
-struct ContextFrame {
-    start: Option<Span>,
-    end: Option<Span>,
-}
-
-impl ContextFrame {
-    pub fn new() -> Self { ContextFrame { start: None, end: None } }
-    
-    pub fn set_start(&mut self, token: &TokenMeta) { 
-        self.start.replace(token.span); 
-    }
-    
-    pub fn set_end(&mut self, token: &TokenMeta) { 
-        self.end.replace(token.span); 
-    }
-    
-    pub fn set_span(&mut self, start: &TokenMeta, end: &TokenMeta) {
-        self.set_start(start);
-        self.set_end(end);
-    }
-    
-    pub fn extend(&mut self, other: &ContextFrame) {
-        if let (None, Some(span)) = (self.start, other.start) {
-            self.start.replace(span);
-        }
-        
-        if let Some(other_span) = other.end {
-            if let Some(self_span) = self.end {
-                if other_span.end_index() > self_span.end_index() {
-                    self.end.replace(other_span);
-                }
-            } else {
-                self.end.replace(other_span);
-            }
-            
-        }
-    }
-    
-    pub fn dbg_info<'n>(&self, file: &'n str) -> DebugMeta<'n> {
-        DebugMeta {
-            file,
-            start: self.start,
-            end: self.end,
-        }
-    }
-}
 
 // Recursive descent parser
 
@@ -279,12 +192,28 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     }
     
     /*
+        Object Constructor syntax:
+        
+        object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
+        member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;
+    
+    */
+    fn parse_object_constructor(&mut self, ctx: &mut ErrorContext) -> Result<ObjectConstructor, ParserError> {
+        ctx.push();
+        
+        unimplemented!();
+        
+        ctx.pop_extend();
+    }
+    
+    /*
         Primary expression syntax:
         
-        primary ::= atom ( access | subscript | invocation )* ;
+        primary ::= atom ( access | subscript | invocation | object-constructor )* ;
         subscript ::= "[" expression "]" ;
         access ::= "." IDENTIFIER ;
         invocation ::= "(" ... ")" ;  (* WIP *)
+        object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
     */
     fn parse_primary(&mut self, ctx: &mut ErrorContext) -> Result<Primary, ParserError> { 
         ctx.push();
@@ -335,11 +264,30 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     unimplemented!()
                 }
                 
+                // object-constructor ::= "{" ...
+                Token::OpenBrace => {
+                    ctx.push();
+                    ctx.set_start(&self.advance().unwrap());
+                    
+                    let obj_ctor = self.parse_object_constructor(ctx)?;
+                    
+                    let next = self.advance()?;
+                    ctx.set_end(&next);
+                    
+                    if matches!(next.token, Token::CloseParen) {
+                        primary.push_construct(obj_ctor);
+                    } else {
+                        return Err(ParserError::new(ErrorKind::ExpectedObjectCtorClose));
+                    }
+                    
+                    ctx.pop_extend();
+                }
+                
                 _ => break,
             };
         }
     
-        ctx.pop_extend();
+        ctx.pop();
         Ok(primary)
     }
     

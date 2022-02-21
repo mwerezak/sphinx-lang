@@ -20,10 +20,9 @@ access ::= primary "." IDENTIFIER ;
 
 (* New non-left-recursive version *)
 atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
-primary ::= atom ( access | subscript | invocation | object-constructor )* ;
+primary ::= atom ( access | subscript | invocation | object-constructor )* ; (* object-constructor is here so you can do stuff like invoke a temporary object: { option: value }(args) *)
 subscript ::= "[" expression "]" ;
 access ::= "." IDENTIFIER ;
-invocation ::= "(" ... ")" ;  (* WIP *)
 
 lvalue ::= IDENTIFIER | primary subscript | primary access ;  (* so called because they can appear on the left side of assignment, see Access below *)
 
@@ -32,6 +31,7 @@ expression ::= primary                  (* technically made redundant by binop-e
              | binop-expression         (* starts with a primary *)
              | assignment-expression    (* starts with a primary or "var" *)  (* at this level and above, we need to grab the next primary *)
              | unary-expression         (* starts with an unary operator *)
+             | object-constructor       (* starts with a "{" symbol. anonymous object *)
              | if-expression            (* starts with "if" keyword *)
              | function-def             (* starts with "fun" keyword *)
              | class-def                (* starts with "class" keyword *)
@@ -94,12 +94,13 @@ expression-list ::= expression ( "," expression )* ;
 
 (*** Function/Method Calls ***)
 
-
+invocation ::= "(" ... ")" ;  (* WIP *)
 
 (*** Constructors ***)
 
-(* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
-tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
-
 object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
 member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;  (* initializers can assign to members or index *)
+
+
+(* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
+tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;

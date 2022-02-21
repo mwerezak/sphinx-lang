@@ -1,5 +1,6 @@
 use crate::parser::primary::Primary;
 use crate::parser::operator::{BinaryOp, UnaryOp};
+use crate::parser::structs::{ObjectConstructor, TupleConstructor};
 use crate::parser::debug::{DebugMeta, DebugInfo};
 
 
@@ -18,6 +19,10 @@ pub enum Expr {
         op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
         expr: Box<Expr>,
     },
+    
+    ObjectCtor(ObjectConstructor),
+    
+    TupleCtor(TupleConstructor),
 }
 
 impl Expr {

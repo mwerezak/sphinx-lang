@@ -3,6 +3,7 @@
 use std::fmt;
 use crate::language;
 use crate::parser::expr::Expr;
+use crate::parser::structs::ObjectConstructor;
 
 
 // Primary Expressions
@@ -36,7 +37,8 @@ impl Atom {
 pub enum PrimaryOp {
     Access(Name),
     Index(Box<Expr>),
-    Invoke,  // TODO
+    Invoke,       // TODO
+    Construct(ObjectConstructor),
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +79,12 @@ impl Primary {
     
     pub fn push_indexing(&mut self, expr: Expr) {
         self.ops.push(PrimaryOp::Index(Box::new(expr)))
+    }
+    
+    //pub fn push_invoke(&mut self, )
+    
+    pub fn push_construct(&mut self, ctor: ObjectConstructor) {
+        self.ops.push(PrimaryOp::Construct(ctor))
     }
 }
 
