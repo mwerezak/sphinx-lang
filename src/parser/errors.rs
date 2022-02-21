@@ -1,29 +1,18 @@
 use std::fmt;
 use std::error::Error;
-use crate::lexer::TokenMeta;
 
-#[derive(Clone, Copy, Debug)]
-pub enum Expect {
-    ParseAtom,
-    ParseGroupCloseParen,
-    ParseAccessIdentifier,    // expected an identifier following a "."
-    ParseIndexingCloseSquare,
-    ParseVarAssignmentExpr,   // expected an assignment following "var" in an expression
-}
-
-// TODO use TokenSpan to identify affected area instead of TokenMeta in ErrorKind...
 
 // Box any owned TokenMeta to prevent bloat
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum ErrorKind {
     RanOutOfTokens,
     LexerError,
-    UnexpectedToken {
-        found: Box<TokenMeta>,
-        expected: Expect,
-    },
-    
-    InvalidAssignmentLHS{ assign: Box<TokenMeta> },
+    ExpectedAtom,
+    ExpectedGroupClose,
+    ExpectedIndexingClose,
+    ExpectedAccessIdentifier,  // expected an identifier following a "."
+    ExpectedVarAssignment,     // expected an assignment following "var"
+    InvalidAssignmentLHS,
 }
 
 #[derive(Debug)]
@@ -45,19 +34,6 @@ impl ParserError {
         }
     }
     
-    pub fn unexpected_token(found: TokenMeta, expected: Expect) -> Self {
-        ParserError::new(ErrorKind::UnexpectedToken {
-            expected,
-            found: Box::new(found),
-        })
-    }
-    
-    pub fn invalid_assignment_lhs(assign: TokenMeta) -> Self {
-        ParserError::new(ErrorKind::InvalidAssignmentLHS {
-            assign: Box::new(assign),
-        })
-    }
-    
     pub fn kind(&self) -> &ErrorKind { &self.kind }
 }
 
@@ -72,4 +48,5 @@ impl fmt::Display for ParserError {
         unimplemented!()
     }
 }
+
 

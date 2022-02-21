@@ -1,5 +1,6 @@
 use crate::parser::primary::Primary;
 use crate::parser::operator::{BinaryOp, UnaryOp};
+use crate::parser::debug::{DebugMeta, DebugInfo};
 
 
 #[derive(Debug, Clone)]
@@ -28,3 +29,10 @@ impl Expr {
         }
     }
 }
+
+
+// impl DebugInfo for Expr {
+//     fn dbg_info(&self) -> &DebugMeta { }
+//     fn dbg_info_mut(&self) -> &mut DebugMeta { }
+//     fn set_dbg_info(&mut self, info: DebugMeta) { }
+// }
