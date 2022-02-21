@@ -31,7 +31,7 @@ expression ::= primary                  (* technically made redundant by binop-e
              | binop-expression         (* starts with a primary *)
              | assignment-expression    (* starts with a primary or "var" *)  (* at this level and above, we need to grab the next primary *)
              | unary-expression         (* starts with an unary operator *)
-             | object-constructor       (* starts with a "{" symbol. anonymous object *)
+             | object-constructor       (* starts with a "{" symbol. This is for an anonymous object, whereas in `primary` it is a typed object *)
              | if-expression            (* starts with "if" keyword *)
              | function-def             (* starts with "fun" keyword *)
              | class-def                (* starts with "class" keyword *)
