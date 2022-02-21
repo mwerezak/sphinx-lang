@@ -20,7 +20,7 @@ pub struct Span {
 #[derive(Clone, Debug)]
 pub struct TokenMeta {
     pub token: Token,
-    pub location: Span,
+    pub span: Span,
 }
 
 // Lexer Builder
@@ -391,7 +391,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     fn token_data(&self, token: Token, token_start: usize, token_line: u64) -> TokenMeta {
         TokenMeta {
             token,
-            location: Span {
+            span: Span {
                 index: token_start,
                 length: token_length(token_start, self.current),
                 lineno: token_line,
@@ -400,20 +400,20 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
     
     fn error(&self, kind: ErrorKind, token_start: usize) -> LexerError {
-        let location = Span {
+        let span = Span {
             index: token_start,
             length: token_length(token_start, self.current),
             lineno: self.lineno,
         };
-        LexerError::new(kind, location)
+        LexerError::new(kind, span)
     }
     
     fn token_error(&self, err: Box<dyn std::error::Error>, token_start: usize) -> LexerError {
-        let location = Span {
+        let span = Span {
             index: token_start,
             length: token_length(token_start, self.current),
             lineno: self.lineno,
         };
-        LexerError::caused_by(err, ErrorKind::CouldNotReadToken, location)
+        LexerError::caused_by(err, ErrorKind::CouldNotReadToken, span)
     }
 }

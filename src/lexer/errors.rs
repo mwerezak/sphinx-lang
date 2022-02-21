@@ -15,27 +15,27 @@ pub enum ErrorKind {
 #[derive(Debug)]
 pub struct LexerError {
     pub kind: ErrorKind,
-    pub location: Span,
+    pub span: Span,
     cause: Option<Box<dyn Error>>,
 }
 
 impl LexerError {
-    pub fn new(kind: ErrorKind, location: Span) -> Self {
+    pub fn new(kind: ErrorKind, span: Span) -> Self {
         LexerError {
-            kind, location,
+            kind, span,
             cause: None,
         }
     }
     
-    pub fn caused_by(cause: Box<dyn Error>, kind: ErrorKind, location: Span) -> Self {
+    pub fn caused_by(cause: Box<dyn Error>, kind: ErrorKind, span: Span) -> Self {
         LexerError {
-            kind, location,
+            kind, span,
             cause: Some(cause),
         }
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
-    pub fn location(&self) -> &Span { &self.location }
+    pub fn span(&self) -> &Span { &self.span }
     
 }
 

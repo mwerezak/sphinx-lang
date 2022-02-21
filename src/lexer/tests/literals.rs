@@ -27,67 +27,67 @@ fn lexer_test_identifiers() {
     
         token if s == "valid" => {
             token: Token::Identifier(s),
-            location: Span { length: 5, .. },
+            span: Span { length: 5, .. },
             ..
         } "valid",
 
         token if s == "_also" => {
             token: Token::Identifier(s),
-            location: Span { length: 5, .. },
+            span: Span { length: 5, .. },
             ..
         } "_also",
 
         token if s == "asd2_32df_s3" => {
             token: Token::Identifier(s),
-            location: Span { length: 12, .. },
+            span: Span { length: 12, .. },
             ..
         } "asd2_32df_s3",
         
         token if s == "both" => {
             token: Token::Identifier(s),
-            location: Span { length: 4, .. },
+            span: Span { length: 4, .. },
             ..
         } "both",
         
         token => {
             token: Token::IntegerLiteral(0),
-            location: Span { length: 1, .. },
+            span: Span { length: 1, .. },
             ..
         } "+",
         
         token if s == "valid2" => {
             token: Token::Identifier(s),
-            location: Span { length: 6, .. },
+            span: Span { length: 6, .. },
             ..
         } "valid2",
         
         error => {
             kind: ErrorKind::NoMatchingRule,
-            location: Span { length: 1, .. },
+            span: Span { length: 1, .. },
             ..
         } "0no - 0",
         
         error => {
             kind: ErrorKind::NoMatchingRule,
-            location: Span { length: 1, .. },
+            span: Span { length: 1, .. },
             ..
         } "0no - n",
 
         error => {
             kind: ErrorKind::NoMatchingRule,
-            location: Span { length: 1, .. },
+            span: Span { length: 1, .. },
             ..
         } "0no - o",
 
         token if s == "_0valid" => {
             token: Token::Identifier(s),
-            location: Span { length: 7, .. },
+            span: Span { length: 7, .. },
             ..
         } "_0valid",
 
         token => {
             token: Token::EOF,
-            location: Span { length: 0, .. },
+            span: Span { length: 0, .. },
             ..
         } "EOF",
     
@@ -108,31 +108,31 @@ fn lexer_test_keywords_and_identifiers() {
     
         token => {
             token: Token::Fun,
-            location: Span { length: 1, .. },
+            span: Span { length: 1, .. },
             ..
         } "k",
         
         token if s == "_k" => {
             token: Token::Identifier(s),
-            location: Span { length: 2, .. },
+            span: Span { length: 2, .. },
             ..
         } "_k",
         
         error => {
             kind: ErrorKind::NoMatchingRule,
-            location: Span { length: 1, .. },
+            span: Span { length: 1, .. },
             ..
         } "9k.1",
         
         error => {
             kind: ErrorKind::NoMatchingRule,
-            location: Span { length: 1, .. },
+            span: Span { length: 1, .. },
             ..
         } "9k.2",
         
         token if s == "k9" => {
             token: Token::Identifier(s),
-            location: Span { length: 2, .. },
+            span: Span { length: 2, .. },
             ..
         } "k9",
     );
@@ -151,13 +151,13 @@ fn lexer_test_keyword_at_eof() {
         
         token => {
             token: Token::Fun,
-            location: Span { length: 1, index: 1, .. },
+            span: Span { length: 1, index: 1, .. },
             ..
         } "k",
         
         token => {
             token: Token::EOF,
-            location: Span { length: 0, index: 2, .. },
+            span: Span { length: 0, index: 2, .. },
         } "eof",
         
     );
@@ -177,25 +177,25 @@ fn lexer_test_integer_literals() {
         
         token if n == 1123 => {
             token: Token::IntegerLiteral(n),
-            location: Span { length: 5, .. },
+            span: Span { length: 5, .. },
             ..
         } "01123",
         
         error => {
             kind: ErrorKind::NoMatchingRule,
-            location: Span { length: 1, .. },
+            span: Span { length: 1, .. },
             ..
         } "x",
         
         error => {
             kind: ErrorKind::NoMatchingRule,
-            location: Span { length: 1, .. },
+            span: Span { length: 1, .. },
             ..
         } "A",
         
         token if n == 0xFACE => {
             token: Token::IntegerLiteral(n),
-            location: Span { length: 6, .. },
+            span: Span { length: 6, .. },
             ..
         } "0xFACE",
         
