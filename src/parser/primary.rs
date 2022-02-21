@@ -65,10 +65,9 @@ impl Primary {
         if self.ops.is_empty() {
             matches!(self.atom, Atom::Identifier(..))
         } else {
-            match self.ops.last().unwrap() {
-                PrimaryOp::Access(..) | PrimaryOp::Index(..) => true,
-                _ => false,
-            }
+            let last_op = self.ops.last().unwrap();
+            
+            matches!(last_op, PrimaryOp::Access(..) | PrimaryOp::Index(..))
         }
     }
     

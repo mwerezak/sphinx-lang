@@ -84,9 +84,11 @@ impl LexerRule for IntegerLiteralRule {
     fn try_match(&mut self, _prev: Option<char>, next: char) -> MatchResult {
         if next.is_ascii_digit() {
             self.buf.push(next);
-            return MatchResult::CompleteMatch;
+            
+            MatchResult::CompleteMatch
+        } else {
+            MatchResult::NoMatch
         }
-        return MatchResult::NoMatch;
     }
     
     fn get_token(&self) -> Result<Token, TokenError> {
@@ -138,9 +140,10 @@ impl LexerRule for HexIntegerLiteralRule {
         
         if next.is_ascii_hexdigit() {
             self.buf.push(next);
-            return MatchResult::CompleteMatch;
+            
+            MatchResult::CompleteMatch
         } else {
-            return MatchResult::NoMatch;
+            MatchResult::NoMatch
         }
     }
     

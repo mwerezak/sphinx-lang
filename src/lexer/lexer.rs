@@ -144,7 +144,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 self.lineno += 1;
             }
         }
-        return (self.last, next);
+        (self.last, next)
     }
     
     // these have to be &mut self because they can mutate the source iterator
@@ -206,7 +206,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
         
         // continue skipping if we are at not at EOF and we advanced
-        return !self.at_eof() && self.current > start_pos;
+        !self.at_eof() && self.current > start_pos
     }
 
     fn reset_rules(&mut self) {
@@ -347,7 +347,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             return Ok(self.token_data(token, token_start, token_line));
         }
         
-        return Err(self.error(ErrorKind::UnexpectedEOF, token_start));
+        Err(self.error(ErrorKind::UnexpectedEOF, token_start))
     }
     
     fn exhaust_rule(&mut self, rule_id: RuleID, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
@@ -382,9 +382,10 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
         
         if self.at_eof() {
-            return Err(self.error(ErrorKind::UnexpectedEOF, token_start));
+            Err(self.error(ErrorKind::UnexpectedEOF, token_start))
+        } else {
+            Err(self.error(ErrorKind::NoMatchingRule, token_start))
         }
-        return Err(self.error(ErrorKind::NoMatchingRule, token_start));
     }
     
     fn token_data(&self, token: Token, token_start: usize, token_line: u64) -> TokenMeta {

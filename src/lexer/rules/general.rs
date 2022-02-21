@@ -22,9 +22,10 @@ impl SingleCharRule {
     
     fn peek(&self, next: char) -> MatchResult {
         if self.state.is_incomplete_match() && next == self.target {
-            return MatchResult::CompleteMatch;
+            MatchResult::CompleteMatch
+        } else {
+            MatchResult::NoMatch
         }
-        return MatchResult::NoMatch;
     }
 }
 
@@ -40,7 +41,7 @@ impl LexerRule for SingleCharRule {
         if match_result.is_match() {
             self.state = match_result;
         }
-        return match_result;
+        match_result
     }
     
     fn get_token(&self) -> Result<Token, TokenError> {

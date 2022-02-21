@@ -67,7 +67,7 @@ impl LexerRule for LineCommentRule {
             self.state = state;
         }
         
-        return match_result;
+        match_result
     }
     
     // produce Some(Token) if current state is CompleteMatch, otherwise None
@@ -104,10 +104,12 @@ impl LexerRule for BlockCommentRule {
         if self.nestlevel > 0 {
             return MatchResult::IncompleteMatch;
         }
+        
         if self.end.last_match_result().is_complete_match() {
             return MatchResult::CompleteMatch;
         }
-        return self.start.last_match_result();
+        
+        self.start.last_match_result()
     }
     
     fn try_match(&mut self, _prev: Option<char>, next: char) -> MatchResult {

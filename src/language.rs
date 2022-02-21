@@ -10,8 +10,8 @@ pub type FloatType = f32;  // internal representation for floats
 
 pub static COMMENT_CHAR: char = '#';
 
-pub static NESTED_COMMENT_START: &'static str = "#{";
-pub static NESTED_COMMENT_END:   &'static str = "}#";
+pub static NESTED_COMMENT_START: &str = "#{";
+pub static NESTED_COMMENT_END:   &str = "}#";
 
 pub fn create_default_lexer_rules() -> LexerBuilder {
     LexerBuilder::new()

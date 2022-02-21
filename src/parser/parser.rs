@@ -110,7 +110,7 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
         
         let assign_op = self.peek_next_assignment_op()?;
-        if !assign_op.is_some() {
+        if assign_op.is_none() {
             return Err(ParserError::unexpected_token(self.advance().unwrap(), Expect::ParseVarAssignmentExpr));
         }
         
@@ -136,7 +136,8 @@ impl<T> Parser<T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             _ => return Ok(None),
         };
-        return Ok(Some(op))
+        
+        Ok(Some(op))
     }
     
     /*

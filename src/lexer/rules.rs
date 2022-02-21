@@ -61,13 +61,9 @@ impl MatchResult {
         }
     }
     
-    pub fn is_complete_match(&self) -> bool {
-        if let MatchResult::CompleteMatch = self { true } else { false }
-    }
+    pub fn is_complete_match(&self) -> bool { matches!(self, MatchResult::CompleteMatch) }
     
-    pub fn is_incomplete_match(&self) -> bool {
-        if let MatchResult::IncompleteMatch = self { true } else { false }
-    }
+    pub fn is_incomplete_match(&self) -> bool { matches!(self, MatchResult::IncompleteMatch) }
 }
 
 // Lexer Rules

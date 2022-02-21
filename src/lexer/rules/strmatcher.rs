@@ -56,7 +56,7 @@ impl<'a> StrMatcher<'a> {
         while self.peek.len() < n + 1 {
             self.peek.push_back(self.chars.next());
         }
-        return self.peek[n];
+        self.peek[n]
     }
     
     fn advance(&mut self) -> Option<char> {
@@ -88,7 +88,8 @@ impl<'a> StrMatcher<'a> {
     pub fn update_match(&mut self, next: char) -> MatchResult {
         self.last_result = self.peek_match(next);
         self.advance();
-        return self.last_result;
+        
+        self.last_result
     }
     
     pub fn try_match(&mut self, next: char) -> MatchResult {
@@ -97,7 +98,7 @@ impl<'a> StrMatcher<'a> {
             self.last_result = match_result;
             self.advance();
         }
-        return match_result;
+        match_result
     }
     
 }
