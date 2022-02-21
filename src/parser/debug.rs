@@ -1,7 +1,12 @@
 use crate::lexer::Span;
 
 
-// Metadata attached to all parser output for error handling and debug output
+// metadata attached to parser output for error handling and debug output
+
+// attached at the expression and statment level: 
+// each Expr and Stmt outputted from the parser should have a DebugMeta
+
+
 #[derive(Clone, Debug)]
 pub struct DebugMeta<'a> {
     pub file: &'a str,

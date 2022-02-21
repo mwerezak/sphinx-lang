@@ -32,7 +32,7 @@ fn main() {
 
 fn exec_cmd(cmd: &str) {
     let lexer = language::create_default_lexer_rules().build(cmd.chars());
-    let mut parser = Parser::new(lexer);
+    let mut parser = Parser::new("<main>", lexer);
     
     // println!("{:?}", parser.parse_primary());
 }

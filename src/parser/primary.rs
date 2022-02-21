@@ -92,6 +92,7 @@ impl Primary {
 // Identifiers
 
 // TODO intern all identifier names and string literals and make this Copy
+// should just be a lightweight handle to an interned string
 #[derive(Debug, Clone)]
 pub struct Name {
     name: String,

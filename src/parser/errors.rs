@@ -78,12 +78,11 @@ impl ErrorContext {
     }
     
     // pops the current context frame and merges it by updating the end span
-    pub fn pop_extend(&mut self) -> ContextFrame {
+    // unlike pop(), does not return anything since the frame is consumed
+    pub fn pop_extend(&mut self) {
         debug_assert!(self.stack.len() > 1);
         let frame = self.pop();
-        self.frame_mut().extend(&frame);
-        
-        frame
+        self.frame_mut().extend(frame);
     }
     
     pub fn reset(&mut self) { 
@@ -103,22 +102,22 @@ pub struct ContextFrame {
 }
 
 fn span_lt(first: &Span, second: &Span) -> bool { first.index < second.index }
-fn span_min<'a>(first: &'a Span, second: &'a Span) -> &'a Span {
-    if span_lt(first, second) { first } else { second }
-}
-fn span_max<'a>(first: &'a Span, second: &'a Span) -> &'a Span {
-    if !span_lt(first, second) { first } else { second }
-}
+// fn span_min<'a>(first: &'a Span, second: &'a Span) -> &'a Span {
+//     if span_lt(first, second) { first } else { second }
+// }
+// fn span_max<'a>(first: &'a Span, second: &'a Span) -> &'a Span {
+//     if !span_lt(first, second) { first } else { second }
+// }
 
 impl ContextFrame {
     pub fn new() -> Self { ContextFrame { start: None, end: None } }
     
     pub fn set_start(&mut self, token: &TokenMeta) { 
-        self.start.replace(token.span); 
+        self.start.replace(token.span.clone()); 
     }
     
     pub fn set_end(&mut self, token: &TokenMeta) { 
-        self.end.replace(token.span); 
+        self.end.replace(token.span.clone()); 
     }
     
     pub fn set_span(&mut self, start: &TokenMeta, end: &TokenMeta) {
@@ -126,23 +125,25 @@ impl ContextFrame {
         self.set_end(end);
     }
     
-    pub fn extend(&mut self, other: &ContextFrame) {
-        if self.start.and(other.start).is_some() {
-            let earliest = span_min(&self.start.unwrap(), &other.start.unwrap());
-            self.start.replace(*earliest);
-        } else {
-            self.start = self.start.or(other.start);
+    pub fn extend(&mut self, other: ContextFrame) {
+        if self.start.as_ref().and(other.start.as_ref()).is_some() {
+            if span_lt(other.start.as_ref().unwrap(), self.start.as_ref().unwrap()) {
+                self.start = other.start;
+            }
+        } else if other.start.is_some() {
+            self.start = other.start;
         }
         
-        if self.end.and(other.end).is_some() {
-            let latest = span_max(&self.end.unwrap(), &other.end.unwrap());
-            self.end.replace(*latest);
-        } else {
-            self.end = self.end.or(other.end);
+        if self.end.as_ref().and(other.end.as_ref()).is_some() {
+            if span_lt(self.end.as_ref().unwrap(), other.end.as_ref().unwrap()) {
+                self.end = other.end;
+            }
+        } else if other.end.is_some() {
+            self.end = other.end;
         }
     }
     
-    pub fn dbg_info<'n>(&self, file: &'n str) -> DebugMeta<'n> {
+    pub fn to_dbg_meta<'n>(self, file: &'n str) -> DebugMeta<'n> {
         DebugMeta {
             file,
             start: self.start,

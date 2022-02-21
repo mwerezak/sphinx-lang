@@ -54,8 +54,9 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
         }
     }
     
+    // temporary top level, will change when statement parsing is added
     pub fn next_expr(&mut self) -> Result<Expr, (ParserError, DebugMeta)> { 
-        let ctx = ErrorContext::new();
+        let mut ctx = ErrorContext::new();
         
         match self.parse_expr(&mut ctx) {
             Ok(expr) => {
@@ -65,7 +66,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                 // grab debugging info from the current context 
                 // and return it with the error after synchronizing
                 
-                return Err((err, ctx.frame().dbg_info(self.name))); // TODO synchronize
+                return Err((err, ctx.pop().to_dbg_meta(self.name))); // TODO synchronize
             },
         }
         
