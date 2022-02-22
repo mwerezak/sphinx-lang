@@ -23,11 +23,14 @@ pub enum ErrorKind {
 pub enum ContextTag {
     Token,  // errors retrieving the actual tokens
     Expr,
+    AssignmentExpr,
+    BinaryOpExpr,
+    UnaryOpExpr,
     PrimaryExpr,
     MemberAccess,
     IndexAccess,
     ObjectCtor,
-    AssignmentExpr,
+    TupleCtor,
     Atom,
 }
 
@@ -69,13 +72,16 @@ impl fmt::Display for ParserError {
 
 // Structures used by the parser for error handling and synchronization (when I get there)
 
+#[derive(Debug, Clone)]
 pub struct ErrorContext {
     stack: Vec<ContextFrame>,
 }
 
 impl ErrorContext {
     pub fn new(base: ContextTag) -> Self {
-        ErrorContext { stack: vec![ ContextFrame::new(base) ] }
+        ErrorContext {
+            stack: vec![ ContextFrame::new(base) ],
+        }
     }
     
     pub fn frame(&self) -> &ContextFrame { self.stack.last().unwrap() }
@@ -83,26 +89,29 @@ impl ErrorContext {
     
     pub fn push(&mut self, tag: ContextTag) { self.stack.push(ContextFrame::new(tag)) }
     
+    pub fn push_continuation(&mut self, tag: ContextTag) {
+        let start = self.frame().start().map(|o| o.to_owned());
+        self.push(tag);
+        self.frame_mut().set_span(start, None);
+    }
+    
     pub fn pop(&mut self) -> ContextFrame { 
-        debug_assert!(self.stack.len() > 1);
+        assert!(self.stack.len() > 1);
         self.stack.pop().unwrap()
     }
     
-    // pops the current context frame and merges it by updating the end span
-    // unlike pop(), does not return anything since the frame is consumed
     pub fn pop_extend(&mut self) {
-        debug_assert!(self.stack.len() > 1);
-        let frame = self.pop();
-        self.frame_mut().extend(frame);
+        let inner_frame = self.pop();
+        self.frame_mut().extend(inner_frame);
     }
     
     // for convenience
     pub fn context(&self) -> ContextTag { self.frame().context() }
     pub fn set_start(&mut self, token: &TokenMeta) { self.frame_mut().set_start(token) }
     pub fn set_end(&mut self, token: &TokenMeta) { self.frame_mut().set_end(token) }
-    pub fn set_span(&mut self, start: &TokenMeta, end: &TokenMeta) { self.frame_mut().set_span(start, end) }
 }
 
+#[derive(Debug, Clone)]
 pub struct ContextFrame {
     tag: ContextTag,
     start: Option<Span>,
@@ -121,6 +130,8 @@ impl ContextFrame {
     pub fn new(tag: ContextTag) -> Self { ContextFrame { tag, start: None, end: None } }
     
     pub fn context(&self) -> ContextTag { self.tag }
+    pub fn start(&self) -> Option<&Span> { self.start.as_ref() }
+    pub fn end(&self) -> Option<&Span> { self.end.as_ref() }
     
     pub fn set_start(&mut self, token: &TokenMeta) { 
         self.start.replace(token.span.clone()); 
@@ -130,9 +141,9 @@ impl ContextFrame {
         self.end.replace(token.span.clone()); 
     }
     
-    pub fn set_span(&mut self, start: &TokenMeta, end: &TokenMeta) {
-        self.set_start(start);
-        self.set_end(end);
+    pub fn set_span(&mut self, start: Option<Span>, end: Option<Span>) {
+        self.start = start;
+        self.end = end;
     }
     
     pub fn extend(&mut self, other: ContextFrame) {

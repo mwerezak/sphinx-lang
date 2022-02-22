@@ -1,6 +1,6 @@
 use crate::parser::primary::Primary;
 use crate::parser::operator::{BinaryOp, UnaryOp};
-use crate::parser::structs::{ObjectConstructor, TupleConstructor};
+use crate::parser::structs::{ObjectConstructor};
 use crate::parser::debug::{DebugMeta, DebugInfo};
 
 
@@ -11,26 +11,34 @@ pub enum Expr {
     
     UnaryOp(UnaryOp, Box<Expr>),
     
-    BinOp(BinaryOp, Box<Expr>, Box<Expr>),
+    BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
     
     Assignment {
         decl: bool, // if this is a var-declaration
-        lvalue: Primary,
+        lhs: Primary,
         op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
         expr: Box<Expr>,
     },
     
     ObjectCtor(ObjectConstructor),
     
-    TupleCtor(TupleConstructor),
+    TupleCtor(Vec<Expr>),
 }
 
 impl Expr {
-    pub fn assignment(lvalue: Primary, op: Option<BinaryOp>, expr: Expr, decl: bool) -> Self {
-        debug_assert!(lvalue.is_lvalue());
+    pub fn unary_op(op: UnaryOp, expr: Expr) -> Self {
+        Self::UnaryOp(op, Box::new(expr))
+    }
+    
+    pub fn binary_op(op: BinaryOp, lhs: Expr, rhs: Expr) -> Self {
+        Self::BinaryOp(op, Box::new(lhs), Box::new(rhs))
+    }
+    
+    pub fn assignment(lhs: Primary, op: Option<BinaryOp>, rhs: Expr, decl: bool) -> Self {
+        debug_assert!(lhs.is_lvalue());
         Self::Assignment {
-            lvalue, op, decl,
-            expr: Box::new(expr),
+            lhs, op, decl,
+            expr: Box::new(rhs),
         }
     }
 }

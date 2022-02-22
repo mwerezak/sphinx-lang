@@ -1,8 +1,8 @@
 use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::parser::expr::Expr;
 use crate::parser::primary::{Primary, Atom};
-use crate::parser::operator::BinaryOp;
-use crate::parser::structs::{ObjectConstructor, TupleConstructor};
+use crate::parser::operator::{UnaryOp, BinaryOp, OpLevel, OP_LEVEL_START, OP_LEVEL_END};
+use crate::parser::structs::{ObjectConstructor};
 use crate::parser::errors::{ParserError, ErrorKind, ErrorContext, ContextTag};
 use crate::parser::debug::DebugMeta;
 
@@ -61,17 +61,15 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
         match self.parse_expr(&mut ctx) {
             Ok(expr) => {
                 // grab debugging info from the current context and attach it to the result
+                Ok(expr)
             },
             Err(err) => {
                 // grab debugging info from the current context 
                 // and return it with the error after synchronizing
-                
+                ctx.pop();
                 return Err((err, ctx.pop().to_dbg_meta(self.name))); // TODO synchronize
             },
         }
-        
-        
-        unimplemented!()
     }
     
     /*** Expression Parsing ***/
@@ -90,30 +88,101 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                      | tuple-constructor ;
                      
     */
-    fn parse_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> { 
-        ctx.push(ContextTag::Expr);
+    fn parse_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {         
+        let mut exprs = vec!( self.parse_assignment_expr(ctx)? );
         
-        let next = self.peek()?;
-        ctx.set_start(&next);
-        
-        let expr = match next.token {
-            Token::Class => unimplemented!(),
-            Token::Fun => unimplemented!(),
-            Token::If => unimplemented!(),
-            Token::OpenBrace => unimplemented!(), // anonymous object constructor
-            Token::Var => unimplemented!(),
-            _ => {
-                // at this point, we need to parse a primary expression to see if this is an object constructor
-                self.parse_primary_expr(ctx)?;
-                unimplemented!()
+        // check for tuple constructor
+        // note: single-element and empty tuples are handled separately in parse_atom()
+        loop {
+            let next = self.peek()?;
+            if !matches!(next.token, Token::Comma) {
+                break;
             }
-        };
+            
+            ctx.push_continuation(ContextTag::TupleCtor);
+            ctx.set_end(&self.advance().unwrap()); // consume comma
+            
+            let next_expr = self.parse_assignment_expr(ctx)?;
+            exprs.push(next_expr);
+            
+            ctx.pop_extend();
+        }
         
-        unimplemented!() 
+        if !exprs.len() > 1 {
+            Ok(Expr::TupleCtor(exprs))
+        } else {
+            Ok(exprs.into_iter().next().unwrap())
+        }
     }
     
-    fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
-        unimplemented!()
+    /*
+        Assignment Expression syntax:
+        
+        assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
+        assignment-target ::= ( "var" )? lvalue ; 
+    */
+    
+    fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
+        let next = self.peek()?;
+        
+        // if the first token is "var", then this must be a var declaration
+        if let Token::Var = next.token {
+            return self.parse_var_decl_expr(ctx);
+        }
+        
+        // otherwise, descend recursively
+        
+        let expr = self.parse_binop_expr(ctx, OP_LEVEL_START)?;
+        
+        let next = self.peek()?;
+        if let Some(assign_op) = Self::which_assignment_op(&next.token) {
+            // consume assign_op token
+            ctx.push_continuation(ContextTag::AssignmentExpr);
+            ctx.set_end(&self.advance().unwrap());
+            
+            // LHS of assignment has to be an lvalue
+            let lhs = match expr {
+                Expr::Primary(lhs) if lhs.is_lvalue() => lhs,
+                _ => return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS, ctx.context())),
+            };
+
+            let rhs_expr = self.parse_expr(ctx)?;
+            
+            ctx.pop_extend();
+            return Ok(Expr::assignment(lhs, assign_op, rhs_expr, false));
+        }
+        
+        Ok(expr)
+    }
+    
+    // should only be called if the next token is "var"
+    fn parse_var_decl_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
+        ctx.push(ContextTag::AssignmentExpr);
+        
+        let next = self.advance().unwrap(); // consume the "var"
+        ctx.set_start(&next);
+        
+        debug_assert!(matches!(next.token, Token::Var));
+        
+        let lhs = self.parse_primary(ctx)?;
+        
+        // LHS of assignment must be an lvalue
+        if !lhs.is_lvalue() {
+            return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS, ctx.context()));
+        }
+        
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        let assign_op = Self::which_assignment_op(&next.token);
+        if assign_op.is_none() {
+            return Err(ParserError::new(ErrorKind::ExpectedAssignmentExpr, ctx.context()));
+        }
+        
+        let rhs_expr = self.parse_expr(ctx)?;
+        
+        ctx.pop_extend();
+        Ok(Expr::assignment(lhs, assign_op.unwrap(), rhs_expr, true))
     }
     
     /*
@@ -123,10 +192,38 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
         operand[8] ::= comparison ;
         operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
     */
-    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
-        unimplemented!()
+    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext, level: OpLevel) -> Result<Expr, ParserError> {
+        if level == OP_LEVEL_END {
+            return self.parse_unary_expr(ctx);  // exit binop precedence recursion
+        }
+        
+        let mut expr = self.parse_binop_expr(ctx, level - 1)?;
+        
+        loop {
+            let next = self.peek()?;
+            let binary_op = Self::which_binary_op(&next.token);
+            
+            if binary_op.is_none() {
+                break;
+            }
+            
+            let binary_op = binary_op.unwrap();
+            if binary_op.precedence_level() != level {
+                break;
+            }
+            
+            ctx.push_continuation(ContextTag::BinaryOpExpr);
+            ctx.set_end(&self.advance().unwrap()); // consume binary_op token
+            
+            let rhs_expr = self.parse_binop_expr(ctx, level - 1)?;
+            
+            expr = Expr::binary_op(binary_op, expr, rhs_expr);
+            
+            ctx.pop_extend();
+        }
+        
+        Ok(expr)
     }
-    
     
     /*
         Unary operator syntax:
@@ -134,71 +231,80 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
         unary-expression ::= ( "-" | "+" | "not" ) unary | primary ;
     */
     fn parse_unary_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
-        unimplemented!()
+        let next = self.peek()?;
+        if let Some(unary_op) = Self::which_unary_op(&next.token) {
+            ctx.push(ContextTag::UnaryOpExpr);
+            ctx.set_start(&self.advance().unwrap()); // consume unary_op token
+            
+            let expr = self.parse_expr(ctx)?;
+            
+            return Ok(Expr::unary_op(unary_op, expr));
+        }
+        
+        self.parse_primary_expr(ctx)
     }
-    
     
     /*
-        Assignment Expression syntax:
-        
-        assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
-        assignment-target ::= ( "var" )? lvalue ; 
+        Here we parse all the things that can be immediately identified
+        from the next token, or else fall back to a primary expression
     */
-    
-    fn parse_assignment_expr(&mut self, primary: Primary, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
-        
-        let assignment = self.peek_next_assignment_op()?;
-
-        if let Some(op) = assignment {
-            // if this is an assignment then primary needs to be an lvalue
-            
-            // consume the "=" token
-            ctx.set_end(&self.advance().unwrap()); 
-            
-            if !primary.is_lvalue() {
-                return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS, ctx.context()))
-            }
-            
-            let rhs_expr = self.parse_expr(ctx)?;
-            
-            Ok(Expr::assignment(primary, op, rhs_expr, false))
-            
-        } else {
-            
-            Ok(Expr::Primary(primary))
-        }
-    }
-    
-    // should only be called if the next token is "var"
-    fn parse_var_decl_assignment_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
-        ctx.push(ContextTag::AssignmentExpr);
-        
-        let next = self.advance().unwrap(); // consume the "var"
-        ctx.set_start(&next);
-        
-        debug_assert!(matches!(next.token, Token::Var));
-        
-        let primary = self.parse_primary(ctx)?;
-        if !primary.is_lvalue() {
-            return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS, ctx.context()));
-        }
-        
-        let assign_op = self.peek_next_assignment_op()?;
-        if assign_op.is_none() {
-            ctx.set_end(self.peek().unwrap());
-            return Err(ParserError::new(ErrorKind::ExpectedAssignmentExpr, ctx.context()));
-        }
-        
-        let rhs_expr = self.parse_expr(ctx)?;
-        
-        ctx.pop_extend();
-        Ok(Expr::assignment(primary, assign_op.unwrap(), rhs_expr, true))
-    }
-    
-    // Helper to see if the next token is an assignment operator and if so, which one it is.
-    fn peek_next_assignment_op(&mut self) -> Result<Option<Option<BinaryOp>>, ParserError> {
+    fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
         let next = self.peek()?;
-        let op = match next.token {
+        match next.token {
+            Token::Class => unimplemented!(),
+            Token::Fun => unimplemented!(),
+            Token::If => unimplemented!(),
+            
+            Token::OpenBrace => {
+                Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?))
+            },
+            
+            _ => Ok(Expr::Primary(self.parse_primary(ctx)?)),
+        }
+    }
+
+    fn which_unary_op(token: &Token) -> Option<UnaryOp> {
+        let op = match token {
+            Token::OpAdd => UnaryOp::Pos,
+            Token::OpSub => UnaryOp::Neg,
+            Token::Not   => UnaryOp::Not,
+            
+            _ => return None,
+        };
+        
+        Some(op)
+    }
+    
+    fn which_binary_op(token: &Token) -> Option<BinaryOp> {
+        let op = match token {
+            Token::OpMul => BinaryOp::Mul,
+            Token::OpDiv => BinaryOp::Div,
+            Token::OpMod => BinaryOp::Mod,
+            Token::OpAdd => BinaryOp::Add,
+            Token::OpSub => BinaryOp::Sub,
+            Token::OpLShift => BinaryOp::LShift,
+            Token::OpRShift => BinaryOp::RShift,
+            Token::OpAnd => BinaryOp::BitAnd,
+            Token::OpXor => BinaryOp::BitXor,
+            Token::OpOr => BinaryOp::BitOr,
+            Token::OpLT => BinaryOp::LT,
+            Token::OpGT => BinaryOp::GT,
+            Token::OpLE => BinaryOp::LE,
+            Token::OpGE => BinaryOp::GE,
+            Token::OpEQ => BinaryOp::EQ,
+            Token::OpNE => BinaryOp::NE,
+            Token::And => BinaryOp::And,
+            Token::Or => BinaryOp::Or,
+            
+            _ => return None,
+        };
+        
+        Some(op)
+    }
+    
+    // Helper to see if the a token is an assignment operator and if so, which one it is.
+    fn which_assignment_op(token: &Token) -> Option<Option<BinaryOp>> {
+        let op = match token {
             Token::OpAssign    => None,
             Token::OpAddAssign => Some(BinaryOp::Add),
             Token::OpSubAssign => Some(BinaryOp::Sub),
@@ -211,10 +317,10 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             Token::OpLShiftAssign => Some(BinaryOp::LShift),
             Token::OpRShiftAssign => Some(BinaryOp::RShift),
             
-            _ => return Ok(None),
+            _ => return None,
         };
         
-        Ok(Some(op))
+        Some(op)
     }
     
     /*
@@ -227,7 +333,18 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     fn parse_object_constructor(&mut self, ctx: &mut ErrorContext) -> Result<ObjectConstructor, ParserError> {
         ctx.push(ContextTag::ObjectCtor);
         
+        let next = self.advance().unwrap();
+        ctx.set_start(&self.advance().unwrap());
+        debug_assert!(matches!(next.token, Token::OpenBrace));
+        
         unimplemented!();
+        
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        if !matches!(next.token, Token::CloseParen) {
+            return Err(ParserError::new(ErrorKind::ExpectedCloseBrace, ctx.context()));
+        }
         
         ctx.pop_extend();
     }
@@ -290,7 +407,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     unimplemented!()
                 }
                 
-                // object-constructor ::= "{" ...
+                // object-constructor ::= "{" ... "}"
                 Token::OpenBrace => {
                     ctx.push(ContextTag::ObjectCtor);
                     ctx.set_start(&self.advance().unwrap());
@@ -313,7 +430,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             };
         }
     
-        ctx.pop();
+        ctx.pop_extend();
         Ok(primary)
     }
     
@@ -336,19 +453,37 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             // IDENTIFIER
             Token::Identifier(ref name) => Atom::identifier(name.as_str()),
             
-            // "(" expression ")"
+            // "(" ")" | "(" expression ")" | "(" expression "," ")"
             Token::OpenParen => {
+                // Check for the empty tuple
+                let next = self.peek()?;
+                if let Token::CloseParen = next.token {
+                    ctx.pop_extend();
+                    return Ok(Atom::EmptyTuple);
+                }
                 
                 let inner_expr = self.parse_expr(ctx)?;
                 
-                let next = self.advance()?;
+                // The next token must either be a "," or close paren
+                let mut next = self.advance()?;
                 ctx.set_end(&next);
                 
+                let atom =
+                    if let Token::Comma = next.token {
+                        next = self.advance()?;
+                        ctx.set_end(&next);
+                        
+                        Atom::single_tuple(inner_expr)
+                    } else {
+                        Atom::group(inner_expr)
+                    };
+                
+                // check for close paren
                 if !matches!(next.token, Token::CloseParen) {
                     return Err(ParserError::new(ErrorKind::ExpectedCloseParen, ctx.context()));
                 }
                 
-                return Ok(Atom::group(inner_expr))
+                atom
             },
             
             _ => { 

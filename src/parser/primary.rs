@@ -15,7 +15,9 @@ pub enum Atom {
     BooleanLiteral(bool),
     IntegerLiteral(language::IntType),
     FloatLiteral(language::FloatType),
-    Group(Box<Expr>)
+    EmptyTuple,
+    SingleTuple(Box<Expr>),
+    Group(Box<Expr>),
 }
 
 impl Atom {
@@ -29,6 +31,10 @@ impl Atom {
     
     pub fn group(expr: Expr) -> Self {
         Self::Group(Box::new(expr))
+    }
+    
+    pub fn single_tuple(expr: Expr) -> Self {
+        Self::SingleTuple(Box::new(expr))
     }
 }
 

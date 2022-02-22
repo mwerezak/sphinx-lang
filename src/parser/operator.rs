@@ -39,8 +39,13 @@ pub enum BinaryOp {
     Or,
 }
 
+pub type OpLevel = u8;
+pub const OP_LEVEL_END: OpLevel = 1; // tightest binding
+pub const OP_LEVEL_START: OpLevel = 10; // weakest binding
+
 impl BinaryOp {
-    pub fn precedence_level(&self) -> i8 {
+    
+    pub fn precedence_level(&self) -> OpLevel {
         match self {
             BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 2,
             
@@ -57,6 +62,18 @@ impl BinaryOp {
             
             BinaryOp::And => 9,
             BinaryOp::Or => 10,
+        }
+    }
+    
+    pub fn is_associative(&self) -> bool {
+        match self {
+            BinaryOp::LT 
+            | BinaryOp::GT 
+            | BinaryOp::LE 
+            | BinaryOp::GE 
+            | BinaryOp::EQ 
+            | BinaryOp::NE => false,
+            _ => true,
         }
     }
 }
