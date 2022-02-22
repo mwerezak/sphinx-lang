@@ -1,3 +1,6 @@
+mod string;
+pub use string::*;
+
 use crate::language;
 use crate::lexer::Token;
 use crate::lexer::rules::{MatchResult, LexerRule, CharClass, TokenError};

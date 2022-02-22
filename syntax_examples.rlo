@@ -27,8 +27,9 @@ false # Not *not* false.
 "I am a string"
 ""     # The empty string.
 "123"  # self is a string, not a number.
-"a\nb" # Escape sequences
 'And then she said, "woah."'  # Can be single or double quoted.
+"\ttab\nnewline, literal\\backslash" # Escape sequences
+r"/[\w._%+-]+@[\w.-]+\.[a-zA-Z]{2,4}/"  # Literal with escape sequences disabled
 
 # Nil
 nil

@@ -51,6 +51,3 @@ impl fmt::Display for LexerError {
     }
 }
 
-
-// invalid token"),
-// "unexpected EOF")
