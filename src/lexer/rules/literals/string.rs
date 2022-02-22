@@ -19,7 +19,7 @@ pub struct CharMapEscape {
 }
 
 impl CharMapEscape {
-    fn new(tag: char, output: &'static str) -> Self {
+    pub fn new(tag: char, output: &'static str) -> Self {
         CharMapEscape { tag, output }
     }
 }
@@ -34,6 +34,10 @@ impl EscapeSequence for CharMapEscape {
 
 // \x00 \xFF
 pub struct HexByteEscape {}
+
+impl HexByteEscape {
+    pub fn new() -> Self { HexByteEscape { } }
+}
 
 const HEX_ESCAPE_TAG: char = 'x';
 impl EscapeSequence for HexByteEscape {
@@ -67,15 +71,15 @@ pub struct StringLiteralRule {
     closed: bool,
     
     raw: bool,
-    escape: Option<&'static dyn EscapeSequence>, // active escape sequence, argbuf
+    escape: Option<usize>, // active escape sequence, argbuf
     argbuf: Option<String>, // option so we can take it into the escape sequence without borrow issues
     error: Option<StringEscapeErrorKind>, // hold the first error to occur when processing an escape
     
-    escapes: Vec<&'static dyn EscapeSequence>,
+    escapes: Vec<Box<dyn EscapeSequence>>,
 }
 
 impl StringLiteralRule {
-    fn new<E>(escapes: E) -> Self where E: IntoIterator<Item=&'static dyn EscapeSequence> {
+    pub fn new(escapes: Vec<Box<dyn EscapeSequence>>) -> Self {
         StringLiteralRule {
             raw_buf: String::new(),
             escaped_buf: String::new(),
@@ -87,18 +91,36 @@ impl StringLiteralRule {
             argbuf: None,
             error: None,
             
-            escapes: escapes.into_iter().collect(),
+            escapes,
         }
     }
     
-    fn find_escape(&self, tag: char) -> Option<&'static dyn EscapeSequence> {
-        self.escapes.iter()
-        .find(|escape| tag == escape.tag())
-        .map(|seq| *seq)
+    fn find_eid_for_tag(&self, tag: char) -> Option<usize> {
+        self.escapes.iter().position(|esc| tag == esc.tag())
     }
     
-    fn process_escape(&mut self, escape: &dyn EscapeSequence, arg: &str) {
-        match escape.transform(arg) {
+    fn lookup_escape(&self, eid: usize) -> &Box<dyn EscapeSequence> {
+        // let (_, slice) = self.escapes.split_at(eid);
+        // let (item, _) = slice.split_first().unwrap();
+        
+        // item
+        
+        &self.escapes[eid]
+    }
+    
+    // can't take a reference to the escape or argument by parameter since it would cause borrow issues
+    // so we take an index to get the escape
+    // and we just have to get the argument directly from self
+    fn process_escape(&mut self, eid: usize) {
+        let escape = &self.escapes[eid];
+        let arg = {
+            match self.argbuf.take() {
+                Some(s) => s,
+                None => String::new(),
+            }
+        };
+        
+        match escape.transform(arg.as_str()) {
             Ok(out) => self.escaped_buf.push_str(out.as_str()),
             Err(err) => self.error = Some(err),
         };
@@ -158,13 +180,18 @@ impl LexerRule for StringLiteralRule {
         if !self.raw && self.error.is_none() {
             
             // if we are already in an escape sequence
-            if let Some(escape) = self.escape {
-                let argbuf = self.argbuf.as_mut().unwrap();
-                argbuf.push(next);
+            if let Some(eid) = self.escape {
+                {
+                    let argbuf = self.argbuf.as_mut().unwrap();
+                    argbuf.push(next);
+                }
+                
+                let argbuf = self.argbuf.as_ref().unwrap();
+                let escape = self.lookup_escape(eid);
                 if argbuf.len() == (escape.arglen() as usize) {
-                    let arg = self.argbuf.take().unwrap();
-                    self.process_escape(escape, arg.as_str());
+                    self.process_escape(eid);
                     self.escape = None;
+                    self.argbuf = None;
                 }
                 
                 self.raw_buf.push(next);
@@ -173,15 +200,19 @@ impl LexerRule for StringLiteralRule {
             
             // escape sequence start
             if let Some(ESCAPE_CHAR) = prev {
-                match self.find_escape(next) {
+                match self.find_eid_for_tag(next) {
                     None => self.error = Some(StringEscapeErrorKind::InvalidEscapeTag),
-                    Some(escape) => {
+                    Some(eid) => {
+                        
+                        let escape = self.lookup_escape(eid);
                         if escape.arglen() == 0 {
                             // if the escape doesnt take any arg we can process it now
-                            self.process_escape(escape, "");
+                            debug_assert!(self.argbuf.is_none());
+                            self.process_escape(eid);
                         } else {
                             // otherwise set up for the next chars
-                            self.escape = Some(escape);
+                            self.escape = Some(eid);
+                            self.argbuf = Some(String::new());
                         }
                     }
                 };
@@ -241,7 +272,7 @@ impl StringEscapeError {
 impl std::error::Error for StringEscapeError { }
 
 impl std::fmt::Display for StringEscapeError { 
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         unimplemented!()
     }
 }

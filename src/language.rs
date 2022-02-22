@@ -2,6 +2,7 @@ use crate::lexer::{LexerBuilder, Token};
 use crate::lexer::rules::{SingleCharRule, MultiCharRule};
 use crate::lexer::rules::keywords::KeywordRule;
 use crate::lexer::rules::literals::{IdentifierRule, IntegerLiteralRule, HexIntegerLiteralRule};
+use crate::lexer::rules::literals::string::{StringLiteralRule, EscapeSequence, CharMapEscape, HexByteEscape};
 
 
 pub type IntType = i32;    // internal representation for integers
@@ -92,7 +93,22 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(IdentifierRule::new())
     .add_rule(IntegerLiteralRule::new())
     .add_rule(HexIntegerLiteralRule::new())
-
+    .add_rule({
+        let mut escapes = Vec::<Box<dyn EscapeSequence>>::new();
+        
+        escapes.push(Box::new(CharMapEscape::new('0', "\x00")));
+        escapes.push(Box::new(CharMapEscape::new('\\', "\\")));
+        escapes.push(Box::new(CharMapEscape::new('\'', "\'")));
+        escapes.push(Box::new(CharMapEscape::new('\"', "\"")));
+        
+        escapes.push(Box::new(CharMapEscape::new('t', "\t")));
+        escapes.push(Box::new(CharMapEscape::new('n', "\n")));
+        escapes.push(Box::new(CharMapEscape::new('r', "\r")));
+        
+        escapes.push(Box::new(HexByteEscape::new()));
+        
+        StringLiteralRule::new(escapes)
+    })
     
 
 

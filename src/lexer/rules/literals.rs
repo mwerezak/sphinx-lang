@@ -1,5 +1,4 @@
-mod string;
-pub use string::*;
+pub mod string;
 
 use crate::language;
 use crate::lexer::Token;
