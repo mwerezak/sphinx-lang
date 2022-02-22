@@ -375,7 +375,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
-                        primary.push_access(name.as_str());
+                        primary.push_access_member(name.as_str());
                     } else {
                         return Err(ParserError::new(ErrorKind::ExpectedIdentifier, ctx.context()));
                     }
@@ -394,7 +394,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     ctx.set_end(&next);
                     
                     if matches!(next.token, Token::CloseSquare) {
-                        primary.push_indexing(index_expr);
+                        primary.push_access_index(index_expr);
                     } else {
                         return Err(ParserError::new(ErrorKind::ExpectedCloseSquare, ctx.context()));
                     }

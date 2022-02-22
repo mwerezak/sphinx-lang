@@ -40,8 +40,8 @@ impl Atom {
 
 // These are the highest precedence operations in the language
 #[derive(Debug, Clone)]
-pub enum PrimaryOp {
-    Access(Name),
+pub enum AccessItem {
+    Member(Name),
     Index(Box<Expr>),
     Invoke,       // TODO
     Construct(ObjectConstructor),
@@ -50,17 +50,17 @@ pub enum PrimaryOp {
 #[derive(Debug, Clone)]
 pub struct Primary {
     atom: Atom,
-    ops: Vec<PrimaryOp>,
+    path: Vec<AccessItem>,
 }
 
 impl Primary {
     pub fn new(atom: Atom) -> Self {
-        Primary { atom, ops: Vec::new() }
+        Primary { atom, path: Vec::new() }
     }
     
-    pub fn with_ops<I>(atom: Atom, ops: I) -> Self
-    where I: Iterator<Item=PrimaryOp> {
-        Primary { atom, ops: ops.collect() }
+    pub fn with_ops<I>(atom: Atom, path: I) -> Self
+    where I: Iterator<Item=AccessItem> {
+        Primary { atom, path: path.collect() }
     }
     
     /*
@@ -69,28 +69,28 @@ impl Primary {
         lvalue ::= IDENTIFIER | primary subscript | primary access ;
     */
     pub fn is_lvalue(&self) -> bool {
-        // if there are no primary ops, then we are in the IDENTIFIER branch
-        if self.ops.is_empty() {
+        // if there are no access items, then we are in the IDENTIFIER branch
+        if self.path.is_empty() {
             matches!(self.atom, Atom::Identifier(..))
         } else {
-            let last_op = self.ops.last().unwrap();
+            let last_op = self.path.last().unwrap();
             
-            matches!(last_op, PrimaryOp::Access(..) | PrimaryOp::Index(..))
+            matches!(last_op, AccessItem::Member(..) | AccessItem::Index(..))
         }
     }
     
-    pub fn push_access(&mut self, name: &str) {
-        self.ops.push(PrimaryOp::Access(Name::new(name)))
+    pub fn push_access_member(&mut self, name: &str) {
+        self.path.push(AccessItem::Member(Name::new(name)))
     }
     
-    pub fn push_indexing(&mut self, expr: Expr) {
-        self.ops.push(PrimaryOp::Index(Box::new(expr)))
+    pub fn push_access_index(&mut self, expr: Expr) {
+        self.path.push(AccessItem::Index(Box::new(expr)))
     }
     
     //pub fn push_invoke(&mut self, )
     
     pub fn push_construct(&mut self, ctor: ObjectConstructor) {
-        self.ops.push(PrimaryOp::Construct(ctor))
+        self.path.push(AccessItem::Construct(ctor))
     }
 }
 
