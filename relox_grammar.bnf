@@ -48,7 +48,7 @@ expression ::= primary
      5:  & 
      6:  ^ 
      7:  | 
-     8:  < > <= >= == !=        (not associative, require grouping)
+     8:  < > <= >= == !=
      9:  and 
     10:  or
 
@@ -102,7 +102,6 @@ immediate-expression ::= class-def
 unary-expression ::= UNARY_OP unary | primary-expression ;
 
 operand[1] ::= unary-expression ;
-operand[8] ::= comparison ;
 operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
 
 assignment ::= assignment-expression | operand[10] ;
