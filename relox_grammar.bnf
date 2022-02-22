@@ -11,13 +11,6 @@
 (*** Expressions ***)
 
 
-(* Original left-recursive version
-primary ::= LITERAL | lvalue | call | "(" expression ")" ;
-lvalue ::= IDENTIFIER | subscript | access ;  (* so called because they can appear on the left side of assignment, see below *)
-subscript ::= primary "[" expression "]" ;
-access ::= primary "." IDENTIFIER ; 
-*)
-
 (* New non-left-recursive version *)
 atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
 primary ::= atom ( access-item )* ; 
@@ -28,17 +21,19 @@ member-access ::= "." IDENTIFIER ;
 
 lvalue ::= IDENTIFIER | primary index-access | primary member-access ;  (* so called because they can appear on the left side of assignment, see Access below *)
 
-                                        (* Notes for parser implemention: *)
-expression ::= primary                  (* technically made redundant by binop-expression, included here for clarity *)
-             | assignment-expression    (* starts with a primary or "var" *)  (* at this level and above, we need to grab the next primary *)
-             | binop-expression         (* starts with a primary *)
-             | unary-expression         (* starts with an unary operator *)
-             | object-constructor       (* starts with a "{" symbol. This is for an anonymous object, whereas in `primary` it is a typed object *)
-             | if-expression            (* starts with "if" keyword *)
-             | function-def             (* starts with "fun" keyword *)
-             | class-def                (* starts with "class" keyword *)
-             | tuple-constructor ;      (* indicated by comma after expression *)
 
+(* This is more for specification than implementation, as it is left-recursive. 
+   See the end of this file for a non-left-recursive reformulation.
+*)
+expression ::= primary
+             | class-def
+             | function-def
+             | if-expression
+             | UNARY_OP expression
+             | expression BINARY_OP expression
+             | assignment-expression
+             | object-constructor
+             | tuple-constructor ;
 
 (*** Binary and Unary Operators ***)
 
@@ -59,21 +54,6 @@ expression ::= primary                  (* technically made redundant by binop-e
 
 *)
 
-(* these special cases escape the general operator production below *)
-binary[1] ::= primary ; (* terminates the binop precedence stack *)
-binary[8] ::= comparison ;
-
-(* OPERATOR[N] refers to the symbols in different levels of the operator precedence table above *)
-binary[N] ::= binary[N-1] ( OPERATOR[N] binary[N-1] )* ;
-
-comparison ::= binary[7] ( OPERATOR[8] binary[7] )? ; (* not associative *)
-
-(* top-level operator expression *)
-binop-expression ::= binary[10] ;
-
-(* right associative *)
-unary-expression ::= ( "-" | "+" | "not" ) unary | primary ;
-
 
 (*** Assignment ***)
 
@@ -85,7 +65,7 @@ unary-expression ::= ( "-" | "+" | "not" ) unary | primary ;
 *)
 
 (* right associative *)
-assignment-expression ::= assignment-target ( ASSIGNMENT_OPERATOR assignment-target )* ASSIGNMENT_OPERATOR expression ;
+assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
 assignment-target ::= ( "var" )? lvalue ; 
 
 assignment-statement ::= assignment-target-list  "=" expression-list ;
@@ -106,3 +86,23 @@ member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;  (* ini
 
 (* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
 tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
+
+
+
+(* Non left-recursive version of `expression` for implementation *)
+
+(* These expressions can all be identified by their first symbol *)
+immediate-expression ::= class-def
+                       | function-def
+                       | if-expression
+                       | object-constructor ;
+                    
+unary-expression ::= UNARY_OP unary | immediate-expression | primary ;
+
+operand[1] ::= unary-expression ;
+operand[8] ::= comparison ;
+operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
+
+assignment ::= assignment-expression | operand[10] ;
+
+expression ::= assignment | tuple-constructor;
