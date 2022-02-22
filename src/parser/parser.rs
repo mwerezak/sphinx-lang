@@ -88,19 +88,33 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                      | tuple-constructor ;
                      
     */
-    fn parse_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {         
+    fn parse_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
+        self.parse_inner_expr(ctx, false)
+    }
+    
+    fn parse_inner_expr(&mut self, ctx: &mut ErrorContext, group: bool) -> Result<Expr, ParserError> {
         let mut exprs = vec!( self.parse_assignment_expr(ctx)? );
         
         // check for tuple constructor
         // note: single-element and empty tuples are handled separately in parse_atom()
+        let mut is_tuple = false;
         loop {
             let next = self.peek()?;
             if !matches!(next.token, Token::Comma) {
                 break;
             }
             
+            is_tuple = true;
             ctx.push_continuation(ContextTag::TupleCtor);
             ctx.set_end(&self.advance().unwrap()); // consume comma
+            
+            // hack
+            let next = self.peek()?;
+            if group && matches!(next.token, Token::CloseParen) {
+                // don't consume close paren since the caller will be expecting it
+                ctx.pop_extend();
+                break;
+            }
             
             let next_expr = self.parse_assignment_expr(ctx)?;
             exprs.push(next_expr);
@@ -108,7 +122,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.pop_extend();
         }
         
-        if exprs.len() > 1 {
+        if is_tuple && (group || exprs.len() > 1) {
             Ok(Expr::TupleCtor(exprs))
         } else {
             Ok(exprs.into_iter().next().unwrap())
@@ -238,6 +252,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             let expr = self.parse_expr(ctx)?;
             
+            ctx.pop_extend();
             return Ok(Expr::unary_op(unary_op, expr));
         }
         
@@ -462,31 +477,21 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     return Ok(Atom::EmptyTuple);
                 }
                 
-                let inner_expr = self.parse_expr(ctx)?;
+                let inner_expr = self.parse_inner_expr(ctx, true)?;
                 
-                // The next token must either be a "," or close paren
-                let mut next = self.advance()?;
+                // The next token must be close paren
+                let next = self.advance()?;
                 ctx.set_end(&next);
                 
-                let atom =
-                    if let Token::Comma = next.token {
-                        next = self.advance()?;
-                        ctx.set_end(&next);
-                        
-                        Atom::single_tuple(inner_expr)
-                    } else {
-                        Atom::group(inner_expr)
-                    };
-                
-                // check for close paren
                 if !matches!(next.token, Token::CloseParen) {
                     return Err(ParserError::new(ErrorKind::ExpectedCloseParen, ctx.context()));
                 }
                 
-                atom
+                Atom::group(inner_expr)
             },
             
             _ => { 
+                println!("{:?}", next);
                 return Err(ParserError::new(ErrorKind::ExpectedAtom, ctx.context()))
             },
         };

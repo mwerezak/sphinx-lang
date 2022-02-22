@@ -11,12 +11,11 @@ use crate::parser::structs::ObjectConstructor;
 #[derive(Debug, Clone)]
 pub enum Atom {
     Nil,
+    EmptyTuple,
     Identifier(Name),
     BooleanLiteral(bool),
     IntegerLiteral(language::IntType),
     FloatLiteral(language::FloatType),
-    EmptyTuple,
-    SingleTuple(Box<Expr>),
     Group(Box<Expr>),
 }
 
@@ -33,9 +32,6 @@ impl Atom {
         Self::Group(Box::new(expr))
     }
     
-    pub fn single_tuple(expr: Expr) -> Self {
-        Self::SingleTuple(Box::new(expr))
-    }
 }
 
 // These are the highest precedence operations in the language
