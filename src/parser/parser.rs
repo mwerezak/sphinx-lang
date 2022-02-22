@@ -108,7 +108,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.pop_extend();
         }
         
-        if !exprs.len() > 1 {
+        if exprs.len() > 1 {
             Ok(Expr::TupleCtor(exprs))
         } else {
             Ok(exprs.into_iter().next().unwrap())
