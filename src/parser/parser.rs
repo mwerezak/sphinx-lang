@@ -11,17 +11,17 @@ use crate::parser::debug::DebugSymbol;
 
 // Recursive descent parser
 
-pub struct Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    filename: &'a str,  // TODO refer to module for which we are parsing code, instead of just a source file name... once module system is implemented
+pub struct Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+    module: &'m str,  // TODO refer to module for which we are parsing code, instead of just a source file name... once module system is implemented
     interner: &'h mut StringInterner,
     tokens: T,
     next: Option<Result<TokenMeta, ParserError>>,
 }
 
-impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    pub fn new(filename: &'a str, interner: &'h mut StringInterner, tokens: T) -> Self {
+impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+    pub fn new(module: &'m str, interner: &'h mut StringInterner, tokens: T) -> Self {
         Parser {
-            filename,
+            module,
             interner,
             tokens,
             next: None,
@@ -59,7 +59,7 @@ impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     
     // temporary top level, will change when statement parsing is added
     pub fn next_expr(&mut self) -> Result<ExprMeta, (ParserError, ErrorContext)> { 
-        let mut ctx = ErrorContext::new(self.filename, ContextTag::Expr);
+        let mut ctx = ErrorContext::new(self.module, ContextTag::Expr);
         
         match self.parse_expr(&mut ctx) {
             Ok(expr) => {

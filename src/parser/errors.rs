@@ -75,19 +75,19 @@ impl fmt::Display for ParserError {
 // Structures used by the parser for error handling and synchronization
 
 #[derive(Debug, Clone)]
-pub struct ErrorContext<'a> {
-    filename: &'a str,
+pub struct ErrorContext<'m> {
+    module: &'m str,
     stack: Vec<ContextFrame>,
 }
 
-impl<'a> ErrorContext<'a> {
-    pub fn new(filename: &'a str, base: ContextTag) -> Self {
+impl<'m> ErrorContext<'m> {
+    pub fn new(module: &'m str, base: ContextTag) -> Self {
         ErrorContext {
-            filename, stack: vec![ ContextFrame::new(base) ],
+            module, stack: vec![ ContextFrame::new(base) ],
         }
     }
     
-    pub fn filename(&self) -> &'a str { self.filename }
+    //pub fn module(&self) -> &'m str { self.module }
     
     pub fn frame(&self) -> &ContextFrame { self.stack.last().unwrap() }
     pub fn frame_mut(&mut self) -> &mut ContextFrame { self.stack.last_mut().unwrap() }
@@ -129,10 +129,10 @@ pub struct ContextFrame {
 }
 
 fn span_lt(first: &Span, second: &Span) -> bool { first.index < second.index }
-// fn span_min<'a>(first: &'a Span, second: &'a Span) -> &'a Span {
+// fn span_min<'m>(first: &'m Span, second: &'m Span) -> &'m Span {
 //     if span_lt(first, second) { first } else { second }
 // }
-// fn span_max<'a>(first: &'a Span, second: &'a Span) -> &'a Span {
+// fn span_max<'m>(first: &'m Span, second: &'m Span) -> &'m Span {
 //     if !span_lt(first, second) { first } else { second }
 // }
 
@@ -175,9 +175,9 @@ impl ContextFrame {
     }
 }
 
-impl<'a> From<ErrorContext<'a>> for DebugSymbol<'a> {
-    fn from(ctx: ErrorContext<'a>) -> Self {
-        let filename = ctx.filename;
+impl<'m> From<ErrorContext<'m>> for DebugSymbol<'m> {
+    fn from(ctx: ErrorContext<'m>) -> Self {
+        let module = ctx.module;
         let frame = ctx.take();
         
         match (frame.start, frame.end) {
@@ -185,16 +185,16 @@ impl<'a> From<ErrorContext<'a>> for DebugSymbol<'a> {
                 let start_index = start.index;
                 let end_index = end.index + TokenIndex::from(end.length);
                 
-                DebugSymbol::new(filename, start_index, end_index)
+                DebugSymbol::new(module, start_index, end_index)
             },
             (Some(span), None) | (None, Some(span)) => {
                 let start_index = span.index;
                 let end_index = span.index + TokenIndex::from(span.length);
                 
-                DebugSymbol::new(filename, start_index, end_index)
+                DebugSymbol::new(module, start_index, end_index)
             },
             (None, None) => {
-                DebugSymbol::new(filename, 0, 0)
+                DebugSymbol::new(module, 0, 0)
             }
         }
     }

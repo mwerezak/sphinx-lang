@@ -6,15 +6,15 @@ pub use crate::lexer::TokenIndex;
 
 
 #[derive(Clone, Debug)]
-pub struct DebugSymbol<'a> {
-    pub file: &'a str,
+pub struct DebugSymbol<'m> {
+    pub module: &'m str,  // TODO reference module instead of just str
     pub start: TokenIndex,
     pub end: TokenIndex,
 }
 
-impl<'a> DebugSymbol<'a> {
-    pub fn new(file: &'a str, start: TokenIndex, end: TokenIndex) -> Self {
-        DebugSymbol { file, start, end }
+impl<'m> DebugSymbol<'m> {
+    pub fn new(module: &'m str, start: TokenIndex, end: TokenIndex) -> Self {
+        DebugSymbol { module, start, end }
     }
 }
 
