@@ -2,7 +2,7 @@ pub mod string;
 
 use crate::language;
 use crate::lexer::Token;
-use crate::lexer::rules::{MatchResult, LexerRule, CharClass, TokenError};
+use crate::lexer::rules::{MatchResult, LexerRule, WordChar, TokenError};
 use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Identifiers

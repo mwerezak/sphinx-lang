@@ -12,15 +12,15 @@ use crate::lexer::Token;
 
 // Helpers
 
-trait CharClass {
-    // alphabetic/alphanumeric + '_'
+// "word" characters are the alphabetic/alphanumeric chars + '_' (underscore)
+trait WordChar {
     fn is_word_alphanumeric(&self) -> bool;
     fn is_word_alphabetic(&self) -> bool;
     fn is_word_ascii_alphanumeric(&self) -> bool;
     fn is_word_ascii_alphabetic(&self) -> bool;
 }
 
-impl CharClass for char {
+impl WordChar for char {
     fn is_word_alphanumeric(&self) -> bool {
         *self == '_' || self.is_alphanumeric()
     }

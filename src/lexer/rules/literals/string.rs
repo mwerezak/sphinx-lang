@@ -1,7 +1,5 @@
-use crate::language;
 use crate::lexer::Token;
-use crate::lexer::rules::{MatchResult, LexerRule, CharClass, TokenError};
-use crate::lexer::rules::strmatcher::StrMatcher;
+use crate::lexer::rules::{MatchResult, LexerRule, TokenError};
 
 // supports escape sequences that consist of a single-character tag (e.g. \t) and an optional fixed-length argument (e.g. \u0FFE, \xFE)
 pub trait EscapeSequence: Sync {
