@@ -12,7 +12,7 @@ use crate::parser::debug::DebugSymbol;
 // Recursive descent parser
 
 pub struct Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    filename: &'a str,
+    filename: &'a str,  // TODO refer to module for which we are parsing code, instead of just a source file name... once module system is implemented
     interner: &'h mut StringInterner,
     tokens: T,
     next: Option<Result<TokenMeta, ParserError>>,
@@ -20,11 +20,11 @@ pub struct Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError
 
 impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     pub fn new(filename: &'a str, interner: &'h mut StringInterner, tokens: T) -> Self {
-        Parser { 
+        Parser {
             filename,
             interner,
-            tokens, 
-            next: None, 
+            tokens,
+            next: None,
         }
     }
     
@@ -407,7 +407,7 @@ impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 Token::Identifier(name) => Atom::identifier(name.as_str(), self.interner),
                 Token::Global => {
                     let next = self.advance()?;
-                    ctx.set_start(&next);
+                    ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
                         Atom::global_identifier(name.as_str(), self.interner)
