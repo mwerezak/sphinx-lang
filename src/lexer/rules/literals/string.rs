@@ -121,7 +121,7 @@ impl StringLiteralRule {
         };
         
         match escape.transform(arg.as_str()) {
-            Ok(out) => self.escaped_buf.push_str(out.as_str()),
+            Ok(output) => self.escaped_buf.push_str(output.as_str()),
             Err(err) => self.error = Some(err),
         };
     }
@@ -181,41 +181,32 @@ impl LexerRule for StringLiteralRule {
             
             // if we are already in an escape sequence
             if let Some(eid) = self.escape {
-                {
-                    let argbuf = self.argbuf.as_mut().unwrap();
-                    argbuf.push(next);
-                }
-                
                 let argbuf = self.argbuf.as_ref().unwrap();
                 let escape = self.lookup_escape(eid);
-                if argbuf.len() == (escape.arglen() as usize) {
-                    self.process_escape(eid);
-                    self.escape = None;
-                    self.argbuf = None;
+                
+                if argbuf.len() < (escape.arglen() as usize) {
+                    let argbuf = self.argbuf.as_mut().unwrap();
+                    argbuf.push(next);
+                    
+                    self.raw_buf.push(next);
+                    return MatchResult::IncompleteMatch;
                 }
                 
-                self.raw_buf.push(next);
-                return MatchResult::IncompleteMatch;
-            }
-            
-            // escape sequence start
-            if let Some(ESCAPE_CHAR) = prev {
-                match self.find_eid_for_tag(next) {
-                    None => self.error = Some(StringEscapeErrorKind::InvalidEscapeTag),
-                    Some(eid) => {
-                        
-                        let escape = self.lookup_escape(eid);
-                        if escape.arglen() == 0 {
-                            // if the escape doesnt take any arg we can process it now
-                            debug_assert!(self.argbuf.is_none());
-                            self.process_escape(eid);
-                        } else {
-                            // otherwise set up for the next chars
-                            self.escape = Some(eid);
-                            self.argbuf = Some(String::new());
-                        }
-                    }
-                };
+                // if we get here, argbuf already has enough characters without adding the next one
+                // process the escape and then do not return so that the next char is processed as normal
+                self.process_escape(eid);
+                self.escape = None;
+                self.argbuf = None;
+                
+            // check for escape sequence start
+            } else if let Some(ESCAPE_CHAR) = prev {
+                
+                if let Some(eid) = self.find_eid_for_tag(next) {
+                    self.escape = Some(eid);
+                    self.argbuf = Some(String::new());
+                } else {
+                    self.error = Some(StringEscapeErrorKind::InvalidEscapeTag);
+                }
                 
                 self.raw_buf.push(next);
                 return MatchResult::IncompleteMatch;
@@ -230,8 +221,10 @@ impl LexerRule for StringLiteralRule {
         }
         
         // inside the string
+        if next != ESCAPE_CHAR {
+            self.escaped_buf.push(next);
+        }
         self.raw_buf.push(next);
-        self.escaped_buf.push(next);
         return MatchResult::IncompleteMatch;
     }
     
@@ -241,8 +234,10 @@ impl LexerRule for StringLiteralRule {
         if let Some(errorkind) = self.error {
             Err(Box::new(StringEscapeError::new(errorkind, self.raw_buf.clone())))
         } else if self.raw {
+            println!{"{:?}", self.raw_buf.clone().as_bytes()}
             Ok(Token::StringLiteral(self.raw_buf.clone()))
         } else {
+            println!{"{:?}", self.escaped_buf.clone().as_bytes()}
             Ok(Token::StringLiteral(self.escaped_buf.clone()))
         }
         

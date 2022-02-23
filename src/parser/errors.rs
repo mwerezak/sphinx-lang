@@ -105,6 +105,11 @@ impl ErrorContext {
         self.frame_mut().extend(inner_frame);
     }
     
+    pub fn take(mut self) -> ContextFrame {
+        assert!(!self.stack.is_empty());
+        self.stack.pop().unwrap()
+    }
+    
     // for convenience
     pub fn context(&self) -> ContextTag { self.frame().context() }
     pub fn set_start(&mut self, token: &TokenMeta) { self.frame_mut().set_start(token) }

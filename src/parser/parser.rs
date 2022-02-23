@@ -66,8 +66,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             Err(err) => {
                 // grab debugging info from the current context 
                 // and return it with the error after synchronizing
-                ctx.pop();
-                return Err((err, ctx.pop().to_dbg_meta(self.name))); // TODO synchronize
+                return Err((err, ctx.take().to_dbg_meta(self.name))); // TODO synchronize
             },
         }
     }
@@ -491,7 +490,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             },
             
             _ => { 
-                println!("{:?}", next);
+                // println!("{:?}", next);
                 return Err(ParserError::new(ErrorKind::ExpectedAtom, ctx.context()))
             },
         };
