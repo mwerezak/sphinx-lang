@@ -10,8 +10,8 @@ use crate::lexer::rules::comments::{LineCommentRule, BlockCommentRule};
 // if one of your source files has more than 4 billion characters thats an error
 // if a token gets longer than 65535 characters, consider that a lexing error
 
-type TokenIndex = u32;  // index of start of token in file
-type TokenLength = u16;
+pub type TokenIndex = u32;  // index of start of token in file
+pub type TokenLength = u16;
 
 // include only mere character indexes in the output
 // if a lexeme needs to be rendered (e.g. for error messages), 

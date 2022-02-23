@@ -1,11 +1,11 @@
 use string_interner::StringInterner;
 use crate::lexer::{TokenMeta, Token, LexerError};
-use crate::parser::expr::Expr;
+use crate::parser::expr::{Expr, ExprMeta};
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::operator::{UnaryOp, BinaryOp, OpLevel, OP_LEVEL_START, OP_LEVEL_END};
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::errors::{ParserError, ErrorKind, ErrorContext, ContextTag};
-use crate::parser::debug::DebugInfo;
+use crate::parser::debug::DebugSymbol;
 
 
 
@@ -58,18 +58,18 @@ impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     }
     
     // temporary top level, will change when statement parsing is added
-    pub fn next_expr(&mut self) -> Result<Expr, (ParserError, DebugInfo)> { 
+    pub fn next_expr(&mut self) -> Result<ExprMeta, (ParserError, ErrorContext)> { 
         let mut ctx = ErrorContext::new(self.filename, ContextTag::Expr);
         
         match self.parse_expr(&mut ctx) {
             Ok(expr) => {
                 // grab debugging info from the current context and attach it to the result
-                Ok(expr)
+                Ok(ExprMeta::new(expr, ctx.into()))
             },
             Err(err) => {
-                // grab debugging info from the current context 
-                // and return it with the error after synchronizing
-                return Err((err, ctx.into())); // TODO synchronize
+                // TODO synchronize
+            
+                Err((err, ctx))
             },
         }
     }

@@ -1,7 +1,7 @@
 use std::fmt;
 use std::error::Error;
 use crate::lexer::{Span, TokenMeta};
-use crate::parser::debug::DebugInfo;
+use crate::parser::debug::{DebugSymbol, TokenIndex};
 
 // Specifies the actual error that occurred
 #[derive(Clone, Copy, Debug)]
@@ -71,7 +71,8 @@ impl fmt::Display for ParserError {
     }
 }
 
-// Structures used by the parser for error handling and synchronization (when I get there)
+
+// Structures used by the parser for error handling and synchronization
 
 #[derive(Debug, Clone)]
 pub struct ErrorContext<'a> {
@@ -172,16 +173,29 @@ impl ContextFrame {
             self.end = other.end;
         }
     }
-    
-    pub fn take_debug_info<'n>(self, file: &'n str) -> DebugInfo<'n> {
-        DebugInfo::new(file, self.start, self.end)
-    }
 }
 
-impl<'a> From<ErrorContext<'a>> for DebugInfo<'a> {
+impl<'a> From<ErrorContext<'a>> for DebugSymbol<'a> {
     fn from(ctx: ErrorContext<'a>) -> Self {
         let filename = ctx.filename;
         let frame = ctx.take();
-        DebugInfo::new(filename, frame.start, frame.end)
+        
+        match (frame.start, frame.end) {
+            (Some(start), Some(end)) => {
+                let start_index = start.index;
+                let end_index = end.index + TokenIndex::from(end.length);
+                
+                DebugSymbol::new(filename, start_index, end_index)
+            },
+            (Some(span), None) | (None, Some(span)) => {
+                let start_index = span.index;
+                let end_index = span.index + TokenIndex::from(span.length);
+                
+                DebugSymbol::new(filename, start_index, end_index)
+            },
+            (None, None) => {
+                DebugSymbol::new(filename, 0, 0)
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-use crate::lexer::Span;
+pub use crate::lexer::TokenIndex;
 
 
 // metadata attached to parser output for error handling and debug output
@@ -6,20 +6,18 @@ use crate::lexer::Span;
 
 
 #[derive(Clone, Debug)]
-pub struct DebugInfo<'a> {
+pub struct DebugSymbol<'a> {
     pub file: &'a str,
-    pub start: Option<Span>,
-    pub end: Option<Span>,
+    pub start: TokenIndex,
+    pub end: TokenIndex,
 }
 
-impl<'a> DebugInfo<'a> {
-    pub fn new(file: &'a str, start: Option<Span>, end: Option<Span>) -> Self {
-        DebugInfo { file, start, end }
+impl<'a> DebugSymbol<'a> {
+    pub fn new(file: &'a str, start: TokenIndex, end: TokenIndex) -> Self {
+        DebugSymbol { file, start, end }
     }
 }
 
-pub trait DebugSymbol {
-    fn dbg_info(&self) -> &DebugInfo;
-    fn dbg_info_mut(&self) -> &mut DebugInfo;
-    fn set_dbg_info(&mut self, info: DebugInfo);
+pub trait HasDebugSymbol {
+    fn debug_symbol(&self) -> &DebugSymbol;
 }

@@ -1,8 +1,7 @@
 use crate::parser::primary::Primary;
 use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::parser::structs::{ObjectConstructor};
-use crate::parser::debug::{DebugSymbol, DebugInfo};
-
+use crate::parser::debug::{DebugSymbol, HasDebugSymbol};
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -50,4 +49,23 @@ pub struct AssignmentInfo {
     lhs: Primary,
     op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     rhs: Expr,
+}
+
+
+#[derive(Debug, Clone)]
+pub struct ExprMeta<'a> {
+    expr: Expr,
+    debug: DebugSymbol<'a>,
+}
+
+impl<'a> ExprMeta<'a> {
+    pub fn new(expr: Expr, debug: DebugSymbol<'a>) -> Self {
+        ExprMeta { expr, debug }
+    }
+    
+    pub fn expr(&self) -> &Expr { &self.expr }
+}
+
+impl HasDebugSymbol for ExprMeta<'_> {
+    fn debug_symbol(&self) -> &DebugSymbol { &self.debug }
 }
