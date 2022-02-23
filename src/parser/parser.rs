@@ -10,16 +10,16 @@ use crate::parser::debug::DebugInfo;
 
 // Recursive descent parser
 
-pub struct Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    name: &'n str,
+pub struct Parser<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+    filename: &'a str,
     tokens: T,
     next: Option<Result<TokenMeta, ParserError>>,
 }
 
-impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    pub fn new(name: &'n str, tokens: T) -> Self {
+impl<'a, T> Parser<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+    pub fn new(filename: &'a str, tokens: T) -> Self {
         Parser { 
-            name,
+            filename,
             tokens, 
             next: None, 
         }
@@ -56,7 +56,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     // temporary top level, will change when statement parsing is added
     pub fn next_expr(&mut self) -> Result<Expr, (ParserError, DebugInfo)> { 
-        let mut ctx = ErrorContext::new(self.name, ContextTag::Expr);
+        let mut ctx = ErrorContext::new(self.filename, ContextTag::Expr);
         
         match self.parse_expr(&mut ctx) {
             Ok(expr) => {
