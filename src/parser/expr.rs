@@ -1,7 +1,7 @@
 use crate::parser::primary::Primary;
 use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::parser::structs::{ObjectConstructor};
-use crate::parser::debug::{DebugMeta, DebugInfo};
+use crate::parser::debug::{DebugSymbol, DebugInfo};
 
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub enum Expr {
     
     BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
     
-    Assignment(Box<Assignment>), // use a box to keep size of Expr down
+    Assignment(Box<AssignmentInfo>), // use a box to keep size of Expr down
     
     ObjectCtor(Box<ObjectConstructor>),
     
@@ -32,10 +32,8 @@ impl Expr {
     
     pub fn assignment(lhs: Primary, op: Option<BinaryOp>, rhs: Expr, decl: bool) -> Self {
         debug_assert!(lhs.is_lvalue());
-        let assignment = Assignment {
-            lhs, op, decl, rhs,
-        };
         
+        let assignment = AssignmentInfo { lhs, op, decl, rhs };
         Self::Assignment(Box::new(assignment))
     }
     
@@ -43,7 +41,7 @@ impl Expr {
 }
 
 #[derive(Debug, Clone)]
-pub struct Assignment {
+pub struct AssignmentInfo {
     decl: bool, // if this is a var-declaration
     lhs: Primary,
     op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...

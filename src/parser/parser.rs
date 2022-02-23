@@ -4,7 +4,7 @@ use crate::parser::primary::{Primary, Atom};
 use crate::parser::operator::{UnaryOp, BinaryOp, OpLevel, OP_LEVEL_START, OP_LEVEL_END};
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::errors::{ParserError, ErrorKind, ErrorContext, ContextTag};
-use crate::parser::debug::DebugMeta;
+use crate::parser::debug::DebugInfo;
 
 
 
@@ -55,8 +55,8 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     }
     
     // temporary top level, will change when statement parsing is added
-    pub fn next_expr(&mut self) -> Result<Expr, (ParserError, DebugMeta)> { 
-        let mut ctx = ErrorContext::new(ContextTag::Expr);
+    pub fn next_expr(&mut self) -> Result<Expr, (ParserError, DebugInfo)> { 
+        let mut ctx = ErrorContext::new(self.name, ContextTag::Expr);
         
         match self.parse_expr(&mut ctx) {
             Ok(expr) => {
@@ -66,7 +66,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             Err(err) => {
                 // grab debugging info from the current context 
                 // and return it with the error after synchronizing
-                return Err((err, ctx.take().to_dbg_meta(self.name))); // TODO synchronize
+                return Err((err, ctx.into())); // TODO synchronize
             },
         }
     }
@@ -426,33 +426,35 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
     fn parse_atom(&mut self, ctx: &mut ErrorContext) -> Result<Atom, ParserError> { 
-        ctx.push(ContextTag::Atom);
         
-        let next = self.advance()?;
-        ctx.set_start(&next);
-        
-        let atom = match next.token {
-            // LITERAL
-            Token::Nil => Atom::Nil,
-            Token::True => Atom::BooleanLiteral(true),
-            Token::False => Atom::BooleanLiteral(false),
+        if let Token::OpenParen = self.peek()?.token {
+            Ok(self.parse_group_expr(ctx)?)
             
-            Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
-            Token::FloatLiteral(value) => Atom::FloatLiteral(value),
-            Token::StringLiteral(value) => Atom::string_literal(value),
+        } else { 
+            ctx.push(ContextTag::Atom);
             
-            Token::Identifier(name) => Atom::identifier(name),
+            let next = self.advance().unwrap();
+            ctx.set_start(&next);
             
-            Token::OpenParen => self.parse_group_expr(ctx)?,
+            let atom = match next.token {
+                Token::Identifier(name) => Atom::identifier(name),
+                
+                Token::Nil => Atom::Nil,
+                Token::True => Atom::BooleanLiteral(true),
+                Token::False => Atom::BooleanLiteral(false),
+                Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
+                Token::FloatLiteral(value) => Atom::FloatLiteral(value),
+                Token::StringLiteral(value) => Atom::string_literal(value),
+                
+                _ => { 
+                    // println!("{:?}", next);
+                    return Err(ParserError::new(ErrorKind::ExpectedStartOfExpr, ctx.context()))
+                },
+            };
             
-            _ => { 
-                // println!("{:?}", next);
-                return Err(ParserError::new(ErrorKind::InvalidStartOfExpr, ctx.context()))
-            },
-        };
-        
-        ctx.pop_extend();
-        Ok(atom)
+            ctx.pop_extend();
+            Ok(atom)
+        }
     }
     
     fn parse_group_expr(&mut self, ctx: &mut ErrorContext) -> Result<Atom, ParserError> {
@@ -475,6 +477,8 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
         // loop through expressions in case this is a tuple
         loop {
             let next = self.advance()?;
+            ctx.set_end(&next);
+            
             match next.token {
                 
                 // end of group

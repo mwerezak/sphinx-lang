@@ -1,14 +1,14 @@
 use std::fmt;
 use std::error::Error;
 use crate::lexer::{Span, TokenMeta};
-use crate::parser::debug::DebugMeta;
+use crate::parser::debug::DebugInfo;
 
 // Specifies the actual error that occurred
 #[derive(Clone, Copy, Debug)]
 pub enum ErrorKind {
     RanOutOfTokens,
     LexerError,
-    InvalidStartOfExpr,   // expected the start of an expression
+    ExpectedStartOfExpr,   // expected the start of an expression
     ExpectedCloseParen,
     ExpectedCloseSquare,
     ExpectedCloseBrace,
@@ -45,7 +45,8 @@ pub struct ParserError {
 impl ParserError {
     pub fn new(kind: ErrorKind, context: ContextTag) -> Self {
         ParserError {
-            kind, context, cause: None,
+            kind, context, 
+            cause: None,
         }
     }
     
@@ -73,16 +74,19 @@ impl fmt::Display for ParserError {
 // Structures used by the parser for error handling and synchronization (when I get there)
 
 #[derive(Debug, Clone)]
-pub struct ErrorContext {
+pub struct ErrorContext<'a> {
+    filename: &'a str,
     stack: Vec<ContextFrame>,
 }
 
-impl ErrorContext {
-    pub fn new(base: ContextTag) -> Self {
+impl<'a> ErrorContext<'a> {
+    pub fn new(filename: &'a str, base: ContextTag) -> Self {
         ErrorContext {
-            stack: vec![ ContextFrame::new(base) ],
+            filename, stack: vec![ ContextFrame::new(base) ],
         }
     }
+    
+    pub fn filename(&self) -> &'a str { self.filename }
     
     pub fn frame(&self) -> &ContextFrame { self.stack.last().unwrap() }
     pub fn frame_mut(&mut self) -> &mut ContextFrame { self.stack.last_mut().unwrap() }
@@ -169,11 +173,15 @@ impl ContextFrame {
         }
     }
     
-    pub fn to_dbg_meta<'n>(self, file: &'n str) -> DebugMeta<'n> {
-        DebugMeta {
-            file,
-            start: self.start,
-            end: self.end,
-        }
+    pub fn take_debug_info<'n>(self, file: &'n str) -> DebugInfo<'n> {
+        DebugInfo::new(file, self.start, self.end)
+    }
+}
+
+impl<'a> From<ErrorContext<'a>> for DebugInfo<'a> {
+    fn from(ctx: ErrorContext<'a>) -> Self {
+        let filename = ctx.filename;
+        let frame = ctx.take();
+        DebugInfo::new(filename, frame.start, frame.end)
     }
 }
