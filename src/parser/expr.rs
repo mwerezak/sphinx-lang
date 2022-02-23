@@ -33,11 +33,10 @@ impl Expr {
         Self::BinaryOp(op, Box::new(lhs), Box::new(rhs))
     }
     
-    pub fn assignment(lhs: Primary, op: Option<BinaryOp>, rhs: Expr, decl: bool) -> Self {
+    pub fn assignment(lhs: Primary, op: Option<BinaryOp>, rhs: Expr) -> Self {
         debug_assert!(lhs.is_lvalue());
         
-        let assignment = AssignmentInfo { lhs, op, decl, rhs };
-        Self::Assignment(Box::new(assignment))
+        Self::Assignment(Box::new(AssignmentInfo { lhs, op, rhs }))
     }
     
     // pub fn object_ctor
@@ -45,7 +44,6 @@ impl Expr {
 
 #[derive(Debug, Clone)]
 pub struct AssignmentInfo {
-    decl: bool, // if this is a var-declaration
     lhs: Primary,
     op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     rhs: Expr,

@@ -117,15 +117,8 @@ impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     */
     
     fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
-        let next = self.peek()?;
         
-        // if the first token is "var", then this must be a var declaration
-        if let Token::Var = next.token {
-            return self.parse_var_decl_expr(ctx);
-        }
-        
-        // otherwise, descend recursively
-        
+        // descend recursively
         let expr = self.parse_binop_expr(ctx, OP_LEVEL_START)?;
         
         let next = self.peek()?;
@@ -143,40 +136,10 @@ impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let rhs_expr = self.parse_expr(ctx)?;
             
             ctx.pop_extend();
-            return Ok(Expr::assignment(*lhs, assign_op, rhs_expr, false));
+            return Ok(Expr::assignment(*lhs, assign_op, rhs_expr));
         }
         
         Ok(expr)
-    }
-    
-    // should only be called if the next token is "var"
-    fn parse_var_decl_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
-        ctx.push(ContextTag::AssignmentExpr);
-        
-        let next = self.advance().unwrap(); // consume the "var"
-        ctx.set_start(&next);
-        
-        debug_assert!(matches!(next.token, Token::Var));
-        
-        let lhs = self.parse_primary(ctx)?;
-        
-        // LHS of assignment must be an lvalue
-        if !lhs.is_lvalue() {
-            return Err(ParserError::new(ErrorKind::InvalidAssignmentLHS, ctx.context()));
-        }
-        
-        let next = self.advance()?;
-        ctx.set_end(&next);
-        
-        let assign_op = Self::which_assignment_op(&next.token);
-        if assign_op.is_none() {
-            return Err(ParserError::new(ErrorKind::ExpectedAssignmentExpr, ctx.context()));
-        }
-        
-        let rhs_expr = self.parse_expr(ctx)?;
-        
-        ctx.pop_extend();
-        Ok(Expr::assignment(lhs, assign_op.unwrap(), rhs_expr, true))
     }
     
     /*
@@ -431,7 +394,7 @@ impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     fn parse_atom(&mut self, ctx: &mut ErrorContext) -> Result<Atom, ParserError> { 
         
         if let Token::OpenParen = self.peek()?.token {
-            Ok(self.parse_group_expr(ctx)?)
+            Ok(self.parse_group_expr(ctx)?)  // Groups
             
         } else { 
             ctx.push(ContextTag::Atom);
@@ -440,17 +403,29 @@ impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             ctx.set_start(&next);
             
             let atom = match next.token {
+                // Identifiers
                 Token::Identifier(name) => Atom::identifier(name.as_str(), self.interner),
+                Token::Global => {
+                    let next = self.advance()?;
+                    ctx.set_start(&next);
+                    
+                    if let Token::Identifier(name) = next.token {
+                        Atom::global_identifier(name.as_str(), self.interner)
+                    } else {
+                        return Err(ParserError::new(ErrorKind::ExpectedIdentifier, ctx.context()))
+                    }
+                },
                 
-                Token::Nil => Atom::Nil,
-                Token::True => Atom::BooleanLiteral(true),
-                Token::False => Atom::BooleanLiteral(false),
-                Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
-                Token::FloatLiteral(value) => Atom::FloatLiteral(value),
-                Token::StringLiteral(value) => Atom::string_literal(value.as_str(), self.interner),
+                // Literals
+                Token::Nil   => Atom::Nil,
+                Token::True  => Atom::boolean(true),
+                Token::False => Atom::boolean(false),
+                
+                Token::IntegerLiteral(value) => Atom::integer(value),
+                Token::FloatLiteral(value)   => Atom::float(value),
+                Token::StringLiteral(value)   => Atom::string_literal(value.as_str(), self.interner),
                 
                 _ => { 
-                    // println!("{:?}", next);
                     return Err(ParserError::new(ErrorKind::ExpectedStartOfExpr, ctx.context()))
                 },
             };

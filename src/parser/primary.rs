@@ -14,6 +14,7 @@ pub enum Atom {
     Nil,
     EmptyTuple,
     Identifier(InternStr),
+    GlobalIdentifier(InternStr),
     BooleanLiteral(bool),
     IntegerLiteral(language::IntType),
     FloatLiteral(language::FloatType),
@@ -22,12 +23,24 @@ pub enum Atom {
 }
 
 impl Atom {
-    // pub fn bool(value: bool) -> Self { Self::BooleanLiteral(value) }
-    // pub fn int(value: language::IntType) -> Self { Self::IntegerLiteral(value) }
-    // pub fn float(value: language::FloatType) -> Self { Self::FloatLiteral(value) }
+    pub fn boolean(value: bool) -> Self {
+        Self::BooleanLiteral(value) 
+    }
+    
+    pub fn integer(value: language::IntType) -> Self {
+        Self::IntegerLiteral(value)
+    }
+    
+    pub fn float(value: language::FloatType) -> Self {
+        Self::FloatLiteral(value) 
+    }
     
     pub fn identifier(name: &str, interner: &mut StringInterner) -> Self {
         Self::Identifier(InternStr::from_str(name, interner))
+    }
+    
+    pub fn global_identifier(name: &str, interner: &mut StringInterner) -> Self {
+        Self::GlobalIdentifier(InternStr::from_str(name, interner))
     }
     
     pub fn string_literal(value: &str, interner: &mut StringInterner) -> Self {
@@ -68,15 +81,13 @@ impl Primary {
     /*
         Check if this primary expression is also an lvalue.
         
-        lvalue ::= IDENTIFIER | primary subscript | primary access ;
+        lvalue ::= IDENTIFIER | "global" IDENTIFIER | primary subscript | primary access ;
     */
     pub fn is_lvalue(&self) -> bool {
-        // if there are no access items, then we are in the IDENTIFIER branch
         if self.path.is_empty() {
-            matches!(self.atom, Atom::Identifier(..))
+            matches!(self.atom, Atom::Identifier(..) | Atom::GlobalIdentifier(..))
         } else {
             let last_op = self.path.last().unwrap();
-            
             matches!(last_op, AccessItem::Member(..) | AccessItem::Index(..))
         }
     }
