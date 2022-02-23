@@ -107,28 +107,60 @@ end
 
 # Variable declaration and assignment
 
-var imAVariable = "here is my value"
-var iAmNil = nil  # initializer is required
+# Assignments come in two flavors: expression or statement
 
-var first, second = "abc", "def"  # tuple destructuring
+# Assignment expressions are expressions using the assignment operator
+# variables can be freely assigned or reassigned
+imAVariable = "here is my value"
+iAmNil = nil  # initializer is required
 
-var inc = 0
+# Assignment statements start with the "var" keyword
+# while more restricted, they allows you to destructure tuples
+var first, second = "abc", "def"
+
+# assignment versions of all binary operators are supported
+# however they require the variable to be defined first before use
+inc = 0
 inc -= 1  # arithmetic assignment
 
-var breakfast = "bagels"
+breakfast = "bagels"
 echo breakfast # "bagels".
+
 breakfast = "beignets"
 echo breakfast # "beignets".
 
-var b = 0
-var c = 1
-var a = b += c = var d = 1  # chaining assignment (right associative)
+# assignment expressions are expressions, and so can be chained
+b = 0
+c = 1
+a = b += c = d = 1  # chaining assignment (right associative)
 
 del a  # drop a variable from the current scope
 
 # assigment expressions bind weaker than operator expressions
 3 * b += c    # Error, assignment target is not an lvalue
 3 * (b += c)  # Ok
+
+# variables in global scope can be read but trying to assign to them will only hide them with a local variable
+# to assign to a global the "global" keyword has to be used in an assignment statement
+# otherwise variables in enclosing scopes can be accessed to freely
+
+tree = "spruce"
+fruit = "alderberry"
+
+begin
+  echo tree         # spruce
+
+  tree = "oak"
+  global fruit = "mango"
+
+  echo fruit        # mango
+  echo tree         # oak
+  
+  echo global tree  # spruce
+end
+
+echo tree  # spruce
+
 
 
 # Control Flow
@@ -315,7 +347,7 @@ breakfast.drink = "coffee"
 del breakfast.bread  # remove an object member
 
 var a = 0
-var anonymous = new { some = a = 1, data = 2 }
+var anonymous = new { some: a = 1, data: 2 }
 
 class Breakfast
   fun serve(self, who)

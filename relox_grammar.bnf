@@ -11,19 +11,18 @@
 (*** Expressions ***)
 
 
-(* New non-left-recursive version *)
-atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
+atom ::= LITERAL | IDENTIFIER | "global" IDENTIFIER | "(" expression ")" ;
 primary ::= atom ( access-item )* ; 
 
 access-item ::= member-access | index-access | invocation | object-constructor ;
 index-access ::= "[" expression "]" ;
 member-access ::= "." IDENTIFIER ;
 
-lvalue ::= IDENTIFIER | primary index-access | primary member-access ;  (* so called because they can appear on the left side of assignment, see Access below *)
+lvalue ::= IDENTIFIER | "global" IDENTIFIER | primary index-access | primary member-access ;  (* so called because they can appear on the left side of assignment, see Access below *)
 
 
-(* This is more for specification than implementation, as it is left-recursive. 
-   See the end of this file for a non-left-recursive reformulation.
+(* 
+    This expression production is left-recursive, and as such, the actual recursive descent parser implementation differs somewhat (see the bottom of this file)
 *)
 expression ::= primary
              | class-def
@@ -54,7 +53,6 @@ expression ::= primary
 
 *)
 
-
 (*** Assignment ***)
 
 (* 
@@ -65,14 +63,12 @@ expression ::= primary
 *)
 
 (* right associative *)
-assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
-assignment-target ::= ( "var" )? lvalue ; 
+assignment-expression ::= lvalue ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
 
-assignment-statement ::= assignment-target-list  "=" expression-list ;
-assignment-target-list ::= assignment-target ( "," assignment-target )* ;
+assignment-statement ::= "var" lvalue-list  "=" expression-list ;
+lvalue-list ::= lvalue ( "," lvalue )* ;
 
 expression-list ::= expression ( "," expression )* ;
-
 
 (*** Function/Method Calls ***)
 
@@ -87,11 +83,25 @@ member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;  (* ini
 (* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
 tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
 
+(*** Statements ***)
+
+(* mainly just loops and the tuple-destructuring assignment statement *)
+statement ::= expression
+            | block
+            | assignment-statement
+            | while-loop
+            | do-while-loop
+            | for-loop ;
+
+(* TODO *)
 
 
-(* Non left-recursive version of `expression` for implementation *)
 
-primary-expression ::= immediate-expression | primary | "(" expression "," ")" | "(" ")" ;
+(***** Non left-recursive version of `expression` for implementation *****)
+
+tuple-constructor ::= "(" expression ( "," expression )+ ")" | "(" ")" ;
+
+primary-expression ::= immediate-expression | primary | tuple-constructor | "(" expression ")" ;
 
 (* These expressions can all be identified by their first symbol *)
 immediate-expression ::= class-def
@@ -106,4 +116,5 @@ operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
 
 assignment ::= assignment-expression | operand[10] ;
 
-expression ::= assignment ( "," assignment )*;  (* possible tuples *)
+(* top-level tuples don't require parens - however, single element tuples are not allowed here, use tuple-constructor instead *)
+expression ::= assignment ( "," assignment )*;

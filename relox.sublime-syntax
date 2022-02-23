@@ -56,7 +56,9 @@ contexts:
 
   # other keywords
   misc-statement-keywords:
-    - match: \b(echo|del)\b
+    - match: \b(var)\b
+      scope: keyword.declaration.other
+    - match: \b(global|del|echo)\b
       scope: keyword.other
 
   control-flow-keywords:
@@ -107,6 +109,12 @@ contexts:
     - match: \'
       scope: punctuation.definition.string.begin
       push: inside_single_string
+    - match: r\"
+      scope: punctuation.definition.string.begin
+      push: inside_double_string_raw
+    - match: r\'
+      scope: punctuation.definition.string.begin
+      push: inside_single_string_raw
 
   inside_double_string:
     - meta_include_prototype: false
@@ -124,6 +132,20 @@ contexts:
       pop: true
     - include: string_escaped_char
 
+  inside_double_string_raw:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.double
+    - match: \"
+      scope: punctuation.definition.string.end
+      pop: true
+
+  inside_single_string_raw:
+    - meta_include_prototype: false
+    - meta_scope: string.quoted.single
+    - match: \'
+      scope: punctuation.definition.string.end
+      pop: true
+
   string_escaped_char:
     - match: \\(?:\\|[nrt\'\"])
       scope: constant.character.escape
@@ -131,8 +153,6 @@ contexts:
       scope: invalid
 
   identifiers:
-    - match: \b(var)\b
-      scope: keyword.declaration.other
     - match: '{{identifier}}'
       scope: variable.other
     - match: \.
@@ -354,6 +374,8 @@ contexts:
           set: function-param-list
 
   object-initializers:
+    - match: \bnew\b
+      scope: keyword.other
     - match: \{
       scope: punctuation.section.braces.begin
       push: object-initializer-lvalue
