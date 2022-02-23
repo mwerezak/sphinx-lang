@@ -247,7 +247,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             Token::Fun => unimplemented!(),
             Token::If => unimplemented!(),
             
-            Token::OpenBrace => Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?)),
+            // Token::OpenBrace => Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?)),
             
             _ => Ok(Expr::Primary(self.parse_primary(ctx)?)),
         }
