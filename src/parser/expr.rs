@@ -13,14 +13,9 @@ pub enum Expr {
     
     BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
     
-    Assignment {
-        decl: bool, // if this is a var-declaration
-        lhs: Primary,
-        op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
-        expr: Box<Expr>,
-    },
+    Assignment(Box<Assignment>), // use a box to keep size of Expr down
     
-    ObjectCtor(ObjectConstructor),
+    ObjectCtor(Box<ObjectConstructor>),
     
     TupleCtor(Vec<Expr>),
 }
@@ -36,16 +31,20 @@ impl Expr {
     
     pub fn assignment(lhs: Primary, op: Option<BinaryOp>, rhs: Expr, decl: bool) -> Self {
         debug_assert!(lhs.is_lvalue());
-        Self::Assignment {
-            lhs, op, decl,
-            expr: Box::new(rhs),
-        }
+        let assignment = Assignment {
+            lhs, op, decl, rhs,
+        };
+        
+        Self::Assignment(Box::new(assignment))
     }
+    
+    // pub fn object_ctor
 }
 
-
-// impl DebugInfo for Expr {
-//     fn dbg_info(&self) -> &DebugMeta { }
-//     fn dbg_info_mut(&self) -> &mut DebugMeta { }
-//     fn set_dbg_info(&mut self, info: DebugMeta) { }
-// }
+#[derive(Debug, Clone)]
+pub struct Assignment {
+    decl: bool, // if this is a var-declaration
+    lhs: Primary,
+    op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
+    rhs: Expr,
+}

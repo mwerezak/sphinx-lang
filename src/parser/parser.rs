@@ -73,20 +73,6 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     /*** Expression Parsing ***/
     
-    /*
-        Expression syntax:
-    
-        expression ::= primary
-                     | assignment-expression 
-                     | binary-expression
-                     | unary-expression
-                     | object-constructor
-                     | if-expression
-                     | function-def
-                     | class-def
-                     | tuple-constructor ;
-                     
-    */
     fn parse_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
         let first_expr = self.parse_inner_expr(ctx)?;
         
@@ -261,9 +247,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             Token::Fun => unimplemented!(),
             Token::If => unimplemented!(),
             
-            Token::OpenBrace => {
-                Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?))
-            },
+            Token::OpenBrace => Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?)),
             
             _ => Ok(Expr::Primary(self.parse_primary(ctx)?)),
         }
