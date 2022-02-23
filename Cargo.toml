@@ -13,4 +13,5 @@ name = "repl"
 
 [dependencies]
 clap = { version = "3.0" }
+lazy_static = { version = "1.4" }
 string-interner = { version = "0.14" }

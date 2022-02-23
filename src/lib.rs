@@ -2,6 +2,9 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
+#[macro_use]
+extern crate lazy_static;
+
 pub mod lexer;
 pub mod parser;
 pub mod language;

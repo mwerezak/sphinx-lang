@@ -101,8 +101,6 @@ impl LexerBuilder {
 
 // Lexer
 
-type RuleID = usize;
-
 fn split_array_pair_mut<T>(pair: &mut [T; 2]) -> (&mut T, &mut T) {
     let (first, rest) = pair.split_first_mut().unwrap();
     let second = &mut rest[0];
@@ -114,6 +112,10 @@ fn token_length(start_idx: usize, end_idx: usize) -> usize {
         end_idx - start_idx 
     } else { 0 }
 }
+
+// to avoid interior self-referentiality inside Lexer, instead of passing around
+// references, we pass indices into the rules Vec instead
+type RuleID = usize;
 
 pub struct Lexer<S> where S: Iterator<Item=char> {
     source: Peekable<S>,

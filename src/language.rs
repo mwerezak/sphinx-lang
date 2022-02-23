@@ -14,6 +14,25 @@ pub static COMMENT_CHAR: char = '#';
 pub static NESTED_COMMENT_START: &str = "#{";
 pub static NESTED_COMMENT_END:   &str = "}#";
 
+// string literal escape sequences - lazy initialized
+lazy_static! {
+    pub static ref ESCAPE_SEQUENCES: Vec<Box<dyn EscapeSequence>> = { 
+        let mut escapes = Vec::<Box<dyn EscapeSequence>>::new();
+        
+        escapes.push(Box::new(CharMapEscape::new('0', "\x00")));
+        escapes.push(Box::new(CharMapEscape::new('\\', "\\")));
+        escapes.push(Box::new(CharMapEscape::new('\'', "\'")));
+        escapes.push(Box::new(CharMapEscape::new('\"', "\"")));
+        
+        escapes.push(Box::new(CharMapEscape::new('t', "\t")));
+        escapes.push(Box::new(CharMapEscape::new('n', "\n")));
+        escapes.push(Box::new(CharMapEscape::new('r', "\r")));
+        escapes.push(Box::new(HexByteEscape::new()));
+        
+        escapes
+    };
+}
+
 pub fn create_default_lexer_rules() -> LexerBuilder {
     LexerBuilder::new()
     
@@ -94,20 +113,9 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(IntegerLiteralRule::new())
     .add_rule(HexIntegerLiteralRule::new())
     .add_rule({
-        let mut escapes = Vec::<Box<dyn EscapeSequence>>::new();
+
         
-        escapes.push(Box::new(CharMapEscape::new('0', "\x00")));
-        escapes.push(Box::new(CharMapEscape::new('\\', "\\")));
-        escapes.push(Box::new(CharMapEscape::new('\'', "\'")));
-        escapes.push(Box::new(CharMapEscape::new('\"', "\"")));
-        
-        escapes.push(Box::new(CharMapEscape::new('t', "\t")));
-        escapes.push(Box::new(CharMapEscape::new('n', "\n")));
-        escapes.push(Box::new(CharMapEscape::new('r', "\r")));
-        
-        escapes.push(Box::new(HexByteEscape::new()));
-        
-        StringLiteralRule::new(escapes)
+        StringLiteralRule::new(ESCAPE_SEQUENCES.iter().map(|esc| esc.as_ref()))
     })
     
 

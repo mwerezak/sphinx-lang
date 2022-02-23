@@ -4,7 +4,7 @@ use crate::lexer::rules::{MatchResult, LexerRule, CharClass, TokenError};
 use crate::lexer::rules::strmatcher::StrMatcher;
 
 // supports escape sequences that consist of a single-character tag (e.g. \t) and an optional fixed-length argument (e.g. \u0FFE, \xFE)
-pub trait EscapeSequence {
+pub trait EscapeSequence: Sync {
     fn tag(&self) -> char;
     fn arglen(&self) -> u8;
     
@@ -64,6 +64,16 @@ const SINGLE_QUOTE: char = '\'';
 const DOUBLE_QUOTE: char = '"';
 const RAW_PREFIX: char = 'r';
 
+struct ActiveEscape {
+    escape: &'static dyn EscapeSequence,
+    argbuf: String,
+}
+
+impl std::ops::Deref for ActiveEscape {
+    type Target = dyn EscapeSequence;
+    fn deref(&self) -> &'static Self::Target { self.escape }
+}
+
 pub struct StringLiteralRule {
     raw_buf: String,
     escaped_buf: String,
@@ -71,15 +81,14 @@ pub struct StringLiteralRule {
     closed: bool,
     
     raw: bool,
-    escape: Option<usize>, // active escape sequence, argbuf
-    argbuf: Option<String>, // option so we can take it into the escape sequence without borrow issues
+    escape: Option<ActiveEscape>, // the currently active escape sequence, if any
     error: Option<StringEscapeErrorKind>, // hold the first error to occur when processing an escape
     
-    escapes: Vec<Box<dyn EscapeSequence>>,
+    escapes: Vec<&'static dyn EscapeSequence>,
 }
 
 impl StringLiteralRule {
-    pub fn new(escapes: Vec<Box<dyn EscapeSequence>>) -> Self {
+    pub fn new<E>(escapes: E) -> Self where E: Iterator<Item=&'static dyn EscapeSequence> {
         StringLiteralRule {
             raw_buf: String::new(),
             escaped_buf: String::new(),
@@ -88,39 +97,23 @@ impl StringLiteralRule {
             raw: false,
             
             escape: None,
-            argbuf: None,
             error: None,
             
-            escapes,
+            escapes: escapes.collect(),
         }
     }
     
-    fn find_eid_for_tag(&self, tag: char) -> Option<usize> {
-        self.escapes.iter().position(|esc| tag == esc.tag())
-    }
-    
-    fn lookup_escape(&self, eid: usize) -> &Box<dyn EscapeSequence> {
-        // let (_, slice) = self.escapes.split_at(eid);
-        // let (item, _) = slice.split_first().unwrap();
-        
-        // item
-        
-        &self.escapes[eid]
+    fn lookup_escape_for_tag(&self, tag: char) -> Option<&'static dyn EscapeSequence> {
+        self.escapes.iter()
+            .find(|escape| tag == escape.tag())
+            .map(|escape| *escape)
     }
     
     // can't take a reference to the escape or argument by parameter since it would cause borrow issues
     // so we take an index to get the escape
     // and we just have to get the argument directly from self
-    fn process_escape(&mut self, eid: usize) {
-        let escape = &self.escapes[eid];
-        let arg = {
-            match self.argbuf.take() {
-                Some(s) => s,
-                None => String::new(),
-            }
-        };
-        
-        match escape.transform(arg.as_str()) {
+    fn process_escape(&mut self, escape: &'static dyn EscapeSequence, arg: &str) {
+        match escape.transform(arg) {
             Ok(output) => self.escaped_buf.push_str(output.as_str()),
             Err(err) => self.error = Some(err),
         };
@@ -136,7 +129,6 @@ impl LexerRule for StringLiteralRule {
         self.closed = false;
         self.raw = false;
         
-        self.argbuf = None;
         self.escape = None;
         self.error = None;
     }
@@ -180,13 +172,9 @@ impl LexerRule for StringLiteralRule {
         if !self.raw && self.error.is_none() {
             
             // if we are already in an escape sequence
-            if let Some(eid) = self.escape {
-                let argbuf = self.argbuf.as_ref().unwrap();
-                let escape = self.lookup_escape(eid);
-                
-                if argbuf.len() < (escape.arglen() as usize) {
-                    let argbuf = self.argbuf.as_mut().unwrap();
-                    argbuf.push(next);
+            if let Some(ref mut active) = self.escape {
+                if active.argbuf.len() < (active.arglen() as usize) {
+                    active.argbuf.push(next);
                     
                     self.raw_buf.push(next);
                     return MatchResult::IncompleteMatch;
@@ -194,16 +182,15 @@ impl LexerRule for StringLiteralRule {
                 
                 // if we get here, argbuf already has enough characters without adding the next one
                 // process the escape and then do not return so that the next char is processed as normal
-                self.process_escape(eid);
-                self.escape = None;
-                self.argbuf = None;
+                
+                let active = self.escape.take().unwrap(); // take out of self.escape as we are done with it
+                self.process_escape(active.escape, active.argbuf.as_str());
                 
             // check for escape sequence start
             } else if let Some(ESCAPE_CHAR) = prev {
                 
-                if let Some(eid) = self.find_eid_for_tag(next) {
-                    self.escape = Some(eid);
-                    self.argbuf = Some(String::new());
+                if let Some(escape) = self.lookup_escape_for_tag(next) {
+                    self.escape = Some(ActiveEscape { escape, argbuf: String::new() });
                 } else {
                     self.error = Some(StringEscapeErrorKind::InvalidEscapeTag);
                 }
