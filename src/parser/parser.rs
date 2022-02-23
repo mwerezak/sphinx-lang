@@ -227,7 +227,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.push(ContextTag::UnaryOpExpr);
             ctx.set_start(&self.advance().unwrap()); // consume unary_op token
             
-            let expr = self.parse_expr(ctx)?;
+            let expr = self.parse_inner_expr(ctx)?;
             
             ctx.pop_extend();
             return Ok(Expr::unary_op(unary_op, expr));
@@ -487,6 +487,11 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                 // single-element tuples
                 Token::Comma => if tuple_exprs.is_empty() {
                     tuple_exprs.push(expr.take().unwrap());
+                    
+                    // comma followed by paren
+                    if let Token::CloseParen = self.peek()?.token {
+                        continue;
+                    }
                 }
                 
                 _ => {
