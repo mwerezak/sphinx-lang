@@ -136,6 +136,11 @@ pub struct Lexer<S> where S: Iterator<Item=char> {
     complete: [Vec<RuleID>; 2],
 }
 
+// indices for active/complete arrays
+const THIS_CYCLE: usize = 0;
+const NEXT_CYCLE: usize = 1;
+
+
 impl<S> Iterator for Lexer<S> where S: Iterator<Item=char> {
     type Item = Result<TokenMeta, LexerError>;
     
@@ -143,9 +148,6 @@ impl<S> Iterator for Lexer<S> where S: Iterator<Item=char> {
 }
 
 type PrevNextChars = (Option<char>, Option<char>);
-
-const THIS_CYCLE: usize = 0;
-const NEXT_CYCLE: usize = 1;
 
 impl<S> Lexer<S> where S: Iterator<Item=char> {
     
