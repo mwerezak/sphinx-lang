@@ -389,7 +389,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
-                        primary.push_access_member(name.as_str());
+                        primary.push_access_member(name);
                     } else {
                         return Err(ParserError::new(ErrorKind::ExpectedIdentifier, ctx.context()));
                     }
@@ -460,12 +460,12 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             Token::Nil => Atom::Nil,
             Token::True => Atom::BooleanLiteral(true),
             Token::False => Atom::BooleanLiteral(false),
+            
             Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
             Token::FloatLiteral(value) => Atom::FloatLiteral(value),
-            // TODO string literals
             
-            // IDENTIFIER
-            Token::Identifier(ref name) => Atom::identifier(name.as_str()),
+            Token::StringLiteral(value) => Atom::string_literal(value),
+            Token::Identifier(name) => Atom::identifier(name),
             
             // "(" ")" | "(" expression ")" | "(" expression "," ")"
             Token::OpenParen => {

@@ -234,10 +234,8 @@ impl LexerRule for StringLiteralRule {
         if let Some(errorkind) = self.error {
             Err(Box::new(StringEscapeError::new(errorkind, self.raw_buf.clone())))
         } else if self.raw {
-            println!{"{:?}", self.raw_buf.clone().as_bytes()}
             Ok(Token::StringLiteral(self.raw_buf.clone()))
         } else {
-            println!{"{:?}", self.escaped_buf.clone().as_bytes()}
             Ok(Token::StringLiteral(self.escaped_buf.clone()))
         }
         
