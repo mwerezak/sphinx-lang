@@ -1,6 +1,7 @@
-// Primary expressions
-
 use std::fmt;
+use string_interner::{Symbol, DefaultSymbol, StringInterner};
+use string_interner::backend::Backend;
+
 use crate::language;
 use crate::parser::expr::Expr;
 use crate::parser::structs::ObjectConstructor;
@@ -25,12 +26,12 @@ impl Atom {
     // pub fn int(value: language::IntType) -> Self { Self::IntegerLiteral(value) }
     // pub fn float(value: language::FloatType) -> Self { Self::FloatLiteral(value) }
     
-    pub fn identifier(name: String) -> Self {
-        Self::Identifier(InternStr::new(name))
+    pub fn identifier(name: &str, interner: &mut StringInterner) -> Self {
+        Self::Identifier(InternStr::from_str(name, interner))
     }
     
-    pub fn string_literal(value: String) -> Self {
-        Self::StringLiteral(InternStr::new(value))
+    pub fn string_literal(value: &str, interner: &mut StringInterner) -> Self {
+        Self::StringLiteral(InternStr::from_str(value, interner))
     }
     
     pub fn group(expr: Expr) -> Self {
@@ -80,8 +81,8 @@ impl Primary {
         }
     }
     
-    pub fn push_access_member(&mut self, name: String) {
-        self.path.push(AccessItem::Member(InternStr::new(name)))
+    pub fn push_access_member(&mut self, name: &str, interner: &mut StringInterner) {
+        self.path.push(AccessItem::Member(InternStr::from_str(name, interner)))
     }
     
     pub fn push_access_index(&mut self, expr: Expr) {
@@ -101,18 +102,20 @@ impl Primary {
 // TODO intern all identifier names and string literals and make this Copy
 // should just be a lightweight handle to an interned string
 #[derive(Debug, Clone)]
-pub struct InternStr {
-    s: String,
+pub struct InternStr<S=DefaultSymbol> where S: Symbol {
+    symbol: S,
 }
 
-impl InternStr {
-    pub fn new(s: String) -> Self {
-        InternStr { s }
+impl<S> InternStr<S> where S: Symbol {
+    pub fn from_str<B>(s: &str, interner: &mut StringInterner<B>) -> Self
+    where B: Backend<Symbol=S> {
+        InternStr { symbol: interner.get_or_intern(s) }
     }
 }
 
 impl fmt::Display for InternStr {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.write_str(self.s.as_str())
+        // fmt.write_str(self.s)
+        unimplemented!()
     }
 }

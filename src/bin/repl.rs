@@ -3,6 +3,8 @@ use std::io;
 use std::io::Write;
 use std::path::Path;
 use clap::{App, Arg};
+
+use string_interner::StringInterner;
 use rlo_interpreter::language;
 use rlo_interpreter::parser::Parser;
 
@@ -41,17 +43,19 @@ fn main() {
 
 fn exec_cmd(cmd: &str) {
     let lexer = language::create_default_lexer_rules().build(cmd.chars());
-    let mut parser = Parser::new("<cmd>", lexer);
+    let mut interner = StringInterner::new();
+    let mut parser = Parser::new("<cmd>", &mut interner, lexer);
     
     println!("{:?}", parser.next_expr());
 }
 
 fn exec_file(path: &Path) {
     let source = fs::read_to_string(path).unwrap();
-    
     let filename = format!("{}", path.display());
+    
     let lexer = language::create_default_lexer_rules().build(source.chars());
-    let mut parser = Parser::new(filename.as_str(), lexer);
+    let mut interner = StringInterner::new();
+    let mut parser = Parser::new(filename.as_str(), &mut interner, lexer);
     
     println!("{:?}", parser.next_expr());
 }
@@ -67,6 +71,8 @@ impl Repl {
     }
     
     pub fn run(&self) {
+        let mut interner = StringInterner::new();
+        
         loop {
             io::stdout().write(self.prompt.as_bytes()).unwrap();
             io::stdout().flush().unwrap();
@@ -92,7 +98,7 @@ impl Repl {
             
             let factory = language::create_default_lexer_rules();
             let lexer = factory.build(input.chars());
-            let mut parser = Parser::new("<repl>", lexer);
+            let mut parser = Parser::new("<repl>", &mut interner, lexer);
             println!("{:?}", parser.next_expr());
         }
     }

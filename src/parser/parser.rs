@@ -1,3 +1,4 @@
+use string_interner::StringInterner;
 use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::parser::expr::Expr;
 use crate::parser::primary::{Primary, Atom};
@@ -10,16 +11,18 @@ use crate::parser::debug::DebugInfo;
 
 // Recursive descent parser
 
-pub struct Parser<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+pub struct Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     filename: &'a str,
+    interner: &'h mut StringInterner,
     tokens: T,
     next: Option<Result<TokenMeta, ParserError>>,
 }
 
-impl<'a, T> Parser<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    pub fn new(filename: &'a str, tokens: T) -> Self {
+impl<'a, 'h, T> Parser<'a, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+    pub fn new(filename: &'a str, interner: &'h mut StringInterner, tokens: T) -> Self {
         Parser { 
             filename,
+            interner,
             tokens, 
             next: None, 
         }
@@ -365,7 +368,7 @@ impl<'a, T> Parser<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                     ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
-                        primary.push_access_member(name);
+                        primary.push_access_member(name.as_str(), self.interner);
                     } else {
                         return Err(ParserError::new(ErrorKind::ExpectedIdentifier, ctx.context()));
                     }
@@ -437,14 +440,14 @@ impl<'a, T> Parser<'a, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.set_start(&next);
             
             let atom = match next.token {
-                Token::Identifier(name) => Atom::identifier(name),
+                Token::Identifier(name) => Atom::identifier(name.as_str(), self.interner),
                 
                 Token::Nil => Atom::Nil,
                 Token::True => Atom::BooleanLiteral(true),
                 Token::False => Atom::BooleanLiteral(false),
                 Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
                 Token::FloatLiteral(value) => Atom::FloatLiteral(value),
-                Token::StringLiteral(value) => Atom::string_literal(value),
+                Token::StringLiteral(value) => Atom::string_literal(value.as_str(), self.interner),
                 
                 _ => { 
                     // println!("{:?}", next);
