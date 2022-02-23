@@ -88,44 +88,36 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
                      
     */
     fn parse_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
-        self.parse_inner_expr(ctx, false)
-    }
-    
-    fn parse_inner_expr(&mut self, ctx: &mut ErrorContext, group: bool) -> Result<Expr, ParserError> {
-        let mut exprs = vec!( self.parse_assignment_expr(ctx)? );
+        let first_expr = self.parse_inner_expr(ctx)?;
         
         // check for tuple constructor
-        // note: single-element and empty tuples are handled separately in parse_atom()
-        let mut is_tuple = false;
+        let mut rest_exprs = Vec::<Expr>::new();
         loop {
             let next = self.peek()?;
             if !matches!(next.token, Token::Comma) {
                 break;
             }
             
-            is_tuple = true;
-            ctx.push_continuation(ContextTag::TupleCtor);
+            if rest_exprs.is_empty() {
+                ctx.push_continuation(ContextTag::TupleCtor);
+            }
             ctx.set_end(&self.advance().unwrap()); // consume comma
             
-            // hack
-            let next = self.peek()?;
-            if group && matches!(next.token, Token::CloseParen) {
-                // don't consume close paren since the caller will be expecting it
-                ctx.pop_extend();
-                break;
-            }
-            
-            let next_expr = self.parse_assignment_expr(ctx)?;
-            exprs.push(next_expr);
-            
-            ctx.pop_extend();
+            let next_expr = self.parse_inner_expr(ctx)?;
+            rest_exprs.push(next_expr);
         }
         
-        if is_tuple && (group || exprs.len() > 1) {
-            Ok(Expr::TupleCtor(exprs))
+        if rest_exprs.is_empty() {
+            Ok(first_expr)
         } else {
-            Ok(exprs.into_iter().next().unwrap())
+            ctx.pop_extend();
+            rest_exprs.insert(0, first_expr);
+            Ok(Expr::TupleCtor(rest_exprs))
         }
+    }
+    
+    fn parse_inner_expr(&mut self, ctx: &mut ErrorContext) -> Result<Expr, ParserError> {
+        self.parse_assignment_expr(ctx)  // the top of the recursive descent stack for expressions
     }
     
     /*
@@ -463,40 +455,67 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
             Token::FloatLiteral(value) => Atom::FloatLiteral(value),
-            
             Token::StringLiteral(value) => Atom::string_literal(value),
+            
             Token::Identifier(name) => Atom::identifier(name),
             
-            // "(" ")" | "(" expression ")" | "(" expression "," ")"
-            Token::OpenParen => {
-                // Check for the empty tuple
-                let next = self.peek()?;
-                if let Token::CloseParen = next.token {
-                    ctx.pop_extend();
-                    return Ok(Atom::EmptyTuple);
-                }
-                
-                let inner_expr = self.parse_inner_expr(ctx, true)?;
-                
-                // The next token must be close paren
-                let next = self.advance()?;
-                ctx.set_end(&next);
-                
-                if !matches!(next.token, Token::CloseParen) {
-                    return Err(ParserError::new(ErrorKind::ExpectedCloseParen, ctx.context()));
-                }
-                
-                Atom::group(inner_expr)
-            },
+            Token::OpenParen => self.parse_group_expr(ctx)?,
             
             _ => { 
                 // println!("{:?}", next);
-                return Err(ParserError::new(ErrorKind::ExpectedAtom, ctx.context()))
+                return Err(ParserError::new(ErrorKind::InvalidStartOfExpr, ctx.context()))
             },
         };
         
         ctx.pop_extend();
         Ok(atom)
+    }
+    
+    fn parse_group_expr(&mut self, ctx: &mut ErrorContext) -> Result<Atom, ParserError> {
+        ctx.push(ContextTag::Group);
+        
+        let next = self.advance().unwrap(); // consume the "("
+        ctx.set_start(&next);
+        debug_assert!(matches!(next.token, Token::OpenParen));
+        
+        // Check for the empty tuple
+        let next = self.peek()?;
+        if let Token::CloseParen = next.token {
+            ctx.pop_extend();
+            return Ok(Atom::EmptyTuple);
+        }
+        
+        let mut expr = Some(self.parse_inner_expr(ctx)?); // may be taken by tuple_expr later
+        let mut tuple_exprs = Vec::<Expr>::new();
+        
+        // loop through expressions in case this is a tuple
+        loop {
+            let next = self.advance()?;
+            match next.token {
+                
+                // end of group
+                Token::CloseParen => break,
+                
+                // single-element tuples
+                Token::Comma => if tuple_exprs.is_empty() {
+                    tuple_exprs.push(expr.take().unwrap());
+                }
+                
+                _ => {
+                    return Err(ParserError::new(ErrorKind::ExpectedCloseParen, ctx.context()));
+                }
+            }
+            
+            let next_expr = self.parse_inner_expr(ctx)?;
+            tuple_exprs.push(next_expr);
+        }
+        
+        ctx.pop_extend();
+        if tuple_exprs.is_empty() {
+            Ok(Atom::group(expr.unwrap()))
+        } else {
+            Ok(Atom::group(Expr::TupleCtor(tuple_exprs)))
+        }
     }
     
     

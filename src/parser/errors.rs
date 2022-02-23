@@ -8,8 +8,7 @@ use crate::parser::debug::DebugMeta;
 pub enum ErrorKind {
     RanOutOfTokens,
     LexerError,
-    ExpectedExpr,   // expected the start of an expression
-    ExpectedAtom,
+    InvalidStartOfExpr,   // expected the start of an expression
     ExpectedCloseParen,
     ExpectedCloseSquare,
     ExpectedCloseBrace,
@@ -32,6 +31,7 @@ pub enum ContextTag {
     ObjectCtor,
     TupleCtor,
     Atom,
+    Group,
 }
 
 
