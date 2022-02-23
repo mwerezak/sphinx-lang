@@ -114,7 +114,7 @@ impl<S> InternStr<S> where S: Symbol {
 }
 
 impl fmt::Display for InternStr {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, _fmt: &mut fmt::Formatter) -> fmt::Result {
         // fmt.write_str(self.s)
         unimplemented!()
     }

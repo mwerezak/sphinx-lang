@@ -10,6 +10,8 @@ pub enum ErrorKind {
     NoMatchingRule,
     UnexpectedEOF,
     CouldNotReadToken,
+    MaxTokenLengthExceeded,
+    SourceTooLong,
 }
 
 #[derive(Debug)]

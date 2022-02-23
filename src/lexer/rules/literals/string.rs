@@ -47,7 +47,7 @@ impl EscapeSequence for HexByteEscape {
         let value = u8::from_str_radix(arg, 16)
             .map_err(|_err| StringEscapeErrorKind::InvalidEscapeArg)?;
         
-        match char::from_u32(value as u32) {
+        match char::from_u32(value.into()) {
             Some(ch) => Ok(ch.to_string()),
             None => Err(StringEscapeErrorKind::InvalidEscapeArg),
         }
@@ -171,7 +171,7 @@ impl LexerRule for StringLiteralRule {
             
             // if we are already in an escape sequence
             if let Some(ref mut active) = self.escape {
-                if active.argbuf.len() < (active.arglen() as usize) {
+                if active.argbuf.len() < active.arglen().into() {
                     active.argbuf.push(next);
                     
                     self.raw_buf.push(next);

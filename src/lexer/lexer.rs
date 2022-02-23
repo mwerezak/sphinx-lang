@@ -7,19 +7,24 @@ use crate::lexer::rules::comments::{LineCommentRule, BlockCommentRule};
 
 // Token Output
 
+// if one of your source files has more than 4 billion characters thats an error
+// if a token gets longer than 65535 characters, consider that a lexing error
+
+type TokenIndex = u32;  // index of start of token in file
+type TokenLength = u16;
+
 // include only mere character indexes in the output
 // if a lexeme needs to be rendered (e.g. for error messages), 
 // the relevant string can be extracted from the source then
 #[derive(Clone, Debug)]
 pub struct Span {
-    pub index: usize,
-    pub length: usize,
-    pub lineno: u64,
+    pub index: TokenIndex,
+    pub length: TokenLength,
 }
 
 impl Span {
-    pub fn start_index(&self) -> usize { self.index }
-    pub fn end_index(&self) -> usize { self.index + self.length }
+    pub fn start_index(&self) -> TokenIndex { self.index }
+    pub fn end_index(&self) -> TokenIndex { self.index + TokenIndex::from(self.length) }
 }
 
 #[derive(Clone, Debug)]
@@ -91,8 +96,6 @@ impl LexerBuilder {
             last: None,
             
             current: 0,
-            lineno: 1,
-            
             active:   [Vec::new(), Vec::new()],
             complete: [Vec::new(), Vec::new()],
         }
@@ -107,14 +110,16 @@ fn split_array_pair_mut<T>(pair: &mut [T; 2]) -> (&mut T, &mut T) {
     (first, second)
 }
 
-fn token_length(start_idx: usize, end_idx: usize) -> usize {
+fn token_length(start_idx: TokenIndex, end_idx: TokenIndex) -> Result<TokenLength, std::num::TryFromIntError> {
     if end_idx > start_idx { 
-        end_idx - start_idx 
-    } else { 0 }
+        TokenLength::try_from(end_idx - start_idx)
+    } else { 
+        Ok(0)
+    }
 }
 
-// to avoid interior self-referentiality inside Lexer, instead of passing around
-// references, we pass indices into the rules Vec instead
+// to avoid interior self-referentiality inside Lexer (not permitted in safe Rust), 
+// instead of passing around references, we pass indices into the rules Vec instead
 type RuleID = usize;
 
 pub struct Lexer<S> where S: Iterator<Item=char> {
@@ -122,8 +127,7 @@ pub struct Lexer<S> where S: Iterator<Item=char> {
     options: LexerOptions,
     rules: Vec<Box<dyn LexerRule>>,
     
-    current: usize, // one ahead of current char
-    lineno: u64,
+    current: TokenIndex, // one ahead of current char
     last: Option<char>,
     
     // internal state used by next_token(). 
@@ -138,24 +142,29 @@ impl<S> Iterator for Lexer<S> where S: Iterator<Item=char> {
     fn next(&mut self) -> Option<Self::Item> { Some(self.next_token()) }
 }
 
+type PrevNextChars = (Option<char>, Option<char>);
+
+const THIS_CYCLE: usize = 0;
+const NEXT_CYCLE: usize = 1;
+
 impl<S> Lexer<S> where S: Iterator<Item=char> {
-    const THIS: usize = 0;
-    const NEXT: usize = 1;
     
-    fn advance(&mut self) -> (Option<char>, Option<char>) {
+    fn advance(&mut self) -> Result<PrevNextChars, LexerError> {
         self.last = self.peek_next();
         let next = self.source.next();
-        if let Some(ch) = next {
-            self.current += 1;
-            if ch == '\n' {
-                self.lineno += 1;
+        
+        if next.is_some() {
+            if self.current == TokenIndex::MAX {
+                return Err(self.error(ErrorKind::SourceTooLong, self.current));
             }
+            self.current += 1;
         }
-        (self.last, next)
+        
+        Ok((self.last, next))
     }
     
     // these have to be &mut self because they can mutate the source iterator
-    fn peek(&mut self) -> (Option<char>, Option<char>) {
+    fn peek(&mut self) -> PrevNextChars {
         (self.last, self.peek_next())
     }
     
@@ -170,15 +179,16 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         self.source.peek().is_none()
     }
     
-    fn skip_whitespace(&mut self) {
+    fn skip_whitespace(&mut self) -> Result<(), LexerError> {
         let mut next = self.peek_next();
         while next.is_some() && next.unwrap().is_whitespace() {
-            self.advance();
+            self.advance()?;
             next = self.peek_next();
         }
+        Ok(())
     }
     
-    fn skip_comments(&mut self) -> bool {
+    fn skip_comments(&mut self) -> Result<bool, LexerError> {
         let line_rule = LineCommentRule::new(language::COMMENT_CHAR);
         let block_rule = BlockCommentRule::new(language::NESTED_COMMENT_START, language::NESTED_COMMENT_END);
         
@@ -209,11 +219,13 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 break;
             }
             
-            self.advance();
+            self.advance()?;
         }
         
         // continue skipping if we are at not at EOF and we advanced
-        !self.at_eof() && self.current > start_pos
+        let continue_ = !self.at_eof() && self.current > start_pos;
+        
+        Ok(continue_)
     }
 
     fn reset_rules(&mut self) {
@@ -229,17 +241,16 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     
     pub fn next_token(&mut self) -> Result<TokenMeta, LexerError> {
         
-        self.skip_whitespace();
+        self.skip_whitespace()?;
         
         if self.options.skip_comments {
-            while self.skip_comments() {
-                self.skip_whitespace();
+            while self.skip_comments()? {
+                self.skip_whitespace()?;
             }
         }
         
         //starting a new token
         let token_start = self.current;
-        let token_line = self.lineno;
         self.reset_rules();
         
         // grab the next char, and feed it to all the rules
@@ -260,12 +271,12 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         let mut next = match next {
             Some(ch) => ch,
             None => {
-                return Ok(self.token_data(Token::EOF, token_start, token_line));
+                return self.token_data(Token::EOF, token_start);
             },
         };
         
         // generate rule ids
-        self.active[Self::THIS].extend(0..self.rules.len());
+        self.active[THIS_CYCLE].extend(0..self.rules.len());
         
         loop {
             
@@ -311,23 +322,23 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     let token = matching_rule.get_token()
                         .map_err(|err| self.token_error(err, token_start))?;
                     
-                    return Ok(self.token_data(token, token_start, token_line));
+                    return self.token_data(token, token_start);
                 
                 }
             }
             
             // commit to accepting this char (and therefore consuming it)
-            self.advance();
+            self.advance()?;
             
             {
-                let next_active = &self.active[Self::NEXT];
+                let next_active = &self.active[NEXT_CYCLE];
                 
                 if next_active.is_empty() {
                     return Err(self.error(ErrorKind::NoMatchingRule, token_start));
                 } 
                 if next_active.len() == 1 {
                     let rule_id = next_active[0];
-                    return self.exhaust_rule(rule_id, token_start, token_line);
+                    return self.exhaust_rule(rule_id, token_start);
                 }
                 
                 prev = Some(next);
@@ -342,7 +353,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             }
         }
         
-        let next_complete = &self.complete[Self::NEXT];
+        let next_complete = &self.complete[NEXT_CYCLE];
         if !next_complete.is_empty() {
             
             // if there is more than one complete rule, the lowest index takes priority!
@@ -351,13 +362,13 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             let token = matching_rule.get_token()
                 .map_err(|err| self.token_error(err, token_start))?;
             
-            return Ok(self.token_data(token, token_start, token_line));
+            return self.token_data(token, token_start);
         }
         
         Err(self.error(ErrorKind::UnexpectedEOF, token_start))
     }
     
-    fn exhaust_rule(&mut self, rule_id: RuleID, token_start: usize, token_line: u64) -> Result<TokenMeta, LexerError> {
+    fn exhaust_rule(&mut self, rule_id: RuleID, token_start: TokenIndex) -> Result<TokenMeta, LexerError> {
         {
             let rule = &mut self.rules[rule_id];
             debug_assert!(!matches!(rule.current_state(), MatchResult::NoMatch));
@@ -375,7 +386,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 let rule = &mut self.rules[rule_id];
                 match rule.try_match(prev, next) {
                     MatchResult::NoMatch => break,
-                    _ => { self.advance(); },
+                    _ => { self.advance()?; },
                 }
             }
         }
@@ -385,7 +396,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             let token = rule.get_token()
                 .map_err(|err| self.token_error(err, token_start))?;
             
-            return Ok(self.token_data(token, token_start, token_line));
+            return self.token_data(token, token_start);
         }
         
         if self.at_eof() {
@@ -395,31 +406,33 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
     }
     
-    fn token_data(&self, token: Token, token_start: usize, token_line: u64) -> TokenMeta {
-        TokenMeta {
-            token,
-            span: Span {
-                index: token_start,
-                length: token_length(token_start, self.current),
-                lineno: token_line,
-            }
+    fn token_data(&self, token: Token, token_start: TokenIndex) -> Result<TokenMeta, LexerError> {
+        let length = token_length(token_start, self.current);
+        
+        let span = Span {
+            index: token_start,
+            length: length.unwrap_or(0),
+        };
+        
+        if length.is_err() {
+            Err(LexerError::new(ErrorKind::MaxTokenLengthExceeded, span))
+        } else {
+            Ok(TokenMeta { token, span })
         }
     }
     
-    fn error(&self, kind: ErrorKind, token_start: usize) -> LexerError {
+    fn error(&self, kind: ErrorKind, token_start: TokenIndex) -> LexerError {
         let span = Span {
             index: token_start,
-            length: token_length(token_start, self.current),
-            lineno: self.lineno,
+            length: token_length(token_start, self.current).unwrap_or(0),
         };
         LexerError::new(kind, span)
     }
     
-    fn token_error(&self, err: Box<dyn std::error::Error>, token_start: usize) -> LexerError {
+    fn token_error(&self, err: Box<dyn std::error::Error>, token_start: TokenIndex) -> LexerError {
         let span = Span {
             index: token_start,
-            length: token_length(token_start, self.current),
-            lineno: self.lineno,
+            length: token_length(token_start, self.current).unwrap_or(0),
         };
         LexerError::caused_by(err, ErrorKind::CouldNotReadToken, span)
     }
