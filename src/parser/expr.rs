@@ -7,7 +7,7 @@ use crate::parser::debug::{DebugSymbol, DebugInfo};
 #[derive(Debug, Clone)]
 pub enum Expr {
     
-    Primary(Primary),
+    Primary(Box<Primary>),
     
     UnaryOp(UnaryOp, Box<Expr>),
     
@@ -22,6 +22,10 @@ pub enum Expr {
 }
 
 impl Expr {
+    pub fn primary(primary: Primary) -> Self {
+        Self::Primary(Box::new(primary))
+    }
+    
     pub fn unary_op(op: UnaryOp, expr: Expr) -> Self {
         Self::UnaryOp(op, Box::new(expr))
     }

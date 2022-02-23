@@ -140,7 +140,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             let rhs_expr = self.parse_expr(ctx)?;
             
             ctx.pop_extend();
-            return Ok(Expr::assignment(lhs, assign_op, rhs_expr, false));
+            return Ok(Expr::assignment(*lhs, assign_op, rhs_expr, false));
         }
         
         Ok(expr)
@@ -249,7 +249,7 @@ impl<'n, T> Parser<'n, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             // Token::OpenBrace => Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?)),
             
-            _ => Ok(Expr::Primary(self.parse_primary(ctx)?)),
+            _ => Ok(Expr::primary(self.parse_primary(ctx)?)),
         }
     }
 
