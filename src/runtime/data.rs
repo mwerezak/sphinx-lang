@@ -20,6 +20,11 @@ pub enum Variant {
 }
 
 
+// type object?
+pub struct RuntimeType {
+    
+}
+
 
 // Interned strings
 
@@ -39,9 +44,3 @@ impl InternStr {
     pub fn symbol(&self) -> StrSymbol { self.symbol }
 }
 
-impl fmt::Display for InternStr {
-    fn fmt(&self, _fmt: &mut fmt::Formatter) -> fmt::Result {
-        // fmt.write_str(self.s)
-        unimplemented!()
-    }
-}

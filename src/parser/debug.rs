@@ -1,3 +1,5 @@
+use crate::runtime::Module;
+
 pub use crate::lexer::TokenIndex;
 
 
@@ -7,13 +9,13 @@ pub use crate::lexer::TokenIndex;
 
 #[derive(Debug, Clone)]
 pub struct DebugSymbol<'m> {
-    pub module: &'m str,  // TODO reference module instead of just str
+    pub module: &'m Module,
     pub start: TokenIndex,
     pub end: TokenIndex,
 }
 
 impl<'m> DebugSymbol<'m> {
-    pub fn new(module: &'m str, start: TokenIndex, end: TokenIndex) -> Self {
+    pub fn new(module: &'m Module, start: TokenIndex, end: TokenIndex) -> Self {
         DebugSymbol { module, start, end }
     }
 }

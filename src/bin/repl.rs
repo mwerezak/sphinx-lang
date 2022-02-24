@@ -5,7 +5,7 @@ use std::path::Path;
 use clap::{App, Arg};
 
 use rlo_interpreter::language;
-use rlo_interpreter::runtime::Runtime;
+use rlo_interpreter::runtime::{Runtime, temp_module};
 
 fn main() {
     let app = App::new("repl")
@@ -51,8 +51,9 @@ fn print_result(result: Result<ExprMeta, ParserError>) {
 }
 
 fn exec_cmd(cmd: &str) {
+    let module = temp_module("<cmd>");
     let mut runtime = Runtime::new(language::create_default_lexer_rules());
-    let mut parser = runtime.create_parser("<cmd>", cmd.chars());
+    let mut parser = runtime.create_parser(&module, cmd.chars());
     print_result(parser.next_expr());
 }
 
@@ -61,7 +62,9 @@ fn exec_file(path: &Path) {
     
     let source = fs::read_to_string(path).unwrap();
     let filename = format!("{}", path.display());
-    let mut parser = runtime.create_parser(filename.as_str(), source.chars());
+    let module = temp_module(filename.as_str());
+    
+    let mut parser = runtime.create_parser(&module, source.chars());
     print_result(parser.next_expr());
 }
 
@@ -80,6 +83,8 @@ impl Repl {
     }
     
     pub fn run(&mut self) {
+        
+        let module = temp_module("<repl>");
         
         loop {
             io::stdout().write(self.prompt.as_bytes()).unwrap();
@@ -104,7 +109,7 @@ impl Repl {
                 break;
             }
             
-            let mut parser = self.runtime.create_parser("<repl>", input.chars());
+            let mut parser = self.runtime.create_parser(&module, input.chars());
             print_result(parser.next_expr());
         }
         

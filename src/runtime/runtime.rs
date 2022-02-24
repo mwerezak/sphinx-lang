@@ -21,7 +21,7 @@ impl Runtime {
         }
     }
     
-    pub fn create_parser<'m, 'h, S>(&'h mut self, module: &'m str, source: S) -> Parser<'m, 'h, Lexer<S>>
+    pub fn create_parser<'m, 'h, S>(&'h mut self, module: &'m Module, source: S) -> Parser<'m, 'h, Lexer<S>>
     where S: Iterator<Item=char> {
         let lexer = self.lexer_factory.build(source);
         Parser::new(module, &mut self.interner, lexer)
@@ -41,3 +41,23 @@ impl Runtime {
 }
 
 
+// runtime execution context
+pub struct RuntimeContext<'r> {
+    runtime: &'r Runtime,
+    // current local scope
+}
+
+impl RuntimeContext<'_> {
+    pub fn runtime(&self) -> &Runtime { self.runtime }
+}
+
+
+#[derive(Debug)]
+pub struct Module {
+    name: String,
+}
+
+// Temporary for development
+pub fn temp_module(name: &str) -> Module {
+    Module { name: name.to_string() }
+}

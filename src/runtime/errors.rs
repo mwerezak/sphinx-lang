@@ -1,6 +1,8 @@
 use std::fmt;
 use std::error::Error;
 
+pub type RuntimeResult<T> = Result<T, RuntimeError>;
+
 #[derive(Debug)]
 pub enum ErrorKind {
     UnsupportedUnaryOperand,

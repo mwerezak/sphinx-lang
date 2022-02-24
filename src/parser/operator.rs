@@ -2,14 +2,14 @@ use std::fmt;
 
 // Unary Operators
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOp {
     Neg, Pos, Not,
 }
 
 // Binary Operators
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BinaryOp {
     // precedence level 2
     Mul, Div, Mod,

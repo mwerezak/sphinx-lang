@@ -1,4 +1,5 @@
 use string_interner::StringInterner;
+use crate::runtime::Module;
 use crate::runtime::data::StrBackend;
 use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::parser::expr::{Expr, ExprMeta};
@@ -12,7 +13,7 @@ use crate::parser::debug::DebugSymbol;
 // Recursive descent parser
 
 pub struct Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    module: &'m str,  // TODO refer to module for which we are parsing code, instead of just a source file name... once module system is implemented
+    module: &'m Module,
     interner: &'h mut StringInterner<StrBackend>,
     tokens: T,
     next: Option<Result<TokenMeta, LexerError>>,
@@ -22,7 +23,7 @@ type InternalResult<T> = Result<T, ErrorPrototype>;
 
 impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     
-    pub fn new(module: &'m str, interner: &'h mut StringInterner<StrBackend>, tokens: T) -> Self {
+    pub fn new(module: &'m Module, interner: &'h mut StringInterner<StrBackend>, tokens: T) -> Self {
         Parser {
             module,
             interner,

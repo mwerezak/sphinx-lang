@@ -5,4 +5,3 @@ pub mod errors;
 
 pub use runtime::*;
 pub use data::Variant;
-pub use eval::eval;
