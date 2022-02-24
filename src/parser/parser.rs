@@ -34,7 +34,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         // Running out of tokens is not normal since we should always read an EOF token first
         let result = match self.tokens.next() {
             Some(inner_result) => Ok(inner_result),
-            None => Err(ParserError::new(ErrorKind::RanOutOfTokens, ContextTag::Token)),
+            None => panic!("unexpected end of token stream"),
         };
         
         result?.map_err(|err| ParserError::caused_by(Box::new(err), ErrorKind::LexerError, ContextTag::Token))

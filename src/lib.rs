@@ -5,6 +5,7 @@
 #[macro_use]
 extern crate lazy_static;
 
+pub mod utils;
 pub mod lexer;
 pub mod parser;
 pub mod language;

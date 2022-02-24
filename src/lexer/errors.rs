@@ -5,13 +5,25 @@ use crate::lexer::Span;
 
 // Lexer Errors
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub enum ErrorKind {
     NoMatchingRule,
     UnexpectedEOF,
     CouldNotReadToken,
     MaxTokenLengthExceeded,
     SourceTooLong,
+}
+
+impl ErrorKind {
+    pub fn message(&self) -> &'static str {
+        match self {
+            Self::NoMatchingRule => "unrecognized token",
+            Self::UnexpectedEOF => "unexpected end of file",
+            Self::CouldNotReadToken => "invalid token",
+            Self::MaxTokenLengthExceeded => "max token length exceeded",
+            Self::SourceTooLong => "max source length exceeded",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -48,8 +60,12 @@ impl Error for LexerError {
 }
 
 impl fmt::Display for LexerError {
-    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        unimplemented!()
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        fmt.write_str(self.kind.message())?;
+        if let Some(err) = self.source() {
+            write!(fmt, ": {}", err)?;
+        }
+        Ok(())
     }
 }
 

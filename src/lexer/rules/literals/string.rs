@@ -1,3 +1,4 @@
+use crate::utils;
 use crate::lexer::Token;
 use crate::lexer::rules::{MatchResult, LexerRule, TokenError};
 
@@ -7,7 +8,7 @@ pub trait EscapeSequence: Sync {
     fn arglen(&self) -> u8;
     
     // produce a string that will replace the escape sequence in the source literal
-    fn transform(&self, arg: &str) -> Result<String, StringEscapeErrorKind>;
+    fn transform(&self, arg: &str) -> Result<String, StringEscapeError>;
 }
 
 // simple escape sequences like \n -> 0x0A or \t -> 0x09
@@ -25,7 +26,7 @@ impl CharMapEscape {
 impl EscapeSequence for CharMapEscape {
     fn tag(&self) -> char { self.tag }
     fn arglen(&self) -> u8 { 0 }
-    fn transform(&self, _arg: &str) -> Result<String, StringEscapeErrorKind> { 
+    fn transform(&self, _arg: &str) -> Result<String, StringEscapeError> { 
         Ok(self.output.to_string())
     }
 }
@@ -41,15 +42,17 @@ const HEX_ESCAPE_TAG: char = 'x';
 impl EscapeSequence for HexByteEscape {
     fn tag(&self) -> char { HEX_ESCAPE_TAG }
     fn arglen(&self) -> u8 { 2 }
-    fn transform(&self, arg: &str) -> Result<String, StringEscapeErrorKind> { 
+    fn transform(&self, arg: &str) -> Result<String, StringEscapeError> { 
         debug_assert!(arg.len() == 2);
         
+        let create_error = || StringEscapeError::new(StringEscapeErrorKind::InvalidEscapeArg, self.tag(), Some(arg.to_string()));
+        
         let value = u8::from_str_radix(arg, 16)
-            .map_err(|_err| StringEscapeErrorKind::InvalidEscapeArg)?;
+            .map_err(|_err| create_error())?;
         
         match char::from_u32(value.into()) {
             Some(ch) => Ok(ch.to_string()),
-            None => Err(StringEscapeErrorKind::InvalidEscapeArg),
+            None => Err(create_error()),
         }
     }
 }
@@ -82,7 +85,7 @@ pub struct StringLiteralRule {
     
     raw: bool,
     escape: Option<ActiveEscape>, // the currently active escape sequence, if any
-    error: Option<StringEscapeErrorKind>, // hold the first error to occur when processing an escape
+    error: Option<StringEscapeError>, // hold the first error to occur when processing an escape
     
     escapes: Vec<&'static dyn EscapeSequence>,
 }
@@ -192,7 +195,9 @@ impl LexerRule for StringLiteralRule {
                 if let Some(escape) = self.lookup_escape_for_tag(next) {
                     self.escape = Some(ActiveEscape { escape, argbuf: String::new() });
                 } else {
-                    self.error = Some(StringEscapeErrorKind::InvalidEscapeTag);
+                    self.error = Some(StringEscapeError::new(
+                        StringEscapeErrorKind::InvalidEscapeTag, next, None
+                    ));
                 }
                 
                 self.raw_buf.push(next);
@@ -218,8 +223,8 @@ impl LexerRule for StringLiteralRule {
     fn get_token(&self) -> Result<Token, TokenError> {
         debug_assert!(self.current_state().is_complete_match());
         
-        if let Some(errorkind) = self.error {
-            Err(Box::new(StringEscapeError::new(errorkind, self.raw_buf.clone())))
+        if let Some(ref error) = self.error {
+            Err(Box::new(error.clone().with_raw(self.raw_buf.clone())))
         } else if self.raw {
             Ok(Token::StringLiteral(self.raw_buf.clone()))
         } else {
@@ -231,28 +236,46 @@ impl LexerRule for StringLiteralRule {
 }
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum StringEscapeErrorKind {
     InvalidEscapeTag,
     InvalidEscapeArg,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StringEscapeError {
     kind: StringEscapeErrorKind,
-    raw: String,
+    tag: char,
+    arg: Option<String>,
+    raw: Option<String>,
 }
 
 impl StringEscapeError {
-    fn new(kind: StringEscapeErrorKind, raw: String) -> Self {
-        StringEscapeError { kind, raw }
+    fn new(kind: StringEscapeErrorKind, tag: char, arg: Option<String>) -> Self {
+        StringEscapeError { kind, tag, arg, raw: None }
+    }
+    
+    fn with_raw(mut self, raw: String) -> Self {
+        self.raw = Some(raw); self
     }
 }
 
 impl std::error::Error for StringEscapeError { }
 
 impl std::fmt::Display for StringEscapeError { 
-    fn fmt(&self, _fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unimplemented!()
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let render_escape = format!("{}{}{}", 
+            ESCAPE_CHAR, self.tag, self.arg.as_ref().map_or("", |arg| arg.as_str())
+        );
+        
+        match self.kind {
+            StringEscapeErrorKind::InvalidEscapeTag => write!(fmt, "unrecognized escape sequence '{}'", render_escape)?,
+            StringEscapeErrorKind::InvalidEscapeArg => write!(fmt, "invalid escape sequence '{}'", render_escape)?,
+        }
+        
+        if let Some(ref raw) = self.raw {
+            write!(fmt, " in string literal \"{}\"", utils::trim_str(raw, 25))?;
+        }
+        Ok(())
     }
 }

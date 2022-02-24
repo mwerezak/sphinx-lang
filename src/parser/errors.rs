@@ -4,21 +4,33 @@ use crate::lexer::{Span, TokenMeta};
 use crate::parser::debug::{DebugSymbol, TokenIndex};
 
 // Specifies the actual error that occurred
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub enum ErrorKind {
-    RanOutOfTokens,
     LexerError,
     ExpectedStartOfExpr,   // expected the start of an expression
     ExpectedCloseParen,
     ExpectedCloseSquare,
     ExpectedCloseBrace,
     ExpectedIdentifier,
-    ExpectedAssignmentExpr, // expected an assignment expression
     InvalidAssignmentLHS,   // the LHS of an assignment was not a valid lvalue
 }
 
+impl ErrorKind {
+    pub fn message(&self) -> &'static str {
+        match self {
+            Self::LexerError => "could not parse token",
+            Self::ExpectedStartOfExpr => "expected start of expression",
+            Self::ExpectedCloseParen => "expected closing ')'",
+            Self::ExpectedCloseSquare => "expected closing ']'",
+            Self::ExpectedCloseBrace => "expected closing '}'",
+            Self::ExpectedIdentifier => "expected an identifier",
+            Self::InvalidAssignmentLHS => "the left hand side of an assignment was invalid",
+        }
+    }
+}
+
 // Provide information about the type of syntactic construct from which the error originated
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ContextTag {
     Token,  // errors retrieving the actual tokens
     Expr,
@@ -66,8 +78,12 @@ impl Error for ParserError {
 }
 
 impl fmt::Display for ParserError {
-    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        unimplemented!()
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        fmt.write_str(self.kind.message())?;
+        if let Some(err) = self.source() {
+            write!(fmt, ": {}", err)?;
+        }
+        Ok(())
     }
 }
 

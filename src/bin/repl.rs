@@ -40,11 +40,20 @@ fn main() {
     }
 }
 
+
+use rlo_interpreter::parser::expr::ExprMeta;
+use rlo_interpreter::parser::{ParserError, ErrorContext};
+fn print_result(result: Result<ExprMeta, (ParserError, ErrorContext)>) {
+    match result {
+        Ok(expr) => println!("{:?}", expr),
+        Err((error, ..)) => println!("{}", error),
+    }
+}
+
 fn exec_cmd(cmd: &str) {
     let mut runtime = Runtime::new(language::create_default_lexer_rules());
     let mut parser = runtime.create_parser("<cmd>", cmd.chars());
-    
-    println!("{:?}", parser.next_expr());
+    print_result(parser.next_expr());
 }
 
 fn exec_file(path: &Path) {
@@ -53,8 +62,7 @@ fn exec_file(path: &Path) {
     let source = fs::read_to_string(path).unwrap();
     let filename = format!("{}", path.display());
     let mut parser = runtime.create_parser(filename.as_str(), source.chars());
-    
-    println!("{:?}", parser.next_expr());
+    print_result(parser.next_expr());
 }
 
 
@@ -97,7 +105,7 @@ impl Repl {
             }
             
             let mut parser = self.runtime.create_parser("<repl>", input.chars());
-            println!("{:?}", parser.next_expr());
+            print_result(parser.next_expr());
         }
         
     }

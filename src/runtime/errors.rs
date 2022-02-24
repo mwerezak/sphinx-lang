@@ -1,11 +1,15 @@
 use std::fmt;
 use std::error::Error;
 
+#[derive(Debug)]
+pub enum ErrorKind {
+    UnsupportedUnaryOperand,
+    UnsupportedBinaryOperand,  // "unsupported operand types: 'a' and 'b'
+}
 
-
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct RuntimeError {
-    
+    kind: ErrorKind,
 }
 
 impl Error for RuntimeError {

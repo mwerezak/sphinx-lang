@@ -5,7 +5,7 @@ pub use crate::lexer::TokenIndex;
 // will probably be attached to the statement level
 
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct DebugSymbol<'m> {
     pub module: &'m str,  // TODO reference module instead of just str
     pub start: TokenIndex,
