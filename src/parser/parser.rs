@@ -16,7 +16,7 @@ pub struct Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError
     module: &'m str,  // TODO refer to module for which we are parsing code, instead of just a source file name... once module system is implemented
     interner: &'h mut StringInterner<StrBackend>,
     tokens: T,
-    next: Option<Result<TokenMeta, ParserError>>,
+    next: Option<Result<TokenMeta, LexerError>>,
 }
 
 impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
@@ -30,23 +30,22 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         }
     }
     
-    fn next_result(&mut self) -> Result<TokenMeta, ParserError> {
-        // Running out of tokens is not normal since we should always read an EOF token first
-        let result = match self.tokens.next() {
-            Some(inner_result) => Ok(inner_result),
-            None => panic!("unexpected end of token stream"),
-        };
-        
-        result?.map_err(|err| ParserError::caused_by(Box::new(err), ErrorKind::LexerError, ContextTag::Token))
+    fn next_token(&mut self) -> Result<TokenMeta, LexerError> {
+        // should never run out of tokens as we should always get EOF first
+        self.tokens.next().expect("unexpected end of token sequence")
     }
     
     fn advance(&mut self) -> Result<TokenMeta, ParserError> {
-        self.next.take().unwrap_or_else(|| self.next_result())
+        self.next.take()
+            .unwrap_or_else(|| self.next_token())
+            .map_err(|err| ParserError::caused_by(
+                Box::new(err), ErrorKind::LexerError, ContextTag::Token
+            ))
     }
     
     fn peek(&mut self) -> Result<&TokenMeta, ParserError> {
         if self.next.is_none() {
-            self.next = Some(self.next_result());
+            self.next = Some(self.next_token());
         }
         
         // This craziness is needed to finagle a reference in one branch 
