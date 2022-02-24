@@ -1,7 +1,7 @@
 use std::fmt;
 use string_interner::StringInterner;
 use crate::language;
-use crate::runtime::InternStr;
+use crate::runtime::data::InternStr;
 use crate::parser::expr::Expr;
 use crate::parser::structs::ObjectConstructor;
 

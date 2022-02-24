@@ -1,5 +1,5 @@
 use string_interner::StringInterner;
-use crate::runtime::StrBackend;
+use crate::runtime::data::StrBackend;
 use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::parser::expr::{Expr, ExprMeta};
 use crate::parser::primary::{Primary, Atom};
