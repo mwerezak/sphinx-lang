@@ -228,6 +228,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         let op = match token {
             Token::OpAdd => UnaryOp::Pos,
             Token::OpSub => UnaryOp::Neg,
+            Token::OpInv => UnaryOp::Inv,
             Token::Not   => UnaryOp::Not,
             
             _ => return None,

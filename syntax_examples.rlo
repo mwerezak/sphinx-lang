@@ -50,8 +50,9 @@ subtract - me
 multiply * me
 divide / me
 
-# to implement: bitwise, shift, modulo
-(7 ^ 3) << 3
+# (x**2) + (y**2)  # TODO exponentiation?
+
+(~7 ^ 3) << 3
 0xff | 235
 3 % 2 == 0
 
@@ -438,7 +439,7 @@ ex[2] = "third"
 # __add, __mul, __sub, __div, __neg, etc...
 # __le, __lt, __eq only, no methamethods for others...
 # __getindex, __setindex, __delindex
-# __tostring
+# __bool, __tostring
 # __exit  - for context managers
 # __call
 

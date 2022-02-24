@@ -4,7 +4,7 @@ use std::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnaryOp {
-    Neg, Pos, Not, // TODO add bit invert
+    Neg, Pos, Inv, Not,
 }
 
 // Binary Operators

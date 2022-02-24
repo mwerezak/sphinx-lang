@@ -18,7 +18,7 @@ pub enum Token {
     
     // Operator Symbols
     OpAdd, OpSub, OpMul, OpDiv, OpMod,
-    OpAnd, OpOr, OpXor, OpLShift, OpRShift,
+    OpInv, OpAnd, OpOr, OpXor, OpLShift, OpRShift,
     
     OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
     OpAndAssign, OpOrAssign, OpXorAssign, OpLShiftAssign, OpRShiftAssign,
