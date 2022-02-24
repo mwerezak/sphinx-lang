@@ -62,6 +62,7 @@ const SINGLE_QUOTE: char = '\'';
 const DOUBLE_QUOTE: char = '"';
 const RAW_PREFIX: char = 'r';
 
+#[derive(Clone)]
 struct ActiveEscape {
     escape: &'static dyn EscapeSequence,
     argbuf: String,
@@ -72,6 +73,7 @@ impl std::ops::Deref for ActiveEscape {
     fn deref(&self) -> &'static Self::Target { self.escape }
 }
 
+#[derive(Clone)]
 pub struct StringLiteralRule {
     raw_buf: String,
     escaped_buf: String,

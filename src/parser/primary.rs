@@ -1,8 +1,7 @@
 use std::fmt;
-use string_interner::{Symbol, DefaultSymbol, StringInterner};
-use string_interner::backend::Backend;
-
+use string_interner::StringInterner;
 use crate::language;
+use crate::runtime::InternStr;
 use crate::parser::expr::Expr;
 use crate::parser::structs::ObjectConstructor;
 
@@ -107,26 +106,3 @@ impl Primary {
     }
 }
 
-
-// Identifiers
-
-// TODO intern all identifier names and string literals and make this Copy
-// should just be a lightweight handle to an interned string
-#[derive(Debug, Clone)]
-pub struct InternStr<S=DefaultSymbol> where S: Symbol {
-    symbol: S,
-}
-
-impl<S> InternStr<S> where S: Symbol {
-    pub fn from_str<B>(s: &str, interner: &mut StringInterner<B>) -> Self
-    where B: Backend<Symbol=S> {
-        InternStr { symbol: interner.get_or_intern(s) }
-    }
-}
-
-impl fmt::Display for InternStr {
-    fn fmt(&self, _fmt: &mut fmt::Formatter) -> fmt::Result {
-        // fmt.write_str(self.s)
-        unimplemented!()
-    }
-}

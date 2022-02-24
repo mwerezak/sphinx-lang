@@ -42,7 +42,7 @@ fn main() {
 }
 
 fn exec_cmd(cmd: &str) {
-    let lexer = language::create_default_lexer_rules().build(cmd.chars());
+    let lexer = language::create_default_lexer_rules().build_once(cmd.chars());
     let mut interner = StringInterner::new();
     let mut parser = Parser::new("<cmd>", &mut interner, lexer);
     
@@ -53,7 +53,7 @@ fn exec_file(path: &Path) {
     let source = fs::read_to_string(path).unwrap();
     let filename = format!("{}", path.display());
     
-    let lexer = language::create_default_lexer_rules().build(source.chars());
+    let lexer = language::create_default_lexer_rules().build_once(source.chars());
     let mut interner = StringInterner::new();
     let mut parser = Parser::new(filename.as_str(), &mut interner, lexer);
     
@@ -97,7 +97,7 @@ impl Repl {
             }
             
             let factory = language::create_default_lexer_rules();
-            let lexer = factory.build(input.chars());
+            let lexer = factory.build_once(input.chars());
             let mut parser = Parser::new("<repl>", &mut interner, lexer);
             println!("{:?}", parser.next_expr());
         }

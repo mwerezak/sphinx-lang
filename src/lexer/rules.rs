@@ -69,7 +69,7 @@ impl MatchResult {
 // Lexer Rules
 type TokenError = Box<dyn Error + 'static>;
 
-pub trait LexerRule {
+pub trait LexerRule: __LexerRule_Clone {
     fn reset(&mut self);
     
     fn current_state(&self) -> MatchResult;
@@ -82,4 +82,25 @@ pub trait LexerRule {
     // and produce an error if the Token could not be produced for some other reason
     // e.g. attempting to read an integer literal that overflows
     fn get_token(&self) -> Result<Token, TokenError>;
+}
+
+
+// In order to use LexerBuilder as a Lexer factory, we need to be able to clone LexerRules.
+// Since each LexerRule is actually a state machine, and in fact likely constitutes most of the state
+// used by a Lexer, each new Lexer must own its own LexerRules.
+
+// Unfortunately, trait objects are not clonable because any trait with Fn() -> Self is not object safe.
+// However, we can work around this to make Box<dyn LexerRule> cloneable...
+
+#[allow(non_camel_case_types)]
+pub trait __LexerRule_Clone {
+    fn __clone_box(&self) -> Box<dyn LexerRule>;
+}
+
+impl<T> __LexerRule_Clone for T where T: 'static + LexerRule + Clone {
+    fn __clone_box(&self) -> Box<dyn LexerRule> { Box::new(self.clone()) }
+}
+
+impl Clone for Box<dyn LexerRule> {
+    fn clone(&self) -> Box<dyn LexerRule> { self.__clone_box() }
 }

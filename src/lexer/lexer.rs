@@ -35,8 +35,8 @@ pub struct TokenMeta {
 
 // Lexer Builder
 
-#[derive(Debug, Clone)]
-struct LexerOptions {
+#[derive(Clone)]
+pub struct LexerOptions {
     skip_comments: bool,
 }
 
@@ -87,18 +87,15 @@ impl LexerBuilder {
         return self;
     }
     
-    pub fn build<S>(self, source: S) -> Lexer<S> 
+    // less expensive than build(), but invalidates self
+    pub fn build_once<S>(self, source: S) -> Lexer<S> 
     where S: Iterator<Item=char> {
-        Lexer { 
-            source: source.peekable(),
-            options: self.options,
-            rules: self.rules,
-            last: None,
-            
-            current: 0,
-            active:   [Vec::new(), Vec::new()],
-            complete: [Vec::new(), Vec::new()],
-        }
+        Lexer::new(source, self.options, self.rules.into_iter())
+    }
+    
+    pub fn build<S>(&self, source: S) -> Lexer<S>
+    where S: Iterator<Item=char> {
+        Lexer::new(source, self.options.clone(), self.rules.clone().into_iter())
     }
 }
 
@@ -150,6 +147,21 @@ impl<S> Iterator for Lexer<S> where S: Iterator<Item=char> {
 type PrevNextChars = (Option<char>, Option<char>);
 
 impl<S> Lexer<S> where S: Iterator<Item=char> {
+    
+    pub fn new<R>(source: S, options: LexerOptions, rules: R) -> Self
+    where R: Iterator<Item=Box<dyn LexerRule>> {
+        Lexer {
+            options,
+            source: source.peekable(),
+            rules: rules.collect(),
+            
+            current: 0,
+            last: None,
+            active:   [Vec::new(), Vec::new()],
+            complete: [Vec::new(), Vec::new()],
+        }
+    }
+    
     
     fn advance(&mut self) -> Result<PrevNextChars, LexerError> {
         self.last = self.peek_next();

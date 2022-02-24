@@ -5,7 +5,7 @@ use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Similar to MultiCharRule but also ensures that the token starts at a word boundary
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeywordRule {
     result: Token,
     matcher: StrMatcher<'static>,

@@ -7,7 +7,7 @@ use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Identifiers
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IdentifierRule {
     buf: String,
 }
@@ -60,6 +60,7 @@ impl LexerRule for IdentifierRule {
 
 // Plain Integer Literals
 
+#[derive(Debug, Clone)]
 pub struct IntegerLiteralRule {
     buf: String,
 }
@@ -107,6 +108,7 @@ impl LexerRule for IntegerLiteralRule {
     
 }
 
+#[derive(Debug, Clone)]
 pub struct HexIntegerLiteralRule {
     buf: String,
     prefix: StrMatcher<'static>,

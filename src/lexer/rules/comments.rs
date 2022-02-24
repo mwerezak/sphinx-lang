@@ -4,7 +4,7 @@ use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Special-Purpose Rules
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LineCommentRule {
     // (start, end)
     // start -> if the comment has started
@@ -77,6 +77,7 @@ impl LexerRule for LineCommentRule {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BlockCommentRule {
     nestlevel: u32,
     start: StrMatcher<'static>,
