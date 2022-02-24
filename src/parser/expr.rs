@@ -14,9 +14,9 @@ pub enum Expr {
     
     Assignment(Box<AssignmentInfo>), // use a box to keep size of Expr down
     
-    ObjectCtor(Box<ObjectConstructor>),
+    Tuple(Vec<Expr>),
     
-    TupleCtor(Vec<Expr>),
+    ObjectCtor(Box<ObjectConstructor>),
     
 }
 

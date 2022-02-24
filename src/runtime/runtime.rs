@@ -13,9 +13,7 @@ pub struct Runtime {
     // loaded modules
 }
 
-
 impl Runtime {
-    
     pub fn new(lexer_factory: LexerBuilder) -> Self {
         Runtime { 
             lexer_factory, 
