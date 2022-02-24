@@ -6,18 +6,19 @@ use string_interner::DefaultSymbol;
 use string_interner::DefaultBackend;
 
 use crate::language;
+use crate::runtime::types::RuntimeType;
 
 
 // Fundamental data value type
 #[derive(Debug, Clone, Copy)]
 pub enum Variant {
     Nil,
-    Empty,
+    Empty, // the empty tuple value
     Boolean(bool),
     Integer(language::IntType),
     Real(language::FloatType),
     InternString(InternStr),
-    //GCObject(Box<..>),
+    //GCObject(GCHandle),
 }
 
 impl Variant {
@@ -28,12 +29,6 @@ impl Variant {
     pub fn truth_value(&self) -> bool {
         unimplemented!()
     }
-}
-
-
-// type object?
-pub struct RuntimeType {
-    
 }
 
 
