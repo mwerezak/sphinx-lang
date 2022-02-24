@@ -92,7 +92,7 @@ impl Repl {
                 continue;
             }
             
-            if input.chars().next().unwrap() == '\x04' || input == "quit" {
+            if input.chars().last().unwrap() == '\x04' || input == "quit" {
                 break;
             }
             
