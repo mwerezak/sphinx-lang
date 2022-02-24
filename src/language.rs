@@ -6,7 +6,7 @@ use crate::lexer::rules::literals::string::{StringLiteralRule, EscapeSequence, C
 
 
 pub type IntType = i32;    // internal representation for integers
-pub type FloatType = f32;  // internal representation for floats
+pub type FloatType = f64;  // internal representation for floats
 
 
 pub static COMMENT_CHAR: char = '#';

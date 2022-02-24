@@ -5,7 +5,7 @@ use std::path::Path;
 use clap::{App, Arg};
 
 use rlo_interpreter::language;
-use rlo_interpreter::runtime::{Runtime, temp_module};
+use rlo_interpreter::runtime::{Runtime, placeholder_module};
 
 fn main() {
     let app = App::new("repl")
@@ -40,21 +40,12 @@ fn main() {
     }
 }
 
-
-use rlo_interpreter::parser::expr::ExprMeta;
-use rlo_interpreter::parser::ParserError;
-fn print_result(result: Result<ExprMeta, ParserError>) {
-    match result {
-        Ok(expr) => println!("{:?}", expr),
-        Err(error) => println!("{}", error),
-    }
-}
-
 fn exec_cmd(cmd: &str) {
-    let module = temp_module("<cmd>");
+    let module = placeholder_module("<cmd>");
     let mut runtime = Runtime::new(language::create_default_lexer_rules());
     let mut parser = runtime.create_parser(&module, cmd.chars());
-    print_result(parser.next_expr());
+    
+    print_eval_str(&mut runtime, &module, cmd);
 }
 
 fn exec_file(path: &Path) {
@@ -62,10 +53,9 @@ fn exec_file(path: &Path) {
     
     let source = fs::read_to_string(path).unwrap();
     let filename = format!("{}", path.display());
-    let module = temp_module(filename.as_str());
+    let module = placeholder_module(filename.as_str());
     
-    let mut parser = runtime.create_parser(&module, source.chars());
-    print_result(parser.next_expr());
+    print_eval_str(&mut runtime, &module, source.as_str());
 }
 
 
@@ -84,7 +74,7 @@ impl Repl {
     
     pub fn run(&mut self) {
         
-        let module = temp_module("<repl>");
+        let module = placeholder_module("<repl>");
         
         loop {
             io::stdout().write(self.prompt.as_bytes()).unwrap();
@@ -109,9 +99,30 @@ impl Repl {
                 break;
             }
             
-            let mut parser = self.runtime.create_parser(&module, input.chars());
-            print_result(parser.next_expr());
+            print_eval_str(&mut self.runtime, &module, input.as_str());
         }
         
     }
+}
+
+use rlo_interpreter::runtime::{Module, placeholder_runtime_ctx};
+use rlo_interpreter::parser::expr::{ExprMeta};
+use rlo_interpreter::parser::ParserError;
+fn print_result(result: Result<ExprMeta, ParserError>) {
+    match result {
+        Ok(expr) => println!("{:?}", expr),
+        Err(error) => println!("{}", error),
+    }
+}
+
+fn print_eval_str(runtime: &mut Runtime, module: &Module, input: &str) {
+    let mut parser = runtime.create_parser(module, input.chars());
+    let expr = match parser.next_expr() {
+        Err(error) => return println!("{}", error),
+        Ok(expr) => expr,
+    };
+
+    let mut local_ctx = placeholder_runtime_ctx(runtime);
+    let eval_result = local_ctx.eval(expr.expr());
+    println!("{:?}", eval_result);
 }

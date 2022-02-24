@@ -57,7 +57,7 @@ impl Atom {
 pub enum AccessItem {
     Member(InternStr),
     Index(Box<Expr>),
-    Invoke,       // TODO
+    Invoke(),       // TODO
     Construct(ObjectConstructor),
 }
 
@@ -72,9 +72,15 @@ impl Primary {
         Primary { atom, path: Vec::new() }
     }
     
-    pub fn with_ops<I>(atom: Atom, path: I) -> Self
+    pub fn with_path<I>(atom: Atom, path: I) -> Self
     where I: Iterator<Item=AccessItem> {
         Primary { atom, path: path.collect() }
+    }
+    
+    pub fn atom(&self) -> &Atom { &self.atom }
+    
+    pub fn iter_path(&self) -> std::slice::Iter<AccessItem> {
+        self.path.iter()
     }
     
     /*

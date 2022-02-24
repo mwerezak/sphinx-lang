@@ -12,11 +12,22 @@ use crate::language;
 #[derive(Debug, Clone, Copy)]
 pub enum Variant {
     Nil,
+    Empty,
     Boolean(bool),
     Integer(language::IntType),
-    Float(language::FloatType),
+    Real(language::FloatType),
     InternString(InternStr),
     //GCObject(Box<..>),
+}
+
+impl Variant {
+    pub fn rtype(&self) -> &RuntimeType {
+        unimplemented!()
+    }
+    
+    pub fn truth_value(&self) -> bool {
+        unimplemented!()
+    }
 }
 
 
