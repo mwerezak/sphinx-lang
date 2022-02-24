@@ -46,38 +46,54 @@ pub enum ContextTag {
     Group,
 }
 
-
+// Since ErrorContext can share references with the Parser, we need to use 
+// an error type that does not refer to the error context internally.
+// The error context is always available at the base of the recursive descent call stack and can be added later.
 #[derive(Debug)]
-pub struct ParserError {
+pub struct ErrorPrototype {
     kind: ErrorKind,
-    context: ContextTag,
     cause: Option<Box<dyn Error>>,
 }
 
-impl ParserError {
-    pub fn new(kind: ErrorKind, context: ContextTag) -> Self {
-        ParserError {
-            kind, context, 
-            cause: None,
-        }
+impl ErrorPrototype {
+    pub fn new(kind: ErrorKind) -> Self {
+        ErrorPrototype { kind, cause: None }
     }
     
-    pub fn caused_by(error: Box<dyn Error>, kind: ErrorKind, context: ContextTag) -> Self {
+    pub fn caused_by(error: Box<dyn Error>, kind: ErrorKind) -> Self {
+        ErrorPrototype { kind, cause: Some(error) }
+    }
+}
+
+#[derive(Debug)]
+pub struct ParserError<'m> {
+    kind: ErrorKind,
+    module: &'m str,
+    frame: ContextFrame,
+    cause: Option<Box<dyn Error>>,
+}
+
+impl<'m> ParserError<'m> {
+    pub fn from_prototype(proto: ErrorPrototype, context: ErrorContext<'m>) -> Self {
         ParserError {
-            kind, context, cause: Some(error),
+            kind: proto.kind,
+            module: context.module,
+            frame: context.take(),
+            cause: proto.cause,
         }
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
 }
 
-impl Error for ParserError {
+
+impl Error for ParserError<'_> {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.cause.as_ref().map(|o| o.as_ref())
     }
 }
 
-impl fmt::Display for ParserError {
+impl fmt::Display for ParserError<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         fmt.write_str(self.kind.message())?;
         if let Some(err) = self.source() {

@@ -42,11 +42,11 @@ fn main() {
 
 
 use rlo_interpreter::parser::expr::ExprMeta;
-use rlo_interpreter::parser::{ParserError, ErrorContext};
-fn print_result(result: Result<ExprMeta, (ParserError, ErrorContext)>) {
+use rlo_interpreter::parser::ParserError;
+fn print_result(result: Result<ExprMeta, ParserError>) {
     match result {
         Ok(expr) => println!("{:?}", expr),
-        Err((error, ..)) => println!("{}", error),
+        Err(error) => println!("{}", error),
     }
 }
 
