@@ -10,12 +10,23 @@ pub struct RuntimeType {
     slots: SlotMetatable,
 }
 
+impl RuntimeType {
+    pub fn name(&self) -> InternStr { self.name }
+    pub fn slots(&self) -> &SlotMetatable { &self.slots }
+}
+
+
+
 // Container of function pointers used to implement metamethods
 
 type SlotUnaryOp = fn(Variant) -> RuntimeResult<Variant>;
 type SlotBinaryOp = fn(Variant, Variant) -> RuntimeResult<Variant>;
 type SlotComparison = fn(Variant, Variant) -> RuntimeResult<bool>;
 
+// TODO store slots in an array instead and lookup by enum?
+// would make it much easier to implement slot-transforming helper functions
+
+#[derive(Default)]
 pub struct SlotMetatable {
     // Special runtime slots
     

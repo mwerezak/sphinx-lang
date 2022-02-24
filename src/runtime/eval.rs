@@ -4,7 +4,7 @@ use crate::parser::expr::Expr;
 use crate::parser::primary::{Primary, Atom, AccessItem};
 use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::runtime::{RuntimeContext, Variant};
-use crate::runtime::errors::{RuntimeError, RuntimeResult};
+use crate::runtime::errors::{RuntimeError, RuntimeResult, ErrorKind};
 
 pub struct EvalContext<'r> {
     runtime: &'r mut RuntimeContext<'r>
@@ -32,7 +32,21 @@ impl<'r> EvalContext<'r> {
     }
     
     fn apply_unary_op(&mut self, op: &UnaryOp, operand: &Expr) -> RuntimeResult<Variant> {
-        unimplemented!()
+        let opval = self.eval(operand)?;
+        let rtype = opval.rtype();
+        
+        let result = match op {
+            UnaryOp::Neg => rtype.slots().neg.map(|neg| neg(opval)), 
+            UnaryOp::Pos => unimplemented!(), 
+            UnaryOp::Inv => unimplemented!(), 
+            UnaryOp::Not => unimplemented!(),
+        };
+        
+        if result.is_none() {
+            Err(RuntimeError::new(ErrorKind::UnsupportedUnaryOperand))
+        } else {
+            result.unwrap()
+        }
     }
 
     fn apply_binary_op(&mut self, op: &BinaryOp, lhs: &Expr, rhs: &Expr) -> RuntimeResult<Variant> {

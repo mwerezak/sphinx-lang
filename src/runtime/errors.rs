@@ -14,6 +14,14 @@ pub struct RuntimeError {
     kind: ErrorKind,
 }
 
+impl RuntimeError {
+    pub fn new(kind: ErrorKind) -> Self {
+        RuntimeError {
+            kind,
+        }
+    }
+}
+
 impl Error for RuntimeError {
     
 }
