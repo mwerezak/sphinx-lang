@@ -4,9 +4,8 @@ use std::io::Write;
 use std::path::Path;
 use clap::{App, Arg};
 
-use string_interner::StringInterner;
 use rlo_interpreter::language;
-use rlo_interpreter::parser::Parser;
+use rlo_interpreter::runtime::Runtime;
 
 fn main() {
     let app = App::new("repl")
@@ -36,26 +35,24 @@ fn main() {
         exec_file(&file_path);
     } else {
         println!("\nReLox Interpreter {}\n", version);
-        let repl = Repl::new(">>> ");
+        let mut repl = Repl::new(">>> ");
         repl.run();
     }
 }
 
 fn exec_cmd(cmd: &str) {
-    let lexer = language::create_default_lexer_rules().build_once(cmd.chars());
-    let mut interner = StringInterner::new();
-    let mut parser = Parser::new("<cmd>", &mut interner, lexer);
+    let mut runtime = Runtime::new(language::create_default_lexer_rules());
+    let mut parser = runtime.create_parser("<cmd>", cmd.chars());
     
     println!("{:?}", parser.next_expr());
 }
 
 fn exec_file(path: &Path) {
+    let mut runtime = Runtime::new(language::create_default_lexer_rules());
+    
     let source = fs::read_to_string(path).unwrap();
     let filename = format!("{}", path.display());
-    
-    let lexer = language::create_default_lexer_rules().build_once(source.chars());
-    let mut interner = StringInterner::new();
-    let mut parser = Parser::new(filename.as_str(), &mut interner, lexer);
+    let mut parser = runtime.create_parser(filename.as_str(), source.chars());
     
     println!("{:?}", parser.next_expr());
 }
@@ -63,15 +60,18 @@ fn exec_file(path: &Path) {
 
 struct Repl {
     prompt: &'static str,
+    runtime: Runtime,
 }
 
 impl Repl {
     pub fn new(prompt: &'static str) -> Self {
-        Repl { prompt }
+        Repl { 
+            prompt, 
+            runtime: Runtime::new(language::create_default_lexer_rules()),
+        }
     }
     
-    pub fn run(&self) {
-        let mut interner = StringInterner::new();
+    pub fn run(&mut self) {
         
         loop {
             io::stdout().write(self.prompt.as_bytes()).unwrap();
@@ -96,10 +96,9 @@ impl Repl {
                 break;
             }
             
-            let factory = language::create_default_lexer_rules();
-            let lexer = factory.build_once(input.chars());
-            let mut parser = Parser::new("<repl>", &mut interner, lexer);
+            let mut parser = self.runtime.create_parser("<repl>", input.chars());
             println!("{:?}", parser.next_expr());
         }
+        
     }
 }
