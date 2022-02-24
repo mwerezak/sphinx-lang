@@ -7,9 +7,9 @@ use crate::lexer::rules::comments::{LineCommentRule, BlockCommentRule};
 
 // Token Output
 
-// if one of your source files has more than 4 billion characters thats an error
-// if a token gets longer than 65535 characters, consider that a lexing error
-
+// if one of your source files has more than 4 billion characters (assuming mostly single byte UTF8 that's a ~4GB file)
+// or if a token gets longer than 65535 characters, just consider that a lexing error
+// In return, we can make the Span struct a fair bit narrower
 pub type TokenIndex = u32;  // index of start of token in file
 pub type TokenLength = u16;
 
