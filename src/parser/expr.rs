@@ -1,7 +1,7 @@
+use crate::debug::symbol::{DebugSymbol, HasDebugSymbol};
 use crate::parser::primary::Primary;
 use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::parser::structs::{ObjectConstructor};
-use crate::parser::debug::{DebugSymbol, HasDebugSymbol};
 
 #[derive(Debug, Clone)]
 pub enum Expr {

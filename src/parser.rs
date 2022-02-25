@@ -5,20 +5,20 @@ pub mod expr;
 pub mod primary;
 pub mod operator;
 pub mod structs;
-pub mod debug;
 
 pub use errors::{ParserError, ContextFrame};
 
 use string_interner::StringInterner;
 use crate::runtime::data::StrBackend;
 use crate::lexer::{TokenMeta, Token, LexerError};
+use crate::debug::symbol::{DebugSymbol, ModuleSource};
 
 use expr::{Expr, ExprMeta};
 use primary::{Primary, Atom};
 use operator::{UnaryOp, BinaryOp, OpLevel, OP_LEVEL_START, OP_LEVEL_END};
 use structs::{ObjectConstructor};
 use errors::{ErrorPrototype, ErrorKind, ErrorContext, ContextTag};
-use debug::{DebugSymbol, ModuleSource};
+
 
 
 

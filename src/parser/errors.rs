@@ -1,7 +1,7 @@
 use std::fmt;
 use std::error::Error;
 use crate::lexer::{Span, TokenMeta};
-use crate::parser::debug::{DebugSymbol, TokenIndex, ModuleSource};
+use crate::debug::symbol::{DebugSymbol, TokenIndex, ModuleSource};
 
 // Specifies the actual error that occurred
 #[derive(Debug)]
