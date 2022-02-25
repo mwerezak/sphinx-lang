@@ -31,8 +31,6 @@ type SlotUnaryOp = fn(Variant) -> RuntimeResult<Variant>;
 type SlotBinaryOp = fn(Variant, Variant) -> RuntimeResult<Option<Variant>>;
 type SlotComparison = fn(Variant, Variant) -> RuntimeResult<Option<bool>>;
 
-type Slot<T> = fn(Variant) -> RuntimeResult<T>;
-
 // TODO store slots in an array instead and lookup by enum?
 // would make it much easier to implement slot-transforming helper functions
 
@@ -40,7 +38,6 @@ type Slot<T> = fn(Variant) -> RuntimeResult<T>;
 pub struct SlotMetatable {
     // Special runtime slots
     
-    // __bool
     // __tostring
     // __call
     

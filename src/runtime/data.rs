@@ -33,7 +33,10 @@ impl Variant {
     }
     
     pub fn truth_value(&self) -> bool {
-        unimplemented!()
+        match self {
+            Self::Nil | Self::Boolean(false) => false,
+            _ => true,
+        }
     }
     
     pub fn int_value(&self) -> Option<language::IntType> {
