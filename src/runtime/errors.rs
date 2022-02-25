@@ -1,14 +1,16 @@
 use std::fmt;
 use std::error::Error;
+use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::types::TypeID;
+
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 #[derive(Debug)]
 pub enum ErrorKind {
     DivideByZero,  // attempt to divide by zero
-    UnsupportedUnaryOperand(TypeID),   // "unsupported operand type: 'a'
-    UnsupportedBinaryOperand(TypeID, TypeID),  // "unsupported operand types: 'a' and 'b'
+    UnsupportedUnaryOperand(UnaryOp, TypeID),   // "unsupported operand type for unary -: 'a'
+    UnsupportedBinaryOperand(BinaryOp, TypeID, TypeID),  // "unsupported operand types for +: 'a' and 'b'
     TypeIDAlreadyTaken(TypeID),
 }
 

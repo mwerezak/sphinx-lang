@@ -31,9 +31,8 @@ impl PartialEq for RuntimeType {
 
 // Container of function pointers used to implement metamethods
 
-pub type SlotUnaryOp = fn(Variant) -> RuntimeResult<Variant>;
+pub type SlotUnaryOp = fn(Variant) -> RuntimeResult<Option<Variant>>;
 pub type SlotBinaryOp = fn(Variant, Variant) -> RuntimeResult<Option<Variant>>;
-pub type SlotComparison = fn(Variant, Variant) -> RuntimeResult<Option<bool>>;
 
 // TODO store slots in an array instead and lookup by enum?
 // would make it much easier to implement slot-transforming helper functions
@@ -53,12 +52,6 @@ pub struct SlotMetatable {
     
     // __attr
     // __index
-    
-    // Comparisons
-    
-    pub eq: Option<SlotComparison>,
-    pub lt: Option<SlotComparison>,
-    pub le: Option<SlotComparison>,
     
     // Numeric operations
     
@@ -88,6 +81,12 @@ pub struct SlotMetatable {
     pub rxor: Option<SlotBinaryOp>, // __rxor
     pub or:   Option<SlotBinaryOp>, // __or
     pub ror:  Option<SlotBinaryOp>, // __ror
+    
+    // Comparisons
+    
+    pub eq:   Option<SlotBinaryOp>, // __eq
+    pub lt:   Option<SlotBinaryOp>, // __lt
+    pub le:   Option<SlotBinaryOp>, // __le
 }
 
 // Notes: primitive types should use slots directly
@@ -101,11 +100,20 @@ pub struct SlotMetatable {
 
 // These methods call the corresponding slot and return either Some(result) or None if the slot is None:
 
+macro_rules! fn_has_slot {
+    ( $slot:tt, $has:tt ) => {
+        pub fn $has(&self) -> bool { self.$slot.is_some() }
+    };
+}
+
 macro_rules! fn_call_slot_unary_op {
     ( $slot:tt, $call:tt ) => {
         
-        pub fn $call(&self, operand: Variant) -> Option<RuntimeResult<Variant>> {
-            self.$slot.map(|$slot| $slot(operand))
+        pub fn $call(&self, operand: Variant) -> RuntimeResult<Option<Variant>> {
+            match self.$slot {
+                Some($slot) => $slot(operand),
+                None => Ok(None),
+            }
         }
         
     };
@@ -116,58 +124,33 @@ macro_rules! fn_call_slot_binary_op {
         
         // Produce None if the operation was not supported by the type
         // i.e. if either the slot was None or the slot function returned None
-        pub fn $call(&self, lhs: Variant, rhs: Variant) -> Option<RuntimeResult<Variant>> {
+        pub fn $call(&self, lhs: Variant, rhs: Variant) -> RuntimeResult<Option<Variant>> {
             match self.$slot {
-                None => None,
-                
-                Some($slot) => match $slot(lhs, rhs) {
-                    Ok(result) => result.map(|value| Ok(value)),
-                    Err(error) => Some(Err(error)),
-                },
+                Some($slot) => $slot(lhs, rhs),
+                None => Ok(None),
             }
         }
         
     };
 }
 
-macro_rules! fn_call_slot_comparison {
-    ( $slot:tt, $call:tt ) => {
-        
-        // Produce None if the operation was not supported by the type
-        // i.e. if either the slot was None or the slot function returned None
-        pub fn $call(&self, lhs: Variant, rhs: Variant) -> Option<RuntimeResult<bool>> {
-            match self.$slot {
-                None => None,
-                
-                Some($slot) => match $slot(lhs, rhs) {
-                    Ok(result) => result.map(|value| Ok(value)),
-                    Err(error) => Some(Err(error)),
-                },
-            }
-        }
-        
-    };
-}
 
-macro_rules! fn_has_slot {
-    ( $slot:tt, $has:tt ) => {
-        pub fn $has(&self) -> bool { self.$slot.is_some() }
-    };
+// Helper to dispatch calls to binary op slots
+pub enum CallSlot {
+    Mul, RMul,
+    Div, RDiv,
+    Mod, RMod,
+    Add, RAdd,
+    Sub, RSub,
+    Shl, RShl,
+    Shr, RShr,
+    And, RAnd,
+    Xor, RXor,
+    Or,  ROr,
+    LT, LE, EQ,
 }
-
-// I've considered having ways to lookup slots using a value, like an enum
-// but slot types are heterogenous anyways so it wouldn't add that much value
 
 impl SlotMetatable {
-    // Comparison
-    
-    fn_has_slot!(eq, has_eq);
-    fn_has_slot!(lt, has_lt);
-    fn_has_slot!(le, has_le);
-    
-    fn_call_slot_comparison!(eq, call_eq);
-    fn_call_slot_comparison!(lt, call_lt);
-    fn_call_slot_comparison!(le, call_le);
     
     // Unary
     
@@ -222,4 +205,42 @@ impl SlotMetatable {
     fn_call_slot_binary_op!(rxor, call_rxor);
     fn_call_slot_binary_op!(or,   call_or);
     fn_call_slot_binary_op!(ror,  call_ror);
+    
+    // Comparison
+    
+    fn_has_slot!(eq, has_eq);
+    fn_has_slot!(lt, has_lt);
+    fn_has_slot!(le, has_le);
+    
+    fn_call_slot_binary_op!(eq, call_eq);
+    fn_call_slot_binary_op!(lt, call_lt);
+    fn_call_slot_binary_op!(le, call_le);
+    
+    pub fn call_binary_op(&self, call: CallSlot, lhs: Variant, rhs: Variant) -> RuntimeResult<Option<Variant>> {
+        match call {
+            CallSlot::Mul    => self.call_mul(lhs, rhs),
+            CallSlot::Div    => self.call_div(lhs, rhs),
+            CallSlot::Mod    => self.call_mod(lhs, rhs),
+            CallSlot::Add    => self.call_add(lhs, rhs),
+            CallSlot::Sub    => self.call_sub(lhs, rhs),
+            CallSlot::Shl    => self.call_shl(lhs, rhs),
+            CallSlot::Shr    => self.call_shr(lhs, rhs),
+            CallSlot::And    => self.call_and(lhs, rhs),
+            CallSlot::Xor    => self.call_xor(lhs, rhs),
+            CallSlot::Or     => self.call_or(lhs, rhs),
+            CallSlot::RMul   => self.call_rmul(lhs, rhs),
+            CallSlot::RDiv   => self.call_rdiv(lhs, rhs),
+            CallSlot::RMod   => self.call_rmod(lhs, rhs),
+            CallSlot::RAdd   => self.call_radd(lhs, rhs),
+            CallSlot::RSub   => self.call_rsub(lhs, rhs),
+            CallSlot::RShl   => self.call_rshl(lhs, rhs),
+            CallSlot::RShr   => self.call_rshr(lhs, rhs),
+            CallSlot::RAnd   => self.call_rand(lhs, rhs),
+            CallSlot::RXor   => self.call_rxor(lhs, rhs),
+            CallSlot::ROr    => self.call_ror(lhs, rhs),
+            CallSlot::LT     => self.call_lt(lhs, rhs),
+            CallSlot::LE     => self.call_le(lhs, rhs),
+            CallSlot::EQ     => self.call_eq(lhs, rhs),
+        }
+    }
 }

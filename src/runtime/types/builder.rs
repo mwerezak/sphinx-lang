@@ -1,6 +1,6 @@
 use crate::runtime::Runtime;
 use crate::runtime::types::{RuntimeType, SlotMetatable};
-use crate::runtime::types::{SlotComparison, SlotBinaryOp, SlotUnaryOp};
+use crate::runtime::types::{SlotBinaryOp, SlotUnaryOp};
 use crate::runtime::errors::{RuntimeResult, RuntimeError, ErrorKind};
 
 pub struct RuntimeTypeBuilder {
@@ -43,10 +43,6 @@ impl RuntimeTypeBuilder {
         runtime.register_type(type_id, rtype)
     }
     
-    fn_update_slot!(eq, SlotComparison, set_eq, clear_eq);
-    fn_update_slot!(lt, SlotComparison, set_lt, clear_lt);
-    fn_update_slot!(le, SlotComparison, set_le, clear_le);
-    
     fn_update_slot!(neg, SlotUnaryOp, set_neg, clear_neg);
     fn_update_slot!(pos, SlotUnaryOp, set_pos, clear_pos);
     fn_update_slot!(inv, SlotUnaryOp, set_inv, clear_inv);
@@ -71,4 +67,8 @@ impl RuntimeTypeBuilder {
     fn_update_slot!(rxor, SlotBinaryOp, set_rxor, clear_rxor);
     fn_update_slot!(or,   SlotBinaryOp, set_or,   clear_or);
     fn_update_slot!(ror,  SlotBinaryOp, set_ror,  clear_ror);
+    
+    fn_update_slot!(eq, SlotBinaryOp, set_eq, clear_eq);
+    fn_update_slot!(lt, SlotBinaryOp, set_lt, clear_lt);
+    fn_update_slot!(le, SlotBinaryOp, set_le, clear_le);
 }

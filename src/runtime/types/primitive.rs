@@ -37,6 +37,9 @@ fn int_mul(lhs: Variant, rhs: Variant) -> RuntimeResult<Option<Variant>> {
         _ => return Ok(None),
     }
 }
+fn int_rmul(rhs: Variant, lhs: Variant) -> RuntimeResult<Option<Variant>> {
+    int_mul(lhs, rhs)
+}
 
 fn int_div(lhs: Variant, rhs: Variant) -> RuntimeResult<Option<Variant>> {
     let lhs_value = lhs.int_value().unwrap();
@@ -60,6 +63,9 @@ fn int_add(lhs: Variant, rhs: Variant) -> RuntimeResult<Option<Variant>> {
         _ => return Ok(None),
     };
     Ok(Some(result))
+}
+fn int_radd(rhs: Variant, lhs: Variant) -> RuntimeResult<Option<Variant>> {
+    int_add(lhs, rhs)
 }
 
 pub fn create_int_type(runtime: &mut Runtime) -> RuntimeResult<&mut RuntimeType> {
