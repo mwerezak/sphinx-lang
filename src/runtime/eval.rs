@@ -90,20 +90,87 @@ impl<'r> EvalContext<'r> {
         let rhs_type = rhs_val.rtype(self.runtime.as_ref());
         
         let result = match op {
-            BinaryOp::Mul    => unimplemented!(),
-            BinaryOp::Div    => unimplemented!(),
-            BinaryOp::Mod    => unimplemented!(),
-            BinaryOp::Add    => {
-                lhs_type.slots().call_add(lhs_val, rhs_val)
-                .or(rhs_type.slots().call_radd(rhs_val, lhs_val))
+            BinaryOp::Mul    => {
+                let value = lhs_type.slots().call_mul(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_rmul(rhs_val, lhs_val)
+                }
             },
-            BinaryOp::Sub    => unimplemented!(),
-            BinaryOp::LShift => unimplemented!(),
-            BinaryOp::RShift => unimplemented!(),
-            BinaryOp::BitAnd => unimplemented!(),
-            BinaryOp::BitXor => unimplemented!(),
-            BinaryOp::BitOr  => unimplemented!(),
-            BinaryOp::LT     => unimplemented!(),
+            BinaryOp::Div    => {
+                let value = lhs_type.slots().call_div(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_rdiv(rhs_val, lhs_val)
+                }
+            },
+            BinaryOp::Mod    => {
+                let value = lhs_type.slots().call_mod(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_rmod(rhs_val, lhs_val)
+                }
+            },
+            BinaryOp::Add    => {
+                let value = lhs_type.slots().call_add(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_radd(rhs_val, lhs_val)
+                }
+            },
+            BinaryOp::Sub    => {
+                let value = lhs_type.slots().call_sub(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_rsub(rhs_val, lhs_val)
+                }
+            },
+            BinaryOp::LShift => {
+                let value = lhs_type.slots().call_shl(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_rshl(rhs_val, lhs_val)
+                }
+            },
+            BinaryOp::RShift => {
+                let value = lhs_type.slots().call_shr(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_rshr(rhs_val, lhs_val)
+                }
+            },
+            BinaryOp::BitAnd => {
+                let value = lhs_type.slots().call_and(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_rand(rhs_val, lhs_val)
+                }
+            },
+            BinaryOp::BitXor => {
+                let value = lhs_type.slots().call_xor(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_rxor(rhs_val, lhs_val)
+                }
+            },
+            BinaryOp::BitOr  => {
+                let value = lhs_type.slots().call_or(lhs_val, rhs_val);
+                if value.is_some() || lhs_type == rhs_type {
+                    value
+                } else {
+                    rhs_type.slots().call_ror(rhs_val, lhs_val)
+                }
+            },
+            BisubyOp::LT     => unimplemented!(),
             BinaryOp::GT     => unimplemented!(),
             BinaryOp::LE     => unimplemented!(),
             BinaryOp::GE     => unimplemented!(),
@@ -122,3 +189,9 @@ impl<'r> EvalContext<'r> {
 }
 
 
+macro_rules! binary_op_helper {
+    ( $call_slot:tt, $call_rslot:tt ) => {
+        
+        
+    };
+}

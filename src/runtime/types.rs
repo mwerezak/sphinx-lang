@@ -25,11 +25,15 @@ impl RuntimeType {
     pub fn slots_mut(&mut self) -> &mut SlotMetatable { &mut self.slots }
 }
 
+impl PartialEq for RuntimeType {
+    fn eq(&self, other: &Self) -> bool { self.type_id == other.type_id }
+}
+
 // Container of function pointers used to implement metamethods
 
-type SlotUnaryOp = fn(Variant) -> RuntimeResult<Variant>;
-type SlotBinaryOp = fn(Variant, Variant) -> RuntimeResult<Option<Variant>>;
-type SlotComparison = fn(Variant, Variant) -> RuntimeResult<Option<bool>>;
+pub type SlotUnaryOp = fn(Variant) -> RuntimeResult<Variant>;
+pub type SlotBinaryOp = fn(Variant, Variant) -> RuntimeResult<Option<Variant>>;
+pub type SlotComparison = fn(Variant, Variant) -> RuntimeResult<Option<bool>>;
 
 // TODO store slots in an array instead and lookup by enum?
 // would make it much easier to implement slot-transforming helper functions
