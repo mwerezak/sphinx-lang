@@ -1,4 +1,4 @@
-use crate::debug::symbol::{DebugSymbol, HasDebugSymbol};
+use crate::debug::symbol::DebugSymbol;
 use crate::parser::primary::Primary;
 use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::parser::structs::{ObjectConstructor};
@@ -51,19 +51,17 @@ pub struct AssignmentInfo {
 
 
 #[derive(Debug, Clone)]
-pub struct ExprMeta<'a> {
+pub struct ExprMeta {
     expr: Expr,
-    debug: DebugSymbol<'a>,
+    debug: DebugSymbol,
 }
 
-impl<'a> ExprMeta<'a> {
-    pub fn new(expr: Expr, debug: DebugSymbol<'a>) -> Self {
+impl ExprMeta {
+    pub fn new(expr: Expr, debug: DebugSymbol) -> Self {
         ExprMeta { expr, debug }
     }
     
     pub fn expr(&self) -> &Expr { &self.expr }
-}
-
-impl HasDebugSymbol for ExprMeta<'_> {
-    fn debug_symbol(&self) -> &DebugSymbol { &self.debug }
+    
+    pub fn debug_symbol(&self) -> &DebugSymbol { &self.debug }
 }

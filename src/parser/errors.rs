@@ -207,9 +207,8 @@ impl ContextFrame {
     }
 }
 
-impl<'m> From<ErrorContext<'m>> for DebugSymbol<'m> {
-    fn from(ctx: ErrorContext<'m>) -> Self {
-        let module = ctx.module;
+impl From<ErrorContext<'_>> for DebugSymbol {
+    fn from(ctx: ErrorContext) -> Self {
         let frame = ctx.take();
         
         match (frame.start, frame.end) {
@@ -217,16 +216,16 @@ impl<'m> From<ErrorContext<'m>> for DebugSymbol<'m> {
                 let start_index = start.index;
                 let end_index = end.index + TokenIndex::from(end.length);
                 
-                DebugSymbol::new(module, start_index, end_index)
+                DebugSymbol::new(start_index, end_index)
             },
             (Some(span), None) | (None, Some(span)) => {
                 let start_index = span.index;
                 let end_index = span.index + TokenIndex::from(span.length);
                 
-                DebugSymbol::new(module, start_index, end_index)
+                DebugSymbol::new(start_index, end_index)
             },
             (None, None) => {
-                DebugSymbol::new(module, 0, 0)
+                DebugSymbol::new(0, 0)
             }
         }
     }

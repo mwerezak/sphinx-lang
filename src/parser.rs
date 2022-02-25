@@ -75,7 +75,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     // temporary top level, will change when statement parsing is added
     // Note: the value returned from this method no longer needs the interner 'h
     // but the compiler can't guess that, so we have to be explicit about the lifetimes here
-    pub fn next_expr(&mut self) -> Result<ExprMeta<'m>, ParserError<'m>> { 
+    pub fn next_expr(&mut self) -> Result<ExprMeta, ParserError<'m>> { 
         let mut ctx = ErrorContext::new(self.module, ContextTag::Expr);
         
         match self.parse_expr(&mut ctx) {
