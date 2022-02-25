@@ -4,8 +4,9 @@ use string_interner::StringInterner;
 use crate::lexer::{Lexer, LexerBuilder};
 use crate::parser::Parser;
 use crate::parser::expr::Expr;
-use crate::runtime::data::{Variant, InternStr, StrBackend};
+use crate::runtime::data::{Variant, InternStr, StrBackend, Primitive};
 use crate::runtime::types::{RuntimeType, TypeID};
+use crate::runtime::types::primitive;
 use crate::runtime::eval::EvalContext;
 use crate::runtime::errors::{RuntimeResult, RuntimeError, ErrorKind};
 
@@ -15,6 +16,7 @@ pub struct Runtime {
     lexer_factory: LexerBuilder,
     
     type_cache: HashMap<TypeID, RuntimeType>,
+    primitives: HashMap<Primitive, TypeID>,
     
     // globals
     // loaded modules
@@ -22,16 +24,29 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn new(lexer_factory: LexerBuilder) -> Self {
-        Runtime {
+        let mut runtime = Runtime {
             lexer_factory, 
             interner: Default::default(),
             type_cache: HashMap::new(),
-        }
+            primitives: HashMap::new(),
+        };
+        
+        let int_type = primitive::create_int_type(&mut runtime).unwrap().type_id();
+        runtime.register_primitive(Primitive::Integer, int_type);
+        
+        return runtime;
     }
     
-    // pub fn type_is_registered(&self, type_id: TypeID) -> bool {
-    //     self.type_cache.contains_key(&type_id)
-    // }
+    fn register_primitive(&mut self, primitive: Primitive, type_id: TypeID) {
+        debug_assert!(!self.primitives.contains_key(&primitive));
+        debug_assert!(self.type_cache.contains_key(&type_id));
+        self.primitives.insert(primitive, type_id);
+    }
+    
+    pub fn get_primitive_type(&self, primitive: Primitive) -> &RuntimeType {
+        let type_id = self.primitives.get(&primitive).unwrap();
+        self.type_cache.get(&type_id).unwrap()
+    }
     
     pub fn register_type(&mut self, type_id: TypeID, rtype: RuntimeType) -> RuntimeResult<&mut RuntimeType> {
         if self.type_cache.contains_key(&type_id) {
@@ -79,6 +94,9 @@ impl<'r> RuntimeContext<'r> {
     }
 }
 
+impl AsRef<Runtime> for RuntimeContext<'_> {
+    fn as_ref(&self) -> &Runtime { self.runtime }
+}
 
 // TODO rename to ModuleInfo or ModuleMetadata or ModuleSource, something like that...
 // should hold the information needed to load up the original source and print error messages

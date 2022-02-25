@@ -6,8 +6,20 @@ use string_interner::DefaultSymbol;
 use string_interner::DefaultBackend;
 
 use crate::language;
+use crate::runtime::Runtime;
 use crate::runtime::types::RuntimeType;
+use crate::runtime::errors::{RuntimeResult, RuntimeError, ErrorKind};
 
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub enum Primitive {
+    Nil,
+    Boolean,
+    Integer,
+    Float,
+    String,
+    Tuple,
+    Object,
+}
 
 // Fundamental data value type
 #[derive(Debug, Clone, Copy)]
@@ -16,18 +28,37 @@ pub enum Variant {
     Empty, // the empty tuple value
     Boolean(bool),
     Integer(language::IntType),
-    Real(language::FloatType),
+    Float(language::FloatType),
     InternString(InternStr),
     //GCObject(GCHandle),
 }
 
 impl Variant {
-    pub fn rtype(&self) -> &RuntimeType {
-        unimplemented!()
+    pub fn rtype<'r>(&self, runtime: &'r Runtime) -> &'r RuntimeType {
+        match self {
+            Self::Integer(..) => runtime.get_primitive_type(Primitive::Integer),
+            _ => unimplemented!(),
+        }
     }
     
     pub fn truth_value(&self) -> bool {
         unimplemented!()
+    }
+    
+    pub fn int_value(&self) -> Option<language::IntType> {
+        match *self {
+            Self::Integer(value) => Some(value),
+            Self::Float(value) if !value.is_nan() => Some(value as language::IntType),
+            _ => None,
+        }
+    }
+    
+    pub fn float_value(&self) -> Option<language::FloatType> {
+        match *self {
+            Self::Integer(value) => Some(value as language::FloatType),
+            Self::Float(value) => Some(value),
+            _ => None,
+        }
     }
 }
 

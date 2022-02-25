@@ -14,12 +14,21 @@ pub enum ErrorKind {
 #[derive(Debug)]
 pub struct RuntimeError {
     kind: ErrorKind,
+    message: Option<&'static str>,
 }
 
 impl RuntimeError {
     pub fn new(kind: ErrorKind) -> Self {
         RuntimeError {
             kind,
+            message: None,
+        }
+    }
+    
+    pub fn with_message(kind: ErrorKind, message: &'static str) -> Self {
+        RuntimeError {
+            kind,
+            message: Some(message),
         }
     }
 }

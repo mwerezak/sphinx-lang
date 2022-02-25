@@ -28,8 +28,8 @@ impl RuntimeType {
 // Container of function pointers used to implement metamethods
 
 type SlotUnaryOp = fn(Variant) -> RuntimeResult<Variant>;
-type SlotBinaryOp = fn(Variant, Variant) -> RuntimeResult<Variant>;
-type SlotComparison = fn(Variant, Variant) -> RuntimeResult<bool>;
+type SlotBinaryOp = fn(Variant, Variant) -> RuntimeResult<Option<Variant>>;
+type SlotComparison = fn(Variant, Variant) -> RuntimeResult<Option<bool>>;
 
 // TODO store slots in an array instead and lookup by enum?
 // would make it much easier to implement slot-transforming helper functions
@@ -100,25 +100,49 @@ pub struct SlotMetatable {
 
 macro_rules! fn_call_slot_unary_op {
     ( $slot:tt, $call:tt ) => {
+        
         pub fn $call(&self, operand: Variant) -> Option<RuntimeResult<Variant>> {
             self.$slot.map(|$slot| $slot(operand))
         }
+        
     };
 }
 
 macro_rules! fn_call_slot_binary_op {
     ( $slot:tt, $call:tt ) => {
+        
+        // Produce None if the operation was not supported by the type
+        // i.e. if either the slot was None or the slot function returned None
         pub fn $call(&self, lhs: Variant, rhs: Variant) -> Option<RuntimeResult<Variant>> {
-            self.$slot.map(|$slot| $slot(lhs, rhs))
+            match self.$slot {
+                None => None,
+                
+                Some($slot) => match $slot(lhs, rhs) {
+                    Ok(result) => result.map(|value| Ok(value)),
+                    Err(error) => Some(Err(error)),
+                },
+            }
         }
+        
     };
 }
 
 macro_rules! fn_call_slot_comparison {
     ( $slot:tt, $call:tt ) => {
+        
+        // Produce None if the operation was not supported by the type
+        // i.e. if either the slot was None or the slot function returned None
         pub fn $call(&self, lhs: Variant, rhs: Variant) -> Option<RuntimeResult<bool>> {
-            self.$slot.map(|$slot| $slot(lhs, rhs))
+            match self.$slot {
+                None => None,
+                
+                Some($slot) => match $slot(lhs, rhs) {
+                    Ok(result) => result.map(|value| Ok(value)),
+                    Err(error) => Some(Err(error)),
+                },
+            }
         }
+        
     };
 }
 
@@ -158,7 +182,7 @@ impl SlotMetatable {
     fn_has_slot!(rmul, has_rmul);
     fn_has_slot!(div,  has_div);
     fn_has_slot!(rdiv, has_rdiv);
-    fn_has_slot!(mod_, has_mod_);
+    fn_has_slot!(mod_, has_mod);
     fn_has_slot!(rmod, has_rmod);
     fn_has_slot!(add,  has_add);
     fn_has_slot!(radd, has_radd);
@@ -179,7 +203,7 @@ impl SlotMetatable {
     fn_call_slot_binary_op!(rmul, call_rmul);
     fn_call_slot_binary_op!(div,  call_div);
     fn_call_slot_binary_op!(rdiv, call_rdiv);
-    fn_call_slot_binary_op!(mod_, call_mod_);
+    fn_call_slot_binary_op!(mod_, call_mod);
     fn_call_slot_binary_op!(rmod, call_rmod);
     fn_call_slot_binary_op!(add,  call_add);
     fn_call_slot_binary_op!(radd, call_radd);
