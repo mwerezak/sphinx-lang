@@ -1,8 +1,7 @@
 use std::fmt;
 use std::error::Error;
-use crate::runtime::Module;
 use crate::lexer::{Span, TokenMeta};
-use crate::parser::debug::{DebugSymbol, TokenIndex};
+use crate::parser::debug::{DebugSymbol, TokenIndex, ModuleSource};
 
 // Specifies the actual error that occurred
 #[derive(Debug)]
@@ -69,7 +68,7 @@ impl ErrorPrototype {
 #[derive(Debug)]
 pub struct ParserError<'m> {
     kind: ErrorKind,
-    module: &'m Module,
+    module: &'m ModuleSource,
     frame: ContextFrame,
     cause: Option<Box<dyn Error>>,
 }
@@ -109,12 +108,12 @@ impl fmt::Display for ParserError<'_> {
 
 #[derive(Debug, Clone)]
 pub struct ErrorContext<'m> {
-    module: &'m Module,
+    module: &'m ModuleSource,
     stack: Vec<ContextFrame>,
 }
 
 impl<'m> ErrorContext<'m> {
-    pub fn new(module: &'m Module, base: ContextTag) -> Self {
+    pub fn new(module: &'m ModuleSource, base: ContextTag) -> Self {
         ErrorContext {
             module, stack: vec![ ContextFrame::new(base) ],
         }

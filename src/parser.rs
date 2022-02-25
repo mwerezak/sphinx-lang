@@ -10,7 +10,6 @@ pub mod debug;
 pub use errors::{ParserError, ContextFrame};
 
 use string_interner::StringInterner;
-use crate::runtime::Module;
 use crate::runtime::data::StrBackend;
 use crate::lexer::{TokenMeta, Token, LexerError};
 
@@ -19,13 +18,14 @@ use primary::{Primary, Atom};
 use operator::{UnaryOp, BinaryOp, OpLevel, OP_LEVEL_START, OP_LEVEL_END};
 use structs::{ObjectConstructor};
 use errors::{ErrorPrototype, ErrorKind, ErrorContext, ContextTag};
-use debug::DebugSymbol;
+use debug::{DebugSymbol, ModuleSource};
+
 
 
 // Recursive descent parser
 
 pub struct Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    module: &'m Module,
+    module: &'m ModuleSource,
     interner: &'h mut StringInterner<StrBackend>,
     tokens: T,
     next: Option<Result<TokenMeta, LexerError>>,
@@ -35,7 +35,7 @@ type InternalResult<T> = Result<T, ErrorPrototype>;
 
 impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     
-    pub fn new(module: &'m Module, interner: &'h mut StringInterner<StrBackend>, tokens: T) -> Self {
+    pub fn new(module: &'m ModuleSource, interner: &'h mut StringInterner<StrBackend>, tokens: T) -> Self {
         Parser {
             module,
             interner,

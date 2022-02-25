@@ -120,15 +120,15 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
 }
 
 
-use crate::runtime::Runtime;
-use crate::runtime::types::primitive;
-use crate::runtime::types::primitive::Primitive;
+// use crate::runtime::Runtime;
+// use crate::runtime::types::primitive;
+// use crate::runtime::types::primitive::Primitive;
 
-pub fn create_runtime() -> Runtime {
-    let mut runtime = Runtime::new(create_default_lexer_rules());
+// pub fn create_runtime() -> Runtime {
+//     let mut runtime = Runtime::new(create_default_lexer_rules());
     
-    let int_type = primitive::create_int_type(&mut runtime).unwrap().type_id();
-    runtime.register_primitive(Primitive::Integer, int_type);
+//     let int_type = primitive::create_int_type(&mut runtime).unwrap().type_id();
+//     runtime.register_primitive(Primitive::Integer, int_type);
     
-    runtime
-}
+//     runtime
+// }
