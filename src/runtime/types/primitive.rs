@@ -20,6 +20,14 @@ pub enum Primitive {
 
 // Integers
 
+fn int_neg(operand: Variant) -> RuntimeResult<Variant> {
+    Ok(Variant::Integer(-operand.int_value().unwrap()))
+}
+
+fn int_pos(operand: Variant) -> RuntimeResult<Variant> {
+    Ok(operand)
+}
+
 fn int_add(lhs: Variant, rhs: Variant) -> RuntimeResult<Option<Variant>> {
     let lhs_value = lhs.int_value().unwrap();
     
@@ -29,10 +37,6 @@ fn int_add(lhs: Variant, rhs: Variant) -> RuntimeResult<Option<Variant>> {
         _ => return Ok(None),
     };
     Ok(Some(result))
-}
-
-fn int_neg(operand: Variant) -> RuntimeResult<Variant> {
-    Ok(Variant::Integer(-operand.int_value().unwrap()))
 }
 
 pub fn create_int_type(runtime: &mut Runtime) -> RuntimeResult<&mut RuntimeType> {

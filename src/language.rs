@@ -115,12 +115,20 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(IdentifierRule::new())
     .add_rule(IntegerLiteralRule::new())
     .add_rule(HexIntegerLiteralRule::new())
-    .add_rule({
+    .add_rule(StringLiteralRule::new(ESCAPE_SEQUENCES.iter().map(|esc| esc.as_ref())))
 
-        
-        StringLiteralRule::new(ESCAPE_SEQUENCES.iter().map(|esc| esc.as_ref()))
-    })
+}
+
+
+use crate::runtime::Runtime;
+use crate::runtime::types::primitive;
+use crate::runtime::types::primitive::Primitive;
+
+pub fn create_runtime() -> Runtime {
+    let mut runtime = Runtime::new(create_default_lexer_rules());
     
-
-
+    let int_type = primitive::create_int_type(&mut runtime).unwrap().type_id();
+    runtime.register_primitive(Primitive::Integer, int_type);
+    
+    runtime
 }

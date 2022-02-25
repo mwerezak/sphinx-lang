@@ -7,7 +7,8 @@ use string_interner::DefaultBackend;
 
 use crate::language;
 use crate::runtime::Runtime;
-use crate::runtime::types::{RuntimeType, Primitive};
+use crate::runtime::types::RuntimeType;
+use crate::runtime::types::primitive::Primitive;
 use crate::runtime::errors::{RuntimeResult, RuntimeError, ErrorKind};
 
 

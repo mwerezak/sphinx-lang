@@ -1,8 +1,6 @@
 pub mod builder;
 pub mod primitive;
 
-pub use primitive::Primitive;
-
 use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::runtime::data::{Variant, InternStr};
 use crate::runtime::errors::RuntimeResult;
@@ -32,6 +30,8 @@ impl RuntimeType {
 type SlotUnaryOp = fn(Variant) -> RuntimeResult<Variant>;
 type SlotBinaryOp = fn(Variant, Variant) -> RuntimeResult<Option<Variant>>;
 type SlotComparison = fn(Variant, Variant) -> RuntimeResult<Option<bool>>;
+
+type Slot<T> = fn(Variant) -> RuntimeResult<T>;
 
 // TODO store slots in an array instead and lookup by enum?
 // would make it much easier to implement slot-transforming helper functions

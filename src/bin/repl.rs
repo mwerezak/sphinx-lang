@@ -42,14 +42,14 @@ fn main() {
 
 fn exec_cmd(cmd: &str) {
     let module = placeholder_module("<cmd>");
-    let mut runtime = Runtime::new(language::create_default_lexer_rules());
+    let mut runtime = language::create_runtime();
     let mut parser = runtime.create_parser(&module, cmd.chars());
     
     print_eval_str(&mut runtime, &module, cmd);
 }
 
 fn exec_file(path: &Path) {
-    let mut runtime = Runtime::new(language::create_default_lexer_rules());
+    let mut runtime = language::create_runtime();
     
     let source = fs::read_to_string(path).unwrap();
     let filename = format!("{}", path.display());
@@ -68,7 +68,7 @@ impl Repl {
     pub fn new(prompt: &'static str) -> Self {
         Repl { 
             prompt, 
-            runtime: Runtime::new(language::create_default_lexer_rules()),
+            runtime: language::create_runtime(),
         }
     }
     

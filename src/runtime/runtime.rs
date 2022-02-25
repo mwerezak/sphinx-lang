@@ -5,8 +5,9 @@ use crate::lexer::{Lexer, LexerBuilder};
 use crate::parser::Parser;
 use crate::parser::expr::Expr;
 use crate::runtime::data::{Variant, InternStr, StrBackend};
-use crate::runtime::types::{RuntimeType, TypeID, Primitive};
+use crate::runtime::types::{RuntimeType, TypeID};
 use crate::runtime::types::primitive;
+use crate::runtime::types::primitive::Primitive;
 use crate::runtime::eval::EvalContext;
 use crate::runtime::errors::{RuntimeResult, RuntimeError, ErrorKind};
 
@@ -24,20 +25,15 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn new(lexer_factory: LexerBuilder) -> Self {
-        let mut runtime = Runtime {
+        Runtime {
             lexer_factory, 
             interner: Default::default(),
             type_cache: HashMap::new(),
             primitives: HashMap::new(),
-        };
-        
-        let int_type = primitive::create_int_type(&mut runtime).unwrap().type_id();
-        runtime.register_primitive(Primitive::Integer, int_type);
-        
-        return runtime;
+        }
     }
     
-    fn register_primitive(&mut self, primitive: Primitive, type_id: TypeID) {
+    pub fn register_primitive(&mut self, primitive: Primitive, type_id: TypeID) {
         debug_assert!(!self.primitives.contains_key(&primitive));
         debug_assert!(self.type_cache.contains_key(&type_id));
         self.primitives.insert(primitive, type_id);
