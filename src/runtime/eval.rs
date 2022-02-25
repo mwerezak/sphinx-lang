@@ -43,7 +43,7 @@ impl<'r> EvalContext<'r> {
         };
         
         if result.is_none() {
-            Err(RuntimeError::new(ErrorKind::UnsupportedUnaryOperand))
+            Err(RuntimeError::new(ErrorKind::UnsupportedUnaryOperand(unimplemented!())))
         } else {
             result.unwrap()
         }

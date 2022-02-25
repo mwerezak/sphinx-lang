@@ -1,12 +1,14 @@
 use std::fmt;
 use std::error::Error;
+use crate::runtime::types::TypeID;
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
 
 #[derive(Debug)]
 pub enum ErrorKind {
-    UnsupportedUnaryOperand,
-    UnsupportedBinaryOperand,  // "unsupported operand types: 'a' and 'b'
+    UnsupportedUnaryOperand(TypeID),   // "unsupported operand type: 'a'
+    UnsupportedBinaryOperand(TypeID, TypeID),  // "unsupported operand types: 'a' and 'b'
+    TypeIDAlreadyTaken(TypeID),
 }
 
 #[derive(Debug)]

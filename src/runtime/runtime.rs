@@ -1,25 +1,44 @@
+use std::collections::HashMap;
 use string_interner::StringInterner;
 
 use crate::lexer::{Lexer, LexerBuilder};
 use crate::parser::Parser;
 use crate::parser::expr::Expr;
 use crate::runtime::data::{Variant, InternStr, StrBackend};
+use crate::runtime::types::{RuntimeType, TypeID};
 use crate::runtime::eval::EvalContext;
-use crate::runtime::errors::RuntimeResult;
+use crate::runtime::errors::{RuntimeResult, RuntimeError, ErrorKind};
 
 // container for data structures necessary for the language runtime
 pub struct Runtime {
     interner: StringInterner<StrBackend>,
     lexer_factory: LexerBuilder,
+    
+    type_cache: HashMap<TypeID, RuntimeType>,
+    
     // globals
     // loaded modules
 }
 
 impl Runtime {
     pub fn new(lexer_factory: LexerBuilder) -> Self {
-        Runtime { 
+        Runtime {
             lexer_factory, 
             interner: Default::default(),
+            type_cache: HashMap::new(),
+        }
+    }
+    
+    // pub fn type_is_registered(&self, type_id: TypeID) -> bool {
+    //     self.type_cache.contains_key(&type_id)
+    // }
+    
+    pub fn register_type(&mut self, type_id: TypeID, rtype: RuntimeType) -> RuntimeResult<&mut RuntimeType> {
+        if self.type_cache.contains_key(&type_id) {
+            Err(RuntimeError::new(ErrorKind::TypeIDAlreadyTaken(type_id)))
+        } else {
+            self.type_cache.insert(type_id, rtype);
+            Ok(self.type_cache.get_mut(&type_id).unwrap())
         }
     }
     
@@ -31,14 +50,14 @@ impl Runtime {
     
     // Interning strings
     
-    pub fn get_or_intern_str<S>(&mut self, string: S) -> InternStr where S: AsRef<str> {
-        InternStr::from_str(string.as_ref(), &mut self.interner)
+    pub fn get_or_intern_str<S: AsRef<str>>(&mut self, s: S) -> InternStr {
+        InternStr::new(self.interner.get_or_intern(s))
     }
     
     // Attempting to resolve an InternStr that was created with a different 
     // Runtime instance may produce unpredictable results or panic.
-    pub fn resolve_str(&self, string: InternStr) -> &str {
-        self.interner.resolve(string.symbol()).unwrap()
+    pub fn resolve_str(&self, s: InternStr) -> &str {
+        self.interner.resolve(s.symbol()).unwrap()
     }
     
 }
