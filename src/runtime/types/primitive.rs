@@ -6,6 +6,18 @@ use crate::runtime::types::builder::RuntimeTypeBuilder;
 use crate::runtime::errors::{RuntimeResult, RuntimeError, ErrorKind};
 
 
+
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub enum Primitive {
+    Nil,
+    Boolean,
+    Integer,
+    Float,
+    String,
+    Tuple,
+    Object,
+}
+
 // Integers
 
 fn int_add(lhs: Variant, rhs: Variant) -> RuntimeResult<Option<Variant>> {

@@ -7,19 +7,9 @@ use string_interner::DefaultBackend;
 
 use crate::language;
 use crate::runtime::Runtime;
-use crate::runtime::types::RuntimeType;
+use crate::runtime::types::{RuntimeType, Primitive};
 use crate::runtime::errors::{RuntimeResult, RuntimeError, ErrorKind};
 
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub enum Primitive {
-    Nil,
-    Boolean,
-    Integer,
-    Float,
-    String,
-    Tuple,
-    Object,
-}
 
 // Fundamental data value type
 #[derive(Debug, Clone, Copy)]

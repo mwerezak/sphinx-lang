@@ -1,6 +1,8 @@
 pub mod builder;
 pub mod primitive;
 
+pub use primitive::Primitive;
+
 use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::runtime::data::{Variant, InternStr};
 use crate::runtime::errors::RuntimeResult;
