@@ -71,7 +71,7 @@ impl Chunk {
         self.bytes.as_slice()
     }
     
-    pub fn push<C: Into<u8>>(&mut self, byte: C) {
+    pub fn push(&mut self, byte: impl Into<u8>) {
         self.bytes.push(byte.into());
     }
     

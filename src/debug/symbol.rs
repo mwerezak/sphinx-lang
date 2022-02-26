@@ -45,7 +45,7 @@ impl ChunkDebugSymbols {
         }
     }
     
-    pub fn symbols(&self) -> &[DebugSymbol] { &self.symbols }
+    pub fn symbols(&self) -> impl Iterator<Item=&DebugSymbol> { self.symbols.iter() }
     
     pub fn push(&mut self, symbol: DebugSymbol) {
         self.symbols.push(symbol)
@@ -53,7 +53,8 @@ impl ChunkDebugSymbols {
 }
 
 pub trait DebugSymbolResolver {
-    fn resolve_symbols<S, R>(&self, symbols: S) -> R 
+    // "impl Trait" is not allowed in trait definitions, it seems
+    fn resolve_symbols<S, R>(&self, symbols: S) -> R
     where S: Iterator<Item=DebugSymbol>, R: Iterator<Item=ResolvedSymbol>;
 }
 

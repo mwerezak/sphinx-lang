@@ -72,14 +72,13 @@ impl Primary {
         Primary { atom, path: Vec::new() }
     }
     
-    pub fn with_path<I>(atom: Atom, path: I) -> Self
-    where I: Iterator<Item=AccessItem> {
+    pub fn with_path<I>(atom: Atom, path: impl Iterator<Item=AccessItem>) -> Self {
         Primary { atom, path: path.collect() }
     }
     
     pub fn atom(&self) -> &Atom { &self.atom }
     
-    pub fn iter_path(&self) -> std::slice::Iter<AccessItem> {
+    pub fn iter_path(&self) -> impl Iterator<Item=&AccessItem> {
         self.path.iter()
     }
     

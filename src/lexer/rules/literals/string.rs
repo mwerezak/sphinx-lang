@@ -91,7 +91,7 @@ pub struct StringLiteralRule {
 }
 
 impl StringLiteralRule {
-    pub fn new<E>(escapes: E) -> Self where E: Iterator<Item=&'static dyn EscapeSequence> {
+    pub fn new(escapes: impl Iterator<Item=&'static dyn EscapeSequence>) -> Self {
         StringLiteralRule {
             raw_buf: String::new(),
             escaped_buf: String::new(),

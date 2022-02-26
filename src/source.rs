@@ -24,7 +24,7 @@ pub struct ModuleSource {
 }
 
 impl ModuleSource {
-    pub fn new<S: ToString>(name: S, source: SourceType) -> Self {
+    pub fn new(name: impl ToString, source: SourceType) -> Self {
         ModuleSource {
             name: name.to_string(), 
             source,

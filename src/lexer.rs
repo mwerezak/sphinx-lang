@@ -84,14 +84,12 @@ impl LexerBuilder {
         return self;
     }
     
-    pub fn insert_rule<R>(mut self, index: usize, rule: R) -> Self
-    where R: LexerRule + 'static {
+    pub fn insert_rule<R>(mut self, index: usize, rule: impl LexerRule + 'static) -> Self {
         self.rules.insert(index, Box::new(rule));
         return self;
     }
     
-    pub fn extend_rules<I, R>(mut self, rules: I) -> Self
-    where I: Iterator<Item=R>, R: LexerRule + 'static {
+    pub fn extend_rules(mut self, rules: impl Iterator<Item=impl LexerRule + 'static>) -> Self {
         for rule in rules {
             self.rules.push(Box::new(rule));
         }
@@ -161,8 +159,7 @@ type PrevNextChars = (Option<char>, Option<char>);
 
 impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
     
-    pub fn new<R>(source: S, options: LexerOptions, rules: R) -> Self
-    where R: Iterator<Item=Box<dyn LexerRule>> {
+    pub fn new(source: S, options: LexerOptions, rules: impl Iterator<Item=Box<dyn LexerRule>>) -> Self {
         Lexer {
             options,
             source: source.peekable(),
