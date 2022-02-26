@@ -7,8 +7,9 @@ use crate::lexer::Span;
 
 #[derive(Debug)]
 pub enum ErrorKind {
-    NoMatchingRule,
+    IOError,
     UnexpectedEOF,
+    NoMatchingRule,
     CouldNotReadToken,
     MaxTokenLengthExceeded,
     SourceTooLong,
@@ -17,6 +18,7 @@ pub enum ErrorKind {
 impl ErrorKind {
     pub fn message(&self) -> &'static str {
         match self {
+            Self::IOError => "error reading source text",
             Self::NoMatchingRule => "unrecognized token",
             Self::UnexpectedEOF => "unexpected end of file",
             Self::CouldNotReadToken => "invalid token",

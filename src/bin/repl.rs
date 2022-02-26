@@ -48,9 +48,9 @@ fn main() {
         match module.source_text().expect("error reading source") {
             SourceText::String(s) => {
                 let mut chars = Vec::new();
-                chars.extend(s.chars());
+                chars.extend(s.chars().map(|c| Ok(c)));
                 
-                let lexer = lexer_factory.build(chars.into_iter());
+                let lexer = lexer_factory.build_once(chars.into_iter());
                 let mut parser = Parser::new(&module, &mut interner, lexer);
                 match parser.next_expr() {
                     Err(error) => println!("{}", error),
@@ -59,7 +59,7 @@ fn main() {
                 
             }
             SourceText::File(readf) => {
-                let lexer = lexer_factory.build(readf.map(|c| c.unwrap()));
+                let lexer = lexer_factory.build_once(readf);
                 let mut parser = Parser::new(&module, &mut interner, lexer);
                 match parser.next_expr() {
                     Err(error) => println!("{}", error),

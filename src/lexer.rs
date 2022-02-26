@@ -8,6 +8,7 @@ pub use rules::MatchResult;
 pub use token::*;
 pub use errors::*;
 
+use std::io;
 use std::iter::{Iterator, Peekable};
 use crate::language;
 
@@ -98,14 +99,16 @@ impl LexerBuilder {
     }
     
     // less expensive than build(), but invalidates self
-    pub fn build_once<S>(self, source: S) -> Lexer<S> 
-    where S: Iterator<Item=char> {
+    pub fn build_once<S>(self, source: S) -> Lexer<S> where S: Iterator<Item=io::Result<char>> {
+        
         Lexer::new(source, self.options, self.rules.into_iter())
+        
     }
     
-    pub fn build<S>(&self, source: S) -> Lexer<S>
-    where S: Iterator<Item=char> {
+    pub fn build<S>(&self, source: S) -> Lexer<S> where S: Iterator<Item=io::Result<char>> {
+        
         Lexer::new(source, self.options.clone(), self.rules.clone().into_iter())
+        
     }
 }
 
@@ -129,7 +132,7 @@ fn token_length(start_idx: TokenIndex, end_idx: TokenIndex) -> Result<TokenLengt
 // instead of passing around references, we pass indices into the rules Vec instead
 type RuleID = usize;
 
-pub struct Lexer<S> where S: Iterator<Item=char> {
+pub struct Lexer<S> where S: Iterator<Item=io::Result<char>> {
     source: Peekable<S>,
     options: LexerOptions,
     rules: Vec<Box<dyn LexerRule>>,
@@ -148,7 +151,7 @@ const THIS_CYCLE: usize = 0;
 const NEXT_CYCLE: usize = 1;
 
 
-impl<S> Iterator for Lexer<S> where S: Iterator<Item=char> {
+impl<S> Iterator for Lexer<S> where S: Iterator<Item=io::Result<char>> {
     type Item = Result<TokenMeta, LexerError>;
     
     fn next(&mut self) -> Option<Self::Item> { Some(self.next_token()) }
@@ -156,7 +159,7 @@ impl<S> Iterator for Lexer<S> where S: Iterator<Item=char> {
 
 type PrevNextChars = (Option<char>, Option<char>);
 
-impl<S> Lexer<S> where S: Iterator<Item=char> {
+impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
     
     pub fn new<R>(source: S, options: LexerOptions, rules: R) -> Self
     where R: Iterator<Item=Box<dyn LexerRule>> {
@@ -172,10 +175,35 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
     }
     
+    // grab the next character from source, transposing any io::Error and mapping it to LexerError
+    fn get_next(&mut self) -> Result<Option<char>, LexerError> {
+        match self.source.next() {
+            None => Ok(None),
+            Some(result) => match result {
+                Ok(c) => Ok(Some(c)),
+                Err(error) => Err(self.inner_error(Box::new(error), ErrorKind::IOError, self.current)),
+            },
+        }
+    }
+    
+    fn peek_next(&mut self) -> Result<Option<char>, LexerError> {
+        let result = match self.source.peek() {
+            None => Ok(None),
+            Some(Ok(c)) => Ok(Some(*c)),
+            
+            // if there is an IO error we cannot process it yet, since peek() merely borrows the error
+            Some(Err(..)) => Err(()),
+        };
+        
+        result.map_err(|_| {
+            let ioerror = self.source.next().unwrap().unwrap_err();
+            self.inner_error(Box::new(ioerror), ErrorKind::IOError, self.current)
+        })
+    }
     
     fn advance(&mut self) -> Result<PrevNextChars, LexerError> {
-        self.last = self.peek_next();
-        let next = self.source.next();
+        self.last = self.peek_next()?;
+        let next = self.get_next()?;
         
         if next.is_some() {
             if self.current == TokenIndex::MAX {
@@ -188,15 +216,8 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
     
     // these have to be &mut self because they can mutate the source iterator
-    fn peek(&mut self) -> PrevNextChars {
-        (self.last, self.peek_next())
-    }
-    
-    fn peek_next(&mut self) -> Option<char> {
-        match self.source.peek() {
-            Some(&ch) => Some(ch),
-            None => None,
-        }
+    fn peek(&mut self) -> Result<PrevNextChars, LexerError> {
+        Ok((self.last, self.peek_next()?))
     }
     
     pub fn at_eof(&mut self) -> bool {
@@ -204,10 +225,10 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
     }
     
     fn skip_whitespace(&mut self) -> Result<(), LexerError> {
-        let mut next = self.peek_next();
+        let mut next = self.peek_next()?;
         while next.is_some() && next.unwrap().is_whitespace() {
             self.advance()?;
-            next = self.peek_next();
+            next = self.peek_next()?;
         }
         Ok(())
     }
@@ -221,7 +242,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         
         let start_pos = self.current;
         loop {
-            let (prev, next) = self.peek();
+            let (prev, next) = self.peek()?;
             let next = match next {
                 Some(ch) => ch,
                 None => break,
@@ -291,7 +312,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         //    advance current to the next char
         
         // check if we are already at EOF
-        let (mut prev, next) = self.peek();
+        let (mut prev, next) = self.peek()?;
         let mut next = match next {
             Some(ch) => ch,
             None => {
@@ -344,7 +365,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                     let rule_id = *complete.iter().min().unwrap();
                     let matching_rule = &mut self.rules[rule_id];
                     let token = matching_rule.get_token()
-                        .map_err(|err| self.token_error(err, token_start))?;
+                        .map_err(|err| self.inner_error(err, ErrorKind::CouldNotReadToken, token_start))?;
                     
                     return self.token_data(token, token_start);
                 
@@ -366,7 +387,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
                 }
                 
                 prev = Some(next);
-                next = match self.peek_next() {
+                next = match self.peek_next()? {
                     Some(ch) => ch,
                     None => break,
                 };
@@ -384,7 +405,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
             let rule_id = *next_complete.iter().min().unwrap();
             let matching_rule = &mut self.rules[rule_id];
             let token = matching_rule.get_token()
-                .map_err(|err| self.token_error(err, token_start))?;
+                .map_err(|err| self.inner_error(err, ErrorKind::CouldNotReadToken, token_start))?;
             
             return self.token_data(token, token_start);
         }
@@ -399,7 +420,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         }
 
         loop {
-            let (prev, next) = self.peek();
+            let (prev, next) = self.peek()?;
             let next = match next {
                 Some(ch) => ch,
                 None => break,
@@ -418,7 +439,7 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         let rule = &mut self.rules[rule_id];
         if let MatchResult::CompleteMatch = rule.current_state() {
             let token = rule.get_token()
-                .map_err(|err| self.token_error(err, token_start))?;
+                .map_err(|err| self.inner_error(err, ErrorKind::CouldNotReadToken, token_start))?;
             
             return self.token_data(token, token_start);
         }
@@ -453,11 +474,11 @@ impl<S> Lexer<S> where S: Iterator<Item=char> {
         LexerError::new(kind, span)
     }
     
-    fn token_error(&self, err: Box<dyn std::error::Error>, token_start: TokenIndex) -> LexerError {
+    fn inner_error(&self, err: Box<dyn std::error::Error>, kind: ErrorKind, token_start: TokenIndex) -> LexerError {
         let span = Span {
             index: token_start,
             length: token_length(token_start, self.current).unwrap_or(0),
         };
-        LexerError::caused_by(err, ErrorKind::CouldNotReadToken, span)
+        LexerError::caused_by(err, kind, span)
     }
 }
