@@ -26,7 +26,7 @@ fn lexer_test_comments() {
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "baz"))
         .add_rule(LineCommentRule::new('#'))
         .add_rule(BlockCommentRule::new("#{", "}#"))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
     
@@ -90,7 +90,7 @@ fn lexer_test_skip_comments() {
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "baz"))
         .add_rule(LineCommentRule::new('#'))
         .add_rule(BlockCommentRule::new("#{", "}#"))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
     

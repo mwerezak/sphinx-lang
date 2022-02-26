@@ -20,7 +20,7 @@ fn lexer_test_identifiers() {
     let mut lexer = LexerBuilder::new()
         .add_rule(IdentifierRule::new())
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     
     assert_token_sequence!(lexer,
@@ -102,7 +102,7 @@ fn lexer_test_keywords_and_identifiers() {
     let mut lexer = LexerBuilder::new()
         .add_rule(KeywordRule::new(Token::Fun, "k"))
         .add_rule(IdentifierRule::new())
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
     
@@ -145,7 +145,7 @@ fn lexer_test_keyword_at_eof() {
     let mut lexer = LexerBuilder::new()
         .add_rule(KeywordRule::new(Token::Fun, "k"))
         .add_rule(IdentifierRule::new())
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
         
     assert_token_sequence!(lexer,
         
@@ -171,7 +171,7 @@ fn lexer_test_integer_literals() {
     let mut lexer = LexerBuilder::new()
         .add_rule(IntegerLiteralRule::new())
         .add_rule(HexIntegerLiteralRule::new())
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
         

@@ -11,7 +11,7 @@ fn lexer_matches_tokens_1() {
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(0), "foo"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "bar"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "baz"))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
         token => {
@@ -38,7 +38,7 @@ fn lexer_skips_whitespace() {
     let mut lexer = LexerBuilder::new()
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "foo"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "bar"))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
         token => {
@@ -61,7 +61,7 @@ fn lexer_tracks_line_numbers() {
     let mut lexer = LexerBuilder::new()
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "foo"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "bar"))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
         
@@ -90,7 +90,7 @@ fn single_char_rule_matches_chars_and_dont_match_invalid() {
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(1), 'a'))
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(2), 'b'))
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(3), 'c'))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
         
@@ -131,7 +131,7 @@ fn rule_substring_tokens_match_1() {
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), 'a'))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "ab"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "abc"))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
         
@@ -167,7 +167,7 @@ fn rule_substring_tokens_match_2() {
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), 'a'))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "ab"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "abc"))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
         
@@ -202,7 +202,7 @@ fn rule_substring_tokens_match_eof() {
     let mut lexer = LexerBuilder::new()
         .add_rule(SingleCharRule::new(Token::IntegerLiteral(0), '+'))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "+="))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
     
@@ -233,7 +233,7 @@ fn lexer_test_matches_tokens_2() {
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "or"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "and"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(3), "+="))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
     
@@ -269,7 +269,7 @@ fn lexer_error_invalid_token() {
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(1), "foo"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(2), "bar"))
         .add_rule(MultiCharRule::new(Token::IntegerLiteral(3), "baz"))
-        .build_once(source.chars());
+        .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
     
