@@ -89,7 +89,7 @@ impl LexerBuilder {
         return self;
     }
     
-    pub fn add_rules<I, R>(mut self, rules: I) -> Self
+    pub fn extend_rules<I, R>(mut self, rules: I) -> Self
     where I: Iterator<Item=R>, R: LexerRule + 'static {
         for rule in rules {
             self.rules.push(Box::new(rule));

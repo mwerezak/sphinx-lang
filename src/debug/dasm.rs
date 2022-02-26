@@ -1,15 +1,21 @@
 use std::fmt;
 use std::fmt::Formatter;
 use crate::runtime::bytecode::{Chunk, OpCode};
+use crate::debug::symbol::ChunkDebugSymbols;
 
 
 pub struct Disassembler<'c> {
     chunk: &'c Chunk,
+    symbols: Option<ChunkDebugSymbols>,
 }
 
 impl<'c> Disassembler<'c> {
     pub fn new(chunk: &'c Chunk) -> Self {
-        Disassembler { chunk }
+        Disassembler { chunk, symbols: None }
+    }
+    
+    pub fn with_symbols(mut self, symbols: ChunkDebugSymbols) -> Self {
+        self.symbols = Some(symbols); self
     }
     
     fn decode_chunk(&self, fmt: &mut Formatter<'_>) -> fmt::Result {

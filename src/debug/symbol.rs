@@ -1,6 +1,7 @@
 pub use crate::lexer::TokenIndex;
 
-use std::path::Path;
+use crate::source::ModuleSource;
+use crate::runtime::bytecode::Chunk;
 
 
 // metadata attached to parser output for error handling and debug output
@@ -19,21 +20,46 @@ impl DebugSymbol {
     }
 }
 
-
-// Temporary, hopefully.
-// Should eventually provide the information necessary 
-// to reload the source code text for error reporting
-#[derive(Debug)]
-pub struct ModuleSource {
-    name: String,
-    path: Option<String>,
+#[derive(Debug, Clone)]
+pub struct ResolvedSymbol {
+    pub line: String,
+    pub lineno: usize,
+    pub start: usize,  // start,end indices into line
+    pub end: usize,
 }
 
-impl ModuleSource {
-    pub fn new<S: ToString>(name: S, path: Option<S>) -> Self {
-        ModuleSource {
-            name: name.to_string(),
-            path: path.map(|s| s.to_string()),
+
+// Container for debug symbols generated for bytecode
+// Should contain a DebugSymbol for each opcode in the 
+// associated Chunk, and in the same order.
+#[derive(Clone)]
+pub struct ChunkDebugSymbols {
+    source: ModuleSource,
+    symbols: Vec<DebugSymbol>,
+}
+
+impl ChunkDebugSymbols {
+    pub fn new(source: ModuleSource) -> Self {
+        ChunkDebugSymbols {
+            source, symbols: Vec::new(),
         }
+    }
+    
+    pub fn symbols(&self) -> &[DebugSymbol] { &self.symbols }
+    
+    pub fn push(&mut self, symbol: DebugSymbol) {
+        self.symbols.push(symbol)
+    }
+}
+
+pub trait DebugSymbolResolver {
+    fn resolve_symbols<S, R>(&self, symbols: S) -> R 
+    where S: Iterator<Item=DebugSymbol>, R: Iterator<Item=ResolvedSymbol>;
+}
+
+impl DebugSymbolResolver for ModuleSource {
+    fn resolve_symbols<S, R>(&self, symbols: S) -> R 
+    where S: Iterator<Item=DebugSymbol>, R: Iterator<Item=ResolvedSymbol> {
+        unimplemented!()
     }
 }

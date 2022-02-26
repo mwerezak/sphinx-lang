@@ -9,9 +9,10 @@ pub mod structs;
 pub use errors::{ParserError, ContextFrame};
 
 use string_interner::StringInterner;
+use crate::source::ModuleSource;
 use crate::runtime::data::StrBackend;
 use crate::lexer::{TokenMeta, Token, LexerError};
-use crate::debug::symbol::{DebugSymbol, ModuleSource};
+use crate::debug::symbol::DebugSymbol;
 
 use expr::{Expr, ExprMeta};
 use primary::{Primary, Atom};

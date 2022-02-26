@@ -33,7 +33,7 @@ impl<'s> fmt::Display for TrimStr<'s> {
 // This struct is born out of a desire to read a file into unicode characters 
 // without pulling the entire file into a buffer
 
-struct ReadChars<R> where R: BufRead {
+pub struct ReadChars<R> where R: BufRead {
     read: R,
     linebuf: String,
     charbuf: VecDeque<char>,
