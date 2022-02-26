@@ -4,9 +4,12 @@ use crate::source::ModuleSource;
 use crate::lexer::{Span, TokenMeta};
 use crate::debug::symbol::{DebugSymbol, TokenIndex};
 
+
+pub type ErrorKind = ParserErrorKind;
+
 // Specifies the actual error that occurred
 #[derive(Debug)]
-pub enum ErrorKind {
+pub enum ParserErrorKind {
     LexerError,
     ExpectedStartOfExpr,   // expected the start of an expression
     ExpectedCloseParen,
@@ -16,7 +19,7 @@ pub enum ErrorKind {
     InvalidAssignmentLHS,   // the LHS of an assignment was not a valid lvalue
 }
 
-impl ErrorKind {
+impl ParserErrorKind {
     pub fn message(&self) -> &'static str {
         match self {
             Self::LexerError => "could not parse token",

@@ -5,8 +5,10 @@ use crate::lexer::Span;
 
 // Lexer Errors
 
+pub type ErrorKind = LexerErrorKind;
+
 #[derive(Debug)]
-pub enum ErrorKind {
+pub enum LexerErrorKind {
     IOError,
     UnexpectedEOF,
     NoMatchingRule,
@@ -15,7 +17,7 @@ pub enum ErrorKind {
     SourceTooLong,
 }
 
-impl ErrorKind {
+impl LexerErrorKind {
     pub fn message(&self) -> &'static str {
         match self {
             Self::IOError => "error reading source text",
