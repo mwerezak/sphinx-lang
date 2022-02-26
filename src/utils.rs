@@ -5,9 +5,9 @@ use std::path::Path;
 use std::collections::VecDeque;
 
 // useful for writing string literals, to ensure that a gigantic string doesnt swamp the output
-pub fn trim_str<'s>(s: &'s str, maxlen: usize) -> TrimStr<'s> {
+pub fn trim_str(target: &str, maxlen: usize) -> TrimStr<'_> {
     TrimStr {
-        target: s.as_ref(),
+        target,
         maxlen,
     }
 }
@@ -54,7 +54,7 @@ impl<R> Iterator for ReadChars<R> where R: BufRead {
     
     fn next(&mut self) -> Option<io::Result<char>> {
         if !self.linebuf.is_empty() {
-            return self.charbuf.pop_front().map(|c| Ok(c));
+            return self.charbuf.pop_front().map(Ok);
         }
         
         // refill linebuf with the next line
@@ -73,6 +73,6 @@ impl<R> Iterator for ReadChars<R> where R: BufRead {
         }
         
         self.charbuf.extend(self.linebuf.chars());
-        self.charbuf.pop_front().map(|c| Ok(c))
+        self.charbuf.pop_front().map(Ok)
     }
 }

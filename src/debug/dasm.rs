@@ -32,15 +32,15 @@ impl<'c> Disassembler<'c> {
         
         let offset = match OpCode::from_byte(instr[0]) {
             Some(OpCode::Const) => {
-                write!(fmt, "{} {: >4}\n", OpCode::Const, instr[1])?;
+                writeln!(fmt, "{} {: >4}", OpCode::Const, instr[1])?;
                 offset + 2
             },
             Some(opcode) => {
-                write!(fmt, "{}\n", opcode)?;
+                writeln!(fmt, "{}", opcode)?;
                 offset + 1
             },
             None => {
-                write!(fmt, "Unknown opcode {:#x}\n", instr[0])?;
+                writeln!(fmt, "Unknown opcode {:#x}", instr[0])?;
                 offset + 1
             }
         };

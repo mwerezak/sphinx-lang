@@ -68,12 +68,12 @@ impl LexerBuilder {
     
     fn set_options(mut self, options: LexerOptions) -> Self {
         self.options = options;
-        return self;
+        self
     }
     
     pub fn set_skip_comments(mut self, skip_comments: bool) -> Self {
         self.options.skip_comments = skip_comments;
-        return self;
+        self
     }
     
     // Note, the order that rules are added determines priority
@@ -81,19 +81,19 @@ impl LexerBuilder {
     pub fn add_rule<R>(mut self, rule: R) -> Self
     where R: LexerRule + 'static {
         self.rules.push(Box::new(rule));
-        return self;
+        self
     }
     
     pub fn insert_rule<R>(mut self, index: usize, rule: impl LexerRule + 'static) -> Self {
         self.rules.insert(index, Box::new(rule));
-        return self;
+        self
     }
     
     pub fn extend_rules(mut self, rules: impl Iterator<Item=impl LexerRule + 'static>) -> Self {
         for rule in rules {
             self.rules.push(Box::new(rule));
         }
-        return self;
+        self
     }
     
     // less expensive than build(), but invalidates self

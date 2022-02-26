@@ -46,7 +46,7 @@ impl LineCommentRule {
         }
         
         // complete comment - anything else will not match
-        return (false, true);
+        (false, true)
     }
 }
 
@@ -144,7 +144,7 @@ impl LexerRule for BlockCommentRule {
             return MatchResult::IncompleteMatch;
         }
         
-        return start_result;
+        start_result
     }
     
     // produce Some(Token) if current state is CompleteMatch, otherwise None

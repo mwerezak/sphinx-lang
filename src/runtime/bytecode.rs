@@ -55,6 +55,7 @@ impl fmt::Display for OpCode {
 
 // Chunks
 
+#[derive(Default)]
 pub struct Chunk {
     bytes: Vec<u8>,
     // consts: 

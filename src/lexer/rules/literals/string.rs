@@ -109,7 +109,7 @@ impl StringLiteralRule {
     fn lookup_escape_for_tag(&self, tag: char) -> Option<&'static dyn EscapeSequence> {
         self.escapes.iter()
             .find(|escape| tag == escape.tag())
-            .map(|escape| *escape)
+            .copied()
     }
     
     // can't take a reference to the escape or argument by parameter since it would cause borrow issues
@@ -217,7 +217,8 @@ impl LexerRule for StringLiteralRule {
             self.escaped_buf.push(next);
         }
         self.raw_buf.push(next);
-        return MatchResult::IncompleteMatch;
+        
+        MatchResult::IncompleteMatch
     }
     
     fn get_token(&self) -> Result<Token, TokenError> {

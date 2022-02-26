@@ -48,7 +48,7 @@ fn main() {
         match module.source_text().expect("error reading source") {
             SourceText::String(s) => {
                 let mut chars = Vec::new();
-                chars.extend(s.chars().map(|c| Ok(c)));
+                chars.extend(s.chars().map(Ok));
                 
                 let lexer = lexer_factory.build_once(chars.into_iter());
                 let mut parser = Parser::new(&module, &mut interner, lexer);

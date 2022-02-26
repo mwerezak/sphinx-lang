@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::io;
 use crate::utils::ReadChars;
 
@@ -39,7 +39,7 @@ impl ModuleSource {
         }
     }
     
-    fn read_source_file(path: &PathBuf) -> io::Result<ReadFileChars> {
+    fn read_source_file(path: &Path) -> io::Result<ReadFileChars> {
         let file = fs::File::open(path)?;
         let reader = io::BufReader::new(file);
         Ok(ReadChars::new(reader))

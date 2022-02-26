@@ -64,18 +64,6 @@ impl BinaryOp {
             BinaryOp::Or => 10,
         }
     }
-    
-    pub fn is_associative(&self) -> bool {
-        match self {
-            BinaryOp::LT 
-            | BinaryOp::GT 
-            | BinaryOp::LE 
-            | BinaryOp::GE 
-            | BinaryOp::EQ 
-            | BinaryOp::NE => false,
-            _ => true,
-        }
-    }
 }
 
 impl fmt::Display for BinaryOp {
