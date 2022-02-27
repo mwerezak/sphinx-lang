@@ -8,9 +8,8 @@ pub mod structs;
 
 pub use errors::{ParserError, ContextFrame};
 
-use string_interner::StringInterner;
 use crate::source::ModuleSource;
-use crate::runtime::data::StrBackend;
+use crate::runtime::data::StringInterner;
 use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::debug::symbol::DebugSymbol;
 
@@ -27,7 +26,7 @@ use errors::{ErrorPrototype, ErrorKind, ErrorContext, ContextTag};
 
 pub struct Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     module: &'m ModuleSource,
-    interner: &'h mut StringInterner<StrBackend>,
+    interner: &'h mut StringInterner,
     tokens: T,
     next: Option<Result<TokenMeta, LexerError>>,
 }
@@ -36,7 +35,7 @@ type InternalResult<T> = Result<T, ErrorPrototype>;
 
 impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     
-    pub fn new(module: &'m ModuleSource, interner: &'h mut StringInterner<StrBackend>, tokens: T) -> Self {
+    pub fn new(module: &'m ModuleSource, interner: &'h mut StringInterner, tokens: T) -> Self {
         Parser {
             module,
             interner,
