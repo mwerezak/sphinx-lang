@@ -13,7 +13,7 @@ use crate::runtime::data::StringInterner;
 use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::debug::symbol::DebugSymbol;
 
-use expr::{Expr, ExprMeta};
+use expr::{Expr, ExprVariant};
 use primary::{Primary, Atom};
 use operator::{UnaryOp, BinaryOp, OpLevel, OP_LEVEL_START, OP_LEVEL_END};
 use structs::{ObjectConstructor};
@@ -75,14 +75,11 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     // temporary top level, will change when statement parsing is added
     // Note: the value returned from this method no longer needs the interner 'h
     // but the compiler can't guess that, so we have to be explicit about the lifetimes here
-    pub fn next_expr(&mut self) -> Result<ExprMeta, ParserError<'m>> { 
-        let mut ctx = ErrorContext::new(self.module, ContextTag::Expr);
+    pub fn placeholder_toplevel(&mut self) -> Result<Expr, ParserError<'m>> { 
+        let mut ctx = ErrorContext::new(self.module, ContextTag::Statement);
         
         match self.parse_expr(&mut ctx) {
-            Ok(expr) => {
-                // grab debugging info from the current context and attach it to the result
-                Ok(ExprMeta::new(expr, ctx.into()))
-            },
+            Ok(expr) => Ok(expr),
             Err(err) => {
                 // TODO synchronize
             
@@ -116,13 +113,27 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         if rest_exprs.is_empty() {
             Ok(first_expr)
         } else {
-            ctx.pop_extend();
             rest_exprs.insert(0, first_expr);
-            Ok(Expr::Tuple(rest_exprs))
+            let tuple = ExprVariant::Tuple(rest_exprs);
+            let symbol = DebugSymbol::from(ctx.frame());
+            
+            ctx.pop_extend(); // pop the TupleCtor context frame
+            Ok(Expr::new(tuple, symbol))
         }
     }
     
+    // parse an expression that cannot be a tuple
     fn parse_inner_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+        ctx.push(ContextTag::Expr);
+        
+        let variant = self.parse_expr_variant(ctx)?;
+        let symbol = DebugSymbol::from(ctx.frame());
+        
+        ctx.pop_extend();
+        Ok(Expr::new(variant, symbol))
+    }
+    
+    fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         self.parse_assignment_expr(ctx)  // the top of the recursive descent stack for expressions
     }
     
@@ -133,7 +144,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         assignment-target ::= ( "var" )? lvalue ; 
     */
     
-    fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         
         // descend recursively
         let expr = self.parse_binop_expr(ctx, OP_LEVEL_START)?;
@@ -146,14 +157,14 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             
             // LHS of assignment has to be an lvalue
             let lhs = match expr {
-                Expr::Primary(lhs) if lhs.is_lvalue() => lhs,
+                ExprVariant::Primary(lhs) if lhs.is_lvalue() => lhs,
                 _ => return Err(ErrorPrototype::new(ErrorKind::InvalidAssignmentLHS)),
             };
 
-            let rhs_expr = self.parse_expr(ctx)?;
+            let rhs_expr = self.parse_expr_variant(ctx)?;
             
             ctx.pop_extend();
-            return Ok(Expr::assignment(*lhs, assign_op, rhs_expr));
+            return Ok(ExprVariant::assignment(*lhs, assign_op, rhs_expr));
         }
         
         Ok(expr)
@@ -166,7 +177,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         operand[8] ::= comparison ;
         operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
     */
-    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext, level: OpLevel) -> InternalResult<Expr> {
+    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext, level: OpLevel) -> InternalResult<ExprVariant> {
         if level == OP_LEVEL_END {
             return self.parse_unary_expr(ctx);  // exit binop precedence recursion
         }
@@ -191,7 +202,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             
             let rhs_expr = self.parse_binop_expr(ctx, level - 1)?;
             
-            expr = Expr::binary_op(binary_op, expr, rhs_expr);
+            expr = ExprVariant::binary_op(binary_op, expr, rhs_expr);
             
             ctx.pop_extend();
         }
@@ -204,16 +215,16 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         
         unary-expression ::= ( "-" | "+" | "not" ) unary | primary ;
     */
-    fn parse_unary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_unary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         let next = self.peek()?;
         if let Some(unary_op) = Self::which_unary_op(&next.token) {
             ctx.push(ContextTag::UnaryOpExpr);
             ctx.set_start(&self.advance().unwrap()); // consume unary_op token
             
-            let expr = self.parse_inner_expr(ctx)?;
+            let expr = self.parse_expr_variant(ctx)?;
             
             ctx.pop_extend();
-            return Ok(Expr::unary_op(unary_op, expr));
+            return Ok(ExprVariant::unary_op(unary_op, expr));
         }
         
         self.parse_primary_expr(ctx)
@@ -223,7 +234,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         Here we parse all the things that can be immediately identified
         from the next token, or else fall back to a primary expression
     */
-    fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         let next = self.peek()?;
         match next.token {
             Token::Class => unimplemented!(),
@@ -232,7 +243,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             
             // Token::OpenBrace => Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?)),
             
-            _ => Ok(Expr::primary(self.parse_primary(ctx)?)),
+            _ => Ok(ExprVariant::primary(self.parse_primary(ctx)?)),
         }
     }
 
@@ -499,12 +510,17 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             tuple_exprs.push(next_expr);
         }
         
-        ctx.pop_extend();
-        if tuple_exprs.is_empty() {
-            Ok(Atom::group(expr.unwrap()))
+        let group = if tuple_exprs.is_empty() {
+            Atom::group(expr.unwrap())
         } else {
-            Ok(Atom::group(Expr::Tuple(tuple_exprs)))
-        }
+            let tuple = ExprVariant::Tuple(tuple_exprs);
+            let symbol = DebugSymbol::from(ctx.frame());
+            
+            Atom::group(Expr::new(tuple, symbol))
+        };
+        
+        ctx.pop_extend();
+        Ok(group)
     }
     
     

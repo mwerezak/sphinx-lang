@@ -55,7 +55,7 @@ impl Atom {
 // These are the highest precedence operations in the language
 #[derive(Debug, Clone)]
 pub enum AccessItem {
-    Member(InternStr),
+    Access(InternStr),
     Index(Box<Expr>),
     Invoke(),       // TODO
     Construct(ObjectConstructor),
@@ -92,12 +92,12 @@ impl Primary {
             matches!(self.atom, Atom::Identifier(..) | Atom::GlobalIdentifier(..))
         } else {
             let last_op = self.path.last().unwrap();
-            matches!(last_op, AccessItem::Member(..) | AccessItem::Index(..))
+            matches!(last_op, AccessItem::Access(..) | AccessItem::Index(..))
         }
     }
     
     pub fn push_access_member(&mut self, name: &str, interner: &mut StringInterner) {
-        self.path.push(AccessItem::Member(InternStr::from_str(name, interner)))
+        self.path.push(AccessItem::Access(InternStr::from_str(name, interner)))
     }
     
     pub fn push_access_index(&mut self, expr: Expr) {

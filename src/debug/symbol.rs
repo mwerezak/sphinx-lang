@@ -360,7 +360,7 @@ impl std::error::Error for SymbolResolutionError {
 }
 
 impl fmt::Display for SymbolResolutionError {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         unimplemented!()
     }
 }

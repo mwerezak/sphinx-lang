@@ -4,13 +4,13 @@ use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::parser::structs::{ObjectConstructor};
 
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub enum ExprVariant {
     
     Primary(Box<Primary>),
     
-    UnaryOp(UnaryOp, Box<Expr>),
+    UnaryOp(UnaryOp, Box<ExprVariant>),
     
-    BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
+    BinaryOp(BinaryOp, Box<ExprVariant>, Box<ExprVariant>),
     
     Assignment(Box<AssignmentInfo>), // use a box to keep size of Expr down
     
@@ -20,48 +20,46 @@ pub enum Expr {
     
 }
 
-impl Expr {
+impl ExprVariant {
     pub fn primary(primary: Primary) -> Self {
         Self::Primary(Box::new(primary))
     }
     
-    pub fn unary_op(op: UnaryOp, expr: Expr) -> Self {
+    pub fn unary_op(op: UnaryOp, expr: ExprVariant) -> Self {
         Self::UnaryOp(op, Box::new(expr))
     }
     
-    pub fn binary_op(op: BinaryOp, lhs: Expr, rhs: Expr) -> Self {
+    pub fn binary_op(op: BinaryOp, lhs: ExprVariant, rhs: ExprVariant) -> Self {
         Self::BinaryOp(op, Box::new(lhs), Box::new(rhs))
     }
     
-    pub fn assignment(lhs: Primary, op: Option<BinaryOp>, rhs: Expr) -> Self {
+    pub fn assignment(lhs: Primary, op: Option<BinaryOp>, rhs: ExprVariant) -> Self {
         debug_assert!(lhs.is_lvalue());
-        
         Self::Assignment(Box::new(AssignmentInfo { lhs, op, rhs }))
     }
-    
-    // pub fn object_ctor
 }
 
 #[derive(Debug, Clone)]
 pub struct AssignmentInfo {
     lhs: Primary,
     op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
-    rhs: Expr,
+    rhs: ExprVariant,
 }
 
 
 #[derive(Debug, Clone)]
-pub struct ExprMeta {
-    expr: Expr,
-    debug: DebugSymbol,
+pub struct Expr {
+    variant: ExprVariant,
+    symbol: DebugSymbol,
 }
 
-impl ExprMeta {
-    pub fn new(expr: Expr, debug: DebugSymbol) -> Self {
-        ExprMeta { expr, debug }
+impl Expr {
+    pub fn new(variant: ExprVariant, symbol: DebugSymbol) -> Self {
+        Expr { variant, symbol }
     }
     
-    pub fn expr(&self) -> &Expr { &self.expr }
+    pub fn variant(&self) -> &ExprVariant { &self.variant }
     
-    pub fn debug_symbol(&self) -> &DebugSymbol { &self.debug }
+    pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
 }
+

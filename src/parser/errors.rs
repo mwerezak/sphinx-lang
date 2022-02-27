@@ -38,6 +38,7 @@ impl ParserErrorKind {
 pub enum ContextTag {
     Token,  // errors retrieving the actual tokens
     Expr,
+    Statement,
     AssignmentExpr,
     BinaryOpExpr,
     UnaryOpExpr,
@@ -211,11 +212,9 @@ impl ContextFrame {
     }
 }
 
-impl From<ErrorContext<'_>> for DebugSymbol {
-    fn from(ctx: ErrorContext) -> Self {
-        let frame = ctx.take();
-        
-        match (frame.start, frame.end) {
+impl From<&ContextFrame> for DebugSymbol {
+    fn from(frame: &ContextFrame) -> Self {
+        match (frame.start.clone(), frame.end.clone()) {
             (Some(start), Some(end)) => {
                 let start_index = start.index;
                 let end_index = end.index + TokenIndex::from(end.length);
