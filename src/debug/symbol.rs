@@ -3,6 +3,8 @@ pub use crate::lexer::{TokenIndex, TokenLength};
 use std::fmt;
 use std::io;
 use std::cmp;
+use std::iter;
+use std::rc::Rc;
 use std::collections::{BinaryHeap, HashMap};
 use crate::source::{ModuleSource, SourceText};
 use crate::runtime::bytecode::Chunk;
@@ -42,7 +44,7 @@ impl ChunkDebugSymbols {
     }
     
     pub fn symbols(&self) -> impl Iterator<Item=&DebugSymbol> { 
-        self.symbols.iter().flat_map(|(sym, count)| std::iter::repeat(sym).take(usize::from(*count)))
+        self.symbols.iter().flat_map(|(sym, count)| iter::repeat(sym).take(usize::from(*count)))
     }
     
     pub fn push(&mut self, symbol: DebugSymbol) {
@@ -67,91 +69,99 @@ impl ChunkDebugSymbols {
 
 #[derive(Debug, Clone)]
 pub struct ResolvedSymbol {
-    text: String,
+    lines: Vec<Rc<String>>,
     lineno: usize,  // line number at the start of the symbol
     start: usize,   // start,end indices into self.text
     end: usize,
-    
-    // indices to chars in self.text at the start of each line, except the first
-    // if this is a single-line symbol then this will be empty
-    lines: Vec<usize>, 
 }
 
 impl ResolvedSymbol {
-    pub fn new(text: String, lineno: usize, start: usize, end: usize) -> Self {
-        let mut lines = Vec::new();
-        for (index, c) in text.chars().enumerate() {
-            if c == '\n' && index + 1 < text.len() {
-                lines.push(index + 1);
+    pub fn new(lines: Vec<Rc<String>>, lineno: usize, start: usize, end: usize) -> Self {
+        ResolvedSymbol { lines, lineno, start, end }
+    }
+    
+    pub fn is_multiline(&self) -> bool { self.lines.len() > 1 }
+    
+    // includes surrounding text on the same lines, trims trailing whitespace
+    pub fn fmt_entire_text(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for line in self.iter_entire_lines() {
+            fmt.write_str(line.trim_end())?;
+            fmt.write_str("\n")?;
+        }
+        Ok(())
+    }
+    
+    // trims trailing whitespace
+    pub fn fmt_symbol_text(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result { 
+        for line in self.iter_lines() {
+            fmt.write_str(line.trim_end())?;
+            fmt.write_str("\n")?;
+        }
+        Ok(())
+    }
+    
+    pub fn fmt_single_line(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result { 
+        if let Some(first_line) = self.iter_lines().nth(0) {
+            if self.is_multiline() {
+                write!(fmt, "{}...", first_line.trim_end())?;
+            } else {
+                fmt.write_str(first_line)?;
             }
         }
-        
-        ResolvedSymbol { text, lineno, start, end, lines }
+        Ok(())
     }
     
-    pub fn is_multiline(&self) -> bool { !self.lines.is_empty() }
-    
-    pub fn symbol_text(&self) -> &str { 
-        &self.text[self.start..self.end]
+    pub fn iter_entire_lines(&self) -> impl Iterator<Item=&str> { 
+        self.lines.iter().map(|s| s.as_str())
     }
     
-    // includes surrounding text on the same lines
-    pub fn entire_text(&self) -> &str {
-        &self.text
-    }
-    
-    // iterate the lines of a multiline symbol WITHOUT the newline characters
+    // write just the symbol text itself
     pub fn iter_lines(&self) -> impl Iterator<Item=&str> { 
-        IterLines { 
-            text: self.text.as_str(),
-            newlines: self.lines.iter().copied(),
-            prev: 0
+        self.lines.iter().scan(0, |cur_line_start, line| {
+            let cur_line_end = *cur_line_start + line.len();
+            
+            let result;
+            if (*cur_line_start <= self.start) && (self.start < cur_line_end) {
+                let start = self.start - *cur_line_start;
+                result = &line[start..];
+            } else if (*cur_line_start <= self.end) && (self.end < cur_line_end) {
+                let end = self.end - *cur_line_start;
+                result = &line[..end];
+            } else {
+                result = line.as_str();
+            };
+            
+            *cur_line_start = cur_line_end;
+            Some(result)
+        })
+    }
+}
+
+impl ToString for ResolvedSymbol {
+    fn to_string(&self) -> String {
+        let mut string = String::new();
+        for line in self.iter_lines() {
+            string += line;
         }
-    }
-    
-    // returns a Display that will produce an abbreviated version of the symbol showing just the first line
-    // if the symbol isn't multiline, the result will be the same as format!("{}", self.symbol())
-    pub fn as_single_line_fmt(&self) -> impl fmt::Display + '_ {
-        SingleLineFormat { symbol: &self }
+        string
     }
 }
 
-impl fmt::Display for ResolvedSymbol {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.write_str(self.symbol_text())
-    }
-}
 
-struct IterLines<'s, I> where I: Iterator<Item=usize> {
-    text: &'s str,
-    newlines: I,
-    prev: usize,
-}
 
-impl<'s, I> Iterator for IterLines<'s, I> where I: Iterator<Item=usize> {
-    type Item = &'s str;
-    fn next(&mut self) -> Option<Self::Item> {
-        let line_end = self.newlines.next()?;
-        let line_start = self.prev;
-        self.prev = line_end;
-        
-        Some(&self.text[line_start..line_end - 1]) //drop the terminating newline
-    }
-}
+// struct SingleLineFormat<'s> {
+//     symbol: &'s ResolvedSymbol,
+// }
 
-struct SingleLineFormat<'s> {
-    symbol: &'s ResolvedSymbol,
-}
-
-impl fmt::Display for SingleLineFormat<'_> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(line) = self.symbol.iter_lines().nth(0) {
-            write!(fmt, "{}...", line)
-        } else {
-            fmt.write_str(self.symbol.symbol_text())
-        }
-    }
-}
+// impl fmt::Display for SingleLineFormat<'_> {
+//     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         if let Some(line) = self.symbol.iter_lines().nth(0) {
+//             write!(fmt, "{}...", line)
+//         } else {
+//             fmt.write_str(self.symbol.symbol_text())
+//         }
+//     }
+// }
 
 // Resolved Symbol Formatting
 
@@ -182,8 +192,8 @@ fn resolve_debug_symbols(source: impl Iterator<Item=io::Result<char>>, symbols: 
     next_symbols.extend(symbols.map(|sym| IndexSort(sym, SortIndex::Start)).map(cmp::Reverse));
     
     let mut open_symbols = BinaryHeap::new();
-    let mut active_symbols = HashMap::<DebugSymbol, (String, usize, usize)>::new(); // values are (buffer, line number, start index)
-    let mut closing_symbols = HashMap::<DebugSymbol, (String, usize, usize, usize)>::new();
+    let mut active_symbols = HashMap::<DebugSymbol, (Vec<Rc<String>>, usize, usize)>::new(); // values are (buffer, line number, start index)
+    let mut closing_symbols = HashMap::<DebugSymbol, (Vec<Rc<String>>, usize, usize, usize)>::new();
     let mut resolved_symbols = ResolvedSymbolTable::new();
     
     let mut lineno = 1;  // count lines
@@ -199,24 +209,25 @@ fn resolve_debug_symbols(source: impl Iterator<Item=io::Result<char>>, symbols: 
                 for cmp::Reverse(IndexSort(symbol,..)) in open_symbols.drain() {
                     resolved_symbols.insert(symbol, Err(ErrorKind::IOError.into()));
                 }
-            
-                for (symbol, (strbuf, lineno, start_index, end_index)) in closing_symbols.drain() {
-                    let resolved = ResolvedSymbol::new(strbuf + "...???", lineno, start_index, end_index);
+                
+                // we've already have the required text for all closing symbols, so we don't need to drop them
+                // just add a suffix that indicates that there was some trailing line content that was lost due to an error
+                let error_rc = Rc::new(current_line.clone() + "...???");
+                for (symbol, (mut lines, lineno, start_index, end_index)) in closing_symbols.drain() {
+                    lines.push(error_rc.clone());
+                    let resolved = ResolvedSymbol::new(lines, lineno, start_index, end_index);
                     resolved_symbols.insert(symbol, Ok(resolved));
                 }
+                
+                current_line.clear();
+                current_line += "???...";
             
                 break;
             },
         };
         
-        // add the char to symbols
+        // add the char to the current line
         current_line.push(c);
-        for (ref mut strbuf, ..) in active_symbols.values_mut() {
-            strbuf.push(c);
-        }
-        for (ref mut strbuf, ..) in closing_symbols.values_mut() {
-            strbuf.push(c);
-        }
         
         // if we are at the start of a new symbol, open it
         while matches!(next_symbols.peek(), Some(&cmp::Reverse(IndexSort(ref sym,..))) if index == sym.start) {
@@ -225,30 +236,47 @@ fn resolve_debug_symbols(source: impl Iterator<Item=io::Result<char>>, symbols: 
                 open_symbols.push(cmp::Reverse(IndexSort(symbol.clone(), SortIndex::End)));
                 
                 let start_index = current_line.len() - 1;
-                let symbol_data = (current_line.clone(), lineno, start_index); 
-                active_symbols.insert(symbol, symbol_data);
+                active_symbols.insert(symbol, (Vec::new(), lineno, start_index));
             }
         }
         
-        // if we are at the end of an open symbol, close it
+        // if we are at the end of an open symbol, mark it as closing
         while matches!(open_symbols.peek(), Some(&cmp::Reverse(IndexSort(ref sym,..))) if index == sym.end) {
             let symbol = open_symbols.pop().unwrap().0.0;
-            if let Some((strbuf, lineno, start_index)) = active_symbols.remove(&symbol) {
+            if let Some((lines, lineno, start_index)) = active_symbols.remove(&symbol) {
                 if !closing_symbols.contains_key(&symbol) {
-                    let end_index = strbuf.len();
-                    closing_symbols.insert(symbol, (strbuf, lineno, start_index, end_index));
+                    
+                    let total_len = lines.iter()
+                        .map(|line| line.len())
+                        .reduce(|acc, n| acc+n)
+                        .unwrap_or(0);
+                    
+                    let end_index = total_len + current_line.len() - 1;
+                    closing_symbols.insert(symbol, (lines, lineno, start_index, end_index));
                 }
             }
         }
         
-        // finalize all symbols in closing_symbols at the end of the current line
+        // once we complete the current line, add it to all open and closing symbols
         if c == '\n' {
             lineno +=1; // count newlines
-            current_line.clear();
-            for (symbol, (strbuf, lineno, start_index, end_index)) in closing_symbols.drain() {
-                let resolved = ResolvedSymbol::new(strbuf, lineno, start_index, end_index);
+            let line_rc = Rc::new(current_line.clone());
+            
+            // open symbols
+            for (ref mut lines, ..) in active_symbols.values_mut() {
+                lines.push(line_rc.clone());
+            }
+            
+            // close all closing symbols
+            for (symbol, (mut lines, lineno, start_index, end_index)) in closing_symbols.drain() {
+                lines.push(line_rc.clone());
+                
+                let resolved = ResolvedSymbol::new(lines, lineno, start_index, end_index);
                 resolved_symbols.insert(symbol, Ok(resolved));
             }
+            
+            // prepare buffer for next line
+            current_line.clear();
         }
         
         if next_symbols.is_empty() && active_symbols.is_empty() && closing_symbols.is_empty() {
