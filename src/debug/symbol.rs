@@ -82,36 +82,7 @@ impl ResolvedSymbol {
     
     pub fn is_multiline(&self) -> bool { self.lines.len() > 1 }
     
-    // includes surrounding text on the same lines, trims trailing whitespace
-    pub fn fmt_entire_text(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for line in self.iter_entire_lines() {
-            fmt.write_str(line.trim_end())?;
-            fmt.write_str("\n")?;
-        }
-        Ok(())
-    }
-    
-    // trims trailing whitespace
-    pub fn fmt_symbol_text(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result { 
-        for line in self.iter_lines() {
-            fmt.write_str(line.trim_end())?;
-            fmt.write_str("\n")?;
-        }
-        Ok(())
-    }
-    
-    pub fn fmt_single_line(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result { 
-        if let Some(first_line) = self.iter_lines().nth(0) {
-            if self.is_multiline() {
-                write!(fmt, "{}...", first_line.trim_end())?;
-            } else {
-                fmt.write_str(first_line)?;
-            }
-        }
-        Ok(())
-    }
-    
-    pub fn iter_entire_lines(&self) -> impl Iterator<Item=&str> { 
+    pub fn iter_whole_lines(&self) -> impl Iterator<Item=&str> { 
         self.lines.iter().map(|s| s.as_str())
     }
     
@@ -135,33 +106,77 @@ impl ResolvedSymbol {
             Some(result)
         })
     }
+    
+    
+    // Formatting
+    
+    // trims trailing whitespace
+    fn fmt_symbol_text(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result { 
+        for line in self.iter_lines() {
+            fmt.write_str(line.trim_end())?;
+            fmt.write_str("\n")?;
+        }
+        Ok(())
+    }
+    
+    
+    pub fn as_whole_line_fmt(&self) -> impl fmt::Display + '_ {
+        WholeLineFormat { symbol: &self }
+    }
+    
+    // includes surrounding text on the same lines, trims trailing whitespace
+    fn fmt_whole_lines(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for line in self.iter_whole_lines() {
+            fmt.write_str(line.trim_end())?;
+            fmt.write_str("\n")?;
+        }
+        Ok(())
+    }
+    
+    pub fn as_single_line_fmt(&self) -> impl fmt::Display + '_ {
+        SingleLineFormat { symbol: self }
+    }
+    
+    fn fmt_single_line(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result { 
+        if let Some(first_line) = self.iter_lines().nth(0) {
+            if self.is_multiline() {
+                write!(fmt, "{}...", first_line.trim_end())?;
+            } else {
+                fmt.write_str(first_line.trim_end())?;
+            }
+        }
+        Ok(())
+    }
 }
 
-impl ToString for ResolvedSymbol {
-    fn to_string(&self) -> String {
-        let mut string = String::new();
-        for line in self.iter_lines() {
-            string += line;
-        }
-        string
+impl fmt::Display for ResolvedSymbol {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.fmt_symbol_text(fmt)
     }
 }
 
 
+struct SingleLineFormat<'s> {
+    symbol: &'s ResolvedSymbol,
+}
 
-// struct SingleLineFormat<'s> {
-//     symbol: &'s ResolvedSymbol,
-// }
+impl fmt::Display for SingleLineFormat<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.symbol.fmt_single_line(fmt)
+    }
+}
 
-// impl fmt::Display for SingleLineFormat<'_> {
-//     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         if let Some(line) = self.symbol.iter_lines().nth(0) {
-//             write!(fmt, "{}...", line)
-//         } else {
-//             fmt.write_str(self.symbol.symbol_text())
-//         }
-//     }
-// }
+struct WholeLineFormat<'s> {
+    symbol: &'s ResolvedSymbol,
+}
+
+impl fmt::Display for WholeLineFormat<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.symbol.fmt_whole_lines(fmt)
+    }
+}
+
+
 
 // Resolved Symbol Formatting
 
