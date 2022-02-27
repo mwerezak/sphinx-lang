@@ -76,3 +76,22 @@ impl<R> Iterator for ReadChars<R> where R: BufRead {
         self.charbuf.pop_front().map(Ok)
     }
 }
+
+
+
+// Formatter that uses a closure
+// Useful to avoid a lot of boilerplate when there are multiple ways to Display a struct
+
+pub fn delegate_fmt<F>(fmt_func: F) -> impl fmt::Display where F: Fn(&mut fmt::Formatter<'_>) -> fmt::Result {
+    FnFormatter { fmt_func }
+}
+
+struct FnFormatter<F> where F: Fn(&mut fmt::Formatter<'_>) -> fmt::Result {
+    fmt_func: F,
+}
+
+impl<F> fmt::Display for FnFormatter<F> where F: Fn(&mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (self.fmt_func)(fmt)
+    }
+}

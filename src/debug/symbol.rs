@@ -6,6 +6,8 @@ use std::cmp;
 use std::iter;
 use std::rc::Rc;
 use std::collections::{BinaryHeap, HashMap};
+
+use crate::utils::delegate_fmt;
 use crate::source::{ModuleSource, SourceText};
 use crate::runtime::bytecode::Chunk;
 
@@ -121,7 +123,7 @@ impl ResolvedSymbol {
     
     
     pub fn as_whole_line_fmt(&self) -> impl fmt::Display + '_ {
-        WholeLineFormat { symbol: &self }
+        delegate_fmt(|fmt| self.fmt_whole_lines(fmt))
     }
     
     // includes surrounding text on the same lines, trims trailing whitespace
@@ -134,7 +136,7 @@ impl ResolvedSymbol {
     }
     
     pub fn as_single_line_fmt(&self) -> impl fmt::Display + '_ {
-        SingleLineFormat { symbol: self }
+        delegate_fmt(|fmt| self.fmt_single_line(fmt))
     }
     
     fn fmt_single_line(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result { 
@@ -154,28 +156,6 @@ impl fmt::Display for ResolvedSymbol {
         self.fmt_symbol_text(fmt)
     }
 }
-
-
-struct SingleLineFormat<'s> {
-    symbol: &'s ResolvedSymbol,
-}
-
-impl fmt::Display for SingleLineFormat<'_> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.symbol.fmt_single_line(fmt)
-    }
-}
-
-struct WholeLineFormat<'s> {
-    symbol: &'s ResolvedSymbol,
-}
-
-impl fmt::Display for WholeLineFormat<'_> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.symbol.fmt_whole_lines(fmt)
-    }
-}
-
 
 
 // Resolved Symbol Formatting
