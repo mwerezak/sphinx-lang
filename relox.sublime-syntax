@@ -99,6 +99,8 @@ contexts:
       scope: keyword.operator.logical
     - match: \=
       scope: keyword.operator.assignment
+    - match: '@'
+      scope: keyword.operator
 
   strings:
     # Strings begin and end with quotes, and use backslashes as an escape

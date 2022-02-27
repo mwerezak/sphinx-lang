@@ -303,6 +303,35 @@ fn()
 var anonFn = fun(x) x + 1 end
 var a = anonFn(3)
 
+
+# Commenting this out because its kind of experimental
+# # Decorator Syntax
+
+# # The "@" syntax can be used to pass a single argument to a function without needing parens
+# @f @g h(x)  # equivalent to f(g(h(x)))
+
+# # This is useful for wrapping functions (and classes, which we'll see later), e.g.
+
+# fun trace(tag)
+#   return fun(func)
+#     echo "Calling " + tag + "!"  # TODO string interpolation
+#   end
+# end
+
+# @trace("do_stuff")
+# fun do_stuff()
+#   # do some stuff here
+# end
+
+# # There is a bit of subtlety required to make this work.
+# # All function definitions are *expressions*, even named functions.
+# # Defining a named function e.g. "fun name() ... end" is equivalent to the
+# # assignment expression "(name = fun() ... end)"
+
+# # However, whenver a
+
+
+
 # Classes
 
 something.field = 1
