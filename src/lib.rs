@@ -11,5 +11,6 @@ pub mod lexer;
 pub mod parser;
 pub mod language;
 pub mod runtime;
+pub mod interpreter;
 pub mod frontend;
 pub mod debug;
