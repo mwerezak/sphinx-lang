@@ -220,16 +220,16 @@ impl From<ErrorContext<'_>> for DebugSymbol {
                 let start_index = start.index;
                 let end_index = end.index + TokenIndex::from(end.length);
                 
-                DebugSymbol::new(start_index, end_index)
+                (start_index, end_index).into()
             },
             (Some(span), None) | (None, Some(span)) => {
                 let start_index = span.index;
                 let end_index = span.index + TokenIndex::from(span.length);
                 
-                DebugSymbol::new(start_index, end_index)
+                (start_index, end_index).into()
             },
             (None, None) => {
-                DebugSymbol::new(0, 0)
+                panic!("ContextFrame has no source index information");
             }
         }
     }
