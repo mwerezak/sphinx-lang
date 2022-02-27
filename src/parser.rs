@@ -221,7 +221,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             ctx.push(ContextTag::UnaryOpExpr);
             ctx.set_start(&self.advance().unwrap()); // consume unary_op token
             
-            let expr = self.parse_expr_variant(ctx)?;
+            let expr = self.parse_primary_expr(ctx)?;
             
             ctx.pop_extend();
             return Ok(ExprVariant::unary_op(unary_op, expr));
@@ -231,8 +231,8 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     }
     
     /*
-        Here we parse all the things that can be immediately identified
-        from the next token, or else fall back to a primary expression
+        Here we parse all the things that are tighter binding than either unary or binary operator expressions.
+        We look for anything that can be immediately identified from the next token, or else fall back to a primary expression.
     */
     fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         let next = self.peek()?;
