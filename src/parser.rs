@@ -511,12 +511,9 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         }
         
         let group = if tuple_exprs.is_empty() {
-            Atom::group(expr.unwrap())
+            Atom::group(expr.unwrap().take_variant())
         } else {
-            let tuple = ExprVariant::Tuple(tuple_exprs);
-            let symbol = DebugSymbol::from(ctx.frame());
-            
-            Atom::group(Expr::new(tuple, symbol))
+            Atom::group(ExprVariant::Tuple(tuple_exprs))
         };
         
         ctx.pop_extend();

@@ -20,6 +20,13 @@ pub enum ExprVariant {
     
 }
 
+#[derive(Debug, Clone)]
+pub struct AssignmentInfo {
+    pub lhs: Primary,
+    pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
+    pub rhs: ExprVariant,
+}
+
 impl ExprVariant {
     pub fn primary(primary: Primary) -> Self {
         Self::Primary(Box::new(primary))
@@ -39,12 +46,12 @@ impl ExprVariant {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct AssignmentInfo {
-    lhs: Primary,
-    op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
-    rhs: ExprVariant,
-}
+// Use Expr instead of ExprVariant when we want to capture a debug symbol
+// This should be for: 
+//      top-level expressions like if/while conditions and statement expressions
+//      innner expressions in tuples and [] indexing,
+//      function arguments,
+//      object constructor initializers,
 
 
 #[derive(Debug, Clone)]
@@ -59,6 +66,7 @@ impl Expr {
     }
     
     pub fn variant(&self) -> &ExprVariant { &self.variant }
+    pub fn take_variant(self) -> ExprVariant { self.variant }
     
     pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
 }

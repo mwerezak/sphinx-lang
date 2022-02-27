@@ -2,7 +2,7 @@ use std::fmt;
 use string_interner::StringInterner;
 use crate::language;
 use crate::runtime::data::InternStr;
-use crate::parser::expr::Expr;
+use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::structs::ObjectConstructor;
 
 
@@ -18,7 +18,7 @@ pub enum Atom {
     IntegerLiteral(language::IntType),
     FloatLiteral(language::FloatType),
     StringLiteral(InternStr),
-    Group(Box<Expr>),
+    Group(Box<ExprVariant>),
 }
 
 impl Atom {
@@ -46,7 +46,7 @@ impl Atom {
         Self::StringLiteral(InternStr::from_str(value, interner))
     }
     
-    pub fn group(expr: Expr) -> Self {
+    pub fn group(expr: ExprVariant) -> Self {
         Self::Group(Box::new(expr))
     }
     
