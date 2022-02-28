@@ -6,8 +6,8 @@ use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::variant::Variant;
-use crate::runtime::errors::EvalResult;
 use crate::interpreter::runtime::Scope;
+use crate::interpreter::errors::EvalResult;
 
 
 pub fn eval(local: &Scope<'_>, expr: &Expr) -> EvalResult<Variant> {

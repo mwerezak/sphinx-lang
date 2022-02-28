@@ -6,8 +6,8 @@ pub type EvalResult<T> = Result<T, EvalError>;
 
 #[derive(Debug)]
 pub enum EvalErrorKind {
-    InvalidConversion, // TODO capture from/to types
-    InvalidUnaryOperand,
+    InvalidFloatToInt, 
+    InvalidUnaryOperand,  // unsupported operand for type
     InvalidBinaryOperand,
 }
 

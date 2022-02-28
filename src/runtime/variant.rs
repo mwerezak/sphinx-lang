@@ -1,25 +1,6 @@
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::data::InternStr;
-use crate::runtime::errors::{EvalResult, EvalErrorKind};
-
-// marker for the fundamental type of a value (from the language's perspective)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Primitive {
-    Nil,
-    Boolean,
-    Integer,
-    Float,
-    String,
-    Tuple,
-    Object,
-}
-
-impl Primitive {
-    pub fn is_numeric(&self) -> bool {
-        matches!(self, Self::Integer | Self::Float)
-    }
-}
 
 
 // Fundamental data value type
@@ -34,47 +15,38 @@ pub enum Variant {
     //GCObject(GCHandle),
 }
 
-
-// impl PartialEq for Variant { }
-// impl PartialOrd for Variant { }
-
 impl Variant {
     // Only "nil" and "false" have a truth value of false.
     pub fn truth_value(&self) -> bool {
         !matches!(self, Self::Nil | Self::Boolean(false))
     }
     
-    pub fn int_value(&self) -> EvalResult<IntType> {
-        let value = match self {
-            Self::Integer(value) => *value,
-            Self::Float(value) => (*value as IntType),  // TODO revisit
-            _ => unimplemented!(),
-        };
-        Ok(value)
-    }
+    // Note, bit_value() and float_value() are defined based on what is needed for the language *implementation*
+    // They do not reflect the semantics of the ReLox language
     
-    pub fn float_value(&self) -> EvalResult<FloatType> {
-        let value = match self {
-            Self::Integer(value) => FloatType::from(*value),
-            Self::Float(value) => *value,
-            _ => unimplemented!(),
-        };
-        Ok(value)
-    }
-    
-    // pub fn string_value(&self)
-    
-    pub fn pri_type(&self) -> Primitive {
+    pub fn bit_value(&self) -> IntType {
         match self {
-            Self::Nil => Primitive::Nil,
-            Self::EmptyTuple => Primitive::Tuple,
-            Self::Boolean(..) => Primitive::Boolean,
-            Self::Integer(..) => Primitive::Integer,
-            Self::Float(..) => Primitive::Float,
-            Self::InternStr(..) => Primitive::String,
+            Self::Integer(value) => *value,
+            Self::Boolean(false) => 0, // all 0s
+            Self::Boolean(true) => !0, // all 1s
+            _ => panic!("bit_value() valid only for integers and booleans"),
         }
     }
     
+    pub fn float_value(&self) -> FloatType {
+        match self {
+            // if we switch to 64-bit ints, this will become a lossy conversion
+            // the idea is that this method should always succeed for numeric primitive types
+            Self::Integer(value) => FloatType::from(*value),
+            Self::Float(value) => *value,
+            
+            _ => panic!("float_value() valid only for numeric primitives"),
+        }
+    }
+    
+    // pub fn string_value(&self) -> ... { }
 }
 
-
+// TODO
+// impl PartialEq for Variant { }
+// impl PartialOrd for Variant { }
