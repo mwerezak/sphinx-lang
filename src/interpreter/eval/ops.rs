@@ -1,3 +1,7 @@
+// Binary and unary operations with certain primitive types will *short-circuit*,
+// meaning that the resulting value will be computed using the logic defined in this module
+// instead of deferring to the type system
+
 use crate::language::{IntType, FloatType};
 use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::variant::Variant;
@@ -51,6 +55,11 @@ fn eval_unary_other(_op: UnaryOp, _operand: &Variant) -> EvalResult<Variant> {
 }
 
 // Binary Operators
+
+// Coercion rules
+// arithmetic operations - short-circuit for int/float, coerce to float if either operand is float
+// bitwise operations    - short-circuit for bool/int, coerce to int if either operand is int
+// shift operations      - short-circuit if LHS is bool/int and RHS is int, result is always int
 
 pub fn eval_binary(op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Variant> {
     // try a numeric short-circuit 
@@ -158,7 +167,7 @@ fn eval_ne(lhs: &Variant, rhs: &Variant) -> Option<Variant> {
 }
 
 
-// Bitwise
+// Bitwise Operations
 
 macro_rules! eval_binary_bitwise {
     ($name:tt, $bool_name:tt, $int_name:tt) => {
@@ -174,6 +183,21 @@ macro_rules! eval_binary_bitwise {
         
     };
 }
+
+eval_binary_bitwise!(eval_and, bool_and, int_and);
+fn bool_and(lhs: bool, rhs: bool) -> Variant { Variant::Boolean(lhs & rhs) }
+fn int_and(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs & rhs) }
+
+eval_binary_bitwise!(eval_xor, bool_xor, int_xor);
+fn bool_xor(lhs: bool, rhs: bool) -> Variant { Variant::Boolean(lhs ^ rhs) }
+fn int_xor(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs ^ rhs) }
+
+eval_binary_bitwise!(eval_or, bool_or, int_or);
+fn bool_or(lhs: bool, rhs: bool) -> Variant { Variant::Boolean(lhs | rhs) }
+fn int_or(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs | rhs) }
+
+
+// Bit Shifts
 
 // for primitive bitshifts, if the LHS is boolean it is treated as 0/1 (instead of all 0s/all 1s)
 macro_rules! eval_binary_shift {
@@ -196,15 +220,3 @@ fn int_shl(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs << rhs)
 
 eval_binary_shift!(eval_shr, int_shr);
 fn int_shr(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs >> rhs) }
-
-eval_binary_bitwise!(eval_and, bool_and, int_and);
-fn bool_and(lhs: bool, rhs: bool) -> Variant { Variant::Boolean(lhs & rhs) }
-fn int_and(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs & rhs) }
-
-eval_binary_bitwise!(eval_xor, bool_xor, int_xor);
-fn bool_xor(lhs: bool, rhs: bool) -> Variant { Variant::Boolean(lhs ^ rhs) }
-fn int_xor(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs ^ rhs) }
-
-eval_binary_bitwise!(eval_or, bool_or, int_or);
-fn bool_or(lhs: bool, rhs: bool) -> Variant { Variant::Boolean(lhs | rhs) }
-fn int_or(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs | rhs) }
