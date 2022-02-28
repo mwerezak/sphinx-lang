@@ -15,3 +15,7 @@ pub enum Variant {
     InternStr(InternStr),
     //GCObject(GCHandle),
 }
+
+
+// impl PartialEq for Variant { }
+// impl PartialOrd for Variant { }
