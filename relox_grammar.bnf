@@ -7,18 +7,36 @@
 *)
 
 
+(*** Statements ***)
+
+statement ::= ";"
+            | assignment-statement
+            | while-loop
+            | do-while-loop
+            | for-loop 
+            | expression ;
+
+block ::= ( statement | control-flow )* ;
+
+control-flow ::= "continue" ( label )? | "break" ( label )? expression | "return" expression ;
+label ::= ... ; (* TODO *)
+
+while-loop ::=  ( label )? "while" expression "do" block "end" ;
+do-while-loop ::= ( label )? "do" block "while" expression "end" ;
+
+for-loop ::= ( label )? "for" ... "end" ; (* TODO *)
 
 (*** Expressions ***)
 
-
-atom ::= LITERAL | IDENTIFIER | "global" IDENTIFIER | "(" expression ")" ;
+atom ::= LITERAL | identifier | "(" expression ")" ;
+identifier ::= IDENTIFIER | "global" IDENTIFIER | "upval" IDENTIFIER ;
 primary ::= atom ( access-item )* ; 
 
 access-item ::= member-access | index-access | invocation | object-constructor ;
 index-access ::= "[" expression "]" ;
 member-access ::= "." IDENTIFIER ;
 
-lvalue ::= IDENTIFIER | "global" IDENTIFIER | primary index-access | primary member-access ;  (* so called because they can appear on the left side of assignment, see Access below *)
+lvalue ::= identifier | primary index-access | primary member-access ;  (* so called because they can appear on the left side of assignment, see Access below *)
 
 
 (* 
@@ -28,30 +46,18 @@ expression ::= primary
              | class-def
              | function-def
              | if-expression
+             | block-expression
              | UNARY_OP expression
              | expression BINARY_OP expression
              | assignment-expression
              | object-constructor
              | tuple-constructor ;
 
-(*** Binary and Unary Operators ***)
+(*** if/block Expressions ***)
 
-(*
-    Operator precendence in order from strong to weak binding
-    (left associative unless otherwise specified)
-     
-     1:  (unary -) (unary +) not          (right associative)
-     2:  * / %
-     3:  + - 
-     4:  << >>
-     5:  & 
-     6:  ^ 
-     7:  | 
-     8:  < > <= >= == !=
-     9:  and 
-    10:  or
+if-expression ::= "if" expression "then" block ( "elseif" block )* ( "else" block )? "end" ;
 
-*)
+block-expression ::= "begin" block "end" ;
 
 (*** Assignment ***)
 
@@ -83,19 +89,6 @@ member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;  (* ini
 (* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
 tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
 
-(*** Statements ***)
-
-(* mainly just loops and the tuple-destructuring assignment statement *)
-statement ::= expression
-            | block
-            | assignment-statement
-            | while-loop
-            | do-while-loop
-            | for-loop ;
-
-(* TODO *)
-
-
 
 (***** Non left-recursive version of `expression` for implementation *****)
 
@@ -109,7 +102,24 @@ immediate-expression ::= class-def
                        | if-expression
                        | object-constructor ;
 
-unary-expression ::= UNARY_OP unary | primary-expression ;
+unary-expression ::= UNARY_OP unary-expression | primary-expression ;
+
+(*
+    Operator precendence in order from strong to weak binding
+    (left associative unless otherwise specified)
+     
+     1:  (unary -) (unary +) not          (right associative)
+     2:  * / %
+     3:  + - 
+     4:  << >>
+     5:  & 
+     6:  ^ 
+     7:  | 
+     8:  < > <= >= == !=
+     9:  and 
+    10:  or
+
+*)
 
 operand[1] ::= unary-expression ;
 operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
