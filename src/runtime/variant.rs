@@ -46,6 +46,3 @@ impl Variant {
     
     // pub fn string_value(&self) -> ... { }
 }
-
-// impl PartialEq for Variant { }
-// impl PartialOrd for Variant { }

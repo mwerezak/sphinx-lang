@@ -79,17 +79,7 @@ pub fn eval_binary(op: Operator, lhs: &Variant, rhs: &Variant) -> EvalResult<Var
             Shift::Right => eval_shr(&lhs, &rhs),
         }
         
-        Operator::Comparison(op) => {
-            match op {
-                Comparison::LT     => eval_lt(&lhs, &rhs),
-                Comparison::GT     => eval_gt(&lhs, &rhs),
-                Comparison::LE     => eval_le(&lhs, &rhs),
-                Comparison::GE     => eval_ge(&lhs, &rhs),
-                Comparison::EQ     => eval_eq(&lhs, &rhs),
-                Comparison::NE     => eval_ne(&lhs, &rhs),
-                
-            }.map(Variant::Boolean)
-        },
+        Operator::Comparison(op) => eval_comparison(op, lhs, rhs).map(Variant::Boolean),
         
         _ => panic!("not handled here"),
     };
@@ -98,6 +88,45 @@ pub fn eval_binary(op: Operator, lhs: &Variant, rhs: &Variant) -> EvalResult<Var
         Ok(value)
     } else {
         eval_binary_other(op, lhs, rhs)
+    }
+}
+
+fn eval_comparison(op: Comparison, lhs: &Variant, rhs: &Variant) -> Option<bool> {
+    match op {
+        Comparison::LT     => eval_lt(&lhs, &rhs),
+        Comparison::GT     => eval_gt(&lhs, &rhs),
+        Comparison::LE     => eval_le(&lhs, &rhs),
+        Comparison::GE     => eval_ge(&lhs, &rhs),
+        
+        Comparison::EQ     => Some(eval_equals(&lhs, &rhs)),
+        Comparison::NE     => Some(!eval_equals(&lhs, &rhs)),
+    }
+}
+
+// Equality is handled specially
+// Note that even for GCObject we will always get a bool because the default is to fallback to reference equality
+// so there is no case where comparing two values for equality will fail, unlike most operators
+
+fn eval_equals(lhs: &Variant, rhs: &Variant) -> bool {
+    match (lhs, rhs) {
+        // nil always compares false
+        (Variant::Nil, _) => false,
+        (_, Variant::Nil) => false,
+        
+        // empty tuple is only equal with itself
+        (Variant::EmptyTuple, Variant::EmptyTuple) => true,
+        
+        // shortcut for interned strings, boolean
+        (Variant::Boolean(lhs_value), Variant::Boolean(rhs_value)) => *lhs_value == *rhs_value,
+        (Variant::InternStr(lhs_value), Variant::InternStr(rhs_value)) => *lhs_value == *rhs_value,
+        
+        // numeric equality
+        (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => *lhs_value == *rhs_value,
+        (_, _) if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) => lhs.float_value() == rhs.float_value(),
+        
+        // TODO GCObject
+
+        _ => false,
     }
 }
 
@@ -181,13 +210,8 @@ fn float_le(lhs: FloatType, rhs: FloatType) -> bool { lhs <= rhs }
 
 fn eval_gt(lhs: &Variant, rhs: &Variant) -> Option<bool> { Some(!eval_le(lhs, rhs)?) }
 
-
 // equality is handled specially, so this only applies to primitive numerics
-eval_binary_comparison!(eval_eq, int_eq, float_eq);
-fn int_eq(lhs: IntType, rhs: IntType) -> bool { lhs == rhs }
-fn float_eq(lhs: FloatType, rhs: FloatType) -> bool { lhs == rhs }
 
-fn eval_ne(lhs: &Variant, rhs: &Variant) -> Option<bool> { Some(!eval_eq(lhs, rhs)?) }
 
 // Bitwise Operations
 
