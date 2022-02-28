@@ -49,14 +49,18 @@ add + me
 subtract - me
 multiply * me
 divide / me
+modulo % me
 
 # (x**2) + (y**2)  # TODO exponentiation?
 
-(~7 ^ 3) << 3
-0xff | 235
-3 % 2 == 0
+# Bitwise and shifts
+(17 ^ 73) << 3
+2412 & 0xff | 0xcc00
+
+# unary
 
 -negateMe
+~invert
 
 # Comparison and equality
 
@@ -74,12 +78,12 @@ greaterThan >= orEqual
 # booleans are not implicitly integers (but all expressions do have a "truth" value)
 true == 1 # false
 
-
 # Logical operators
 
 not true  # false.
 not false # true.
 
+# these will short circuit
 true and false # false.
 true and true  # true.
 
@@ -87,7 +91,7 @@ false or false # false.
 true or false  # true.
 
 # Precendence and grouping
-var average = (min + max) / 2
+average = (min + max) / 2
 
 
 # Blocks
@@ -118,6 +122,7 @@ iAmNil = nil  # initializer is required
 # Assignment statements start with the "var" keyword
 # while more restricted, they allows you to destructure tuples
 var first, second = "abc", "def"
+var second, first = first, second
 
 # assignment versions of all binary operators are supported
 # however they require the variable to be defined first before use
@@ -151,7 +156,7 @@ fruit = "alderberry"
 begin
   echo tree         # spruce
 
-  tree = "oak"
+  tree = "oak"      # hides tree from global scope
   global fruit = "mango"
 
   echo fruit        # mango
@@ -182,7 +187,7 @@ else
   "default"
 end
 
-var condExpr = 
+condExpr = 
   if condition1 then
     "first"
   elif condition2 then
@@ -192,8 +197,6 @@ var condExpr =
   end
   
 # if-expressions and assigment expressions
-
-var a, var b = (1, 2)
 
 # This is not allowed, otherwise anytime an identifier is encountered
 # it would be ambiguous whether you want to lookup the value of a variable
@@ -206,7 +209,7 @@ if cond then a += 1 else b += 1 end  # works
 
 # loops support both break and continue statements
 
-var a = 1
+a = 1
 while a < 10 do
   if exitcond then 
     break
@@ -214,6 +217,8 @@ while a < 10 do
   if skipcond then 
     continue
   end
+
+  
 
   echo a
   a += 1
@@ -287,18 +292,38 @@ fun outerFunction()
   localFunction()
 end
 
-fun returnFunction()
+fun returnFunctions()
   var outside = "outside"
 
   fun inner()
     echo outside
   end
 
-  return inner
+  # "upval" is similar to the "global" keyword, but accesses the 
+  # nearest enclosing scope instead of global scope
+
+  fun hideOutside()
+    outside = "local"
+    echo outside
+    echo upval outside
+  end
+  
+  fun setOutside(newValue)
+    upval outside = "inside"
+  end
+
+  return inner, setOutside
 end
 
-var fn = returnFunction()
-fn()
+var fn, hide, set = returnFunctions()
+
+fn()   # prints "outside"
+hide() # prints "local" then "outside"
+fn()   # prints "outside"
+set()
+fn()   # prints "inside"
+hide() # prints "local" then "inside"
+
 
 var anonFn = fun(x) x + 1 end
 var a = anonFn(3)

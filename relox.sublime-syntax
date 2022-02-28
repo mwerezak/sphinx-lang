@@ -58,7 +58,7 @@ contexts:
   misc-statement-keywords:
     - match: \b(var)\b
       scope: keyword.declaration.other
-    - match: \b(global|del|echo)\b
+    - match: \b(global|upval|del|echo)\b
       scope: keyword.other
 
   control-flow-keywords:
