@@ -35,7 +35,7 @@ pub fn eval_not(operand: &Variant) -> EvalResult<Variant> {
 }
 
 
-pub fn eval_unary_other(op: UnaryOp, operand: &Variant) -> EvalResult<Variant> {
+fn eval_unary_other(op: UnaryOp, operand: &Variant) -> EvalResult<Variant> {
     // TODO defer to the operand's type's metamethods
     unimplemented!()
 }
@@ -50,11 +50,11 @@ pub fn eval_binary(op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Var
         BinaryOp::Mod    => eval_mod(&lhs, &rhs)?,
         BinaryOp::Add    => eval_add(&lhs, &rhs)?,
         BinaryOp::Sub    => eval_sub(&lhs, &rhs)?,
-        BinaryOp::LShift => unimplemented!(),
-        BinaryOp::RShift => unimplemented!(),
-        BinaryOp::BitAnd => unimplemented!(),
-        BinaryOp::BitXor => unimplemented!(),
-        BinaryOp::BitOr  => unimplemented!(),
+        BinaryOp::LShift => eval_shl(&lhs, &rhs)?,
+        BinaryOp::RShift => eval_shr(&lhs, &rhs)?,
+        BinaryOp::BitAnd => eval_and(&lhs, &rhs)?,
+        BinaryOp::BitXor => eval_xor(&lhs, &rhs)?,
+        BinaryOp::BitOr  => eval_or(&lhs, &rhs)?,
         BinaryOp::LT     => unimplemented!(),
         BinaryOp::GT     => unimplemented!(),
         BinaryOp::LE     => unimplemented!(),
@@ -82,9 +82,11 @@ pub fn eval_binary_other(op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResu
 
 // lots of boilerplate
 macro_rules! eval_binary_numeric {
+    
+    // Arithmetic
     ($name:tt, $int_name:tt, $float_name:tt) => {
         
-        pub fn $name (lhs: &Variant, rhs: &Variant) -> EvalResult<Option<Variant>> {
+        fn $name (lhs: &Variant, rhs: &Variant) -> EvalResult<Option<Variant>> {
             let value = match (lhs.pri_type(), rhs.pri_type()) {
                 (Primitive::Integer, Primitive::Integer) => $int_name (lhs.int_value()?, rhs.int_value()?),
                 (lt, rt) if lt.is_numeric() && rt.is_numeric() => $float_name (lhs.float_value()?, rhs.float_value()?),
@@ -94,7 +96,23 @@ macro_rules! eval_binary_numeric {
         }
         
     };
+    
+    // Bitwise
+    
+    ($name:tt, $int_name:tt) => {
+        
+        fn $name (lhs: &Variant, rhs: &Variant) -> EvalResult<Option<Variant>> {
+            if lhs.pri_type() == Primitive::Integer && rhs.pri_type() == Primitive::Integer {
+                Ok(Some($int_name (lhs.int_value()?, rhs.int_value()?)))
+            } else {
+                Ok(None)
+            }
+        }
+        
+    };
 }
+
+// Arithmetic
 
 eval_binary_numeric!(eval_mul, int_mul, float_mul);
 fn int_mul(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs * rhs) }
@@ -115,3 +133,20 @@ fn float_add(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Float(lhs + r
 eval_binary_numeric!(eval_sub, int_sub, float_sub);
 fn int_sub(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs - rhs) }
 fn float_sub(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Float(lhs - rhs) }
+
+// Bitwise
+
+eval_binary_numeric!(eval_shl, int_shl);
+fn int_shl(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs << rhs) }
+
+eval_binary_numeric!(eval_shr, int_shr);
+fn int_shr(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs >> rhs) }
+
+eval_binary_numeric!(eval_and, int_and);
+fn int_and(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs & rhs) }
+
+eval_binary_numeric!(eval_xor, int_xor);
+fn int_xor(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs ^ rhs) }
+
+eval_binary_numeric!(eval_or, int_or);
+fn int_or(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs | rhs) }

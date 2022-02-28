@@ -35,6 +35,7 @@ impl<'r> EvalContext<'r> {
             ExprVariant::Primary(primary) => self.eval_primary(primary),
             ExprVariant::UnaryOp(op, expr) => self.eval_unary_op(*op, expr),
             ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op(*op, lhs, rhs),
+            ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op(*op, lhs, rhs),
             ExprVariant::Assignment(assignment) => unimplemented!(),
             ExprVariant::Tuple(expr_list) => unimplemented!(),
             ExprVariant::ObjectCtor(ctor) => unimplemented!(),
@@ -80,6 +81,8 @@ impl<'r> EvalContext<'r> {
     }
     
     fn eval_binary_op(&self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+        // TODO short-circuiting And/Or
+        
         let lhs_value = self.eval_inner_expr(lhs)?;
         let rhs_value = self.eval_inner_expr(rhs)?;
         
