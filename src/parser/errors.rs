@@ -19,20 +19,6 @@ pub enum ParserErrorKind {
     InvalidAssignmentLHS,   // the LHS of an assignment was not a valid lvalue
 }
 
-impl ParserErrorKind {
-    pub fn message(&self) -> &'static str {
-        match self {
-            Self::LexerError => "could not parse token",
-            Self::ExpectedStartOfExpr => "expected start of expression",
-            Self::ExpectedCloseParen => "expected closing ')'",
-            Self::ExpectedCloseSquare => "expected closing ']'",
-            Self::ExpectedCloseBrace => "expected closing '}'",
-            Self::ExpectedIdentifier => "expected an identifier",
-            Self::InvalidAssignmentLHS => "the left hand side of an assignment was invalid",
-        }
-    }
-}
-
 // Provide information about the type of syntactic construct from which the error originated
 #[derive(Debug, Clone, Copy)]
 pub enum ContextTag {
@@ -100,11 +86,23 @@ impl Error for ParserError<'_> {
 
 impl fmt::Display for ParserError<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        fmt.write_str(self.kind.message())?;
-        if let Some(err) = self.source() {
-            write!(fmt, ": {}", err)?;
+        
+        let message = match self.kind() {
+            ParserErrorKind::LexerError => "",
+            ParserErrorKind::ExpectedStartOfExpr  => "expected start of expression",
+            ParserErrorKind::ExpectedCloseParen   => "missing closing ')'",
+            ParserErrorKind::ExpectedCloseSquare  => "missing closing ']'",
+            ParserErrorKind::ExpectedCloseBrace   => "missing closing '}'",
+            ParserErrorKind::ExpectedIdentifier   => "missing identifier",
+            ParserErrorKind::InvalidAssignmentLHS => "invalid assignment",
+        };
+        
+        match (message, self.source()) {
+            ("", None) => write!(fmt, "syntax error"),
+            ("", Some(error)) => write!(fmt, "syntax error: {}", error),
+            (message, None) => write!(fmt, "syntax error: {}", message),
+            (message, Some(error)) => write!(fmt, "syntax error: {}: {}", message, error),
         }
-        Ok(())
     }
 }
 
