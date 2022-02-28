@@ -83,26 +83,7 @@ impl<'r> EvalContext<'r> {
         let lhs_value = self.eval_inner_expr(lhs)?;
         let rhs_value = self.eval_inner_expr(rhs)?;
         
-        match op {
-            BinaryOp::Mul    => eval_mul(&lhs_value, &rhs_value),
-            BinaryOp::Div    => eval_div(&lhs_value, &rhs_value),
-            BinaryOp::Mod    => eval_mod(&lhs_value, &rhs_value),
-            BinaryOp::Add    => eval_add(&lhs_value, &rhs_value),
-            BinaryOp::Sub    => eval_sub(&lhs_value, &rhs_value),
-            BinaryOp::LShift => unimplemented!(),
-            BinaryOp::RShift => unimplemented!(),
-            BinaryOp::BitAnd => unimplemented!(),
-            BinaryOp::BitXor => unimplemented!(),
-            BinaryOp::BitOr  => unimplemented!(),
-            BinaryOp::LT     => unimplemented!(),
-            BinaryOp::GT     => unimplemented!(),
-            BinaryOp::LE     => unimplemented!(),
-            BinaryOp::GE     => unimplemented!(),
-            BinaryOp::EQ     => unimplemented!(),
-            BinaryOp::NE     => unimplemented!(),
-            BinaryOp::And    => unimplemented!(),
-            BinaryOp::Or     => unimplemented!(),
-        }
+        eval_binary(op, &lhs_value, &rhs_value)
     }
 }
 
