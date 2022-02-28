@@ -36,7 +36,7 @@ impl Variant {
     pub fn float_value(&self) -> FloatType {
         match self {
             // if we switch to 64-bit ints, this will become a lossy conversion
-            // the idea is that this method should always succeed for numeric primitive types
+            // this method should always succeed for numeric primitive types
             Self::Integer(value) => FloatType::from(*value),
             Self::Float(value) => *value,
             
@@ -47,6 +47,5 @@ impl Variant {
     // pub fn string_value(&self) -> ... { }
 }
 
-// TODO
 // impl PartialEq for Variant { }
 // impl PartialOrd for Variant { }

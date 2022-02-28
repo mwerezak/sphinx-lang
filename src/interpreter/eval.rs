@@ -4,8 +4,8 @@ use ops::*;
 
 use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};
-use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::variant::Variant;
+use crate::runtime::operator::{Operator, Unary, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::interpreter::runtime::Scope;
 use crate::interpreter::errors::EvalResult;
 
@@ -33,11 +33,9 @@ impl<'r> EvalContext<'r> {
     fn eval_inner_expr(&self, expr: &ExprVariant) -> EvalResult<Variant> {
         match expr {
             ExprVariant::Primary(primary) => self.eval_primary(primary),
-            ExprVariant::UnaryOp(op, expr) => self.eval_unary_op(*op, expr),
             
-            ExprVariant::BinaryOp(BinaryOp::And, lhs, rhs) => self.eval_short_circuit_and(lhs, rhs),
-            ExprVariant::BinaryOp(BinaryOp::Or, lhs, rhs) => self.eval_short_circuit_or(lhs, rhs),
-            ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op(*op, lhs, rhs),
+            ExprVariant::UnaryOp(op, expr) => self.eval_unary_op((*op).into(), expr),
+            ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op((*op).into(), lhs, rhs),
             
             ExprVariant::Assignment(assignment) => unimplemented!(),
             ExprVariant::Tuple(expr_list) => unimplemented!(),
@@ -72,42 +70,42 @@ impl<'r> EvalContext<'r> {
         Ok(value)
     }
     
-    fn eval_unary_op(&self, op: UnaryOp, expr: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_unary_op(&self, op: Unary, expr: &ExprVariant) -> EvalResult<Variant> {
         let operand = self.eval_inner_expr(expr)?;
         
         match op {
-            UnaryOp::Neg => eval_neg(&operand),
-            UnaryOp::Pos => eval_pos(&operand),
-            UnaryOp::Inv => eval_inv(&operand),
-            UnaryOp::Not => eval_not(&operand),
+            Unary::Neg => eval_neg(&operand),
+            Unary::Pos => eval_pos(&operand),
+            Unary::Inv => eval_inv(&operand),
+            Unary::Not => eval_not(&operand),
         }
     }
     
-    fn eval_short_circuit_and(&self, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
-        let lhs_value = self.eval_inner_expr(lhs)?;
-        if !lhs_value.truth_value() {
-            Ok(lhs_value)
-        } else {
-            self.eval_inner_expr(rhs)
+    fn eval_binary_op(&self, op: Operator, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+        if let Operator::Logical(logic) = op {
+            return self.eval_short_circuit_logic(logic, lhs, rhs);
         }
-    }
-    
-    fn eval_short_circuit_or(&self, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
-        let lhs_value = self.eval_inner_expr(lhs)?;
-        if lhs_value.truth_value() {
-            Ok(lhs_value)
-        } else {
-            self.eval_inner_expr(rhs)
-        }
-    }
-    
-    fn eval_binary_op(&self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
-        // TODO short-circuiting And/Or
         
         let lhs_value = self.eval_inner_expr(lhs)?;
         let rhs_value = self.eval_inner_expr(rhs)?;
         
         eval_binary(op, &lhs_value, &rhs_value)
     }
+    
+    fn eval_short_circuit_logic(&self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+        let lhs_value = self.eval_inner_expr(lhs)?;
+        
+        let cond = match op {
+            Logical::And => !lhs_value.truth_value(),
+            Logical::Or => lhs_value.truth_value(),
+        };
+        
+        if cond {
+            Ok(lhs_value)
+        } else {
+            self.eval_inner_expr(rhs)
+        }
+    }
+    
 }
 

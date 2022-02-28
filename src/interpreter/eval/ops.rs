@@ -3,9 +3,10 @@
 // instead of deferring to the type system
 
 use crate::language::{IntType, FloatType};
-use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::variant::Variant;
+use crate::runtime::operator::{Operator, Unary, Arithmetic, Bitwise, Shift, Comparison};
 use crate::interpreter::errors::{EvalResult, EvalErrorKind};
+
 
 pub fn is_arithmetic_primitive(value: &Variant) -> bool {
     matches!(value, Variant::Integer(..) | Variant::Float(..))
@@ -21,7 +22,7 @@ pub fn eval_neg(operand: &Variant) -> EvalResult<Variant> {
     let value = match operand {
         Variant::Integer(value) => Variant::Integer(-value),
         Variant::Float(value) => Variant::Float(-value),
-        _ => return eval_unary_other(UnaryOp::Neg, operand),
+        _ => return eval_unary_other(Unary::Neg, operand),
     };
     Ok(value)
 }
@@ -31,7 +32,7 @@ pub fn eval_pos(operand: &Variant) -> EvalResult<Variant> {
         // No-op for arithmetic primitives
         Variant::Integer(value) => Variant::Integer(*value),
         Variant::Float(value) => Variant::Float(*value),
-        _ => return eval_unary_other(UnaryOp::Pos, operand),
+        _ => return eval_unary_other(Unary::Pos, operand),
     };
     Ok(value)
 }
@@ -40,7 +41,7 @@ pub fn eval_inv(operand: &Variant) -> EvalResult<Variant> {
     let value = match operand {
         Variant::Boolean(value) => Variant::Boolean(!value),
         Variant::Integer(value) => Variant::Integer(!value),
-        _ => return eval_unary_other(UnaryOp::Inv, operand),
+        _ => return eval_unary_other(Unary::Inv, operand),
     };
     Ok(value)
 }
@@ -49,38 +50,48 @@ pub fn eval_not(operand: &Variant) -> EvalResult<Variant> {
     return Ok(Variant::Boolean(!operand.truth_value()))
 }
 
-fn eval_unary_other(_op: UnaryOp, _operand: &Variant) -> EvalResult<Variant> {
+fn eval_unary_other(_op: Unary, _operand: &Variant) -> EvalResult<Variant> {
     // TODO defer to the operand's type's metamethods
     unimplemented!()
 }
 
 // Binary Operators
 
-// Coercion rules
-// arithmetic operations - short-circuit for int/float, coerce to float if either operand is float
-// bitwise operations    - short-circuit for bool/int, coerce to int if either operand is int
-// shift operations      - short-circuit if LHS is bool/int and RHS is int, result is always int
-
-pub fn eval_binary(op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Variant> {
+pub fn eval_binary(op: Operator, lhs: &Variant, rhs: &Variant) -> EvalResult<Variant> {
     // try a numeric short-circuit 
     let result = match op {
-        BinaryOp::Mul    => eval_mul(&lhs, &rhs),
-        BinaryOp::Div    => eval_div(&lhs, &rhs),
-        BinaryOp::Mod    => eval_mod(&lhs, &rhs),
-        BinaryOp::Add    => eval_add(&lhs, &rhs),
-        BinaryOp::Sub    => eval_sub(&lhs, &rhs),
-        BinaryOp::LShift => eval_shl(&lhs, &rhs),
-        BinaryOp::RShift => eval_shr(&lhs, &rhs),
-        BinaryOp::BitAnd => eval_and(&lhs, &rhs),
-        BinaryOp::BitXor => eval_xor(&lhs, &rhs),
-        BinaryOp::BitOr  => eval_or(&lhs, &rhs),
-        BinaryOp::LT     => eval_lt(&lhs, &rhs),
-        BinaryOp::GT     => eval_gt(&lhs, &rhs),
-        BinaryOp::LE     => eval_le(&lhs, &rhs),
-        BinaryOp::GE     => eval_ge(&lhs, &rhs),
-        BinaryOp::EQ     => eval_eq(&lhs, &rhs),
-        BinaryOp::NE     => eval_ne(&lhs, &rhs),
-        _ => None,
+        Operator::Arithmetic(op) => match op {
+            Arithmetic::Mul    => eval_mul(&lhs, &rhs),
+            Arithmetic::Div    => eval_div(&lhs, &rhs),
+            Arithmetic::Mod    => eval_mod(&lhs, &rhs),
+            Arithmetic::Add    => eval_add(&lhs, &rhs),
+            Arithmetic::Sub    => eval_sub(&lhs, &rhs),
+        },
+        
+        Operator::Bitwise(op) => match op {
+            Bitwise::And => eval_and(&lhs, &rhs),
+            Bitwise::Xor => eval_xor(&lhs, &rhs),
+            Bitwise::Or  => eval_or(&lhs, &rhs),
+        },
+        
+        Operator::Shift(op) => match op {
+            Shift::Left => eval_shl(&lhs, &rhs),
+            Shift::Right => eval_shr(&lhs, &rhs),
+        }
+        
+        Operator::Comparison(op) => {
+            match op {
+                Comparison::LT     => eval_lt(&lhs, &rhs),
+                Comparison::GT     => eval_gt(&lhs, &rhs),
+                Comparison::LE     => eval_le(&lhs, &rhs),
+                Comparison::GE     => eval_ge(&lhs, &rhs),
+                Comparison::EQ     => eval_eq(&lhs, &rhs),
+                Comparison::NE     => eval_ne(&lhs, &rhs),
+                
+            }.map(Variant::Boolean)
+        },
+        
+        _ => panic!("not handled here"),
     };
     
     if let Some(value) = result {
@@ -90,7 +101,7 @@ pub fn eval_binary(op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Var
     }
 }
 
-fn eval_binary_other(_op: BinaryOp, _lhs: &Variant, _rhs: &Variant) -> EvalResult<Variant> {
+fn eval_binary_other(_op: Operator, _lhs: &Variant, _rhs: &Variant) -> EvalResult<Variant> {
     // TODO defer to lhs's type metamethods, or rhs's type reflected metamethod
     unimplemented!()
 }
@@ -103,6 +114,9 @@ fn eval_binary_other(_op: BinaryOp, _lhs: &Variant, _rhs: &Variant) -> EvalResul
 // Instead, they produce an Option and return None if the operands aren't the right type to short-circuit
 
 // lots of boilerplate
+
+// Arithmetic
+
 macro_rules! eval_binary_arithmetic {
     ($name:tt, $int_name:tt, $float_name:tt) => {
         
@@ -117,8 +131,6 @@ macro_rules! eval_binary_arithmetic {
         
     };
 }
-
-// Arithmeticis_bitwise_primitive
 
 eval_binary_arithmetic!(eval_mul, int_mul, float_mul);
 fn int_mul(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs * rhs) }
@@ -140,32 +152,42 @@ eval_binary_arithmetic!(eval_sub, int_sub, float_sub);
 fn int_sub(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs - rhs) }
 fn float_sub(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Float(lhs - rhs) }
 
-// Comparison - uses the same numeric coercion rules as Arithmetic
-
-eval_binary_arithmetic!(eval_lt, int_lt, float_lt);
-fn int_lt(lhs: IntType, rhs: IntType) -> Variant { Variant::Boolean(lhs < rhs) }
-fn float_lt(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Boolean(lhs < rhs) }
-
-fn eval_ge(lhs: &Variant, rhs: &Variant) -> Option<Variant> {
-    Some(Variant::Boolean(!eval_lt(lhs, rhs)?.truth_value()))
+// Comparison - uses similar coercion rules as Arithmetic, may only produce boolean results
+macro_rules! eval_binary_comparison {
+    ($name:tt, $int_name:tt, $float_name:tt) => {
+        
+        fn $name (lhs: &Variant, rhs: &Variant) -> Option<bool> {
+            let value = match (lhs, rhs) {
+                (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => $int_name (*lhs_value, *rhs_value),
+                _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) => $float_name (lhs.float_value(), rhs.float_value()),
+                _ => return None,
+            };
+            Some(value)
+        }
+        
+    };
 }
 
-eval_binary_arithmetic!(eval_le, int_le, float_le);
-fn int_le(lhs: IntType, rhs: IntType) -> Variant { Variant::Boolean(lhs <= rhs) }
-fn float_le(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Boolean(lhs <= rhs) }
+eval_binary_comparison!(eval_lt, int_lt, float_lt);
+fn int_lt(lhs: IntType, rhs: IntType) -> bool { lhs < rhs }
+fn float_lt(lhs: FloatType, rhs: FloatType) -> bool { lhs < rhs }
 
-fn eval_gt(lhs: &Variant, rhs: &Variant) -> Option<Variant> {
-    Some(Variant::Boolean(!eval_le(lhs, rhs)?.truth_value()))
-}
+fn eval_ge(lhs: &Variant, rhs: &Variant) -> Option<bool> { Some(!eval_lt(lhs, rhs)?) }
 
-eval_binary_arithmetic!(eval_eq, int_eq, float_eq);
-fn int_eq(lhs: IntType, rhs: IntType) -> Variant { Variant::Boolean(lhs == rhs) }
-fn float_eq(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Boolean(lhs == rhs) }
 
-fn eval_ne(lhs: &Variant, rhs: &Variant) -> Option<Variant> {
-    Some(Variant::Boolean(!eval_eq(lhs, rhs)?.truth_value()))
-}
+eval_binary_comparison!(eval_le, int_le, float_le);
+fn int_le(lhs: IntType, rhs: IntType) -> bool { lhs <= rhs }
+fn float_le(lhs: FloatType, rhs: FloatType) -> bool { lhs <= rhs }
 
+fn eval_gt(lhs: &Variant, rhs: &Variant) -> Option<bool> { Some(!eval_le(lhs, rhs)?) }
+
+
+// equality is handled specially, so this only applies to primitive numerics
+eval_binary_comparison!(eval_eq, int_eq, float_eq);
+fn int_eq(lhs: IntType, rhs: IntType) -> bool { lhs == rhs }
+fn float_eq(lhs: FloatType, rhs: FloatType) -> bool { lhs == rhs }
+
+fn eval_ne(lhs: &Variant, rhs: &Variant) -> Option<bool> { Some(!eval_eq(lhs, rhs)?) }
 
 // Bitwise Operations
 
