@@ -245,7 +245,7 @@ fn int_or(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs | rhs) }
 
 // Bit Shifts
 
-// for primitive bitshifts, if the LHS is boolean it is treated as 0/1 (instead of all 0s/all 1s)
+// for primitive bitshifts, if the LHS is boolean it is treated as 0/1 i.e. do a shift, or not (instead of all 0s/all 1s for the bitwise ops)
 macro_rules! eval_binary_shift {
     ($name:tt, $int_name:tt) => {
         
