@@ -34,8 +34,11 @@ impl<'r> EvalContext<'r> {
         match expr {
             ExprVariant::Primary(primary) => self.eval_primary(primary),
             ExprVariant::UnaryOp(op, expr) => self.eval_unary_op(*op, expr),
+            
+            ExprVariant::BinaryOp(BinaryOp::And, lhs, rhs) => self.eval_short_circuit_and(lhs, rhs),
+            ExprVariant::BinaryOp(BinaryOp::Or, lhs, rhs) => self.eval_short_circuit_or(lhs, rhs),
             ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op(*op, lhs, rhs),
-            ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op(*op, lhs, rhs),
+            
             ExprVariant::Assignment(assignment) => unimplemented!(),
             ExprVariant::Tuple(expr_list) => unimplemented!(),
             ExprVariant::ObjectCtor(ctor) => unimplemented!(),
@@ -77,6 +80,24 @@ impl<'r> EvalContext<'r> {
             UnaryOp::Pos => eval_pos(&operand),
             UnaryOp::Inv => eval_inv(&operand),
             UnaryOp::Not => eval_not(&operand),
+        }
+    }
+    
+    fn eval_short_circuit_and(&self, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+        let lhs_value = self.eval_inner_expr(lhs)?;
+        if !lhs_value.truth_value() {
+            Ok(lhs_value)
+        } else {
+            self.eval_inner_expr(rhs)
+        }
+    }
+    
+    fn eval_short_circuit_or(&self, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+        let lhs_value = self.eval_inner_expr(lhs)?;
+        if lhs_value.truth_value() {
+            Ok(lhs_value)
+        } else {
+            self.eval_inner_expr(rhs)
         }
     }
     
