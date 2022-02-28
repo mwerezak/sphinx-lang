@@ -1,11 +1,16 @@
+mod ops;
+
+use ops::*;
+
 use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};
+use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::variant::Variant;
+use crate::runtime::errors::EvalResult;
 use crate::interpreter::runtime::Scope;
-use crate::interpreter::errors::EvalResult;
 
 
-fn eval(local: &Scope<'_>, expr: &Expr) -> EvalResult<Variant> {
+pub fn eval(local: &Scope<'_>, expr: &Expr) -> EvalResult<Variant> {
     EvalContext::new(local, expr).eval()
 }
 
@@ -28,8 +33,8 @@ impl<'r> EvalContext<'r> {
     fn eval_inner_expr(&self, expr: &ExprVariant) -> EvalResult<Variant> {
         match expr {
             ExprVariant::Primary(primary) => self.eval_primary(primary),
-            ExprVariant::UnaryOp(op, expr) => unimplemented!(),
-            ExprVariant::BinaryOp(op, lhs, rhs) => unimplemented!(),
+            ExprVariant::UnaryOp(op, expr) => self.eval_unary_op(*op, expr),
+            ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op(*op, lhs, rhs),
             ExprVariant::Assignment(assignment) => unimplemented!(),
             ExprVariant::Tuple(expr_list) => unimplemented!(),
             ExprVariant::ObjectCtor(ctor) => unimplemented!(),
@@ -61,6 +66,43 @@ impl<'r> EvalContext<'r> {
             Atom::Group(expr) => self.eval_inner_expr(expr)?,
         };
         Ok(value)
+    }
+    
+    fn eval_unary_op(&self, op: UnaryOp, expr: &ExprVariant) -> EvalResult<Variant> {
+        let operand = self.eval_inner_expr(expr)?;
+        
+        match op {
+            UnaryOp::Neg => eval_neg(&operand),
+            UnaryOp::Pos => eval_pos(&operand),
+            UnaryOp::Inv => eval_inv(&operand),
+            UnaryOp::Not => eval_not(&operand),
+        }
+    }
+    
+    fn eval_binary_op(&self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+        let lhs_value = self.eval_inner_expr(lhs)?;
+        let rhs_value = self.eval_inner_expr(rhs)?;
+        
+        match op {
+            BinaryOp::Mul    => eval_mul(&lhs_value, &rhs_value),
+            BinaryOp::Div    => eval_div(&lhs_value, &rhs_value),
+            BinaryOp::Mod    => eval_mod(&lhs_value, &rhs_value),
+            BinaryOp::Add    => eval_add(&lhs_value, &rhs_value),
+            BinaryOp::Sub    => eval_sub(&lhs_value, &rhs_value),
+            BinaryOp::LShift => unimplemented!(),
+            BinaryOp::RShift => unimplemented!(),
+            BinaryOp::BitAnd => unimplemented!(),
+            BinaryOp::BitXor => unimplemented!(),
+            BinaryOp::BitOr  => unimplemented!(),
+            BinaryOp::LT     => unimplemented!(),
+            BinaryOp::GT     => unimplemented!(),
+            BinaryOp::LE     => unimplemented!(),
+            BinaryOp::GE     => unimplemented!(),
+            BinaryOp::EQ     => unimplemented!(),
+            BinaryOp::NE     => unimplemented!(),
+            BinaryOp::And    => unimplemented!(),
+            BinaryOp::Or     => unimplemented!(),
+        }
     }
 }
 

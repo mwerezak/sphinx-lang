@@ -8,10 +8,10 @@ use string_interner::StringInterner;
 use rlo_interpreter::source::{ModuleSource, SourceType, SourceText};
 
 use rlo_interpreter::language;
-use rlo_interpreter::interpreter::runtime::Runtime;
 use rlo_interpreter::parser::Parser;
+use rlo_interpreter::interpreter::runtime::{Runtime, Scope};
+use rlo_interpreter::interpreter::eval::eval;
 
-// use rlo_interpreter::runtime::{Runtime, placeholder_module};
 
 fn main() {
     let app = App::new("repl")
@@ -145,10 +145,15 @@ fn print_eval_str(runtime: &mut Runtime, input: &str) {
     
     let lexer = runtime.lexer_factory.build(chars.into_iter());
     let mut parser = Parser::new(&module, &mut runtime.interner, lexer);
-    match parser.placeholder_toplevel() {
-        Err(error) => println!("{}", error),
-        Ok(expr) => println!("{:#?}", expr),
+    let expr = match parser.placeholder_toplevel() {
+        Ok(expr) => expr,
+        Err(error) => return println!("{}", error),
     };
+
+    let scope = Scope { runtime };
+    let eval_result = eval(&scope, &expr);
+    
+    println!("{:?}", eval_result);
 
     // let mut local_ctx = placeholder_runtime_ctx(runtime);
     // let eval_result = local_ctx.eval(expr.expr());

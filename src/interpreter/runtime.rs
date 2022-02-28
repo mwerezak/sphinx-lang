@@ -20,6 +20,6 @@ impl Runtime {
 
 
 pub struct Scope<'r> {
-    runtime: &'r Runtime,
+    pub runtime: &'r Runtime,
 }
 
