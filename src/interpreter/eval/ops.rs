@@ -5,7 +5,7 @@
 use crate::language::{IntType, FloatType};
 use crate::runtime::variant::Variant;
 use crate::runtime::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison};
-use crate::interpreter::errors::{EvalResult, EvalErrorKind};
+use crate::interpreter::errors::{EvalResult, EvalError, EvalErrorKind};
 
 
 pub fn is_arithmetic_primitive(value: &Variant) -> bool {
@@ -14,6 +14,17 @@ pub fn is_arithmetic_primitive(value: &Variant) -> bool {
 
 pub fn is_bitwise_primitive(value: &Variant) -> bool {
     matches!(value, Variant::Boolean(..) | Variant::Integer(..))
+}
+
+// using macros because lots of boilerplate
+
+macro_rules! checked_int_math {  // overflow check
+    ( $method:tt, $lhs:expr, $rhs:expr ) => {
+        match $lhs.$method($rhs) {
+            (value, false) => Ok(Variant::Integer(value)),
+            (_, true) => Err(EvalErrorKind::OverflowError.into()),
+        }
+    };
 }
 
 // Unary Operators
@@ -61,11 +72,11 @@ pub fn eval_binary(op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Var
     // try a numeric short-circuit 
     let result = match op {
         BinaryOp::Arithmetic(op) => match op {
-            Arithmetic::Mul    => eval_mul(&lhs, &rhs),
-            Arithmetic::Div    => eval_div(&lhs, &rhs),
-            Arithmetic::Mod    => eval_mod(&lhs, &rhs),
-            Arithmetic::Add    => eval_add(&lhs, &rhs),
-            Arithmetic::Sub    => eval_sub(&lhs, &rhs),
+            Arithmetic::Mul    => eval_mul(&lhs, &rhs)?,
+            Arithmetic::Div    => eval_div(&lhs, &rhs)?,
+            Arithmetic::Mod    => eval_mod(&lhs, &rhs)?,
+            Arithmetic::Add    => eval_add(&lhs, &rhs)?,
+            Arithmetic::Sub    => eval_sub(&lhs, &rhs)?,
         },
         
         BinaryOp::Bitwise(op) => match op {
@@ -75,13 +86,13 @@ pub fn eval_binary(op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Var
         },
         
         BinaryOp::Shift(op) => match op {
-            Shift::Left => eval_shl(&lhs, &rhs),
-            Shift::Right => eval_shr(&lhs, &rhs),
+            Shift::Left => eval_shl(&lhs, &rhs)?,
+            Shift::Right => eval_shr(&lhs, &rhs)?,
         }
         
         BinaryOp::Comparison(op) => eval_comparison(op, lhs, rhs).map(Variant::Boolean),
         
-        _ => panic!("not handled here"),
+        _ => None,
     };
     
     if let Some(value) = result {
@@ -142,44 +153,43 @@ fn eval_binary_other(_op: BinaryOp, _lhs: &Variant, _rhs: &Variant) -> EvalResul
 // They always succeed (due to the way the numeric coercion rules are set up), and hence don't use EvalResult. 
 // Instead, they produce an Option and return None if the operands aren't the right type to short-circuit
 
-// lots of boilerplate
 
 // Arithmetic
 
 macro_rules! eval_binary_arithmetic {
     ($name:tt, $int_name:tt, $float_name:tt) => {
         
-        fn $name (lhs: &Variant, rhs: &Variant) -> Option<Variant> {
+        fn $name (lhs: &Variant, rhs: &Variant) -> EvalResult<Option<Variant>> {
             let value = match (lhs, rhs) {
-                (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => $int_name (*lhs_value, *rhs_value),
-                _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) => $float_name (lhs.float_value(), rhs.float_value()),
-                _ => return None,
+                (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => $int_name (*lhs_value, *rhs_value)?,
+                _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) => $float_name (lhs.float_value(), rhs.float_value())?,
+                _ => return Ok(None),
             };
-            Some(value)
+            Ok(Some(value))
         }
         
     };
 }
 
 eval_binary_arithmetic!(eval_mul, int_mul, float_mul);
-fn int_mul(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs * rhs) }
-fn float_mul(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Float(lhs * rhs) }
+fn int_mul(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { checked_int_math!(overflowing_mul, lhs, rhs) }
+fn float_mul(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs * rhs)) }
 
 eval_binary_arithmetic!(eval_div, int_div, float_div);
-fn int_div(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs / rhs) }
-fn float_div(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Float(lhs / rhs) }
+fn int_div(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { checked_int_math!(overflowing_div, lhs, rhs) }
+fn float_div(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs / rhs)) }
 
 eval_binary_arithmetic!(eval_mod, int_mod, float_mod);
-fn int_mod(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs % rhs) }
-fn float_mod(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Float(lhs % rhs) }
+fn int_mod(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { Ok(Variant::Integer(lhs % rhs)) }
+fn float_mod(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs % rhs)) }
 
 eval_binary_arithmetic!(eval_add, int_add, float_add);
-fn int_add(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs + rhs) }
-fn float_add(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Float(lhs + rhs) }
+fn int_add(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { checked_int_math!(overflowing_add, lhs, rhs) }
+fn float_add(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs + rhs)) }
 
 eval_binary_arithmetic!(eval_sub, int_sub, float_sub);
-fn int_sub(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs - rhs) }
-fn float_sub(lhs: FloatType, rhs: FloatType) -> Variant { Variant::Float(lhs - rhs) }
+fn int_sub(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { checked_int_math!(overflowing_sub, lhs, rhs) }
+fn float_sub(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs - rhs)) }
 
 // Comparison - uses similar coercion rules as Arithmetic, may only produce boolean results
 macro_rules! eval_binary_comparison {
@@ -249,20 +259,31 @@ fn int_or(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs | rhs) }
 macro_rules! eval_binary_shift {
     ($name:tt, $int_name:tt) => {
         
-        fn $name (lhs: &Variant, rhs: &Variant) -> Option<Variant> {
-            match (lhs, rhs) {
-                (_, Variant::Integer(shift)) if is_bitwise_primitive(lhs) => Some($int_name (lhs.bit_value(), *shift)),
-                (_, Variant::Boolean(true))  if is_bitwise_primitive(lhs) => Some($int_name (lhs.bit_value(), 1)),
-                (_, Variant::Boolean(false)) if is_bitwise_primitive(lhs) => Some($int_name (lhs.bit_value(), 0)),
-                _ => None,
-            }
+        fn $name (lhs: &Variant, rhs: &Variant) -> EvalResult<Option<Variant>> {
+            let value = match (lhs, rhs) {
+                (_, Variant::Integer(shift)) if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), *shift)?,
+                (_, Variant::Boolean(true))  if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), 1)?,
+                (_, Variant::Boolean(false)) if is_bitwise_primitive(lhs) => *lhs, // no-op
+                _ => return Ok(None),
+            };
+            Ok(Some(value))
         }
         
     };
 }
 
 eval_binary_shift!(eval_shl, int_shl);
-fn int_shl(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs << rhs) }
+fn int_shl(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { 
+    if rhs < 0 { 
+        return Err(EvalErrorKind::NegativeShiftCount.into()); 
+    }
+    checked_int_math!(overflowing_shl, lhs, rhs.try_into().unwrap()) 
+}
 
 eval_binary_shift!(eval_shr, int_shr);
-fn int_shr(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs >> rhs) }
+fn int_shr(lhs: IntType, rhs: IntType) -> EvalResult<Variant> {
+    if rhs < 0 { 
+        return Err(EvalErrorKind::NegativeShiftCount.into()); 
+    }
+    checked_int_math!(overflowing_shr, lhs, rhs.try_into().unwrap()) 
+}

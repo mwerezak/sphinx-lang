@@ -6,9 +6,10 @@ pub type EvalResult<T> = Result<T, EvalError>;
 
 #[derive(Debug)]
 pub enum EvalErrorKind {
-    InvalidFloatToInt, 
     InvalidUnaryOperand,  // unsupported operand for type
     InvalidBinaryOperand,
+    OverflowError,
+    NegativeShiftCount,
 }
 
 impl From<EvalErrorKind> for EvalError {
