@@ -75,6 +75,14 @@ impl<'m> ParserError<'m> {
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
+    
+    pub fn module(&self) -> &ModuleSource { self.module }
+    
+    pub fn debug_symbol(&self) -> DebugSymbol { DebugSymbol::from(&self.frame) }
+    pub fn context(&self) -> ContextTag { self.frame.context() }
+    
+    pub fn start_token(&self) -> Option<&Span> { self.frame.start() }
+    pub fn end_token(&self) -> Option<&Span> { self.frame.end() }
 }
 
 

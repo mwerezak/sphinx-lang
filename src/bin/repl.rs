@@ -148,7 +148,7 @@ fn print_eval_str(runtime: &mut Runtime, input: &str) {
     let mut parser = Parser::new(&module, &mut runtime.interner, lexer);
     let stmt = match parser.placeholder_toplevel() {
         Ok(expr) => expr,
-        Err(error) => return println!("{}", error),
+        Err(error) => return println!("{} [{:?}]", error, error.debug_symbol()),
     };
 
     let scope = Scope { runtime };
