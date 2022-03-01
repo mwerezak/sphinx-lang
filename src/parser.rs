@@ -456,12 +456,18 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let atom = match next.token {
                 // Identifiers
                 Token::Identifier(name) => Atom::identifier(name.as_str(), self.interner),
-                Token::Global => {
+                Token::Global | Token::Upval => {
+                    let scope = next.token;
                     let next = self.advance()?;
                     ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
-                        Atom::global_identifier(name.as_str(), self.interner)
+                        match scope {
+                            Token::Global => Atom::global_identifier(name.as_str(), self.interner),
+                            Token::Upval => Atom::upval_identifier(name.as_str(), self.interner),
+                            _ => unreachable!(),
+                        }
+                        
                     } else {
                         return Err(ErrorPrototype::new(ErrorKind::ExpectedIdentifier))
                     }

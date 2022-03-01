@@ -43,6 +43,10 @@ impl Atom {
         Self::GlobalIdentifier(InternStr::from_str(name, interner))
     }
     
+    pub fn upval_identifier(name: &str, interner: &mut StringInterner) -> Self {
+        Self::UpvalIdentifier(InternStr::from_str(name, interner))
+    }
+    
     pub fn string_literal(value: &str, interner: &mut StringInterner) -> Self {
         Self::StringLiteral(InternStr::from_str(value, interner))
     }
