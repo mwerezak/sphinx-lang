@@ -1,8 +1,8 @@
 use crate::lexer::{LexerBuilder, Token};
 use crate::lexer::rules::{SingleCharRule, MultiCharRule};
 use crate::lexer::rules::keywords::KeywordRule;
-use crate::lexer::rules::literals::{IdentifierRule, IntegerLiteralRule, HexIntegerLiteralRule};
-use crate::lexer::rules::literals::string::{StringLiteralRule, EscapeSequence, CharMapEscape, HexByteEscape};
+use crate::lexer::rules::literals::*;
+use crate::lexer::rules::literals::string::*;
 
 
 pub type IntType = i32;    // internal representation for integers
@@ -119,6 +119,10 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(IdentifierRule::new())
     .add_rule(IntegerLiteralRule::new())
     .add_rule(HexIntegerLiteralRule::new())
+    
+    .add_rule(FloatLiteralRule::new())
+    
     .add_rule(StringLiteralRule::new(ESCAPE_SEQUENCES.iter().map(|esc| esc.as_ref())))
+    
 
 }

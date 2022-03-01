@@ -101,7 +101,7 @@ impl fmt::Display for ParserError<'_> {
             ParserErrorKind::ExpectedCloseParen   => "missing closing ')'",
             ParserErrorKind::ExpectedCloseSquare  => "missing closing ']'",
             ParserErrorKind::ExpectedCloseBrace   => "missing closing '}'",
-            ParserErrorKind::ExpectedIdentifier   => "missing identifier",
+            ParserErrorKind::ExpectedIdentifier   => "invalid identifier",
             ParserErrorKind::InvalidAssignmentLHS => "invalid assignment",
         };
         
