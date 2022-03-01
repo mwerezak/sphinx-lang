@@ -5,7 +5,7 @@ use crate::lexer::rules::literals::*;
 use crate::lexer::rules::literals::string::*;
 
 
-pub type IntType = i32;    // internal representation for integers
+pub type IntType = i64;    // internal representation for integers
 pub type FloatType = f64;  // internal representation for floats
 
 

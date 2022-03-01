@@ -37,7 +37,7 @@ impl Variant {
         match self {
             // if we switch to 64-bit ints, this will become a lossy conversion
             // this method should always succeed for numeric primitive types
-            Self::Integer(value) => FloatType::from(*value),
+            Self::Integer(value) => (*value) as FloatType,
             Self::Float(value) => *value,
             
             _ => panic!("float_value() valid only for numeric primitives"),
@@ -45,4 +45,5 @@ impl Variant {
     }
     
     // pub fn string_value(&self) -> ... { }
+
 }
