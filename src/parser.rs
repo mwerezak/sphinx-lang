@@ -106,7 +106,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             Token::Continue => unimplemented!(),
             Token::Break => unimplemented!(),
             Token::Return => unimplemented!(),
-            _ => self.parse_expr(ctx)?.into(), //
+            _ => self.parse_expr(ctx)?.into(),
         };
         Ok(stmt)
     }
@@ -138,7 +138,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         } else {
             rest_exprs.insert(0, first_expr);
             let tuple = ExprVariant::Tuple(rest_exprs);
-            let symbol = DebugSymbol::from(ctx.frame());
+            let symbol = ctx.frame().as_debug_symbol().unwrap();
             
             ctx.pop_extend(); // pop the TupleCtor context frame
             Ok(Expr::new(tuple, symbol))
@@ -150,7 +150,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         ctx.push(ContextTag::Expr);
         
         let variant = self.parse_expr_variant(ctx)?;
-        let symbol = DebugSymbol::from(ctx.frame());
+        let symbol = ctx.frame().as_debug_symbol().unwrap();
         
         ctx.pop_extend();
         Ok(Expr::new(variant, symbol))

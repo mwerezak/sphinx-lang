@@ -78,7 +78,7 @@ impl<'m> ParserError<'m> {
     
     pub fn module(&self) -> &ModuleSource { self.module }
     
-    pub fn debug_symbol(&self) -> DebugSymbol { DebugSymbol::from(&self.frame) }
+    pub fn debug_symbol(&self) -> Option<DebugSymbol> { self.frame.as_debug_symbol() }
     pub fn context(&self) -> ContextTag { self.frame.context() }
     
     pub fn start_token(&self) -> Option<&Span> { self.frame.start() }
@@ -216,26 +216,27 @@ impl ContextFrame {
             self.end = other.end;
         }
     }
-}
-
-impl From<&ContextFrame> for DebugSymbol {
-    fn from(frame: &ContextFrame) -> Self {
-        match (frame.start.clone(), frame.end.clone()) {
+    
+    pub fn as_debug_symbol(&self) -> Option<DebugSymbol> {
+        match (self.start.clone(), self.end.clone()) {
+            
             (Some(start), Some(end)) => {
                 let start_index = start.index;
                 let end_index = end.index + TokenIndex::from(end.length);
                 
-                (start_index, end_index).into()
+                Some((start_index, end_index).into())
             },
+            
             (Some(span), None) | (None, Some(span)) => {
                 let start_index = span.index;
                 let end_index = span.index + TokenIndex::from(span.length);
                 
-                (start_index, end_index).into()
+                Some((start_index, end_index).into())
             },
-            (None, None) => {
-                panic!("ContextFrame has no source index information");
-            }
+            
+            (None, None) => None,
         }
     }
 }
+
+
