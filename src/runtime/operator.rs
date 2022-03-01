@@ -1,8 +1,15 @@
-use crate::parser::operator::{UnaryOp, BinaryOp};
+use crate::parser::operator::{UnaryOp as ParserUnary, BinaryOp as ParserBinary};
 
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Unary {
+pub enum Operator {
+    Unary(UnaryOp),
+    Binary(BinaryOp),
+}
+
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnaryOp {
     Pos, Neg, Inv, Not,
 }
 
@@ -43,8 +50,7 @@ pub enum Logical {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Operator {
-    Unary(Unary),
+pub enum BinaryOp {
     Arithmetic(Arithmetic),
     Bitwise(Bitwise),
     Shift(Shift),
@@ -52,64 +58,60 @@ pub enum Operator {
     Logical(Logical),
 }
 
-impl From<Unary> for Operator {
-    fn from(op: Unary) -> Self { Self::Unary(op) }
-}
-
-impl From<Arithmetic> for Operator {
+impl From<Arithmetic> for BinaryOp {
     fn from(op: Arithmetic) -> Self { Self::Arithmetic(op) }
 }
 
-impl From<Bitwise> for Operator {
+impl From<Bitwise> for BinaryOp {
     fn from(op: Bitwise) -> Self { Self::Bitwise(op) }
 }
 
-impl From<Shift> for Operator {
+impl From<Shift> for BinaryOp {
     fn from(op: Shift) -> Self { Self::Shift(op) }
 }
 
-impl From<Comparison> for Operator {
+impl From<Comparison> for BinaryOp {
     fn from(op: Comparison) -> Self { Self::Comparison(op) }
 }
 
-impl From<Logical> for Operator {
+impl From<Logical> for BinaryOp {
     fn from(op: Logical) -> Self { Self::Logical(op) }
 }
 
 // Conversion from parser op types
 
-impl From<UnaryOp> for Unary {
-    fn from(op: UnaryOp) -> Self {
+impl From<ParserUnary> for UnaryOp {
+    fn from(op: ParserUnary) -> Self {
         match op {
-            UnaryOp::Neg => Self::Neg,
-            UnaryOp::Pos => Self::Pos,
-            UnaryOp::Inv => Self::Inv,
-            UnaryOp::Not => Self::Not,
+            ParserUnary::Neg => Self::Neg,
+            ParserUnary::Pos => Self::Pos,
+            ParserUnary::Inv => Self::Inv,
+            ParserUnary::Not => Self::Not,
         }
     }
 }
 
-impl From<BinaryOp> for Operator {
-    fn from(op: BinaryOp) -> Self {
+impl From<ParserBinary> for BinaryOp {
+    fn from(op: ParserBinary) -> Self {
         match op {
-            BinaryOp::Mul    => Self::Arithmetic(Arithmetic::Mul),
-            BinaryOp::Div    => Self::Arithmetic(Arithmetic::Div),
-            BinaryOp::Mod    => Self::Arithmetic(Arithmetic::Mod),
-            BinaryOp::Add    => Self::Arithmetic(Arithmetic::Add),
-            BinaryOp::Sub    => Self::Arithmetic(Arithmetic::Sub),
-            BinaryOp::LShift => Self::Shift(Shift::Left),
-            BinaryOp::RShift => Self::Shift(Shift::Right),
-            BinaryOp::BitAnd => Self::Bitwise(Bitwise::And),
-            BinaryOp::BitXor => Self::Bitwise(Bitwise::Xor),
-            BinaryOp::BitOr  => Self::Bitwise(Bitwise::Or),
-            BinaryOp::LT     => Self::Comparison(Comparison::LT),
-            BinaryOp::GT     => Self::Comparison(Comparison::GT),
-            BinaryOp::LE     => Self::Comparison(Comparison::LE),
-            BinaryOp::GE     => Self::Comparison(Comparison::GE),
-            BinaryOp::EQ     => Self::Comparison(Comparison::EQ),
-            BinaryOp::NE     => Self::Comparison(Comparison::NE),
-            BinaryOp::And    => Self::Logical(Logical::And),
-            BinaryOp::Or     => Self::Logical(Logical::Or),
+            ParserBinary::Mul    => Self::Arithmetic(Arithmetic::Mul),
+            ParserBinary::Div    => Self::Arithmetic(Arithmetic::Div),
+            ParserBinary::Mod    => Self::Arithmetic(Arithmetic::Mod),
+            ParserBinary::Add    => Self::Arithmetic(Arithmetic::Add),
+            ParserBinary::Sub    => Self::Arithmetic(Arithmetic::Sub),
+            ParserBinary::LShift => Self::Shift(Shift::Left),
+            ParserBinary::RShift => Self::Shift(Shift::Right),
+            ParserBinary::BitAnd => Self::Bitwise(Bitwise::And),
+            ParserBinary::BitXor => Self::Bitwise(Bitwise::Xor),
+            ParserBinary::BitOr  => Self::Bitwise(Bitwise::Or),
+            ParserBinary::LT     => Self::Comparison(Comparison::LT),
+            ParserBinary::GT     => Self::Comparison(Comparison::GT),
+            ParserBinary::LE     => Self::Comparison(Comparison::LE),
+            ParserBinary::GE     => Self::Comparison(Comparison::GE),
+            ParserBinary::EQ     => Self::Comparison(Comparison::EQ),
+            ParserBinary::NE     => Self::Comparison(Comparison::NE),
+            ParserBinary::And    => Self::Logical(Logical::And),
+            ParserBinary::Or     => Self::Logical(Logical::Or),
         }
     }
 }

@@ -13,6 +13,7 @@ pub enum Atom {
     Nil,
     EmptyTuple,
     Identifier(InternStr),
+    UpvalIdentifier(InternStr),
     GlobalIdentifier(InternStr),
     BooleanLiteral(bool),
     IntegerLiteral(language::IntType),

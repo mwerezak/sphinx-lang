@@ -1,7 +1,16 @@
 use crate::debug::symbol::DebugSymbol;
+use crate::runtime::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::Primary;
-use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::parser::structs::{ObjectConstructor};
+use crate::parser::stmt::{Stmt, StmtVariant};
+
+
+#[derive(Debug, Clone)]
+pub struct AssignmentInfo {
+    pub lhs: Primary,
+    pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
+    pub rhs: ExprVariant,
+}
 
 #[derive(Debug, Clone)]
 pub enum ExprVariant {
@@ -18,13 +27,11 @@ pub enum ExprVariant {
     
     ObjectCtor(Box<ObjectConstructor>),
     
-}
-
-#[derive(Debug, Clone)]
-pub struct AssignmentInfo {
-    pub lhs: Primary,
-    pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
-    pub rhs: ExprVariant,
+    // IfExpr
+    // BlockExpr
+    
+    // FunctionDef
+    // ClassDef
 }
 
 impl ExprVariant {
@@ -71,3 +78,11 @@ impl Expr {
     pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
 }
 
+// create an expression-statement
+
+impl From<Expr> for Stmt {
+    fn from(expr: Expr) -> Self {
+        let variant = StmtVariant::Expression(expr.variant);
+        Stmt::new(variant, expr.symbol)
+    }
+}

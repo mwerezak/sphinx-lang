@@ -2,6 +2,7 @@ mod errors;
 mod tests;
 
 pub mod expr;
+pub mod stmt;
 pub mod primary;
 pub mod operator;
 pub mod structs;
@@ -14,6 +15,7 @@ use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::debug::symbol::DebugSymbol;
 
 use expr::{Expr, ExprVariant};
+use stmt::{Stmt, StmtVariant};
 use primary::{Primary, Atom};
 use operator::{UnaryOp, BinaryOp, OpLevel, OP_LEVEL_START, OP_LEVEL_END};
 use structs::{ObjectConstructor};
@@ -75,17 +77,38 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     // temporary top level, will change when statement parsing is added
     // Note: the value returned from this method no longer needs the interner 'h
     // but the compiler can't guess that, so we have to be explicit about the lifetimes here
-    pub fn placeholder_toplevel(&mut self) -> Result<Expr, ParserError<'m>> { 
-        let mut ctx = ErrorContext::new(self.module, ContextTag::Statement);
+    pub fn placeholder_toplevel(&mut self) -> Result<Stmt, ParserError<'m>> { 
+        let mut ctx = ErrorContext::new(self.module, ContextTag::TopLevel);
         
-        match self.parse_expr(&mut ctx) {
-            Ok(expr) => Ok(expr),
+        match self.parse_stmt_variant(&mut ctx) {
+            Ok(stmt) => Ok(stmt),
             Err(err) => {
                 // TODO synchronize
             
                 Err(ParserError::from_prototype(err, ctx))
             },
         }
+    }
+    
+    /*** Statement Parsing ***/
+    
+    fn parse_stmt_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<Stmt> {
+        // skip statement separators
+        while let Token::Semicolon = self.peek()?.token {
+            self.advance()?;
+        }
+        
+        let stmt = match self.peek()?.token {
+            Token::Var => unimplemented!(),
+            Token::While => unimplemented!(),
+            Token::Do => unimplemented!(),
+            Token::For => unimplemented!(),
+            Token::Continue => unimplemented!(),
+            Token::Break => unimplemented!(),
+            Token::Return => unimplemented!(),
+            _ => self.parse_expr(ctx)?.into(), //
+        };
+        Ok(stmt)
     }
     
     /*** Expression Parsing ***/
@@ -164,7 +187,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let rhs_expr = self.parse_expr_variant(ctx)?;
             
             ctx.pop_extend();
-            return Ok(ExprVariant::assignment(*lhs, assign_op, rhs_expr));
+            return Ok(ExprVariant::assignment(*lhs, assign_op.map(|op| op.into()), rhs_expr));
         }
         
         Ok(expr)
@@ -202,7 +225,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             
             let rhs_expr = self.parse_binop_expr(ctx, level - 1)?;
             
-            expr = ExprVariant::binary_op(binary_op, expr, rhs_expr);
+            expr = ExprVariant::binary_op(binary_op.into(), expr, rhs_expr);
             
             ctx.pop_extend();
         }
@@ -224,7 +247,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let expr = self.parse_primary_expr(ctx)?;
             
             ctx.pop_extend();
-            return Ok(ExprVariant::unary_op(unary_op, expr));
+            return Ok(ExprVariant::unary_op(unary_op.into(), expr));
         }
         
         self.parse_primary_expr(ctx)
@@ -235,8 +258,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         We look for anything that can be immediately identified from the next token, or else fall back to a primary expression.
     */
     fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
-        let next = self.peek()?;
-        match next.token {
+        match self.peek()?.token {
             Token::Class => unimplemented!(),
             Token::Fun => unimplemented!(),
             Token::If => unimplemented!(),

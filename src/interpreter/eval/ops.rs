@@ -4,7 +4,7 @@
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::variant::Variant;
-use crate::runtime::operator::{Operator, Unary, Arithmetic, Bitwise, Shift, Comparison};
+use crate::runtime::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison};
 use crate::interpreter::errors::{EvalResult, EvalErrorKind};
 
 
@@ -22,7 +22,7 @@ pub fn eval_neg(operand: &Variant) -> EvalResult<Variant> {
     let value = match operand {
         Variant::Integer(value) => Variant::Integer(-value),
         Variant::Float(value) => Variant::Float(-value),
-        _ => return eval_unary_other(Unary::Neg, operand),
+        _ => return eval_unary_other(UnaryOp::Neg, operand),
     };
     Ok(value)
 }
@@ -32,7 +32,7 @@ pub fn eval_pos(operand: &Variant) -> EvalResult<Variant> {
         // No-op for arithmetic primitives
         Variant::Integer(value) => Variant::Integer(*value),
         Variant::Float(value) => Variant::Float(*value),
-        _ => return eval_unary_other(Unary::Pos, operand),
+        _ => return eval_unary_other(UnaryOp::Pos, operand),
     };
     Ok(value)
 }
@@ -41,7 +41,7 @@ pub fn eval_inv(operand: &Variant) -> EvalResult<Variant> {
     let value = match operand {
         Variant::Boolean(value) => Variant::Boolean(!value),
         Variant::Integer(value) => Variant::Integer(!value),
-        _ => return eval_unary_other(Unary::Inv, operand),
+        _ => return eval_unary_other(UnaryOp::Inv, operand),
     };
     Ok(value)
 }
@@ -50,17 +50,17 @@ pub fn eval_not(operand: &Variant) -> EvalResult<Variant> {
     return Ok(Variant::Boolean(!operand.truth_value()))
 }
 
-fn eval_unary_other(_op: Unary, _operand: &Variant) -> EvalResult<Variant> {
+fn eval_unary_other(_op: UnaryOp, _operand: &Variant) -> EvalResult<Variant> {
     // TODO defer to the operand's type's metamethods
     unimplemented!()
 }
 
 // Binary Operators
 
-pub fn eval_binary(op: Operator, lhs: &Variant, rhs: &Variant) -> EvalResult<Variant> {
+pub fn eval_binary(op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Variant> {
     // try a numeric short-circuit 
     let result = match op {
-        Operator::Arithmetic(op) => match op {
+        BinaryOp::Arithmetic(op) => match op {
             Arithmetic::Mul    => eval_mul(&lhs, &rhs),
             Arithmetic::Div    => eval_div(&lhs, &rhs),
             Arithmetic::Mod    => eval_mod(&lhs, &rhs),
@@ -68,18 +68,18 @@ pub fn eval_binary(op: Operator, lhs: &Variant, rhs: &Variant) -> EvalResult<Var
             Arithmetic::Sub    => eval_sub(&lhs, &rhs),
         },
         
-        Operator::Bitwise(op) => match op {
+        BinaryOp::Bitwise(op) => match op {
             Bitwise::And => eval_and(&lhs, &rhs),
             Bitwise::Xor => eval_xor(&lhs, &rhs),
             Bitwise::Or  => eval_or(&lhs, &rhs),
         },
         
-        Operator::Shift(op) => match op {
+        BinaryOp::Shift(op) => match op {
             Shift::Left => eval_shl(&lhs, &rhs),
             Shift::Right => eval_shr(&lhs, &rhs),
         }
         
-        Operator::Comparison(op) => eval_comparison(op, lhs, rhs).map(Variant::Boolean),
+        BinaryOp::Comparison(op) => eval_comparison(op, lhs, rhs).map(Variant::Boolean),
         
         _ => panic!("not handled here"),
     };
@@ -130,7 +130,7 @@ fn eval_equals(lhs: &Variant, rhs: &Variant) -> bool {
     }
 }
 
-fn eval_binary_other(_op: Operator, _lhs: &Variant, _rhs: &Variant) -> EvalResult<Variant> {
+fn eval_binary_other(_op: BinaryOp, _lhs: &Variant, _rhs: &Variant) -> EvalResult<Variant> {
     // TODO defer to lhs's type metamethods, or rhs's type reflected metamethod
     unimplemented!()
 }

@@ -24,7 +24,7 @@ pub enum ParserErrorKind {
 pub enum ContextTag {
     Token,  // errors retrieving the actual tokens
     Expr,
-    Statement,
+    TopLevel,
     AssignmentExpr,
     BinaryOpExpr,
     UnaryOpExpr,

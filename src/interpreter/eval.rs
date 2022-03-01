@@ -2,32 +2,33 @@ mod ops;
 
 use ops::*;
 
+use crate::debug::symbol::DebugSymbol;
 use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};
 use crate::runtime::variant::Variant;
-use crate::runtime::operator::{Operator, Unary, Arithmetic, Bitwise, Shift, Comparison, Logical};
+use crate::runtime::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::interpreter::runtime::Scope;
 use crate::interpreter::errors::EvalResult;
 
 
-pub fn eval(local: &Scope<'_>, expr: &Expr) -> EvalResult<Variant> {
-    EvalContext::new(local, expr).eval()
+pub fn eval_expr(local: &Scope<'_>, expr: &ExprVariant, debug: Option<&DebugSymbol>) -> EvalResult<Variant> {
+    EvalContext::new(local, debug).eval(expr)
 }
 
 
 // tracks the local scope and the innermost Expr
 pub struct EvalContext<'r> {
     local: &'r Scope<'r>,
-    expr: &'r Expr,
+    debug: Option<&'r DebugSymbol>,
 }
 
 impl<'r> EvalContext<'r> {
-    pub fn new(local: &'r Scope, expr: &'r Expr) -> Self {
-        EvalContext { local, expr }
+    pub fn new(local: &'r Scope, debug: Option<&'r DebugSymbol>) -> Self {
+        EvalContext { local, debug }
     }
     
-    pub fn eval(&self) -> EvalResult<Variant> {
-        self.eval_inner_expr(self.expr.variant())
+    pub fn eval(&self, expr: &ExprVariant) -> EvalResult<Variant> {
+        self.eval_inner_expr(expr)
     }
     
     fn eval_inner_expr(&self, expr: &ExprVariant) -> EvalResult<Variant> {
@@ -63,6 +64,7 @@ impl<'r> EvalContext<'r> {
             Atom::StringLiteral(value) => Variant::InternStr(*value),
             
             Atom::Identifier(name) => unimplemented!(),
+            Atom::UpvalIdentifier(name) => unimplemented!(),
             Atom::GlobalIdentifier(name) => unimplemented!(),
             
             Atom::Group(expr) => self.eval_inner_expr(expr)?,
@@ -70,19 +72,19 @@ impl<'r> EvalContext<'r> {
         Ok(value)
     }
     
-    fn eval_unary_op(&self, op: Unary, expr: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_unary_op(&self, op: UnaryOp, expr: &ExprVariant) -> EvalResult<Variant> {
         let operand = self.eval_inner_expr(expr)?;
         
         match op {
-            Unary::Neg => eval_neg(&operand),
-            Unary::Pos => eval_pos(&operand),
-            Unary::Inv => eval_inv(&operand),
-            Unary::Not => eval_not(&operand),
+            UnaryOp::Neg => eval_neg(&operand),
+            UnaryOp::Pos => eval_pos(&operand),
+            UnaryOp::Inv => eval_inv(&operand),
+            UnaryOp::Not => eval_not(&operand),
         }
     }
     
-    fn eval_binary_op(&self, op: Operator, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
-        if let Operator::Logical(logic) = op {
+    fn eval_binary_op(&self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+        if let BinaryOp::Logical(logic) = op {
             return self.eval_short_circuit_logic(logic, lhs, rhs);
         }
         
