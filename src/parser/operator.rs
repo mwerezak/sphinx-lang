@@ -1,4 +1,6 @@
 use std::fmt;
+use crate::runtime::types::operator;
+use crate::runtime::types::operator::{Arithmetic, Bitwise, Shift, Comparison, Logical};
 
 // Unary Operators
 
@@ -92,4 +94,40 @@ impl fmt::Display for BinaryOp {
     }
 }
 
+// Conversion to runtime operator types
 
+impl From<UnaryOp> for operator::UnaryOp {
+    fn from(op: UnaryOp) -> Self {
+        match op {
+            UnaryOp::Neg => Self::Neg,
+            UnaryOp::Pos => Self::Pos,
+            UnaryOp::Inv => Self::Inv,
+            UnaryOp::Not => Self::Not,
+        }
+    }
+}
+
+impl From<BinaryOp> for operator::BinaryOp {
+    fn from(op: BinaryOp) -> Self {
+        match op {
+            BinaryOp::Mul    => Self::Arithmetic(Arithmetic::Mul),
+            BinaryOp::Div    => Self::Arithmetic(Arithmetic::Div),
+            BinaryOp::Mod    => Self::Arithmetic(Arithmetic::Mod),
+            BinaryOp::Add    => Self::Arithmetic(Arithmetic::Add),
+            BinaryOp::Sub    => Self::Arithmetic(Arithmetic::Sub),
+            BinaryOp::LShift => Self::Shift(Shift::Left),
+            BinaryOp::RShift => Self::Shift(Shift::Right),
+            BinaryOp::BitAnd => Self::Bitwise(Bitwise::And),
+            BinaryOp::BitXor => Self::Bitwise(Bitwise::Xor),
+            BinaryOp::BitOr  => Self::Bitwise(Bitwise::Or),
+            BinaryOp::LT     => Self::Comparison(Comparison::LT),
+            BinaryOp::GT     => Self::Comparison(Comparison::GT),
+            BinaryOp::LE     => Self::Comparison(Comparison::LE),
+            BinaryOp::GE     => Self::Comparison(Comparison::GE),
+            BinaryOp::EQ     => Self::Comparison(Comparison::EQ),
+            BinaryOp::NE     => Self::Comparison(Comparison::NE),
+            BinaryOp::And    => Self::Logical(Logical::And),
+            BinaryOp::Or     => Self::Logical(Logical::Or),
+        }
+    }
+}

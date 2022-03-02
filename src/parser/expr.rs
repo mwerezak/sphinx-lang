@@ -1,5 +1,5 @@
 use crate::debug::symbol::DebugSymbol;
-use crate::runtime::operator::{BinaryOp, UnaryOp};
+use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::Primary;
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::stmt::{Stmt, StmtVariant};

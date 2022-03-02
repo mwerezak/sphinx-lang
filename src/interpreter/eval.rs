@@ -1,14 +1,11 @@
-mod ops;
-
-use ops::*;
-
 use crate::debug::symbol::DebugSymbol;
 use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};
 use crate::runtime::Variant;
-use crate::runtime::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
+use crate::runtime::ops::*;
+use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
+use crate::runtime::errors::EvalResult;
 use crate::interpreter::runtime::Scope;
-use crate::interpreter::errors::EvalResult;
 
 
 pub fn eval_expr(local: &Scope<'_>, expr: &ExprVariant, debug: Option<&DebugSymbol>) -> EvalResult<Variant> {
@@ -73,6 +70,21 @@ impl<'r> EvalContext<'r> {
         Ok(value)
     }
     
+    fn eval_short_circuit_logic(&self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+        let lhs_value = self.eval_inner_expr(lhs)?;
+        
+        let cond = match op {
+            Logical::And => !lhs_value.truth_value(),
+            Logical::Or => lhs_value.truth_value(),
+        };
+        
+        if cond {
+            Ok(lhs_value)
+        } else {
+            self.eval_inner_expr(rhs)
+        }
+    }
+    
     fn eval_unary_op(&self, op: UnaryOp, expr: &ExprVariant) -> EvalResult<Variant> {
         let operand = self.eval_inner_expr(expr)?;
         
@@ -92,22 +104,51 @@ impl<'r> EvalContext<'r> {
         let lhs_value = self.eval_inner_expr(lhs)?;
         let rhs_value = self.eval_inner_expr(rhs)?;
         
-        eval_binary(op, &lhs_value, &rhs_value)
-    }
-    
-    fn eval_short_circuit_logic(&self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
-        let lhs_value = self.eval_inner_expr(lhs)?;
-        
-        let cond = match op {
-            Logical::And => !lhs_value.truth_value(),
-            Logical::Or => lhs_value.truth_value(),
+        let result = match op {
+            BinaryOp::Arithmetic(op) => match op {
+                Arithmetic::Mul    => eval_mul(&lhs_value, &rhs_value)?,
+                Arithmetic::Div    => eval_div(&lhs_value, &rhs_value)?,
+                Arithmetic::Mod    => eval_mod(&lhs_value, &rhs_value)?,
+                Arithmetic::Add    => eval_add(&lhs_value, &rhs_value)?,
+                Arithmetic::Sub    => eval_sub(&lhs_value, &rhs_value)?,
+            },
+            
+            BinaryOp::Bitwise(op) => match op {
+                Bitwise::And => eval_and(&lhs_value, &rhs_value),
+                Bitwise::Xor => eval_xor(&lhs_value, &rhs_value),
+                Bitwise::Or  => eval_or(&lhs_value, &rhs_value),
+            },
+            
+            BinaryOp::Shift(op) => match op {
+                Shift::Left => eval_shl(&lhs_value, &rhs_value)?,
+                Shift::Right => eval_shr(&lhs_value, &rhs_value)?,
+            }
+            
+            BinaryOp::Comparison(op) => match op {
+                Comparison::LT     => eval_lt(&lhs_value, &rhs_value),
+                Comparison::GT     => eval_gt(&lhs_value, &rhs_value),
+                Comparison::LE     => eval_le(&lhs_value, &rhs_value),
+                Comparison::GE     => eval_ge(&lhs_value, &rhs_value),
+                
+                Comparison::EQ     => Some(eval_eq(&lhs_value, &rhs_value)),
+                Comparison::NE     => Some(eval_ne(&lhs_value, &rhs_value)),
+            
+            }.map(Variant::from),
+            
+            _ => None,
         };
         
-        if cond {
-            Ok(lhs_value)
+        if let Some(value) = result {
+            Ok(value)
         } else {
-            self.eval_inner_expr(rhs)
+            Self::eval_binary_from_type(op, &lhs_value, &rhs_value)
         }
+    }
+    
+    // This will probably be replaced once type system is implemented
+    fn eval_binary_from_type(_op: BinaryOp, _lhs: &Variant, _rhs: &Variant) -> EvalResult<Variant> {
+        // TODO defer to lhs's type metamethods, or rhs's type reflected metamethod
+        unimplemented!()
     }
     
 }
