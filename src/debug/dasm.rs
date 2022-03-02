@@ -66,7 +66,7 @@ impl fmt::Display for OpCode {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mnemonic = match *self {
             Self::LoadConst => "OP_LDCONST",
-            Self::LoadConstWide => "OP_LDCONST_W",
+            Self::LoadConstWide => "OP_LDCONST_16",
             Self::Return => "OP_RETURN",
         };
         
