@@ -8,22 +8,22 @@ use crate::runtime::Variant;
 use crate::runtime::ops::*;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::errors::EvalResult;
-use crate::interpreter::runtime::Scope;
+use crate::interpreter::runtime::Environment;
 
 
-pub fn eval_expr(local: &Scope<'_>, expr: &ExprVariant, debug: Option<&DebugSymbol>) -> EvalResult<Variant> {
+pub fn eval_expr(local: &Environment<'_>, expr: &ExprVariant, debug: Option<&DebugSymbol>) -> EvalResult<Variant> {
     EvalContext::new(local, debug).eval(expr)
 }
 
 
 // tracks the local scope and the innermost Expr
 pub struct EvalContext<'r> {
-    local: &'r Scope<'r>,
+    local: &'r Environment<'r>,
     debug: Option<&'r DebugSymbol>,
 }
 
 impl<'r> EvalContext<'r> {
-    pub fn new(local: &'r Scope, debug: Option<&'r DebugSymbol>) -> Self {
+    pub fn new(local: &'r Environment, debug: Option<&'r DebugSymbol>) -> Self {
         EvalContext { local, debug }
     }
     

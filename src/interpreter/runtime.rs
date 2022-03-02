@@ -19,7 +19,7 @@ impl Runtime {
 }
 
 
-pub struct Scope<'r> {
+pub struct Environment<'r> {
     pub runtime: &'r Runtime,
 }
 

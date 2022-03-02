@@ -13,7 +13,7 @@ use rlo_interpreter::debug::symbol::DebugSymbolResolver;
 use rlo_interpreter::language;
 use rlo_interpreter::parser::Parser;
 use rlo_interpreter::parser::stmt::StmtVariant;
-use rlo_interpreter::interpreter::runtime::{Runtime, Scope};
+use rlo_interpreter::interpreter::runtime::{Runtime, Environment};
 use rlo_interpreter::interpreter::eval::eval_expr;
 
 
@@ -160,7 +160,7 @@ fn print_eval_str(runtime: &mut Runtime, input: &str) {
         Err(error) => return println!("{} [{:?}]", error, error.debug_symbol()),
     };
 
-    let scope = Scope { runtime };
+    let scope = Environment { runtime };
     
     if let StmtVariant::Expression(expr) = stmt.variant() {
         let eval_result = eval_expr(&scope, &expr, Some(stmt.debug_symbol()));
