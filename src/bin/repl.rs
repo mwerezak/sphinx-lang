@@ -7,6 +7,9 @@ use string_interner::StringInterner;
 
 use rlo_interpreter::source::{ModuleSource, SourceType, SourceText};
 
+use rlo_interpreter::frontend::render_parser_error;
+use rlo_interpreter::debug::symbol::DebugSymbolResolver;
+
 use rlo_interpreter::language;
 use rlo_interpreter::parser::Parser;
 use rlo_interpreter::parser::stmt::StmtVariant;
@@ -66,8 +69,14 @@ fn main() {
                 let lexer = lexer_factory.build_once(readf);
                 let mut parser = Parser::new(&module, &mut interner, lexer);
                 match parser.placeholder_toplevel() {
-                    Err(error) => println!("{}", error),
                     Ok(expr) => println!("{:#?}", expr),
+                    Err(error) => {
+                        let symbol = error.debug_symbol().unwrap();
+                        let resolved = module.resolve_symbols(std::iter::once(&symbol)).unwrap();
+                        let symbol = resolved.get(&symbol).unwrap().as_ref().unwrap();
+                        
+                        println!("{}", render_parser_error(&error, symbol));
+                    },
                 };
             },
         };
@@ -166,3 +175,4 @@ fn print_eval_str(runtime: &mut Runtime, input: &str) {
     // let eval_result = local_ctx.eval(expr.expr());
     // println!("{:?}", eval_result);
 }
+

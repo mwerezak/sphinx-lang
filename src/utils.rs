@@ -29,6 +29,13 @@ impl<'s> fmt::Display for TrimStr<'s> {
     }
 }
 
+pub fn title_case_string(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
 
 // This struct is born out of a desire to read a file into unicode characters 
 // without pulling the entire file into a buffer

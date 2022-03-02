@@ -118,52 +118,16 @@ impl ResolvedSymbol {
             Some(result)
         })
     }
-    
-    
-    // Formatting
-    
-    // trims trailing whitespace
-    fn fmt_symbol_text(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result { 
+
+}
+
+impl fmt::Display for ResolvedSymbol {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         for line in self.iter_lines() {
             fmt.write_str(line.trim_end())?;
             fmt.write_str("\n")?;
         }
         Ok(())
-    }
-    
-    
-    pub fn as_whole_line_fmt(&self) -> impl fmt::Display + '_ {
-        delegate_fmt(|fmt| self.fmt_whole_lines(fmt))
-    }
-    
-    // includes surrounding text on the same lines, trims trailing whitespace
-    fn fmt_whole_lines(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for line in self.iter_whole_lines() {
-            fmt.write_str(line.trim_end())?;
-            fmt.write_str("\n")?;
-        }
-        Ok(())
-    }
-    
-    pub fn as_single_line_fmt(&self) -> impl fmt::Display + '_ {
-        delegate_fmt(|fmt| self.fmt_single_line(fmt))
-    }
-    
-    fn fmt_single_line(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result { 
-        if let Some(first_line) = self.iter_lines().nth(0) {
-            if self.is_multiline() {
-                write!(fmt, "{}...", first_line.trim_end())?;
-            } else {
-                fmt.write_str(first_line.trim_end())?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl fmt::Display for ResolvedSymbol {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.fmt_symbol_text(fmt)
     }
 }
 
