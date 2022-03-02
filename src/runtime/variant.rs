@@ -1,4 +1,4 @@
-
+use std::fmt;
 use crate::language::{IntType, FloatType};
 use crate::runtime::data::InternStr;
 
@@ -46,4 +46,18 @@ impl Variant {
     
     // pub fn string_value(&self) -> ... { }
 
+}
+
+impl fmt::Display for Variant {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Nil => fmt.write_str("nil"),
+            Self::EmptyTuple => fmt.write_str("()"),
+            Self::Boolean(true) => fmt.write_str("true"),
+            Self::Boolean(false) => fmt.write_str("false"),
+            Self::Integer(value) => write!(fmt, "{}", value),
+            Self::Float(value) => write!(fmt, "{:.6}", value),
+            Self::InternStr(sym) => write!(fmt, "$({:?})", sym.symbol()),
+        }
+    }
 }

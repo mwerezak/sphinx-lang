@@ -46,7 +46,9 @@ impl ChunkDebugSymbols {
     }
     
     pub fn symbols(&self) -> impl Iterator<Item=&DebugSymbol> { 
-        self.symbols.iter().flat_map(|(sym, count)| iter::repeat(sym).take(usize::from(*count)))
+        self.symbols.iter().flat_map(
+            |(sym, count)| iter::repeat(sym).take(usize::from(*count))
+        )
     }
     
     pub fn push(&mut self, symbol: DebugSymbol) {
@@ -56,14 +58,6 @@ impl ChunkDebugSymbols {
             },
             _ => { self.symbols.push((symbol, 1)) }
         }
-        
-        
-        
-        // if matches!(self.symbols.last(), Some((last, ref mut count)) if *last == symbol && *count < u8::MAX) {
-        //     count += 1;
-        // } else {
-        //     self.symbols.push((symbol, 1));
-        // }
     }
 }
 

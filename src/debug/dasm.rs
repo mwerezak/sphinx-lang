@@ -31,8 +31,9 @@ impl<'c> Disassembler<'c> {
         write!(fmt, "{:04} ", offset)?;
         
         let offset = match OpCode::from_byte(instr[0]) {
-            Some(OpCode::Const) => {
-                writeln!(fmt, "{} {: >4}", OpCode::Const, instr[1])?;
+            Some(OpCode::LoadConst) => {
+                let cid = instr[1];
+                writeln!(fmt, "{} {: >4} '{}'", OpCode::LoadConst, cid, self.chunk.lookup_const(cid))?;
                 offset + 2
             },
             Some(opcode) => {
