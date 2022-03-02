@@ -30,7 +30,8 @@ fn debug_symbols_test_symbol_resolution() {
 
 use crate::debug::dasm::Disassembler;
 use crate::runtime::Variant;
-use crate::runtime::bytecode::{OpCode, Chunk};
+use crate::runtime::data::Chunk;
+use crate::runtime::opcodes::OpCode;
 
 
 #[test]

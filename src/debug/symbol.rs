@@ -9,7 +9,7 @@ use std::collections::{BinaryHeap, HashMap};
 
 use crate::utils::delegate_fmt;
 use crate::source::{ModuleSource, SourceText};
-use crate::runtime::bytecode::Chunk;
+use crate::runtime::data::Chunk;
 
 
 // metadata attached to parser output for error handling and debug output

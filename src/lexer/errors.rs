@@ -34,8 +34,9 @@ impl fmt::Display for LexerErrorKind {
 
 #[derive(Debug)]
 pub struct LexerError {
-    kind: ErrorKind,
-    span: Span,
+    // these are pub for tests
+    pub kind: ErrorKind,
+    pub span: Span,
     cause: Option<Box<dyn Error>>,
 }
 
