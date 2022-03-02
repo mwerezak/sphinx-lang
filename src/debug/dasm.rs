@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fmt::Formatter;
-use crate::runtime::variant::Variant;
+use crate::runtime::Variant;
 use crate::runtime::bytecode::{Chunk, OpCode, ConstID};
 use crate::debug::symbol::ChunkDebugSymbols;
 

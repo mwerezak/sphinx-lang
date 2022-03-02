@@ -5,7 +5,7 @@ use ops::*;
 use crate::debug::symbol::DebugSymbol;
 use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};
-use crate::runtime::variant::Variant;
+use crate::runtime::Variant;
 use crate::runtime::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::interpreter::runtime::Scope;
 use crate::interpreter::errors::EvalResult;

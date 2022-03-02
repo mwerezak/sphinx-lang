@@ -3,7 +3,7 @@
 // instead of deferring to the type system
 
 use crate::language::{IntType, FloatType};
-use crate::runtime::variant::Variant;
+use crate::runtime::Variant;
 use crate::runtime::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison};
 use crate::interpreter::errors::{EvalResult, EvalError, EvalErrorKind};
 
