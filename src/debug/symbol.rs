@@ -77,6 +77,22 @@ impl ResolvedSymbol {
     }
     
     pub fn is_multiline(&self) -> bool { self.lines.len() > 1 }
+    pub fn line_count(&self) -> usize { self.lines.len() }
+    
+    pub fn lineno(&self) -> usize { self.lineno }
+    pub fn start(&self) -> usize { self.start }
+    pub fn end(&self) -> usize { self.end }
+    
+    pub fn start_col(&self) -> usize { self.start }
+    pub fn end_col(&self) -> usize {
+        let offset = self.lines.iter()
+            .take(self.lines.len() - 1)
+            .map(|line| line.len())
+            .reduce(|acc, n| acc + n)
+            .unwrap_or(0);
+        
+        self.end - offset  // subtract index to start of final line
+    }
     
     pub fn iter_whole_lines(&self) -> impl Iterator<Item=&str> { 
         self.lines.iter().map(|s| s.as_str())
@@ -156,14 +172,14 @@ impl fmt::Display for ResolvedSymbol {
 
 // Symbol Resolution
 
-pub type ResolvedSymbolTable = HashMap<DebugSymbol, Result<ResolvedSymbol, SymbolResolutionError>>;
+pub type ResolvedSymbolTable<'s> = HashMap<&'s DebugSymbol, Result<ResolvedSymbol, SymbolResolutionError>>;
 
 pub trait DebugSymbolResolver {
-    fn resolve_symbols<S>(&self, symbols: S) -> io::Result<ResolvedSymbolTable> where S: Iterator<Item=DebugSymbol>;
+    fn resolve_symbols<'s, S>(&self, symbols: S) -> io::Result<ResolvedSymbolTable<'s>> where S: Iterator<Item=&'s DebugSymbol>;
 }
 
 impl DebugSymbolResolver for ModuleSource {
-    fn resolve_symbols<S>(&self, symbols: S) -> io::Result<ResolvedSymbolTable> where S: Iterator<Item=DebugSymbol> {
+    fn resolve_symbols<'s, S>(&self, symbols: S) -> io::Result<ResolvedSymbolTable<'s>> where S: Iterator<Item=&'s DebugSymbol> {
         match self.source_text()? {
             SourceText::String(string) => {
                 Ok(resolve_debug_symbols(string.chars().map(Ok), symbols))
@@ -175,14 +191,14 @@ impl DebugSymbolResolver for ModuleSource {
     }
 }
 
-fn resolve_debug_symbols(source: impl Iterator<Item=io::Result<char>>, symbols: impl Iterator<Item=DebugSymbol>) -> ResolvedSymbolTable {
+fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbols: impl Iterator<Item=&'s DebugSymbol>) -> ResolvedSymbolTable<'s> {
     // put all the symbols into a priority queue based on first occurrence in the source text
     let mut next_symbols = BinaryHeap::new();
     next_symbols.extend(symbols.map(|sym| IndexSort(sym, SortIndex::Start)).map(cmp::Reverse));
     
     let mut open_symbols = BinaryHeap::new();
-    let mut active_symbols = HashMap::<DebugSymbol, (Vec<Rc<String>>, usize, usize)>::new(); // values are (buffer, line number, start index)
-    let mut closing_symbols = HashMap::<DebugSymbol, (Vec<Rc<String>>, usize, usize, usize)>::new();
+    let mut active_symbols = HashMap::<&DebugSymbol, (Vec<Rc<String>>, usize, usize)>::new(); // values are (buffer, line number, start index)
+    let mut closing_symbols = HashMap::<&DebugSymbol, (Vec<Rc<String>>, usize, usize, usize)>::new();
     let mut resolved_symbols = ResolvedSymbolTable::new();
     
     let mut lineno = 1;  // count lines
@@ -222,7 +238,7 @@ fn resolve_debug_symbols(source: impl Iterator<Item=io::Result<char>>, symbols: 
         while matches!(next_symbols.peek(), Some(&cmp::Reverse(IndexSort(ref sym,..))) if index == sym.start) {
             let symbol = next_symbols.pop().unwrap().0.0;
             if !active_symbols.contains_key(&symbol) {
-                open_symbols.push(cmp::Reverse(IndexSort(symbol.clone(), SortIndex::End)));
+                open_symbols.push(cmp::Reverse(IndexSort(symbol, SortIndex::End)));
                 
                 let start_index = current_line.len() - 1;
                 active_symbols.insert(symbol, (Vec::new(), lineno, start_index));
@@ -268,21 +284,43 @@ fn resolve_debug_symbols(source: impl Iterator<Item=io::Result<char>>, symbols: 
             current_line.clear();
         }
         
+        // println!("{}: {}", lineno, current_line);
+        // println!("next_symbols: {:?}", next_symbols);
+        // println!("open_symbols: {:?}", open_symbols);
+        // println!("active_symbols: {:?}", active_symbols);
+        // println!("closing_symbols: {:?}", closing_symbols);
+        // println!("resolved_symbols: {:?}", resolved_symbols);
+        
         if next_symbols.is_empty() && active_symbols.is_empty() && closing_symbols.is_empty() {
             break;
         }
+    }
+    
+    // process any active or closing symbols left after we hit EOF
+    for cmp::Reverse(IndexSort(symbol,..)) in open_symbols.drain() {
+        resolved_symbols.insert(symbol, Err(ErrorKind::EOFReached.into()));
+    }
+    
+    let line_rc = Rc::new(current_line.clone());
+    for (symbol, (mut lines, lineno, start_index, end_index)) in closing_symbols.drain() {
+        lines.push(line_rc.clone());
+        
+        let resolved = ResolvedSymbol::new(lines, lineno, start_index, end_index);
+        resolved_symbols.insert(symbol, Ok(resolved));
     }
     
     resolved_symbols
 }
 
 
+#[derive(Debug)]
 enum SortIndex { Start, End }
 
 // comparison based on start or end index
-struct IndexSort(DebugSymbol, SortIndex);
+#[derive(Debug)]
+struct IndexSort<'s>(&'s DebugSymbol, SortIndex);
 
-impl IndexSort {
+impl IndexSort<'_> {
     fn sort_value(&self) -> &TokenIndex {
         match self.1 {
             SortIndex::Start => &self.0.start,
@@ -291,20 +329,20 @@ impl IndexSort {
     }
 }
 
-impl PartialEq for IndexSort {
+impl PartialEq for IndexSort<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.sort_value() == other.sort_value()
     }
 }
-impl Eq for IndexSort { }
+impl Eq for IndexSort<'_> { }
 
-impl PartialOrd for IndexSort {
+impl PartialOrd for IndexSort<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         Some(TokenIndex::cmp(&self.sort_value(), &other.sort_value()))
     }
 }
 
-impl Ord for IndexSort {
+impl Ord for IndexSort<'_> {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         IndexSort::partial_cmp(self, other).unwrap()
     }
@@ -316,7 +354,8 @@ pub type ErrorKind = SymbolResolutionErrorKind;
 
 #[derive(Debug)]
 pub enum SymbolResolutionErrorKind {
-    IOError,
+    IOError,    // hit an io::Error while grabbing the symbol text
+    EOFReached, // hit EOF before reaching the indicated end of symbol
 }
 
 #[derive(Debug)]
