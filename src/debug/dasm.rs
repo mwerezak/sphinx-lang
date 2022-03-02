@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
-use crate::runtime::bytecode::{Chunk, OpCode};
+use crate::runtime::variant::Variant;
+use crate::runtime::bytecode::{Chunk, OpCode, ConstID};
 use crate::debug::symbol::ChunkDebugSymbols;
 
 
@@ -33,8 +34,13 @@ impl<'c> Disassembler<'c> {
         let offset = match OpCode::from_byte(instr[0]) {
             Some(OpCode::LoadConst) => {
                 let cid = instr[1];
-                writeln!(fmt, "{} {: >4} '{}'", OpCode::LoadConst, cid, self.chunk.lookup_const(cid))?;
+                writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConst, cid, self.chunk.lookup_const(cid))?;
                 offset + 2
+            },
+            Some(OpCode::LoadConstWide) => {
+                let cid =  ConstID::from_le_bytes(instr[1..3].try_into().unwrap());
+                writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConstWide, cid, self.chunk.lookup_const(cid))?;
+                offset + 3
             },
             Some(opcode) => {
                 writeln!(fmt, "{}", opcode)?;
@@ -52,5 +58,36 @@ impl<'c> Disassembler<'c> {
 impl fmt::Display for Disassembler<'_> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         self.decode_chunk(fmt)
+    }
+}
+
+
+impl fmt::Display for OpCode {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mnemonic = match *self {
+            Self::LoadConst => "OP_LDCONST",
+            Self::LoadConstWide => "OP_LDCONST_W",
+            Self::Return => "OP_RETURN",
+        };
+        
+        if let Some(width) = fmt.width() {
+            write!(fmt, "{:1$}", mnemonic, width)
+        } else {
+            fmt.write_str(mnemonic)
+        }
+    }
+}
+
+impl fmt::Display for Variant {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Nil => fmt.write_str("nil"),
+            Self::EmptyTuple => fmt.write_str("()"),
+            Self::Boolean(true) => fmt.write_str("true"),
+            Self::Boolean(false) => fmt.write_str("false"),
+            Self::Integer(value) => write!(fmt, "{}", value),
+            Self::Float(value) => write!(fmt, "{:.6}", value),
+            Self::InternStr(sym) => write!(fmt, "$({:?})", sym.symbol()),
+        }
     }
 }

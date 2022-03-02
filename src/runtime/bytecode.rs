@@ -1,4 +1,3 @@
-use std::fmt;
 use crate::runtime::variant::Variant;
 
 // Opcodes
@@ -7,14 +6,16 @@ use crate::runtime::variant::Variant;
 // So if we want to convert between them and integer constants easily, 
 // we need to explictly define each value as a const
 
-const OP_LDCONST: u8 = 0x1;  // load a constant from the chunk's const pool
-const OP_RETURN:  u8 = 0xF;  // return from current function
+const OP_RETURN:        u8 = 0x0;  // return from current function
+const OP_LDCONST:       u8 = 0x1;  // load a constant from the chunk's const pool
+const OP_LDCONST_W:     u8 = 0x2;  // ...using a 16-bit index
 
 
 #[repr(u8)]
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum OpCode {
     LoadConst  = OP_LDCONST,
+    LoadConstWide = OP_LDCONST_W,
     Return = OP_RETURN, 
 }
 
@@ -22,6 +23,7 @@ impl OpCode {
     pub fn from_byte(byte: u8) -> Option<OpCode> {
         let opcode = match byte {
             OP_LDCONST => Self::LoadConst,
+            OP_LDCONST_W => Self::LoadConstWide,
             OP_RETURN => Self::Return,
             _ => return None,
         };
@@ -33,6 +35,7 @@ impl From<OpCode> for u8 {
     fn from(opcode: OpCode) -> Self {
         match opcode {
             OpCode::LoadConst => OP_LDCONST,
+            OpCode::LoadConstWide => OP_LDCONST_W,
             OpCode::Return => OP_RETURN,
         }
     }
@@ -44,15 +47,6 @@ impl PartialEq<u8> for OpCode {
     }
 }
 
-impl fmt::Display for OpCode {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mnemonic = match *self {
-            Self::LoadConst => "OP_LDCONST",
-            Self::Return => "OP_RETURN",
-        };
-        fmt.write_str(mnemonic)
-    }
-}
 
 // Chunks
 
