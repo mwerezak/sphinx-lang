@@ -17,7 +17,7 @@ use crate::debug::symbol::DebugSymbol;
 use expr::{Expr, ExprVariant};
 use stmt::{Stmt, StmtVariant};
 use primary::{Primary, Atom};
-use operator::{UnaryOp, BinaryOp, OpLevel, OP_LEVEL_START, OP_LEVEL_END};
+use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use structs::{ObjectConstructor};
 use errors::{ErrorPrototype, ErrorKind, ErrorContext, ContextTag};
 
@@ -170,7 +170,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         
         // descend recursively
-        let expr = self.parse_binop_expr(ctx, OP_LEVEL_START)?;
+        let expr = self.parse_binop_expr(ctx, PRECEDENCE_START)?;
         
         let next = self.peek()?;
         if let Some(assign_op) = Self::which_assignment_op(&next.token) {
@@ -200,8 +200,8 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         operand[8] ::= comparison ;
         operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
     */
-    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext, level: OpLevel) -> InternalResult<ExprVariant> {
-        if level == OP_LEVEL_END {
+    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext, level: Precedence) -> InternalResult<ExprVariant> {
+        if level == PRECEDENCE_END {
             return self.parse_unary_expr(ctx);  // exit binop precedence recursion
         }
         
@@ -262,6 +262,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             Token::Class => unimplemented!(),
             Token::Fun => unimplemented!(),
             Token::If => unimplemented!(),
+            Token::Begin => unimplemented!(),
             
             // Token::OpenBrace => Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?)),
             

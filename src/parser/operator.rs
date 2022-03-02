@@ -39,13 +39,13 @@ pub enum BinaryOp {
     Or,
 }
 
-pub type OpLevel = u8;
-pub const OP_LEVEL_END: OpLevel = 1; // tightest binding
-pub const OP_LEVEL_START: OpLevel = 10; // weakest binding
+pub type Precedence = u8;
+pub const PRECEDENCE_END: Precedence = 1; // tightest binding
+pub const PRECEDENCE_START: Precedence = 10; // weakest binding
 
 impl BinaryOp {
     
-    pub fn precedence_level(&self) -> OpLevel {
+    pub fn precedence_level(&self) -> Precedence {
         match self {
             BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 2,
             
