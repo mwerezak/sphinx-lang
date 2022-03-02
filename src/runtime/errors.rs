@@ -37,8 +37,37 @@ impl Error for EvalError {
 }
 
 impl fmt::Display for EvalError {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         unimplemented!()
     }
 }
 
+
+#[derive(Debug)]
+enum ExecErrorKind {
+    FailedEval,
+}
+
+#[derive(Debug)]
+struct ExecError {
+    kind: ExecErrorKind,
+    cause: Option<Box<dyn Error>>,
+}
+
+impl ExecError {
+    pub fn caused_by(mut self, cause: impl Error + 'static) -> Self {
+        self.cause = Some(Box::new(cause)); self
+    }
+}
+
+impl Error for ExecError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.cause.as_ref().map(|o| o.as_ref())
+    }
+}
+
+impl fmt::Display for ExecError {
+    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        unimplemented!()
+    }
+}

@@ -54,9 +54,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     fn advance(&mut self) -> InternalResult<TokenMeta> {
         self.next.take()
             .unwrap_or_else(|| self.next_token())
-            .map_err(|err| ErrorPrototype::caused_by(
-                Box::new(err), ErrorKind::LexerError
-            ))
+            .map_err(|err| ErrorPrototype::from(ErrorKind::LexerError).caused_by(err))
     }
     
     fn peek(&mut self) -> InternalResult<&TokenMeta> {
@@ -181,7 +179,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             // LHS of assignment has to be an lvalue
             let lhs = match expr {
                 ExprVariant::Primary(lhs) if lhs.is_lvalue() => lhs,
-                _ => return Err(ErrorPrototype::new(ErrorKind::InvalidAssignmentLHS)),
+                _ => return Err(ErrorKind::InvalidAssignmentLHS.into()),
             };
 
             let rhs_expr = self.parse_expr_variant(ctx)?;
@@ -385,7 +383,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     if let Token::Identifier(name) = next.token {
                         primary.push_access_member(name.as_str(), self.interner);
                     } else {
-                        return Err(ErrorPrototype::new(ErrorKind::ExpectedIdentifier));
+                        return Err(ErrorKind::ExpectedIdentifier.into());
                     }
                     
                     ctx.pop_extend();
@@ -404,7 +402,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     if matches!(next.token, Token::CloseSquare) {
                         primary.push_access_index(index_expr);
                     } else {
-                        return Err(ErrorPrototype::new(ErrorKind::ExpectedCloseSquare));
+                        return Err(ErrorKind::ExpectedCloseSquare.into());
                     }
                     
                     ctx.pop_extend();
@@ -428,7 +426,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     if matches!(next.token, Token::CloseParen) {
                         primary.push_construct(obj_ctor);
                     } else {
-                        return Err(ErrorPrototype::new(ErrorKind::ExpectedCloseBrace));
+                        return Err(ErrorKind::ExpectedCloseBrace.into());
                     }
                     
                     ctx.pop_extend();
@@ -470,7 +468,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                         }
                         
                     } else {
-                        return Err(ErrorPrototype::new(ErrorKind::ExpectedIdentifier))
+                        return Err(ErrorKind::ExpectedIdentifier.into())
                     }
                 },
                 
@@ -484,7 +482,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 Token::StringLiteral(value)   => Atom::string_literal(value.as_str(), self.interner),
                 
                 _ => { 
-                    return Err(ErrorPrototype::new(ErrorKind::ExpectedStartOfExpr))
+                    return Err(ErrorKind::ExpectedStartOfExpr.into())
                 },
             };
             
@@ -531,7 +529,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 }
                 
                 _ => {
-                    return Err(ErrorPrototype::new(ErrorKind::ExpectedCloseParen));
+                    return Err(ErrorKind::ExpectedCloseParen.into());
                 }
             }
             

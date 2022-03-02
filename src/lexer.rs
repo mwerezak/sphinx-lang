@@ -476,6 +476,6 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
             index: token_start,
             length: token_length(token_start, self.current).unwrap_or(0),
         };
-        LexerError::caused_by(err, kind, span)
+        LexerError::new(kind, span).caused_by(err)
     }
 }

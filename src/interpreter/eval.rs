@@ -1,3 +1,6 @@
+#![allow(unused_variables)]
+#![allow(unused_mut)]
+
 use crate::debug::symbol::DebugSymbol;
 use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};

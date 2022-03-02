@@ -47,12 +47,14 @@ pub struct ErrorPrototype {
 }
 
 impl ErrorPrototype {
-    pub fn new(kind: ErrorKind) -> Self {
-        ErrorPrototype { kind, cause: None }
+    pub fn caused_by(mut self, cause: impl Into<Box<dyn Error>>) -> Self {
+        self.cause = Some(cause.into()); self
     }
-    
-    pub fn caused_by(error: Box<dyn Error>, kind: ErrorKind) -> Self {
-        ErrorPrototype { kind, cause: Some(error) }
+}
+
+impl From<ParserErrorKind> for ErrorPrototype {
+    fn from(kind: ParserErrorKind) -> Self {
+        ErrorPrototype { kind, cause: None }
     }
 }
 
@@ -77,9 +79,8 @@ impl<'m> ParserError<'m> {
     pub fn kind(&self) -> &ErrorKind { &self.kind }
     
     pub fn module(&self) -> &ModuleSource { self.module }
-    
-    pub fn debug_symbol(&self) -> Option<DebugSymbol> { self.frame.as_debug_symbol() }
     pub fn context(&self) -> ContextTag { self.frame.context() }
+    pub fn debug_symbol(&self) -> Option<DebugSymbol> { self.frame.as_debug_symbol() }
     
     pub fn start_token(&self) -> Option<&Span> { self.frame.start() }
     pub fn end_token(&self) -> Option<&Span> { self.frame.end() }
