@@ -8,7 +8,8 @@ use crate::runtime::data::InternStr;
 pub enum Variant {
     Nil,
     EmptyTuple, // the empty tuple value
-    Boolean(bool),
+    BoolTrue,
+    BoolFalse,
     Integer(IntType),
     Float(FloatType),
     InternStr(InternStr),
@@ -18,7 +19,7 @@ pub enum Variant {
 impl Variant {
     // Only "nil" and "false" have a truth value of false.
     pub fn truth_value(&self) -> bool {
-        !matches!(self, Self::Nil | Self::Boolean(false))
+        !matches!(self, Self::Nil | Self::BoolFalse)
     }
     
     // Note, bit_value() and float_value() are defined based on what is needed for the language *implementation*
@@ -27,8 +28,8 @@ impl Variant {
     pub fn bit_value(&self) -> IntType {
         match self {
             Self::Integer(value) => *value,
-            Self::Boolean(false) => 0, // all 0s
-            Self::Boolean(true) => !0, // all 1s
+            Self::BoolFalse => 0, // all 0s
+            Self::BoolTrue => !0, // all 1s
             _ => panic!("bit_value() valid only for integers and booleans"),
         }
     }
@@ -48,3 +49,24 @@ impl Variant {
 
 }
 
+
+impl From<bool> for Variant {
+    fn from(value: bool) -> Self {
+        match value {
+            true => Self::BoolTrue,
+            false => Self::BoolFalse,
+        }
+    }
+}
+
+impl From<IntType> for Variant {
+    fn from(value: IntType) -> Self { Variant::Integer(value) }
+}
+
+impl From<FloatType> for Variant {
+    fn from(value: FloatType) -> Self { Variant::Float(value) }
+}
+
+impl From<InternStr> for Variant {
+    fn from(intern: InternStr) -> Self { Variant::InternStr(intern) }
+}

@@ -13,26 +13,15 @@ pub fn is_arithmetic_primitive(value: &Variant) -> bool {
 }
 
 pub fn is_bitwise_primitive(value: &Variant) -> bool {
-    matches!(value, Variant::Boolean(..) | Variant::Integer(..))
-}
-
-// using macros because lots of boilerplate
-
-macro_rules! checked_int_math {  // overflow check
-    ( $method:tt, $lhs:expr, $rhs:expr ) => {
-        match $lhs.$method($rhs) {
-            (value, false) => Ok(Variant::Integer(value)),
-            (_, true) => Err(EvalErrorKind::OverflowError.into()),
-        }
-    };
+    matches!(value, Variant::BoolTrue | Variant::BoolFalse | Variant::Integer(..))
 }
 
 // Unary Operators
 
 pub fn eval_neg(operand: &Variant) -> EvalResult<Variant> {
     let value = match operand {
-        Variant::Integer(value) => Variant::Integer(-value),
-        Variant::Float(value) => Variant::Float(-value),
+        Variant::Integer(value) => (-value).into(),
+        Variant::Float(value) => (-value).into(),
         _ => return eval_unary_other(UnaryOp::Neg, operand),
     };
     Ok(value)
@@ -41,8 +30,8 @@ pub fn eval_neg(operand: &Variant) -> EvalResult<Variant> {
 pub fn eval_pos(operand: &Variant) -> EvalResult<Variant> {
     let value = match operand {
         // No-op for arithmetic primitives
-        Variant::Integer(value) => Variant::Integer(*value),
-        Variant::Float(value) => Variant::Float(*value),
+        Variant::Integer(value) => (*value).into(),
+        Variant::Float(value) => (*value).into(),
         _ => return eval_unary_other(UnaryOp::Pos, operand),
     };
     Ok(value)
@@ -50,15 +39,16 @@ pub fn eval_pos(operand: &Variant) -> EvalResult<Variant> {
 
 pub fn eval_inv(operand: &Variant) -> EvalResult<Variant> {
     let value = match operand {
-        Variant::Boolean(value) => Variant::Boolean(!value),
-        Variant::Integer(value) => Variant::Integer(!value),
+        Variant::BoolTrue => Variant::BoolFalse,
+        Variant::BoolFalse => Variant::BoolTrue,
+        Variant::Integer(value) => Variant::from(!value),
         _ => return eval_unary_other(UnaryOp::Inv, operand),
     };
     Ok(value)
 }
 
 pub fn eval_not(operand: &Variant) -> EvalResult<Variant> {
-    return Ok(Variant::Boolean(!operand.truth_value()))
+    return Ok(Variant::from(!operand.truth_value()))
 }
 
 fn eval_unary_other(_op: UnaryOp, _operand: &Variant) -> EvalResult<Variant> {
@@ -90,7 +80,7 @@ pub fn eval_binary(op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Var
             Shift::Right => eval_shr(&lhs, &rhs)?,
         }
         
-        BinaryOp::Comparison(op) => eval_comparison(op, lhs, rhs).map(Variant::Boolean),
+        BinaryOp::Comparison(op) => eval_comparison(op, lhs, rhs).map(Variant::from),
         
         _ => None,
     };
@@ -127,8 +117,9 @@ fn eval_equals(lhs: &Variant, rhs: &Variant) -> bool {
         // empty tuple is only equal with itself
         (Variant::EmptyTuple, Variant::EmptyTuple) => true,
         
-        // shortcut for interned strings, boolean
-        (Variant::Boolean(lhs_value), Variant::Boolean(rhs_value)) => *lhs_value == *rhs_value,
+        (Variant::BoolTrue, Variant::BoolTrue) => true,
+        (Variant::BoolFalse, Variant::BoolFalse) => true,
+        
         (Variant::InternStr(lhs_value), Variant::InternStr(rhs_value)) => *lhs_value == *rhs_value,
         
         // numeric equality
@@ -153,6 +144,17 @@ fn eval_binary_other(_op: BinaryOp, _lhs: &Variant, _rhs: &Variant) -> EvalResul
 // They always succeed (due to the way the numeric coercion rules are set up), and hence don't use EvalResult. 
 // Instead, they produce an Option and return None if the operands aren't the right type to short-circuit
 
+
+// using macros because lots of boilerplate
+
+macro_rules! checked_int_math {  // overflow check
+    ( $method:tt, $lhs:expr, $rhs:expr ) => {
+        match $lhs.$method($rhs) {
+            (value, false) => Ok(Variant::Integer(value)),
+            (_, true) => Err(EvalErrorKind::OverflowError.into()),
+        }
+    };
+}
 
 // Arithmetic
 
@@ -230,7 +232,10 @@ macro_rules! eval_binary_bitwise {
         
         fn $name (lhs: &Variant, rhs: &Variant) -> Option<Variant> {
             let value = match (lhs, rhs) {
-                (Variant::Boolean(lhs_value), Variant::Boolean(rhs_value)) => $bool_name (*lhs_value, *rhs_value),
+                (Variant::BoolTrue, Variant::BoolTrue) => $bool_name (true, true),
+                (Variant::BoolTrue, Variant::BoolFalse) => $bool_name (true, false),
+                (Variant::BoolFalse, Variant::BoolTrue) => $bool_name (false, true),
+                (Variant::BoolFalse, Variant::BoolFalse) => $bool_name (false, false),
                 _ if is_bitwise_primitive(lhs) && is_bitwise_primitive(rhs) => $int_name (lhs.bit_value(), rhs.bit_value()),
                 _ => return None,
             };
@@ -241,16 +246,16 @@ macro_rules! eval_binary_bitwise {
 }
 
 eval_binary_bitwise!(eval_and, bool_and, int_and);
-fn bool_and(lhs: bool, rhs: bool) -> Variant { Variant::Boolean(lhs & rhs) }
-fn int_and(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs & rhs) }
+fn bool_and(lhs: bool, rhs: bool) -> Variant { (lhs & rhs).into() }
+fn int_and(lhs: IntType, rhs: IntType) -> Variant { (lhs & rhs).into() }
 
 eval_binary_bitwise!(eval_xor, bool_xor, int_xor);
-fn bool_xor(lhs: bool, rhs: bool) -> Variant { Variant::Boolean(lhs ^ rhs) }
-fn int_xor(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs ^ rhs) }
+fn bool_xor(lhs: bool, rhs: bool) -> Variant { (lhs ^ rhs).into() }
+fn int_xor(lhs: IntType, rhs: IntType) -> Variant { (lhs ^ rhs).into() }
 
 eval_binary_bitwise!(eval_or, bool_or, int_or);
-fn bool_or(lhs: bool, rhs: bool) -> Variant { Variant::Boolean(lhs | rhs) }
-fn int_or(lhs: IntType, rhs: IntType) -> Variant { Variant::Integer(lhs | rhs) }
+fn bool_or(lhs: bool, rhs: bool) -> Variant { (lhs | rhs).into() }
+fn int_or(lhs: IntType, rhs: IntType) -> Variant { (lhs | rhs).into() }
 
 
 // Bit Shifts
@@ -262,8 +267,8 @@ macro_rules! eval_binary_shift {
         fn $name (lhs: &Variant, rhs: &Variant) -> EvalResult<Option<Variant>> {
             let value = match (lhs, rhs) {
                 (_, Variant::Integer(shift)) if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), *shift)?,
-                (_, Variant::Boolean(true))  if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), 1)?,
-                (_, Variant::Boolean(false)) if is_bitwise_primitive(lhs) => *lhs, // no-op
+                (_, Variant::BoolTrue)  if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), 1)?,
+                (_, Variant::BoolFalse) if is_bitwise_primitive(lhs) => *lhs, // no-op
                 _ => return Ok(None),
             };
             Ok(Some(value))

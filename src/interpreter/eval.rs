@@ -58,7 +58,8 @@ impl<'r> EvalContext<'r> {
         let value = match atom {
             Atom::Nil => Variant::Nil,
             Atom::EmptyTuple => Variant::EmptyTuple,
-            Atom::BooleanLiteral(value) => Variant::Boolean(*value),
+            Atom::BooleanLiteral(true) => Variant::BoolTrue,
+            Atom::BooleanLiteral(false) => Variant::BoolFalse,
             Atom::IntegerLiteral(value) => Variant::Integer(*value),
             Atom::FloatLiteral(value) => Variant::Float(*value),
             Atom::StringLiteral(value) => Variant::InternStr(*value),
