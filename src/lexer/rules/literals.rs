@@ -143,7 +143,7 @@ impl LexerRule for HexIntegerLiteralRule {
     }
     
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
-        if self.buf.is_empty() && matches!(prev, Some(c) if c.is_ascii_digit()) {
+        if self.buf.is_empty() && self.prefix.count() == 0 && matches!(prev, Some(c) if c.is_ascii_digit()) {
             return MatchResult::NoMatch;
         }
         
