@@ -19,6 +19,8 @@ use rlo_interpreter::interpreter::eval::eval_expr;
 
 
 fn main() {
+    env_logger::init();
+    
     let app = App::new("repl")
         .version("0.0")
         .author("M. Werezak <mwerezak@gmail.com>")
@@ -71,7 +73,7 @@ fn main() {
                 let parser = Parser::new(&module, &mut interner, lexer);
                 let results = parser.collect::<Vec::<Result<Stmt, ParserError<'_>>>>();
                 
-                println!("{:#?}", results);
+                // println!("{:#?}", results);
                 
                 if results.iter().any(|r| r.is_err()) {
                     let errors = results.into_iter()

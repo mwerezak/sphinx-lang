@@ -28,12 +28,12 @@ pub fn fmt_parser_error(fmt: &mut Formatter<'_>, error: &ParserError, symbol: &R
         if !symbol.is_multiline() {
             symbol.end_col()
         } else {
-            source_line.len() - start_col
+            source_line.len()
         };
     
     let mut marker = String::new();
     marker.extend(iter::repeat(' ').take(margin.len() + start_col));
-    marker.extend(iter::repeat('^').take(usize::min(end_col - start_col, 1)));
+    marker.extend(iter::repeat('^').take(end_col - start_col));
     
     writeln!(fmt, "{}{}", margin, source_line)?;
     writeln!(fmt, "{}\n", marker)?;
@@ -62,7 +62,7 @@ pub fn render_symbol_single_line<'a>(symbol: &'a ResolvedSymbol) -> impl fmt::Di
 }
 
 fn fmt_symbol_single_line(fmt: &mut fmt::Formatter<'_>, symbol: &ResolvedSymbol) -> fmt::Result { 
-    if let Some(first_line) = symbol.iter_lines().nth(0) {
+    if let Some(first_line) = symbol.iter_whole_lines().nth(0) {
         if symbol.is_multiline() {
             write!(fmt, "{}...", first_line.trim_end())?;
         } else {

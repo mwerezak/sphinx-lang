@@ -9,6 +9,8 @@ pub mod structs;
 
 pub use errors::{ParserError, ContextFrame};
 
+use log::debug;
+
 use crate::source::ModuleSource;
 use crate::runtime::data::StringInterner;
 use crate::lexer::{TokenMeta, Token, LexerError};
@@ -89,22 +91,32 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         
         // check stop conditions
         match self.peek() {
-            Ok(next) if matches!(next.token, Token::EOF) => return None,
             Err(error) if matches!(error.kind(), ErrorKind::EndofTokenStream) => return None,
             Err(error) => return {
                 let error = ParserError::from_prototype(error, ctx);
                 Some(Err(error))
             },
-            _ => { },
+            
+            Ok(next) if matches!(next.token, Token::EOF) => return None,
+            Ok(next) => {
+                debug!("parsing stmt at index {}...", next.span.index);
+            },
         }
         
         let result = match self.parse_stmt_variant(&mut ctx) {
             Ok(stmt) => Ok(stmt),
             Err(err) => {
+                let error = ParserError::from_prototype(err, ctx);
+                debug!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
+                    error.kind(), error.context(), 
+                    error.debug_symbol(),
+                );
                 
+                debug!("sync to next stmt...");
+                let mut ctx = ErrorContext::new(self.module, ContextTag::Sync);
                 self.synchronize_stmt(&mut ctx);
-                Err(ParserError::from_prototype(err, ctx))
                 
+                Err(error)
             },
         };
         Some(result)
@@ -119,6 +131,10 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         loop {
 
             let next = match self.peek() {
+                // no more tokens...
+                Err(error) if matches!(error.kind(), ErrorKind::EndofTokenStream) => break,
+                
+                // skip errors
                 Err(..) => {
                     self.advance().unwrap_err();
                     continue;
@@ -132,11 +148,11 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 Token::Continue | Token::Break | Token::Return | 
                 Token::Echo) {
                 
-                return;
+                break;
             }
 
             if self.parse_expr_variant(ctx).is_ok() {
-                return;
+                break;
             }
 
         }

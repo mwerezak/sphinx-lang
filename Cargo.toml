@@ -12,7 +12,9 @@ name = "repl"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "3.0" }
-lazy_static = { version = "1.4" }
-string-interner = { version = "0.14" }
-rustc-hash = { version = "1.1.0" }
+clap = "3.0"
+lazy_static = "1.4"
+string-interner = "0.14"
+rustc-hash = "1.1.0"
+log = "0.4.0"
+env_logger = "0.8.4"
