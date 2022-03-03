@@ -8,11 +8,12 @@ use string_interner::StringInterner;
 use rlo_interpreter::source::{ModuleSource, SourceType, SourceText};
 
 use rlo_interpreter::frontend::render_parser_error;
+use rlo_interpreter::debug::symbol::DebugSymbol;
 use rlo_interpreter::debug::symbol::DebugSymbolResolver;
 
 use rlo_interpreter::language;
-use rlo_interpreter::parser::Parser;
-use rlo_interpreter::parser::stmt::StmtVariant;
+use rlo_interpreter::parser::{Parser, ParserError};
+use rlo_interpreter::parser::stmt::{Stmt, StmtVariant};
 use rlo_interpreter::interpreter::runtime::{Runtime, Environment};
 use rlo_interpreter::interpreter::eval::eval_expr;
 
@@ -67,17 +68,39 @@ fn main() {
             }
             SourceText::File(readf) => {
                 let lexer = lexer_factory.build_once(readf);
-                let mut parser = Parser::new(&module, &mut interner, lexer);
-                match parser.next_stmt().unwrap() {
-                    Ok(stmt) => println!("{:#?}", stmt),
-                    Err(error) => {
-                        let symbol = error.debug_symbol().unwrap();
-                        let resolved = module.resolve_symbols(std::iter::once(&symbol)).unwrap();
-                        let symbol = resolved.get(&symbol).unwrap().as_ref().unwrap();
+                let parser = Parser::new(&module, &mut interner, lexer);
+                let results = parser.collect::<Vec::<Result<Stmt, ParserError<'_>>>>();
+                
+                println!("{:#?}", results);
+                
+                if results.iter().any(|r| r.is_err()) {
+                    let errors = results.into_iter()
+                        .filter(|r| r.is_err())
+                        .map(|e| e.unwrap_err())
+                        .collect::<Vec<ParserError<'_>>>();
+                    
+                    let symbols = errors.iter()
+                        .filter_map(|err| err.debug_symbol())
+                        .collect::<Vec<DebugSymbol>>();
                         
-                        println!("{}", render_parser_error(&error, symbol));
-                    },
-                };
+                    let resolved_table = module.resolve_symbols(symbols.iter()).unwrap();
+                    
+                    for error in errors.iter() {
+                        let resolved = resolved_table.get(&error.debug_symbol().unwrap()).unwrap().as_ref().unwrap();
+                        println!("{}", render_parser_error(&error, resolved));
+                    }
+                }
+                
+                // match parser.next_stmt().unwrap() {
+                //     Ok(stmt) => println!("{:#?}", stmt),
+                //     Err(error) => {
+                //         let symbol = error.debug_symbol().unwrap();
+                //         let resolved = module.resolve_symbols(std::iter::once(&symbol)).unwrap();
+                //         let symbol = resolved.get(&symbol).unwrap().as_ref().unwrap();
+                        
+                //         println!("{}", render_parser_error(&error, symbol));
+                //     },
+                // };
             },
         };
         
