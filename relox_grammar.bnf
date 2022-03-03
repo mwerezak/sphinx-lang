@@ -16,15 +16,13 @@ statement ::= ";"
             | for-loop 
             | expression ;
 
-block ::= ( statement | control-flow )* ;
+statement-block ::= ( statement | control-flow )* ;
+control-flow ::= "continue" ( ":" LABEL )? | "break" ( ":" LABEL )? | "return" expression ;
 
-control-flow ::= "continue" ( label )? | "break" ( label )? expression | "return" expression ;
-label ::= ... ; (* TODO *)
+while-loop ::=  ( LABEL ":" )? "while" expression "do" statement-block "end" ;
+do-while-loop ::= ( LABEL ":" )? "do" statement-block "while" expression "end" ;
 
-while-loop ::=  ( label )? "while" expression "do" block "end" ;
-do-while-loop ::= ( label )? "do" block "while" expression "end" ;
-
-for-loop ::= ( label )? "for" ... "end" ; (* TODO *)
+for-loop ::= ( LABEL ":" )? "for" ... "end" ; (* TODO *)
 
 (*** Expressions ***)
 
@@ -56,8 +54,7 @@ expression ::= primary
 (*** if/block Expressions ***)
 
 if-expression ::= "if" expression "then" block ( "elseif" block )* ( "else" block )? "end" ;
-
-block-expression ::= "begin" block "end" ;
+block-expression ::= "begin" ( statement | control-flow | "break" expression )* "end" ;  (* break can be supplied a value inside of begin-blocks *)
 
 (*** Assignment ***)
 
@@ -88,6 +85,14 @@ member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;  (* ini
 
 (* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
 tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
+
+(*** Function Defs ***)
+
+function-def ::= ... ; (* TODO *)
+
+(*** Class Defs ***)
+
+class-def ::= ... ; (* TODO *)
 
 
 (***** Non left-recursive version of `expression` for implementation *****)
