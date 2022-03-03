@@ -15,7 +15,7 @@ pub enum StmtVariant {
     // Break
     // Return
     
-    Placeholder,
+    Echo(ExprVariant),
 }
 
 impl StmtVariant {

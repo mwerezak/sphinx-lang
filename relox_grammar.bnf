@@ -26,7 +26,7 @@ for-loop ::= ( LABEL ":" )? "for" ... "end" ; (* TODO *)
 
 (*** Expressions ***)
 
-atom ::= LITERAL | identifier | "(" expression ")" ;
+atom ::= LITERAL | identifier | "self" | "super" | "(" expression ")" ;
 identifier ::= IDENTIFIER | "global" IDENTIFIER | "upval" IDENTIFIER ;
 primary ::= atom ( access-item )* ; 
 

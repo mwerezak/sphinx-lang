@@ -22,6 +22,8 @@ impl InternStr {
     pub fn from_str(s: &str, interner: &mut StringInterner) -> Self {
         InternStr { symbol: interner.get_or_intern(s) }
     }
+    
+    pub fn symbol(&self) -> &InternSymbol { &self.symbol }
 }
 
 impl From<InternSymbol> for InternStr {

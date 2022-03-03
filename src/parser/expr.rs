@@ -51,6 +51,11 @@ impl ExprVariant {
         debug_assert!(lhs.is_lvalue());
         Self::Assignment(Box::new(AssignmentInfo { lhs, op, rhs }))
     }
+    
+    pub fn tuple(exprs: impl Iterator<Item=Expr>) -> Self {
+        let exprs = exprs.collect();
+        Self::Tuple(exprs)
+    }
 }
 
 // Use Expr instead of ExprVariant when we want to capture a debug symbol
@@ -75,7 +80,15 @@ impl Expr {
     pub fn variant(&self) -> &ExprVariant { &self.variant }
     pub fn take_variant(self) -> ExprVariant { self.variant }
     
+    pub fn replace_variant(&mut self, variant: ExprVariant) -> ExprVariant { 
+        std::mem::replace(&mut self.variant, variant)
+    }
+    
     pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
+}
+
+impl From<Expr> for (ExprVariant, DebugSymbol) {
+    fn from(expr: Expr) -> Self { (expr.variant, expr.symbol) }
 }
 
 // create an expression-statement

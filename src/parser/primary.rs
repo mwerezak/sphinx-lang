@@ -12,6 +12,8 @@ use crate::parser::structs::ObjectConstructor;
 pub enum Atom {
     Nil,
     EmptyTuple,
+    Self_,
+    Super,
     Identifier(InternStr),
     UpvalIdentifier(InternStr),
     GlobalIdentifier(InternStr),

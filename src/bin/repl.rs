@@ -61,7 +61,7 @@ fn main() {
                 let mut parser = Parser::new(&module, &mut interner, lexer);
                 match parser.placeholder_toplevel() {
                     Err(error) => println!("{}", error),
-                    Ok(expr) => println!("{:#?}", expr),
+                    Ok(stmt) => println!("{:#?}", stmt),
                 };
                 
             }
@@ -69,7 +69,7 @@ fn main() {
                 let lexer = lexer_factory.build_once(readf);
                 let mut parser = Parser::new(&module, &mut interner, lexer);
                 match parser.placeholder_toplevel() {
-                    Ok(expr) => println!("{:#?}", expr),
+                    Ok(stmt) => println!("{:#?}", stmt),
                     Err(error) => {
                         let symbol = error.debug_symbol().unwrap();
                         let resolved = module.resolve_symbols(std::iter::once(&symbol)).unwrap();

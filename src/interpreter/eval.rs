@@ -68,6 +68,9 @@ impl<'r> EvalContext<'r> {
             Atom::UpvalIdentifier(name) => unimplemented!(),
             Atom::GlobalIdentifier(name) => unimplemented!(),
             
+            Atom::Self_ => unimplemented!(),
+            Atom::Super => unimplemented!(),
+            
             Atom::Group(expr) => self.eval_inner_expr(expr)?,
         };
         Ok(value)

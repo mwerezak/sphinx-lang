@@ -47,6 +47,9 @@ in the class object unless overridden.
 
 `__class` - used by the default implementation of `__getattr` obtain the class object.
 
+`__mro` - used by the default implementation of `__getattr` to iteratively search parent classes. 
+By default should use C3 Linearization.
+
 ### Class definition expressions
 
 Class definition expressions are just syntactic sugar, they are equivalent to:
@@ -82,6 +85,7 @@ by default all objects are dictionaries like in Lua and support both attr access
 - `__new`
 - `__meta`
 - `__class`
+- `__mro`
 
 ### Context Managers
 

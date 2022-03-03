@@ -96,6 +96,8 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             self.advance()?;
         }
         
+        ctx.push(ContextTag::Stmt);
+        
         let stmt = match self.peek()?.token {
             Token::Var => unimplemented!(),
             Token::While => unimplemented!(),
@@ -104,14 +106,32 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             Token::Continue => unimplemented!(),
             Token::Break => unimplemented!(),
             Token::Return => unimplemented!(),
-            _ => self.parse_expr(ctx)?.into(),
+            Token::Echo => {
+                ctx.set_end(&self.advance().unwrap());
+                StmtVariant::Echo(self.parse_expr_variant(ctx)?)
+            },
+            _ => StmtVariant::Expression(self.parse_expr_variant(ctx)?),
         };
-        Ok(stmt)
+        
+        let symbol = ctx.frame().as_debug_symbol().unwrap();
+        
+        ctx.pop();
+        Ok(Stmt::new(stmt, symbol))
     }
     
     /*** Expression Parsing ***/
     
     fn parse_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+        ctx.push(ContextTag::Expr);
+        
+        let variant = self.parse_expr_variant(ctx)?;
+        let symbol = ctx.frame().as_debug_symbol().unwrap();
+        
+        ctx.pop_extend();
+        Ok(Expr::new(variant, symbol))
+    }
+    
+    fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         let first_expr = self.parse_inner_expr(ctx)?;
         
         // check for tuple constructor
@@ -132,29 +152,27 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         }
         
         if rest_exprs.is_empty() {
-            Ok(first_expr)
+            Ok(first_expr.take_variant())
         } else {
             rest_exprs.insert(0, first_expr);
-            let tuple = ExprVariant::Tuple(rest_exprs);
-            let symbol = ctx.frame().as_debug_symbol().unwrap();
-            
             ctx.pop_extend(); // pop the TupleCtor context frame
-            Ok(Expr::new(tuple, symbol))
+            
+            Ok(ExprVariant::Tuple(rest_exprs))
         }
     }
     
-    // parse an expression that cannot be a tuple
+    // parse an expression that cannot be a tuple (without grouping)
     fn parse_inner_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
         ctx.push(ContextTag::Expr);
         
-        let variant = self.parse_expr_variant(ctx)?;
+        let variant = self.parse_inner_expr_variant(ctx)?;
         let symbol = ctx.frame().as_debug_symbol().unwrap();
         
         ctx.pop_extend();
         Ok(Expr::new(variant, symbol))
     }
     
-    fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
+    fn parse_inner_expr_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         self.parse_assignment_expr(ctx)  // the top of the recursive descent stack for expressions
     }
     
@@ -182,7 +200,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 _ => return Err(ErrorKind::InvalidAssignmentLHS.into()),
             };
 
-            let rhs_expr = self.parse_expr_variant(ctx)?;
+            let rhs_expr = self.parse_inner_expr_variant(ctx)?;
             
             ctx.pop_extend();
             return Ok(ExprVariant::assignment(*lhs, assign_op.map(|op| op.into()), rhs_expr));
@@ -504,6 +522,10 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             ctx.pop_extend();
             return Ok(Atom::EmptyTuple);
         }
+        
+        // need to duplicate some of the tuple parsing logic here because the only way to
+        // identify a single-element tuple is by a comma followed by a closing paren.
+        // and parse_expr_variant() only deals with naked tuples
         
         let mut expr = Some(self.parse_inner_expr(ctx)?); // may be taken by tuple_expr later
         let mut tuple_exprs = Vec::<Expr>::new();
