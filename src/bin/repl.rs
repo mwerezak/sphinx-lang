@@ -5,7 +5,7 @@ use clap::{App, Arg};
 
 use string_interner::StringInterner;
 
-use rlo_interpreter::source::{ModuleSource, SourceType, SourceText};
+use rlo_interpreter::source::{ModuleSource, SourceType, SourceText, ParseContext};
 
 use rlo_interpreter::frontend::render_parser_error;
 use rlo_interpreter::debug::symbol::DebugSymbol;
@@ -53,59 +53,31 @@ fn main() {
     
     if let Some(module) = module {
         let lexer_factory = language::create_default_lexer_rules();
-        
         let mut interner = StringInterner::default();
-        match module.source_text().expect("error reading source") {
-            SourceText::String(s) => {
-                let mut chars = Vec::new();
-                chars.extend(s.chars().map(Ok));
-                
-                let lexer = lexer_factory.build_once(chars.into_iter());
-                let mut parser = Parser::new(&module, &mut interner, lexer);
-                match parser.next_stmt().unwrap() {
-                    Err(error) => println!("{}", error),
-                    Ok(stmt) => println!("{:#?}", stmt),
-                };
-                
-            }
-            SourceText::File(readf) => {
-                let lexer = lexer_factory.build_once(readf);
-                let parser = Parser::new(&module, &mut interner, lexer);
-                let results = parser.collect::<Vec::<Result<Stmt, ParserError<'_>>>>();
-                
-                // println!("{:#?}", results);
-                
-                if results.iter().any(|r| r.is_err()) {
-                    let errors = results.into_iter()
-                        .filter(|r| r.is_err())
-                        .map(|e| e.unwrap_err())
-                        .collect::<Vec<ParserError<'_>>>();
-                    
-                    let symbols = errors.iter()
-                        .filter_map(|err| err.debug_symbol())
-                        .collect::<Vec<DebugSymbol>>();
-                        
-                    let resolved_table = module.resolve_symbols(symbols.iter()).unwrap();
-                    
-                    for error in errors.iter() {
-                        let resolved = resolved_table.get(&error.debug_symbol().unwrap()).unwrap().as_ref().unwrap();
-                        println!("{}", render_parser_error(&error, resolved));
-                    }
-                }
-                
-                // match parser.next_stmt().unwrap() {
-                //     Ok(stmt) => println!("{:#?}", stmt),
-                //     Err(error) => {
-                //         let symbol = error.debug_symbol().unwrap();
-                //         let resolved = module.resolve_symbols(std::iter::once(&symbol)).unwrap();
-                //         let symbol = resolved.get(&symbol).unwrap().as_ref().unwrap();
-                        
-                //         println!("{}", render_parser_error(&error, symbol));
-                //     },
-                // };
-            },
-        };
         
+        let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
+        let source_text = module.source_text().expect("error reading source");
+        let parse_result = parse_ctx.parse_ast(source_text);
+        
+        match parse_result {
+            Ok(_stmts) => {
+                // TODO
+            },
+            Err(errors) => { 
+                println!("Errors in file \"{}\":\n", module.name());
+            
+                let symbols = errors.iter()
+                    .filter_map(|err| err.debug_symbol())
+                    .collect::<Vec<DebugSymbol>>();
+                    
+                let resolved_table = module.resolve_symbols(symbols.iter()).unwrap();
+                
+                for error in errors.iter() {
+                    let resolved = resolved_table.get(&error.debug_symbol().unwrap()).unwrap().as_ref().unwrap();
+                    println!("{}", render_parser_error(&error, resolved));
+                }
+            },
+        }
         
     } else {
         println!("\nReLox Interpreter {}\n", version);
@@ -123,7 +95,7 @@ struct Repl {
 impl Repl {
     pub fn new(prompt: &'static str) -> Self {
         Repl { 
-            prompt, 
+            prompt,
             runtime: Runtime::new(),
         }
     }
