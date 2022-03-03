@@ -43,13 +43,21 @@ impl fmt::Display for EvalError {
 }
 
 
+pub type ExecResult<T> = Result<T, ExecError>;
+
 #[derive(Debug)]
-enum ExecErrorKind {
+pub enum ExecErrorKind {
     FailedEval,
 }
 
+impl From<ExecErrorKind> for ExecError {
+    fn from(kind: ExecErrorKind) -> Self {
+        ExecError { kind, cause: None }
+    }
+}
+
 #[derive(Debug)]
-struct ExecError {
+pub struct ExecError {
     kind: ExecErrorKind,
     cause: Option<Box<dyn Error>>,
 }

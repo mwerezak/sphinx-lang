@@ -13,22 +13,51 @@ pub type InternSymbol = DefaultSymbol;
 pub type InternBackend = DefaultBackend<InternSymbol>;
 pub type StringInterner = string_interner::StringInterner<InternBackend>;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InternStr {
     symbol: InternSymbol,
 }
 
 impl InternStr {
-    pub fn new(symbol: InternSymbol) -> Self {
-        InternStr { symbol }
-    }
-    
     pub fn from_str(s: &str, interner: &mut StringInterner) -> Self {
         InternStr { symbol: interner.get_or_intern(s) }
     }
-    
-    pub fn symbol(&self) -> InternSymbol { self.symbol }
 }
+
+impl From<InternSymbol> for InternStr {
+    fn from(symbol: InternSymbol) -> Self {
+        Self { symbol }
+    }
+}
+
+
+
+
+// wraps an InternStr when hashing so as to allow it to hash and compare consistently with non-interned strings
+#[derive(Debug, Clone, Copy)]
+struct InternKey<'h> {
+    symbol: InternSymbol,
+    interner: &'h StringInterner,
+}
+
+impl<'h> InternKey<'h> {
+    pub fn new(symbol: impl Into<InternSymbol>, interner: &'h StringInterner) -> Self {
+        Self { symbol: symbol.into(), interner }
+    }
+}
+
+// TODO
+// impl PartialEq
+// impl Eq
+// impl Hash
+
+impl From<InternKey<'_>> for InternStr {
+    fn from(key: InternKey) -> Self {
+        key.symbol.into()
+    }
+}
+
+
 
 
 // Chunks
