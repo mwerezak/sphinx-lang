@@ -2,7 +2,6 @@
 
 
 
-
 ## Python Style Design?
 
 Each object may refer to another object as it's "type"
@@ -12,18 +11,6 @@ Attribute lookups that fail on an object defer to the object's "type" object.
 Special behaviours are handled by specially named callables on objects. 
 Whether the special callable ends up being on an instance itself or on the 
 instance's "type" object doesn't matter.
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -44,22 +31,26 @@ depending on whether or not the associated value is a function.
 
 
 
-
-
-
-
-
-
-
-
-
-
 ## Special/MetaMethods
 
+### General
 
-- `__attr` attributes that are not found on an object are looked up on the object referenced
+- `__getindex` attributes that are not found on an object are looked up on the object referenced
+- `__setindex` assignment
+- `__delindex` 
 
+- `__bool` truth value of an object
+- `__tostring`
 
+### Context Managers
+
+- `__exit`
+
+### Descriptors
+
+- `__get`
+- `__set`
+- `__del`
 
 
 #### Operator Overloading
