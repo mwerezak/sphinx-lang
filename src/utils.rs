@@ -60,8 +60,9 @@ impl<R> Iterator for ReadChars<R> where R: BufRead {
     type Item = io::Result<char>;
     
     fn next(&mut self) -> Option<io::Result<char>> {
-        if !self.linebuf.is_empty() {
-            return self.charbuf.pop_front().map(Ok);
+        let next = self.charbuf.pop_front().map(Ok);
+        if next.is_some() {
+            return next;
         }
         
         // refill linebuf with the next line

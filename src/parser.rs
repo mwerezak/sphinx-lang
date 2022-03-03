@@ -101,8 +101,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         let result = match self.parse_stmt_variant(&mut ctx) {
             Ok(stmt) => Ok(stmt),
             Err(err) => {
-                // TODO synchronize, set error flag
-            
+                // TODO synchronize
                 Err(ParserError::from_prototype(err, ctx))
             },
         };
