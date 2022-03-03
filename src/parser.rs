@@ -101,11 +101,45 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         let result = match self.parse_stmt_variant(&mut ctx) {
             Ok(stmt) => Ok(stmt),
             Err(err) => {
-                // TODO synchronize
+                
+                self.synchronize_stmt(&mut ctx);
                 Err(ParserError::from_prototype(err, ctx))
+                
             },
         };
         Some(result)
+    }
+    
+    // If we hit an error we need to synchronize back to a likely-valid state before we continue parsing again
+    // To do this, just keep discarding tokens until we think we're at the start of a new statement
+    fn synchronize_stmt(&mut self, ctx: &mut ErrorContext) {
+        // Check for either: a token that only appears at the start of a new statement
+        // OR try to parse an expression. If we can do it without errors, assume we're in a good state. The expression can be discarded.
+        
+        loop {
+
+            let next = match self.peek() {
+                Err(..) => {
+                    self.advance().unwrap_err();
+                    continue;
+                },
+                Ok(token) => token,
+            };
+
+            if matches!(next.token, 
+                Token::EOF | Token::Semicolon | Token::Var | 
+                Token::While  | Token::Do | Token::For | 
+                Token::Continue | Token::Break | Token::Return | 
+                Token::Echo) {
+                
+                return;
+            }
+
+            if self.parse_expr_variant(ctx).is_ok() {
+                return;
+            }
+
+        }
     }
     
     /*** Statement Parsing ***/
@@ -589,9 +623,4 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         Ok(group)
     }
     
-    
-    // Discards tokens until we reach a statement boundary
-    fn synchronize_stmt(&mut self) {
-        unimplemented!()
-    }
 }

@@ -24,8 +24,8 @@ pub enum ParserErrorKind {
 #[derive(Debug, Clone, Copy)]
 pub enum ContextTag {
     Token,  // errors retrieving the actual tokens
-    
     TopLevel,
+    Sync,
     Stmt,
     Expr,
     AssignmentExpr,
