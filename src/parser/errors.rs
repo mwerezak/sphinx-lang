@@ -11,6 +11,7 @@ pub type ErrorKind = ParserErrorKind;
 #[derive(Debug)]
 pub enum ParserErrorKind {
     LexerError,
+    EndofTokenStream,
     ExpectedStartOfExpr,   // expected the start of an expression
     ExpectedCloseParen,
     ExpectedCloseSquare,
@@ -52,6 +53,8 @@ impl ErrorPrototype {
     pub fn caused_by(mut self, cause: impl Into<Box<dyn Error>>) -> Self {
         self.cause = Some(cause.into()); self
     }
+    
+    pub fn kind(&self) -> &ErrorKind { &self.kind }
 }
 
 impl From<ParserErrorKind> for ErrorPrototype {
@@ -100,6 +103,7 @@ impl fmt::Display for ParserError<'_> {
         
         let message = match self.kind() {
             ParserErrorKind::LexerError => "",
+            ParserErrorKind::EndofTokenStream => "unexpected end of token stream",
             ParserErrorKind::ExpectedStartOfExpr  => "expected start of expression",
             ParserErrorKind::ExpectedCloseParen   => "missing closing ')'",
             ParserErrorKind::ExpectedCloseSquare  => "missing closing ']'",

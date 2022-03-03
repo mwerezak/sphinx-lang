@@ -33,6 +33,11 @@ pub struct Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError
     next: Option<Result<TokenMeta, LexerError>>,
 }
 
+impl<'m, T> Iterator for Parser<'m, '_, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+    type Item = Result<Stmt, ParserError<'m>>;
+    fn next(&mut self) -> Option<Self::Item> { self.next_stmt() }
+}
+
 type InternalResult<T> = Result<T, ErrorPrototype>;
 
 impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
@@ -46,20 +51,27 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         }
     }
     
-    fn next_token(&mut self) -> Result<TokenMeta, LexerError> {
-        // should never run out of tokens as we should always get EOF first
-        self.tokens.next().expect("unexpected end of token sequence")
+    fn next_token(&mut self) -> Option<Result<TokenMeta, LexerError>> {
+        self.tokens.next()
     }
     
     fn advance(&mut self) -> InternalResult<TokenMeta> {
-        self.next.take()
-            .unwrap_or_else(|| self.next_token())
-            .map_err(|err| ErrorPrototype::from(ErrorKind::LexerError).caused_by(err))
+        let next = self.next.take()
+            .or_else(|| self.next_token());
+        
+        if let Some(result) = next {
+            result.map_err(|err| ErrorPrototype::from(ErrorKind::LexerError).caused_by(err))
+        } else {
+            Err(ErrorKind::EndofTokenStream.into())
+        }
     }
     
     fn peek(&mut self) -> InternalResult<&TokenMeta> {
         if self.next.is_none() {
-            self.next = Some(self.next_token());
+            self.next = self.next_token();
+            if self.next.is_none() {
+                return Err(ErrorKind::EndofTokenStream.into());
+            }
         }
         
         // This craziness is needed to finagle a reference in one branch 
@@ -72,20 +84,29 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         }
     }
     
-    // temporary top level, will change when statement parsing is added
-    // Note: the value returned from this method no longer needs the interner 'h
-    // but the compiler can't guess that, so we have to be explicit about the lifetimes here
-    pub fn placeholder_toplevel(&mut self) -> Result<Stmt, ParserError<'m>> { 
+    pub fn next_stmt(&mut self) -> Option<Result<Stmt, ParserError<'m>>> {
         let mut ctx = ErrorContext::new(self.module, ContextTag::TopLevel);
         
-        match self.parse_stmt_variant(&mut ctx) {
+        // check stop conditions
+        match self.peek() {
+            Ok(next) if matches!(next.token, Token::EOF) => return None,
+            Err(error) if matches!(error.kind(), ErrorKind::EndofTokenStream) => return None,
+            Err(error) => return {
+                let error = ParserError::from_prototype(error, ctx);
+                Some(Err(error))
+            },
+            _ => { },
+        }
+        
+        let result = match self.parse_stmt_variant(&mut ctx) {
             Ok(stmt) => Ok(stmt),
             Err(err) => {
-                // TODO synchronize
+                // TODO synchronize, set error flag
             
                 Err(ParserError::from_prototype(err, ctx))
             },
-        }
+        };
+        Some(result)
     }
     
     /*** Statement Parsing ***/

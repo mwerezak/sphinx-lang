@@ -59,7 +59,7 @@ fn main() {
                 
                 let lexer = lexer_factory.build_once(chars.into_iter());
                 let mut parser = Parser::new(&module, &mut interner, lexer);
-                match parser.placeholder_toplevel() {
+                match parser.next_stmt().unwrap() {
                     Err(error) => println!("{}", error),
                     Ok(stmt) => println!("{:#?}", stmt),
                 };
@@ -68,7 +68,7 @@ fn main() {
             SourceText::File(readf) => {
                 let lexer = lexer_factory.build_once(readf);
                 let mut parser = Parser::new(&module, &mut interner, lexer);
-                match parser.placeholder_toplevel() {
+                match parser.next_stmt().unwrap() {
                     Ok(stmt) => println!("{:#?}", stmt),
                     Err(error) => {
                         let symbol = error.debug_symbol().unwrap();
@@ -155,7 +155,7 @@ fn print_eval_str(runtime: &mut Runtime, input: &str) {
     
     let lexer = runtime.lexer_factory.build(chars.into_iter());
     let mut parser = Parser::new(&module, &mut runtime.interner, lexer);
-    let stmt = match parser.placeholder_toplevel() {
+    let stmt = match parser.next_stmt().unwrap() {
         Ok(expr) => expr,
         Err(error) => return println!("{} [{:?}]", error, error.debug_symbol()),
     };
