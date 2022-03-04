@@ -1,7 +1,6 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 
-use crate::debug::symbol::DebugSymbol;
 use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};
 use crate::runtime::Variant;
@@ -11,20 +10,19 @@ use crate::runtime::errors::EvalResult;
 use crate::interpreter::runtime::Environment;
 
 
-pub fn eval_expr(local: &Environment<'_>, expr: &ExprVariant, debug: Option<&DebugSymbol>) -> EvalResult<Variant> {
-    EvalContext::new(local, debug).eval(expr)
+pub fn eval_expr(local: &Environment<'_>, expr: &ExprVariant) -> EvalResult<Variant> {
+    EvalContext::new(local).eval(expr)
 }
 
 
 // tracks the local scope and the innermost Expr
 pub struct EvalContext<'r> {
     local: &'r Environment<'r>,
-    debug: Option<&'r DebugSymbol>,
 }
 
 impl<'r> EvalContext<'r> {
-    pub fn new(local: &'r Environment, debug: Option<&'r DebugSymbol>) -> Self {
-        EvalContext { local, debug }
+    pub fn new(local: &'r Environment) -> Self {
+        EvalContext { local }
     }
     
     pub fn eval(&self, expr: &ExprVariant) -> EvalResult<Variant> {

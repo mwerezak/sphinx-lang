@@ -103,3 +103,19 @@ impl<F> fmt::Display for FnFormatter<F> where F: Fn(&mut fmt::Formatter<'_>) -> 
         (self.fmt_func)(fmt)
     }
 }
+
+
+// Formats an error that may have a message and/or a source error
+pub fn format_error(fmt: &mut fmt::Formatter<'_>, title: &str, message: Option<&str>, source: Option<&dyn std::error::Error>) -> fmt::Result {
+    // empty messages are formatted the same as no message
+    let message =
+        if let Some("") = message { None }
+        else { message };
+    
+    match (message, source) {
+        (None, None) => fmt.write_str(title),
+        (None, Some(error)) => write!(fmt, "{}: {}", title, error),
+        (Some(message), None) => write!(fmt, "{}: {}", title, message),
+        (Some(message), Some(error)) => write!(fmt, "{}: {}: {}", title, message, error),
+    }
+}

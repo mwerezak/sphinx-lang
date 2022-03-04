@@ -1,5 +1,6 @@
 use std::fmt;
 use std::error::Error;
+use crate::utils;
 use crate::source::ModuleSource;
 use crate::lexer::{Span, TokenMeta};
 use crate::debug::symbol::{DebugSymbol, TokenIndex};
@@ -112,12 +113,7 @@ impl fmt::Display for ParserError<'_> {
             ParserErrorKind::InvalidAssignmentLHS => "invalid assignment",
         };
         
-        match (message, self.source()) {
-            ("", None) => write!(fmt, "syntax error"),
-            ("", Some(error)) => write!(fmt, "syntax error: {}", error),
-            (message, None) => write!(fmt, "syntax error: {}", message),
-            (message, Some(error)) => write!(fmt, "syntax error: {}: {}", message, error),
-        }
+        utils::format_error(fmt, "syntax error", Some(message), self.source())
     }
 }
 

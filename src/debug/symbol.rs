@@ -7,7 +7,7 @@ use std::iter;
 use std::rc::Rc;
 use std::collections::{BinaryHeap, HashMap};
 
-use crate::utils::delegate_fmt;
+use crate::utils;
 use crate::source::{ModuleSource, SourceText};
 use crate::runtime::data::Chunk;
 
@@ -314,6 +314,8 @@ impl Ord for IndexSort<'_> {
 
 // Errors
 
+use std::error::Error;
+
 pub type ErrorKind = SymbolResolutionErrorKind;
 
 #[derive(Debug)]
@@ -350,14 +352,20 @@ impl From<ErrorKind> for SymbolResolutionError {
     }
 }
 
-impl std::error::Error for SymbolResolutionError {
+impl Error for SymbolResolutionError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.cause.as_ref().map(|o| o.as_ref())
     }
 }
 
 impl fmt::Display for SymbolResolutionError {
-    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unimplemented!()
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        
+        let message = match self.kind() {
+            SymbolResolutionErrorKind::IOError => "I/O error while extracting symbol",
+            SymbolResolutionErrorKind::EOFReached => "EOF reached while extracting symbol",
+        };
+        
+        utils::format_error(fmt, "could not resolve symbol", Some(message), self.source())
     }
 }
