@@ -73,8 +73,15 @@ fn main() {
                 let resolved_table = module.resolve_symbols(symbols.iter()).unwrap();
                 
                 for error in errors.iter() {
-                    let resolved = resolved_table.get(&error.debug_symbol().unwrap()).unwrap().as_ref().unwrap();
-                    println!("{}", render_parser_error(&error, resolved));
+                    let resolved = resolved_table.get(&error.debug_symbol().unwrap()).unwrap().as_ref();
+                    
+                    match resolved {
+                        Ok(resolved) => println!("{}", render_parser_error(&error, resolved)),
+                        Err(resolve_error) => {
+                            println!("{}", error);
+                            println!("Could not resolve symbol: {}", resolve_error);
+                        }
+                    }
                 }
             },
         }
@@ -102,8 +109,6 @@ impl Repl {
     
     pub fn run(&mut self) {
         
-        // let module = placeholder_module("<repl>");
-        
         loop {
             io::stdout().write(self.prompt.as_bytes()).unwrap();
             io::stdout().flush().unwrap();
@@ -127,49 +132,40 @@ impl Repl {
                 break;
             }
             
-            print_eval_str(&mut self.runtime, input.as_str());
+            let mut parse_ctx = ParseContext::new(&self.runtime.lexer_factory, &mut self.runtime.interner);
+            let module = ModuleSource::new("<repl>", SourceType::String(input));
+            let source_text = module.source_text().expect("error reading source");
+            let parse_result = parse_ctx.parse_ast(source_text);
+            
+            let stmts = match parse_result {
+                Ok(stmts) => stmts,
+                
+                Err(errors) => { 
+                    let symbols = errors.iter()
+                        .filter_map(|err| err.debug_symbol())
+                        .collect::<Vec<DebugSymbol>>();
+                        
+                    let resolved_table = module.resolve_symbols(symbols.iter()).unwrap();
+                    
+                    for error in errors.iter() {
+                        let resolved = resolved_table.get(&error.debug_symbol().unwrap()).unwrap().as_ref();
+                        println!("{}", render_parser_error(&error, resolved.unwrap()));
+                    }
+                    
+                    continue;
+                },
+            };
+            
+            let env = Environment { runtime: &self.runtime };
+            for stmt in stmts.iter() {
+                if let StmtVariant::Expression(expr) = stmt.variant() {
+                    let eval_result = eval_expr(&env, &expr, Some(stmt.debug_symbol()));
+                    println!("{:?}", eval_result);
+                } else {
+                    println!("{:?}", stmt);
+                }
+            }
         }
         
     }
 }
-
-// use rlo_interpreter::runtime::{Module, placeholder_runtime_ctx};
-// use rlo_interpreter::parser::expr::{ExprMeta};
-// use rlo_interpreter::parser::ParserError;
-// fn print_result(result: Result<ExprMeta, ParserError>) {
-//     match result {
-//         Ok(expr) => println!("{:?}", expr),
-//         Err(error) => println!("{}", error),
-//     }
-// }
-
-fn print_eval_str(runtime: &mut Runtime, input: &str) {
-    let string = input.to_string();
-    let module = ModuleSource::new("<main>", SourceType::String(string.clone()));
-    
-    let mut chars = Vec::new();
-    chars.extend(string.chars().map(Ok));
-    
-    let lexer = runtime.lexer_factory.build(chars.into_iter());
-    let mut parser = Parser::new(&module, &mut runtime.interner, lexer);
-    let stmt = match parser.next_stmt().unwrap() {
-        Ok(expr) => expr,
-        Err(error) => return println!("{} [{:?}]", error, error.debug_symbol()),
-    };
-
-    let scope = Environment { runtime };
-    
-    if let StmtVariant::Expression(expr) = stmt.variant() {
-        let eval_result = eval_expr(&scope, &expr, Some(stmt.debug_symbol()));
-        println!("{:?}", eval_result);
-    } else {
-        println!("{:?}", stmt);
-    }
-    
-    
-
-    // let mut local_ctx = placeholder_runtime_ctx(runtime);
-    // let eval_result = local_ctx.eval(expr.expr());
-    // println!("{:?}", eval_result);
-}
-

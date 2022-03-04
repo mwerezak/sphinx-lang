@@ -21,7 +21,7 @@ pub enum Atom {
     IntegerLiteral(language::IntType),
     FloatLiteral(language::FloatType),
     StringLiteral(InternStr),
-    Group(Box<ExprVariant>),
+    Group(Box<ExprVariant>), // type annotation
 }
 
 impl Atom {

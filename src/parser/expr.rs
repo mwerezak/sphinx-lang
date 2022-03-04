@@ -10,6 +10,7 @@ pub struct AssignmentInfo {
     pub lhs: Primary,
     pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     pub rhs: ExprVariant,
+    // type annotation
 }
 
 #[derive(Debug, Clone)]
