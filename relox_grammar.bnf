@@ -6,7 +6,6 @@
     I plan to implement a recursive descent parser, so care needs to be taken to avoid any left recursion in the grammar.
 *)
 
-
 (*** Statements ***)
 
 statement ::= ";"
@@ -22,21 +21,21 @@ control-flow ::= "continue" ( label )? | "break" ( label )? | "return" expressio
 while-loop ::=  ( label )? "while" expression "do" statement-block "end" ;
 do-while-loop ::= ( label )? "do" statement-block "while" expression "end" ;
 
-for-loop ::= ( label ":" )? "for" ... "end" ; (* TODO *)
+for-loop ::= ( label )? "for" lvalue-list "in" expression "end" ;
 
 label ::= "::" LABELNAME ;
 
 (*** Expressions ***)
 
-atom ::= LITERAL | identifier | "self" | "super" | "(" expression ")" ;
+atom ::= LITERAL | identifier | "self" | "super" | group ;
 identifier ::= IDENTIFIER | "global" IDENTIFIER | "upval" IDENTIFIER ;
-primary ::= atom ( access-item )* ; 
 
+primary ::= atom ( access-item )* ; 
 access-item ::= member-access | index-access | invocation | object-constructor ;
 index-access ::= "[" expression "]" ;
 member-access ::= "." IDENTIFIER ;
 
-lvalue ::= identifier | primary index-access | primary member-access ;  (* so called because they can appear on the left side of assignment, see Access below *)
+group ::= "(" expression ( ":" TYPE )? ")" ; (* can be type annotated *)
 
 
 (* 
@@ -68,7 +67,11 @@ block-expression ::= ( label )? "begin" ( statement | control-flow | "break" ( l
 *)
 
 (* right associative *)
-assignment-expression ::= lvalue ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
+lvalue-primary ::= identifier | primary index-access | primary member-access ; 
+lvalue ::= lvalue-primary ( ":" TYPE )? ;  (* all lvalues can be type annotated *)
+
+assignment-op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
+assignment-expression ::= lvalue ( "=" | assignment-op ) expression ;
 
 assignment-statement ::= "var" lvalue-list  "=" expression-list ;
 lvalue-list ::= lvalue ( "," lvalue )* ;
@@ -89,7 +92,7 @@ argument ::= ( "..." )? expression ;  (* support argument unpacking syntax *)
 (*** Constructors ***)
 
 object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
-member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;  (* initializers can assign to members or index *)
+member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ( ":" TYPE )? "=" expression ;
 
 
 (* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
