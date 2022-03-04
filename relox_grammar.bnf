@@ -17,12 +17,14 @@ statement ::= ";"
             | expression ;
 
 statement-block ::= ( statement | control-flow )* ;
-control-flow ::= "continue" ( ":" LABEL )? | "break" ( ":" LABEL )? | "return" expression ;
+control-flow ::= "continue" ( label )? | "break" ( label )? | "return" expression ;
 
-while-loop ::=  ( LABEL ":" )? "while" expression "do" statement-block "end" ;
-do-while-loop ::= ( LABEL ":" )? "do" statement-block "while" expression "end" ;
+while-loop ::=  ( label )? "while" expression "do" statement-block "end" ;
+do-while-loop ::= ( label )? "do" statement-block "while" expression "end" ;
 
-for-loop ::= ( LABEL ":" )? "for" ... "end" ; (* TODO *)
+for-loop ::= ( label ":" )? "for" ... "end" ; (* TODO *)
+
+label ::= "::" LABELNAME ;
 
 (*** Expressions ***)
 
@@ -54,7 +56,7 @@ expression ::= primary
 (*** if/block Expressions ***)
 
 if-expression ::= "if" expression "then" block ( "elseif" block )* ( "else" block )? "end" ;
-block-expression ::= "begin" ( statement | control-flow | "break" expression )* "end" ;  (* break can be supplied a value inside of begin-blocks *)
+block-expression ::= ( label )? "begin" ( statement | control-flow | "break" ( label )? expression )* "end" ;  (* break can be supplied a value inside of begin-blocks *)
 
 (*** Assignment ***)
 
@@ -75,7 +77,14 @@ expression-list ::= expression ( "," expression )* ;
 
 (*** Function/Method Calls ***)
 
-invocation ::= "(" ... ")" ;  (* WIP *)
+(* 
+Special case here: An invocation cannot be the first production following a new line. 
+This is the only situation where white space is considered when parsing RLO.
+This prevents function calls from splitting across lines (an issue that Lua also has, and our syntax is based on Lua).
+However RLO has tuples, so its important for us to deal with that.
+*)
+invocation ::= "(" ")" | "(" argument ( "," argument )* ")" ; 
+argument ::= ( "..." )? expression ;  (* support argument unpacking syntax *)
 
 (*** Constructors ***)
 

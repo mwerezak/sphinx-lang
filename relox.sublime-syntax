@@ -22,6 +22,7 @@ contexts:
     - include: misc-statement-keywords
     - include: blocks
     - include: while-statements
+    - include: for-statements
     - include: control-flow-keywords
     - include: late-expressions
     - match: ';'
@@ -36,6 +37,7 @@ contexts:
     - include: reserved-names
     - include: numbers
     - include: operators
+    - include: assignments
     - include: strings
     - include: tuples
     - include: parens
@@ -62,8 +64,12 @@ contexts:
       scope: keyword.other
 
   control-flow-keywords:
-    - match: \b(return|break|continue)\b
+    - match: \b(return)\b
       scope: keyword.control
+    - match: \b(break|continue)\b\s*(::\w+)?
+      captures:
+        1: keyword.control
+        2: entity.name.label
 
   constants:
     - match: \b(nil|true|false)\b
@@ -85,22 +91,35 @@ contexts:
       scope: constant.numeric
 
   operators:
-    - match: \+\=|-\=|\*\=|/\=|%\=
-      scope: keyword.operator.arithmetic keyword.operator.assignment
     - match: '[\+\-/\*%]'
       scope: keyword.operator.arithmetic
-    - match: '\~\=|&\=|\|\=|\^\=|>>\=|<<\='
-      scope: keyword.operator.bitwise keyword.operator.assignment
     - match: '[\~\&\|\^]|<<|>>'
       scope: keyword.operator.bitwise
     - match: <\=|>\=|\=\=|<|>|!\=
       scope: keyword.operator.comparison
     - match: \b(not|and|or)\b
       scope: keyword.operator.logical
-    - match: \=
-      scope: keyword.operator.assignment
-    - match: '@'
-      scope: keyword.operator
+    # - match: '@'
+    #   scope: keyword.operator
+
+  assignments:
+    - match: ((:)\s*({{identifier}}))?\s*(\+\=|-\=|\*\=|/\=|%\=)
+      captures:
+        2: punctuation.separator
+        3: storage.type
+        4: keyword.operator.arithmetic keyword.operator.assignment
+
+    - match: ((:)\s*({{identifier}}))?\s*(\~\=|&\=|\|\=|\^\=|>>\=|<<\=)
+      captures:
+        2: punctuation.separator
+        3: storage.type
+        4: keyword.operator.bitwise keyword.operator.assignment
+
+    - match: ((:)\s*({{identifier}}))?\s*(\=)
+      captures:
+        2: punctuation.separator
+        3: storage.type
+        4: keyword.operator.assignment
 
   strings:
     # Strings begin and end with quotes, and use backslashes as an escape
@@ -160,6 +179,12 @@ contexts:
     - match: \.
       scope: punctuation.accessor
 
+  type_annotation:
+    - match: (:)\s*({{identifier}})
+      captures:
+        1: punctuation.separator
+        2: storage.type
+
   tuples:
     - match: \,
       scope: punctuation.separator
@@ -173,6 +198,7 @@ contexts:
           scope: punctuation.section.parens.end
           pop: true
         - include: expressions
+        - include: type_annotation
 
   subscripts:
     - match: \[
@@ -243,8 +269,10 @@ contexts:
 
   while-statements:
     # normal while loops
-    - match: \b(while)\b
-      scope: keyword.control
+    - match: (::\w+)?\s*\b(while)\b
+      captures:
+        1: entity.name.label
+        2: keyword.control
       push:
         - match: \b(do)\b
           scope: keyword.control
@@ -261,6 +289,29 @@ contexts:
         - include: statements
 
   while-body:
+    - meta_scope: meta.block
+    - match: \b(end)\b
+      scope: keyword.control
+      pop: true
+    - include: statements
+
+  for-statements:
+    # normal while loops
+    - match: (::\w+)?\s*\b(for)\b
+      captures:
+        1: entity.name.label
+        2: keyword.control
+      push:
+        - match: \b(in)\b
+          scope: keyword.control
+          set:
+            - match: \b(do)\b
+              scope: keyword.control
+              set: for-body
+            - include: expressions
+        - include: expressions
+
+  for-body:
     - meta_scope: meta.block
     - match: \b(end)\b
       scope: keyword.control
@@ -287,17 +338,37 @@ contexts:
 
   function-param-list:
     - meta_scope: meta.group
-    - match : \)
+    - match: \)(?=\s*->)
+      scope: punctuation.section.group.end
+      set: return-type-annotation
+    - match: \)
       scope: punctuation.section.group.end
       set: function-body
+
     - match: \,
       scope: punctuation.separator
     - match: \b(self)\b  # method descriptor syntax
       scope: variable.language
-    - match: '({{identifier}})(\.\.\.)?'
+    - match: ({{identifier}})(\.\.\.)?
       captures:
         1: variable.parameter
         2: keyword.operator
+    - include: type_annotation
+
+    - match: '='
+      scope: keyword.operator.assignment
+      push:
+        - match : '(?=[,)])'
+          pop: true
+        - include: expressions
+
+  return-type-annotation:
+    - match: (->)\s*({{identifier}})\s*(:)
+      captures:
+        1: keyword.operator
+        2: storage.type
+        3: punctuation.separator
+      set: function-body
 
   function-body:
     - meta_scope: meta.block
@@ -391,8 +462,9 @@ contexts:
       scope: punctuation.separator
       set: object-initializer-rvalue
     - match: '{{identifier}}'
-      scope: variable.member
+      scope: variable.parameter
     - include: subscripts
+    - include: type_annotation
 
   object-initializer-rvalue:
     - meta_scope: meta.braces

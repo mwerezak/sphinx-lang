@@ -1,3 +1,8 @@
+# RLO syntax examples
+# If you use Sublime Text you can read this with syntax highlighting!
+# (highlighter for sublime text provided by relox.sublime-syntax)
+
+
 #{
     Block Comment
    #{   Nesting!   }#
@@ -13,6 +18,10 @@ echo "Hello, world!"  # print() function will be available later once there is a
 # the end of a statement can always be inferred without
 # needing to be whitespace-sensitive.
 
+# The language will support type annotations and have structural type inference built in
+# Any expression can be annotated.
+# This is still WIP
+("Type Annotations" : String) 
 
 # Booleans
 true  # Not false.
@@ -41,8 +50,14 @@ nil
 ()  # the empty tuple
 ("solo",)  # tuple with one element
 
-# Object
+# Objects
+{ name = "Bob", age = 13 }  # anonymous object
+
 Person { name = "Bob", age = 13 }
+
+get_person_type() { name = "Bob", age = 13 }  # type can be an expression
+
+{ name: String = "Bob", age: Int = 13 }  # with annotations
 
 # Arithmetic expressions
 add + me
@@ -59,15 +74,15 @@ modulo % me
 
 # unary
 
--negateMe
+-negate_me
 ~invert
 
 # Comparison and equality
 
 less < than
-lessThan <= orEqual
+less_than <= or_equal
 greater > than
-greaterThan >= orEqual
+greater_than >= or_equal
 
 1 == 2         # false.
 "cat" != "dog" # true.
@@ -116,13 +131,17 @@ end
 
 # Assignment expressions are expressions using the assignment operator
 # variables can be freely assigned or reassigned
-imAVariable = "here is my value"
-iAmNil = nil  # initializer is required
+im_a_variable = "here is my value"
+i_am_nil = nil  # initializer is required
+im_a_float: Float = 3.14159  # assignment with type annotation
 
 # Assignment statements start with the "var" keyword
 # while more restricted, they allows you to destructure tuples
 var first, second = "abc", "def"
 var second, first = first, second
+
+# destructuring assignment with type annotations
+var index: Int, val: String = 0, "example" 
 
 # assignment versions of all binary operators are supported
 # however they require the variable to be defined first before use
@@ -187,7 +206,7 @@ else
   "default"
 end
 
-condExpr = 
+cond_expr = 
   if condition1 then
     "first"
   elif condition2 then
@@ -217,64 +236,87 @@ while a < 10 do
   if skipcond then 
     continue
   end
-
   
-
   echo a
   a += 1
+end
+
+# break and continue can use labels to target an outer loop
+::outer while example_cond() do
+
+  some_work()
+
+  while inner_cond() do
+    if exit_inner() then
+      break
+    end
+    
+    if continue_outer() then 
+      continue ::outer
+    end
+    
+    if exit_outer() then
+      break ::outer
+    end
+    
+  end
 end
 
 do
   var cond = example()
 while cond
 
-# for loops TBD
+# for loops using iterators
 
-# C-style for loop
-# for var i , i < 10 , i+1 do
-# end
+# here, create_iter() returns an "iterator"
+for item in create_iter() do
+  echo item
+end
 
 #{
-  iterator-based for loops
+  An iterator is one of the following
+      A 3-tuple: (iterfunc, invariant, i0)
+      A callable that when invoked with no arguments creates such a 3-tuple
+      An object that has the __iter metamethod which returns such a 3-tuple
   
-  # Option 1. Lua style e.g...
+  An iterator 3-tuple must do the following:
+      iterfunc must accept a (i, invariant) and return (i_next, ...) or nil
+      invariant is a value that is passed to each invocation of iterfunc
+      i0 is a value that is passed to iterfunc as the initial value of i
+  
+  Before each execution of the for-loop body, iterfunc is invoked and the first value of the
+  returned tuple is saved to be used as the next value of i.
+  
+  Then, the entire tuple is assigned to item, which may be a tuple-destructuring expression.
+  After the for-loop body is executed, the process is repeated until iterfunc returns nil.
 
-  # iterfunc must accept a (i, invariant) and return (next_i, ...)
-  for i, ... in iterfunc, invariant, i0 do
-    ...
-  end
-  
-  # then with an iter() that returns the required 3-tuple you would do:
-  
-  for i, ... in iter() do
-    ...
-  end  
-
-  
-  # Option 2. Python style...
-  
-  # iter is an object with __next() metamethod
-  for item in iter do
-    ...
-  end
 }#
+
 
 # Functions
 
-makeBreakfast(bacon, eggs, toast)
-makeBreakfast()
+make_breakfast(bacon, eggs, toast)
+make_breakfast()
 
-fun echoSum(a, b)
+# implicitly returns nil
+fun echo_sum(a, b)
   echo a + b
 end
 
-fun returnSum(a, b)
+fun echo_default(thing = "default")
+  echo thing
+end
+
+# optional type annotations
+fun return_sum(a: Float, b: Float = 0.0) -> Float:
   return a + b
 end
 
+
+
 # Closures
 
-fun addPair(a, b)
+fun add_pair(a, b)
   return a + b
 end
 
@@ -282,7 +324,7 @@ fun identity(a)
   return a
 end
 
-echo identity(addPair)(1, 2) # echos "3".
+echo identity(add_pair)(1, 2) # echos "3".
 
 fun outerFunction()
   fun localFunction()
@@ -435,41 +477,29 @@ end
 
 
 # Variadic arguments
-fun variadicFun(normalArg, variadic...)
-  echo normalArg
+fun variadic_fun(normal_arg, variadic...)
+  echo normal_arg
   
-  ## TODO figure out how for loops will work then redo this example
-  var i = 0
-  while i < variadic.len do
-    echo variadic[i]
-    i += 1
+  for variadic_arg in variadic do
+    echo variadic_arg
   end
+
 end
 
-variadicFun("red", "blue", "green")  # prints "red" then "blue" then "green"
+variadic_fun("red", "blue", "green")  # prints "red" then "blue" then "green"
 
 var mylist = list.new("red", "green", "blue")  # important use case: constructor functions for collection types
 
 # Argument unpacking
 
 var things = ("second", "third")
-variadicFun("first", ...things)  # prints "first" then "second"
-variadicFun(...things)  # prints "second" then "third"
+variadic_fun("first", ...things)  # prints "first" then "second"
+variadic_fun(...things)  # prints "second" then "third"
 
-# Named Arguments TBD
-#{
-fun example(positionalArg, :namedArg) 
-  if namedArg then
-    echo positionalArg
-  end
-end
-
-example("otter", namedArg: true)
-
-# arguments to function calls must happen in this order
-anotherFunc("positional", ...unpackArgs, namedArg: "named")
-}#
-
+# named arguments are not supported
+# instead, use a function that takes an object as a single argument
+# and use an anonymous object literal
+lotta_options({ tag = "example", option1 = true, option2 = 3 })
 
 # Metamethods
 
