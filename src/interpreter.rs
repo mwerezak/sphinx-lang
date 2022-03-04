@@ -1,26 +1,22 @@
 pub mod eval;
+pub mod exec;
 // pub mod errors;
 
 
 use crate::parser::expr::ExprVariant;
+use crate::parser::stmt::StmtVariant;
 use crate::runtime::{Environment, Variant};
-use crate::runtime::errors::EvalResult;
+use crate::runtime::errors::{EvalResult, ExecResult};
 use crate::interpreter::eval::EvalContext;
+use crate::interpreter::exec::ExecContext;
 
 
-// A tree-walking interpreter
-pub struct Interpreter<'r> {
-    env: &'r mut Environment<'r>
+pub fn eval<'a, 'r>(env: &'a mut Environment<'r>, expr: &ExprVariant) -> EvalResult<Variant> {
+    let mut ctx = EvalContext::from(env);
+    ctx.eval(&expr)
 }
 
-impl<'r> Interpreter<'r> {
-    pub fn new(env: &'r mut Environment<'r>) -> Self {
-        Interpreter { env }
-    }
-    
-    // need to use 'a here to ensure that ctx is dropped when the method returns
-    pub fn eval<'a>(&'a mut self, expr: &ExprVariant) -> EvalResult<Variant> {
-        let mut ctx = EvalContext::new(self.env);
-        ctx.eval(&expr)
-    }
+pub fn exec<'a, 'r>(env: &'a mut Environment<'r>, stmt: &StmtVariant) -> ExecResult<()> {
+    let mut ctx = ExecContext::from(env);
+    ctx.exec(&stmt)
 }

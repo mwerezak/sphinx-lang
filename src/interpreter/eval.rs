@@ -16,11 +16,13 @@ pub struct EvalContext<'a, 'r> {
     env: &'a mut Environment<'r>,
 }
 
-impl<'a, 'r> EvalContext<'a, 'r> {
-    pub fn new(env: &'a mut Environment<'r>) -> Self {
+impl<'a, 'r> From<&'a mut Environment<'r>> for EvalContext<'a, 'r> {
+    fn from(env: &'a mut Environment<'r>) -> Self {
         EvalContext { env }
     }
-    
+}
+
+impl<'a, 'r> EvalContext<'a, 'r> {
     pub fn eval(&mut self, expr: &ExprVariant) -> EvalResult<Variant> {
         self.eval_inner_expr(expr)
     }

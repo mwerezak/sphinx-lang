@@ -68,5 +68,7 @@ impl From<FloatType> for Variant {
 }
 
 impl From<InternStr> for Variant {
-    fn from(intern: InternStr) -> Self { Variant::InternStr(intern) }
+    fn from(sym: InternStr) -> Self { Variant::InternStr(sym) }
 }
+
+

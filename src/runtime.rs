@@ -13,7 +13,7 @@ mod tests;
 
 use crate::language;
 use crate::lexer::LexerBuilder;
-use crate::runtime::data::StringInterner;
+use crate::runtime::data::{StringInterner, InternStr};
 
 
 pub struct Runtime {
@@ -32,6 +32,10 @@ impl Runtime {
     // TODO return global env, and get local env from global
     pub fn placeholder_env(&mut self) -> Environment<'_> {
         Environment { runtime: self }
+    }
+    
+    pub fn resolve_str(&self, sym: &InternStr) -> &str {
+        self.string_table.resolve(*sym.symbol()).unwrap()
     }
 }
 

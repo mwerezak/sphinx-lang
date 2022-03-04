@@ -43,39 +43,32 @@ impl fmt::Display for EvalError {
 }
 
 
-pub type ExecResult<T> = Result<T, ExecError>;
+use std::any::Any;
+
+// Runtime errors are so wide in scope, this is just a smart pointer to an error trait object
+
+pub type ExecResult<T> = Result<T, RuntimeError>;
 
 #[derive(Debug)]
-pub enum ExecErrorKind {
-    FailedEval,
+pub struct RuntimeError {
+    error: Box<dyn Error>,
 }
 
-impl From<ExecErrorKind> for ExecError {
-    fn from(kind: ExecErrorKind) -> Self {
-        ExecError { kind, cause: None }
+impl<E> From<E> for RuntimeError where E: Error + 'static {
+    fn from(error: E) -> Self {
+        RuntimeError { error: Box::new(error) }
     }
 }
 
-#[derive(Debug)]
-pub struct ExecError {
-    kind: ExecErrorKind,
-    cause: Option<Box<dyn Error>>,
-}
-
-impl ExecError {
-    pub fn caused_by(mut self, cause: impl Error + 'static) -> Self {
-        self.cause = Some(Box::new(cause)); self
+impl std::ops::Deref for RuntimeError {
+    type Target = dyn Error;
+    fn deref(&self) -> &Self::Target {
+        &*self.error
     }
 }
 
-impl Error for ExecError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.cause.as_ref().map(|o| o.as_ref())
-    }
-}
-
-impl fmt::Display for ExecError {
-    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        unimplemented!()
+impl RuntimeError {
+    pub fn downcast<E>(self) -> Result<Box<E>, Box<(dyn Error + 'static)>> where E: Error + 'static {
+        self.error.downcast::<E>()
     }
 }
