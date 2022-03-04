@@ -6,6 +6,11 @@
     I plan to implement a recursive descent parser, so care needs to be taken to avoid any left recursion in the grammar.
 *)
 
+(*** Type Annotations ***)
+
+type-expression ::= (* TODO *) ;
+
+
 (*** Statements ***)
 
 statement ::= ";"
@@ -27,17 +32,6 @@ label ::= "::" LABELNAME ;
 
 (*** Expressions ***)
 
-atom ::= LITERAL | identifier | "self" | "super" | group ;
-identifier ::= IDENTIFIER | "global" IDENTIFIER | "upval" IDENTIFIER ;
-
-primary ::= atom ( access-item )* ; 
-access-item ::= member-access | index-access | invocation | object-constructor ;
-index-access ::= "[" expression "]" ;
-member-access ::= "." IDENTIFIER ;
-
-group ::= "(" expression ( ":" TYPE )? ")" ; (* can be type annotated *)
-
-
 (* 
     This expression production is left-recursive, and as such, the actual recursive descent parser implementation differs somewhat (see the bottom of this file)
 *)
@@ -51,6 +45,20 @@ expression ::= primary
              | assignment-expression
              | object-constructor
              | tuple-constructor ;
+
+expression-list ::= expression ( "," expression )* ;
+
+(*** Primary expressions ***)
+
+atom ::= LITERAL | identifier | "self" | "super" | group ;
+identifier ::= IDENTIFIER | "global" IDENTIFIER | "upval" IDENTIFIER ;
+
+primary ::= atom ( access-item )* ; 
+access-item ::= member-access | index-access | invocation | object-constructor ;
+index-access ::= "[" expression "]" ;
+member-access ::= "." IDENTIFIER ;
+
+group ::= "(" expression ( ":" type-expression )? ")" ; (* can be type annotated *)
 
 (*** if/block Expressions ***)
 
@@ -67,16 +75,14 @@ block-expression ::= ( label )? "begin" ( statement | control-flow | "break" ( l
 *)
 
 (* right associative *)
-lvalue-primary ::= identifier | primary index-access | primary member-access ; 
-lvalue ::= lvalue-primary ( ":" TYPE )? ;  (* all lvalues can be type annotated *)
+lvalue ::= identifier | primary index-access | primary member-access ; 
+lvalue-annotated ::= lvalue-primary ( ":" type-expression )? ; 
 
 assignment-op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-assignment-expression ::= lvalue ( "=" | assignment-op ) expression ;
+assignment-expression ::= lvalue-annotated ( "=" | assignment-op ) expression ;
 
 assignment-statement ::= "var" lvalue-list  "=" expression-list ;
-lvalue-list ::= lvalue ( "," lvalue )* ;
-
-expression-list ::= expression ( "," expression )* ;
+lvalue-list ::= lvalue-annotated ( "," lvalue-annotated )* ;
 
 (*** Function/Method Calls ***)
 
@@ -87,12 +93,12 @@ This prevents function calls from splitting across lines (an issue that Lua also
 However RLO has tuples, so its important for us to deal with that.
 *)
 invocation ::= "(" ")" | "(" argument ( "," argument )* ")" ; 
-argument ::= ( "..." )? expression ;  (* support argument unpacking syntax *)
+argument ::= ( "..." )? expression ;  (* "..." is for argument unpacking syntax *)
 
 (*** Constructors ***)
 
 object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
-member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ( ":" TYPE )? "=" expression ;
+member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ( ":" type-expression )? "=" expression ;
 
 
 (* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
@@ -100,11 +106,16 @@ tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
 
 (*** Function Defs ***)
 
-function-def ::= ... ; (* TODO *)
+function-def ::= "fun" ( lvalue )?  parameter-list ( "->" type-expression ":" )?  statement-block "end" ;
+
+parameter-list ::= "(" ")" | "(" parameter ( "," parameter )* ( parameter "..." )? ")" ;
+
+parameter ::= IDENTIFIER ( ":" type-expression )? ( "=" expression )? ;
+
 
 (*** Class Defs ***)
 
-class-def ::= ... ; (* TODO *)
+class-def ::= (* TODO *) ;
 
 
 (***** Non left-recursive version of `expression` for implementation *****)

@@ -303,6 +303,7 @@ fun echo_sum(a, b)
   echo a + b
 end
 
+# unlike python, default arguments are re-evaluated with each invocation
 fun echo_default(thing = "default")
   echo thing
 end
