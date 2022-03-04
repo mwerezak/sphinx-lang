@@ -104,8 +104,12 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         }
         
         let result = match self.parse_stmt_variant(&mut ctx) {
-            Ok(stmt) => Ok(stmt),
+            Ok(stmt) => {
+                debug!("parser: {:?}", stmt); 
+                Ok(stmt)
+            },
             Err(err) => {
+                debug!("{:#?}", ctx);
                 let error = ParserError::from_prototype(err, ctx);
                 debug!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
                     error.kind(), error.context(), 
@@ -458,7 +462,8 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         let mut primary = Primary::new(self.parse_atom(ctx)?);
         
         loop {
-            match self.peek()?.token {
+            let next = self.peek()?;
+            match next.token {
                 
                 // access ::= "." IDENTIFIER ;
                 Token::OpAccess => {
@@ -496,8 +501,13 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     ctx.pop_extend();
                 }
                 
+                // Invocation is a special case. 
+                // The parens containing the argument list are not allowed to be on a separate line
+                // Lua has a similar issue, but doesn't have tuples so it isn't as big a problem there
+                // By checking next.newline we ensure that a () on the next line is properly parsed as a tuple
+                
                 // invocation ::= "(" ... ")" ;  (* WIP *)
-                Token::OpenParen => {
+                Token::OpenParen if !next.newline => {
                     unimplemented!()
                 }
                 
@@ -589,6 +599,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         // Check for the empty tuple
         let next = self.peek()?;
         if let Token::CloseParen = next.token {
+            ctx.set_end(&self.advance().unwrap());
             ctx.pop_extend();
             return Ok(Atom::EmptyTuple);
         }

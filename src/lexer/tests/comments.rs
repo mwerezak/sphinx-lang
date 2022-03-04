@@ -33,36 +33,43 @@ fn lexer_test_comments() {
         token => {
             token: Token::IntegerLiteral(0),
             span: Span { length: 3, .. },
+            ..
         } "foo",
         
         token => {
             token: Token::Comment,
             span: Span { length: 5, .. },
+            ..
         } "#bar",
         
         token => {
             token: Token::Comment,
             span: Span { length: 8, .. },
+            ..
         } "#   #{{",
         
         token => {
             token: Token::IntegerLiteral(2),
             span: Span { length: 3, .. },
+            ..
         } "baz",
         
         token => {
             token: Token::Comment,
             span: Span { length: 65, .. },
+            ..
         } "multiline comment block",
     
         token => {
             token: Token::IntegerLiteral(1),
             span: Span { length: 3, .. },
+            ..
         } "bar",
     
         token => {
             token: Token::EOF,
             span: Span { length: 0, .. },
+            ..
         } "EOF",
     
     );
@@ -97,21 +104,25 @@ fn lexer_test_skip_comments() {
         token => {
             token: Token::IntegerLiteral(0),
             span: Span { length: 3, .. },
+            ..
         } "foo",
         
         token => {
             token: Token::IntegerLiteral(2),
             span: Span { length: 3, .. },
+            ..
         } "baz",
         
         token => {
             token: Token::IntegerLiteral(1),
             span: Span { length: 3, .. },
+            ..
         } "bar",
         
         token => {
             token: Token::EOF,
             span: Span { length: 0, .. },
+            ..
         } "EOF",
     
     );

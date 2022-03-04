@@ -49,3 +49,32 @@ pub enum Token {
     Comment,
     EOF,
 }
+
+
+// Token Output
+
+// Max source file length ~4 billion characters (assuming mostly single byte UTF8 that's a ~4GB file)
+// Max token length 65535 characters
+pub type TokenIndex = u32;
+pub type TokenLength = u16;
+
+// include only mere character indexes in the output
+// if a lexeme needs to be rendered (e.g. for error messages), 
+// the relevant string can be extracted from the source at that point
+#[derive(Clone, Debug)]
+pub struct Span {
+    pub index: TokenIndex,  // index of start of token in file
+    pub length: TokenLength,
+}
+
+impl Span {
+    pub fn start_index(&self) -> TokenIndex { self.index }
+    pub fn end_index(&self) -> TokenIndex { self.index + TokenIndex::from(self.length) }
+}
+
+#[derive(Clone, Debug)]
+pub struct TokenMeta {
+    pub token: Token,
+    pub span: Span,
+    pub newline: bool,  // true if this is the first token after the start of a new line
+}

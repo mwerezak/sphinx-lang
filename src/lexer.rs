@@ -16,34 +16,6 @@ use rules::LexerRule;
 use rules::comments::{LineCommentRule, BlockCommentRule};
 
 
-// Token Output
-
-// if one of your source files has more than 4 billion characters (assuming mostly single byte UTF8 that's a ~4GB file)
-// or if a token gets longer than 65535 characters, just consider that a lexing error
-// In return, we can make the Span struct a fair bit narrower
-pub type TokenIndex = u32;  // index of start of token in file
-pub type TokenLength = u16;
-
-// include only mere character indexes in the output
-// if a lexeme needs to be rendered (e.g. for error messages), 
-// the relevant string can be extracted from the source then
-#[derive(Clone, Debug)]
-pub struct Span {
-    pub index: TokenIndex,
-    pub length: TokenLength,
-}
-
-impl Span {
-    pub fn start_index(&self) -> TokenIndex { self.index }
-    pub fn end_index(&self) -> TokenIndex { self.index + TokenIndex::from(self.length) }
-}
-
-#[derive(Clone, Debug)]
-pub struct TokenMeta {
-    pub token: Token,
-    pub span: Span,
-}
-
 // Lexer Builder
 
 #[derive(Clone)]
@@ -137,6 +109,7 @@ pub struct Lexer<S> where S: Iterator<Item=io::Result<char>> {
     
     current: TokenIndex, // one ahead of current char
     last: Option<char>,
+    newline: bool,
     
     // internal state used by next_token(). 
     // putting these here instead to avoid unnecessary allocations
@@ -167,6 +140,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
             
             current: 0,
             last: None,
+            newline: true,
             active:   [Vec::new(), Vec::new()],
             complete: [Vec::new(), Vec::new()],
         }
@@ -224,7 +198,10 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
     fn skip_whitespace(&mut self) -> Result<(), LexerError> {
         let mut next = self.peek_next()?;
         while next.is_some() && next.unwrap().is_whitespace() {
-            self.advance()?;
+            // consume whitespace and update self.newline
+            if let (_, Some('\n')) = self.advance()? {
+                self.newline = true;
+            }
             next = self.peek_next()?;
         }
         Ok(())
@@ -261,7 +238,10 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
                 break;
             }
             
-            self.advance()?;
+            // consume comment char and update self.newline
+            if let (_, Some('\n')) = self.advance()? {
+                self.newline = true;
+            }
         }
         
         // continue skipping if we are at not at EOF and we advanced
@@ -282,7 +262,6 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
     }
     
     pub fn next_token(&mut self) -> Result<TokenMeta, LexerError> {
-        
         self.skip_whitespace()?;
         
         if self.options.skip_comments {
@@ -290,6 +269,14 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
                 self.skip_whitespace()?;
             }
         }
+        
+        let result = self.scan_token();
+        self.newline = matches!(self.last, Some('\n'));
+        
+        result
+    }
+    
+    fn scan_token(&mut self) -> Result<TokenMeta, LexerError> {
         
         //starting a new token
         let token_start = self.current;
@@ -459,7 +446,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
         if length.is_err() {
             Err(LexerError::new(ErrorKind::MaxTokenLengthExceeded, span))
         } else {
-            Ok(TokenMeta { token, span })
+            Ok(TokenMeta { token, span, newline: self.newline })
         }
     }
     

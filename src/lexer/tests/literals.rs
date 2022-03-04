@@ -158,6 +158,7 @@ fn lexer_test_keyword_at_eof() {
         token => {
             token: Token::EOF,
             span: Span { length: 0, index: 2, .. },
+            ..
         } "eof",
         
     );

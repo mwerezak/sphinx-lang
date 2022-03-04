@@ -104,7 +104,7 @@ impl fmt::Display for ParserError<'_> {
         let message = match self.kind() {
             ParserErrorKind::LexerError => "",
             ParserErrorKind::EndofTokenStream => "unexpected end of token stream",
-            ParserErrorKind::ExpectedStartOfExpr  => "expected start of expression",
+            ParserErrorKind::ExpectedStartOfExpr  => "expected an expression here",
             ParserErrorKind::ExpectedCloseParen   => "missing closing ')'",
             ParserErrorKind::ExpectedCloseSquare  => "missing closing ']'",
             ParserErrorKind::ExpectedCloseBrace   => "missing closing '}'",
