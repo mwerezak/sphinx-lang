@@ -5,17 +5,15 @@ use clap::{App, Arg};
 
 use string_interner::StringInterner;
 
-use rlo_interpreter::source::{ModuleSource, SourceType, SourceText, ParseContext};
+use rlo_interpreter::source::{ModuleSource, SourceType, ParseContext};
 
 use rlo_interpreter::frontend::render_parser_error;
 use rlo_interpreter::debug::symbol::DebugSymbol;
 use rlo_interpreter::debug::symbol::DebugSymbolResolver;
 
 use rlo_interpreter::language;
-use rlo_interpreter::parser::{Parser, ParserError};
-use rlo_interpreter::parser::stmt::{Stmt, StmtVariant};
+use rlo_interpreter::parser::stmt::{StmtVariant};
 use rlo_interpreter::interpreter::runtime::{Runtime, Environment};
-use rlo_interpreter::interpreter::eval::eval_expr;
 
 
 fn main() {
@@ -132,7 +130,7 @@ impl Repl {
                 break;
             }
             
-            let mut parse_ctx = ParseContext::new(&self.runtime.lexer_factory, &mut self.runtime.interner);
+            let mut parse_ctx = ParseContext::new(&self.runtime.lexer_factory, &mut self.runtime.string_table);
             let module = ModuleSource::new("<repl>", SourceType::String(input));
             let source_text = module.source_text().expect("error reading source");
             let parse_result = parse_ctx.parse_ast(source_text);
@@ -156,15 +154,16 @@ impl Repl {
                 },
             };
             
-            let env = Environment { runtime: &self.runtime };
+            let mut env = Environment { runtime: &mut self.runtime };
             for stmt in stmts.iter() {
                 if let StmtVariant::Expression(expr) = stmt.variant() {
-                    let eval_result = eval_expr(&env, &expr, Some(stmt.debug_symbol()));
+                    let eval_result = env.eval(&expr);
                     println!("{:?}", eval_result);
                 } else {
                     println!("{:?}", stmt);
                 }
             }
+            
         }
         
     }

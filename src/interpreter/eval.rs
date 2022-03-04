@@ -10,26 +10,23 @@ use crate::runtime::errors::EvalResult;
 use crate::interpreter::runtime::Environment;
 
 
-pub fn eval_expr(local: &Environment<'_>, expr: &ExprVariant) -> EvalResult<Variant> {
-    EvalContext::new(local).eval(expr)
-}
-
-
 // tracks the local scope and the innermost Expr
-pub struct EvalContext<'r> {
-    local: &'r Environment<'r>,
+pub struct EvalContext<'a, 'r> {
+    // very important to keep 'a and 'r separate
+    // otherwise EvalContext would be forced to live as long as 'r!
+    env: &'a mut Environment<'r>,
 }
 
-impl<'r> EvalContext<'r> {
-    pub fn new(local: &'r Environment) -> Self {
-        EvalContext { local }
+impl<'a, 'r> EvalContext<'a, 'r> {
+    pub fn new(env: &'a mut Environment<'r>) -> Self {
+        EvalContext { env }
     }
     
-    pub fn eval(&self, expr: &ExprVariant) -> EvalResult<Variant> {
+    pub fn eval(&mut self, expr: &ExprVariant) -> EvalResult<Variant> {
         self.eval_inner_expr(expr)
     }
     
-    fn eval_inner_expr(&self, expr: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_inner_expr(&mut self, expr: &ExprVariant) -> EvalResult<Variant> {
         match expr {
             ExprVariant::Primary(primary) => self.eval_primary(primary),
             
@@ -37,12 +34,13 @@ impl<'r> EvalContext<'r> {
             ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op((*op).into(), lhs, rhs),
             
             ExprVariant::Assignment(assignment) => unimplemented!(),
+            
             ExprVariant::Tuple(expr_list) => unimplemented!(),
             ExprVariant::ObjectCtor(ctor) => unimplemented!(),
         }
     }
 
-    fn eval_primary(&self, primary: &Primary) -> EvalResult<Variant> {
+    fn eval_primary(&mut self, primary: &Primary) -> EvalResult<Variant> {
         let mut value = self.eval_atom(primary.atom())?;
         
         for item in primary.iter_path() {
@@ -52,7 +50,7 @@ impl<'r> EvalContext<'r> {
         Ok(value)
     }
 
-    fn eval_atom(&self, atom: &Atom) -> EvalResult<Variant> {
+    fn eval_atom(&mut self, atom: &Atom) -> EvalResult<Variant> {
         let value = match atom {
             Atom::Nil => Variant::Nil,
             Atom::EmptyTuple => Variant::EmptyTuple,
@@ -74,7 +72,7 @@ impl<'r> EvalContext<'r> {
         Ok(value)
     }
     
-    fn eval_short_circuit_logic(&self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_short_circuit_logic(&mut self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
         let lhs_value = self.eval_inner_expr(lhs)?;
         
         let cond = match op {
@@ -89,7 +87,7 @@ impl<'r> EvalContext<'r> {
         }
     }
     
-    fn eval_unary_op(&self, op: UnaryOp, expr: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_unary_op(&mut self, op: UnaryOp, expr: &ExprVariant) -> EvalResult<Variant> {
         let operand = self.eval_inner_expr(expr)?;
         
         match op {
@@ -100,7 +98,7 @@ impl<'r> EvalContext<'r> {
         }
     }
     
-    fn eval_binary_op(&self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_binary_op(&mut self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
         if let BinaryOp::Logical(logic) = op {
             return self.eval_short_circuit_logic(logic, lhs, rhs);
         }
