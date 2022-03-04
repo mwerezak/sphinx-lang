@@ -3,11 +3,10 @@
 
 use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};
-use crate::runtime::Variant;
+use crate::runtime::{Environment, Variant};
 use crate::runtime::ops::*;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::errors::EvalResult;
-use crate::interpreter::runtime::Environment;
 
 
 // tracks the local scope and the innermost Expr

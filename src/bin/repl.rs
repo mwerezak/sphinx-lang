@@ -13,7 +13,8 @@ use rlo_interpreter::debug::symbol::DebugSymbolResolver;
 
 use rlo_interpreter::language;
 use rlo_interpreter::parser::stmt::{StmtVariant};
-use rlo_interpreter::interpreter::runtime::{Runtime, Environment};
+use rlo_interpreter::runtime::Runtime;
+use rlo_interpreter::interpreter::Interpreter;
 
 
 fn main() {
@@ -154,10 +155,11 @@ impl Repl {
                 },
             };
             
-            let mut env = Environment { runtime: &mut self.runtime };
+            let mut env = self.runtime.placeholder_env();
+            let mut interpreter = Interpreter::new(&mut env);
             for stmt in stmts.iter() {
                 if let StmtVariant::Expression(expr) = stmt.variant() {
-                    let eval_result = env.eval(&expr);
+                    let eval_result = interpreter.eval(&expr);
                     println!("{:?}", eval_result);
                 } else {
                     println!("{:?}", stmt);
