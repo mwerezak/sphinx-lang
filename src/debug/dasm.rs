@@ -24,12 +24,12 @@ impl<'c> Disassembler<'c> {
         let mut offset = 0;
         while offset < self.chunk.bytes().len() {
             let (_, bytes) = self.chunk.bytes().split_at(offset);
-            offset = self.decode_instr(fmt, offset, bytes)?;
+            offset = self.decode_instr(fmt, &offset, bytes)?;
         }
         Ok(())
     }
 
-    fn decode_instr(&self, fmt: &mut Formatter<'_>, offset: usize, instr: &[u8]) -> Result<usize, fmt::Error> {
+    fn decode_instr(&self, fmt: &mut Formatter<'_>, offset: &usize, instr: &[u8]) -> Result<usize, fmt::Error> {
         write!(fmt, "{:04} ", offset)?;
         
         let offset = match OpCode::from_byte(instr[0]) {

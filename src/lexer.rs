@@ -90,7 +90,7 @@ fn split_array_pair_mut<T>(pair: &mut [T; 2]) -> (&mut T, &mut T) {
     (first, second)
 }
 
-fn token_length(start_idx: TokenIndex, end_idx: TokenIndex) -> Result<TokenLength, std::num::TryFromIntError> {
+fn token_length(start_idx: &TokenIndex, end_idx: &TokenIndex) -> Result<TokenLength, std::num::TryFromIntError> {
     if end_idx > start_idx { 
         TokenLength::try_from(end_idx - start_idx)
     } else { 
@@ -436,7 +436,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
     }
     
     fn token_data(&self, token: Token, token_start: TokenIndex) -> Result<TokenMeta, LexerError> {
-        let length = token_length(token_start, self.current);
+        let length = token_length(&token_start, &self.current);
         
         let span = Span {
             index: token_start,
@@ -453,7 +453,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
     fn error(&self, kind: ErrorKind, token_start: TokenIndex) -> LexerError {
         let span = Span {
             index: token_start,
-            length: token_length(token_start, self.current).unwrap_or(0),
+            length: token_length(&token_start, &self.current).unwrap_or(0),
         };
         LexerError::new(kind, span)
     }
@@ -461,7 +461,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
     fn inner_error(&self, err: Box<dyn std::error::Error>, kind: ErrorKind, token_start: TokenIndex) -> LexerError {
         let span = Span {
             index: token_start,
-            length: token_length(token_start, self.current).unwrap_or(0),
+            length: token_length(&token_start, &self.current).unwrap_or(0),
         };
         LexerError::new(kind, span).caused_by(err)
     }
