@@ -44,7 +44,7 @@ fn fmt_source_lines(fmt: &mut Formatter<'_>, symbol: &ResolvedSymbol) -> fmt::Re
         marker.push_str("     ");
         
         marker.extend(iter::repeat(' ').take(start_col));
-        marker.extend(iter::repeat('^').take(end_col - start_col));
+        marker.extend(iter::repeat('^').take(usize::max(end_col - start_col, 1))); // for single index symbols
         
         writeln!(fmt, "{}|    {}", margin, source_line)?;
         writeln!(fmt, "{}", marker)?;
@@ -69,7 +69,7 @@ fn fmt_source_line_single(fmt: &mut Formatter<'_>, symbol: &ResolvedSymbol) -> f
     
     let mut marker = String::new();
     marker.extend(iter::repeat(' ').take(margin.len() + start_col));
-    marker.extend(iter::repeat('^').take(end_col - start_col));
+    marker.extend(iter::repeat('^').take(usize::max(end_col - start_col, 1)));
     
     writeln!(fmt, "{}{}", margin, source_line)?;
     writeln!(fmt, "{}\n", marker)?;

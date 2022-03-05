@@ -159,11 +159,15 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
     // put all the symbols into a priority queue based on first occurrence in the source text
     let mut next_symbols = BinaryHeap::new();
     next_symbols.extend(symbols.map(|sym| IndexSort(sym, SortIndex::Start)).map(cmp::Reverse));
+    let symbol_count = next_symbols.len();
     
     let mut open_symbols = BinaryHeap::new();
     let mut active_symbols = HashMap::<&DebugSymbol, (Vec<Rc<String>>, usize, usize)>::new(); // values are (buffer, line number, start index)
     let mut closing_symbols = HashMap::<&DebugSymbol, (Vec<Rc<String>>, usize, usize, usize)>::new();
     let mut resolved_symbols = ResolvedSymbolTable::new();
+    
+    // handle symbols at EOF by adding a single blank at the end
+    let source = source.chain(iter::once(Ok(' ')));
     
     let mut lineno = 1;  // count lines
     let mut current_line = String::new();
@@ -272,6 +276,8 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
         let resolved = ResolvedSymbol::new(lines, lineno, start_index, end_index);
         resolved_symbols.insert(symbol, Ok(resolved));
     }
+    
+    debug_assert!(symbol_count == resolved_symbols.len());
     
     resolved_symbols
 }

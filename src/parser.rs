@@ -9,7 +9,7 @@ pub mod structs;
 
 pub use errors::{ParserError, ContextFrame};
 
-use log::debug;
+use log;
 
 use crate::source::ModuleSource;
 use crate::runtime::data::StringInterner;
@@ -99,24 +99,25 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             
             Ok(next) if matches!(next.token, Token::EOF) => return None,
             Ok(next) => {
-                debug!("parsing stmt at index {}...", next.span.index);
+                log::info!("parsing stmt at index {}...", next.span.index);
             },
         }
         
         let result = match self.parse_stmt_variant(&mut ctx) {
             Ok(stmt) => {
-                debug!("parser: {:?}", stmt); 
+                log::debug!("parser: {:?}", stmt); 
                 Ok(stmt)
             },
             Err(err) => {
-                debug!("{:#?}", ctx);
+                log::debug!("{:#?}", ctx);
+                
                 let error = ParserError::from_prototype(err, ctx);
-                debug!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
+                log::info!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
                     error.kind(), error.context(), 
                     error.debug_symbol(),
                 );
                 
-                debug!("sync to next stmt...");
+                log::info!("sync to next stmt...");
                 let mut ctx = ErrorContext::new(self.module, ContextTag::Sync);
                 self.synchronize_stmt(&mut ctx);
                 

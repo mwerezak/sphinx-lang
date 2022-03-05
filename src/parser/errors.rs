@@ -68,28 +68,29 @@ impl From<ParserErrorKind> for ErrorPrototype {
 pub struct ParserError<'m> {
     kind: ErrorKind,
     module: &'m ModuleSource,
-    frame: ContextFrame,
+    context: ContextTag,
+    symbol: DebugSymbol,
     cause: Option<Box<dyn Error>>,
 }
 
 impl<'m> ParserError<'m> {
     pub fn from_prototype(proto: ErrorPrototype, context: ErrorContext<'m>) -> Self {
+        let module = context.module;
+        let frame = context.take();
         ParserError {
             kind: proto.kind,
-            module: context.module,
-            frame: context.take(),
             cause: proto.cause,
+            module: module,
+            symbol: frame.as_debug_symbol().unwrap(),
+            context: frame.tag,
+            
         }
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
-    
     pub fn module(&self) -> &ModuleSource { self.module }
-    pub fn context(&self) -> ContextTag { self.frame.context() }
-    pub fn debug_symbol(&self) -> Option<DebugSymbol> { self.frame.as_debug_symbol() }
-    
-    pub fn start_token(&self) -> Option<&Span> { self.frame.start() }
-    pub fn end_token(&self) -> Option<&Span> { self.frame.end() }
+    pub fn context(&self) -> &ContextTag { &self.context }
+    pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
 }
 
 

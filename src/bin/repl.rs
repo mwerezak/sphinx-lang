@@ -2,7 +2,7 @@ use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 
-use log::debug;
+use log;
 
 use clap::{App, Arg};
 
@@ -67,13 +67,12 @@ fn main() {
                 println!("Errors in file \"{}\":\n", module.name());
             
                 let symbols = errors.iter()
-                    .filter_map(|err| err.debug_symbol())
-                    .collect::<Vec<DebugSymbol>>();
+                    .map(|err| err.debug_symbol());
                     
-                let resolved_table = module.resolve_symbols(symbols.iter()).unwrap();
+                let resolved_table = module.resolve_symbols(symbols).unwrap();
                 
                 for error in errors.iter() {
-                    let resolved = resolved_table.get(&error.debug_symbol().unwrap()).unwrap().as_ref();
+                    let resolved = resolved_table.get(&error.debug_symbol()).unwrap().as_ref();
                     
                     match resolved {
                         Ok(resolved) => println!("{}", render_parser_error(&error, resolved)),
@@ -142,13 +141,12 @@ impl Repl {
                 
                 Err(errors) => { 
                     let symbols = errors.iter()
-                        .filter_map(|err| err.debug_symbol())
-                        .collect::<Vec<DebugSymbol>>();
+                        .map(|err| err.debug_symbol());
                         
-                    let resolved_table = module.resolve_symbols(symbols.iter()).unwrap();
+                    let resolved_table = module.resolve_symbols(symbols).unwrap();
                     
                     for error in errors.iter() {
-                        let resolved = resolved_table.get(&error.debug_symbol().unwrap()).unwrap().as_ref();
+                        let resolved = resolved_table.get(&error.debug_symbol()).unwrap().as_ref();
                         println!("{}", render_parser_error(&error, resolved.unwrap()));
                     }
                     
@@ -161,11 +159,11 @@ impl Repl {
                 match stmt.variant() {
                     StmtVariant::Expression(expr) => {
                         let eval_result = interpreter::eval(&mut env, &expr);
-                        debug!("{:?}", eval_result);
+                        log::debug!("{:?}", eval_result);
                     },
                     stmt => {
                         let exec_result = interpreter::exec(&mut env, &stmt);
-                        debug!("{:?}", exec_result);
+                        log::debug!("{:?}", exec_result);
                     },
                 }
             }
