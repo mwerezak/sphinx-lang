@@ -9,7 +9,7 @@ pub mod structs;
 
 pub use errors::{ParserError, ContextFrame};
 
-use log;
+use log::debug;
 
 use crate::source::ModuleSource;
 use crate::runtime::data::StringInterner;
@@ -53,16 +53,12 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         }
     }
     
-    fn next_token(&mut self) -> Option<Result<TokenMeta, LexerError>> {
-        self.tokens.next()
-    }
-    
     fn advance(&mut self) -> InternalResult<TokenMeta> {
         let next = self.next.take()
-            .or_else(|| self.next_token());
+            .or_else(|| self.tokens.next());
         
         if let Some(result) = next {
-            result.map_err(|err| ErrorPrototype::from(ErrorKind::LexerError).caused_by(err))
+            Ok(result?)
         } else {
             Err(ErrorKind::EndofTokenStream.into())
         }
@@ -70,7 +66,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     
     fn peek(&mut self) -> InternalResult<&TokenMeta> {
         if self.next.is_none() {
-            self.next = self.next_token();
+            self.next = self.tokens.next();
             if self.next.is_none() {
                 return Err(ErrorKind::EndofTokenStream.into());
             }
@@ -99,25 +95,24 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             
             Ok(next) if matches!(next.token, Token::EOF) => return None,
             Ok(next) => {
-                log::info!("parsing stmt at index {}...", next.span.index);
+                debug!("parsing stmt at index {}...", next.span.index);
             },
         }
         
         let result = match self.parse_stmt_variant(&mut ctx) {
             Ok(stmt) => {
-                log::debug!("parser: {:?}", stmt); 
+                debug!("parser: {:?}", stmt); 
                 Ok(stmt)
             },
             Err(err) => {
-                log::debug!("{:#?}", ctx);
-                
+                debug!("{:#?}", ctx);
                 let error = ParserError::from_prototype(err, ctx);
-                log::info!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
+                debug!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
                     error.kind(), error.context(), 
                     error.debug_symbol(),
                 );
                 
-                log::info!("sync to next stmt...");
+                debug!("sync to next stmt...");
                 let mut ctx = ErrorContext::new(self.module, ContextTag::Sync);
                 self.synchronize_stmt(&mut ctx);
                 

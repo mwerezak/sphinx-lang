@@ -2,7 +2,7 @@ use std::fmt;
 use std::error::Error;
 use crate::utils;
 use crate::source::ModuleSource;
-use crate::lexer::{Span, TokenMeta};
+use crate::lexer::{Span, TokenMeta, LexerError};
 use crate::debug::symbol::{DebugSymbol, TokenIndex};
 
 
@@ -47,20 +47,25 @@ pub enum ContextTag {
 #[derive(Debug)]
 pub struct ErrorPrototype {
     kind: ErrorKind,
-    cause: Option<Box<dyn Error>>,
+    lexer_error: Option<LexerError>,
 }
 
 impl ErrorPrototype {
-    pub fn caused_by(mut self, cause: impl Into<Box<dyn Error>>) -> Self {
-        self.cause = Some(cause.into()); self
-    }
-    
     pub fn kind(&self) -> &ErrorKind { &self.kind }
 }
 
 impl From<ParserErrorKind> for ErrorPrototype {
     fn from(kind: ParserErrorKind) -> Self {
-        ErrorPrototype { kind, cause: None }
+        ErrorPrototype { kind, lexer_error: None }
+    }
+}
+
+impl From<LexerError> for ErrorPrototype {
+    fn from(error: LexerError) -> Self {
+        ErrorPrototype { 
+            kind: ErrorKind::LexerError, 
+            lexer_error: Some(error) 
+        }
     }
 }
 
@@ -76,14 +81,22 @@ pub struct ParserError<'m> {
 impl<'m> ParserError<'m> {
     pub fn from_prototype(proto: ErrorPrototype, context: ErrorContext<'m>) -> Self {
         let module = context.module;
-        let frame = context.take();
+        let context_tag = context.frame().context();
+        
+        let symbol;
+        let cause;
+        if let Some(error) = proto.lexer_error {
+            symbol = (&error.span).into();
+            cause = Some(Box::new(error) as Box<dyn Error>);
+        } else {
+            symbol = context.take_debug_symbol();
+            cause = None;
+        }
+        
         ParserError {
+            module, cause, symbol,
             kind: proto.kind,
-            cause: proto.cause,
-            module: module,
-            symbol: frame.as_debug_symbol().unwrap(),
-            context: frame.tag,
-            
+            context: context_tag,
         }
     }
     
@@ -166,6 +179,21 @@ impl<'m> ErrorContext<'m> {
     pub fn context(&self) -> ContextTag { self.frame().context() }
     pub fn set_start(&mut self, token: &TokenMeta) { self.frame_mut().set_start(token) }
     pub fn set_end(&mut self, token: &TokenMeta) { self.frame_mut().set_end(token) }
+    
+    pub fn take_debug_symbol(mut self) -> DebugSymbol {
+        let mut symbol = self.frame().as_debug_symbol();
+        while symbol.is_none() {
+            if self.stack.len() <= 1 {
+                symbol = self.take().as_debug_symbol();
+                break;
+            }
+            
+            self.pop();
+            symbol = self.frame().as_debug_symbol();
+        }
+        
+        symbol.expect("could not take debug symbol")
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -227,15 +255,11 @@ impl ContextFrame {
             (Some(start), Some(end)) => {
                 let start_index = start.index;
                 let end_index = end.index + TokenIndex::from(end.length);
-                
                 Some((start_index, end_index).into())
             },
             
             (Some(span), None) | (None, Some(span)) => {
-                let start_index = span.index;
-                let end_index = span.index + TokenIndex::from(span.length);
-                
-                Some((start_index, end_index).into())
+                Some((&span).into())
             },
             
             (None, None) => None,

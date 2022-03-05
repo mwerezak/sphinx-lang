@@ -8,6 +8,7 @@ use std::rc::Rc;
 use std::collections::{BinaryHeap, HashMap};
 
 use crate::utils;
+use crate::lexer::Span;
 use crate::source::{ModuleSource, SourceText};
 use crate::runtime::data::Chunk;
 
@@ -25,6 +26,14 @@ pub struct DebugSymbol {
 impl From<(TokenIndex, TokenIndex)> for DebugSymbol {
     fn from(tuple: (TokenIndex, TokenIndex)) -> Self {
         let (start, end) = tuple;
+        DebugSymbol { start, end }
+    }
+}
+
+impl From<&Span> for DebugSymbol {
+    fn from(span: &Span) -> Self {
+        let start = span.index;
+        let end = span.index + TokenIndex::from(span.length);
         DebugSymbol { start, end }
     }
 }
