@@ -1,3 +1,6 @@
+use std::hash::BuildHasherDefault;
+use rustc_hash::FxHasher;
+
 use string_interner;
 use string_interner::backend::Backend;
 
@@ -9,9 +12,11 @@ use crate::runtime::Variant;
 
 // Interned Strings
 
+pub type InternHashBuilder = BuildHasherDefault<FxHasher>;
 pub type InternSymbol = DefaultSymbol;
 pub type InternBackend = DefaultBackend<InternSymbol>;
-pub type StringInterner = string_interner::StringInterner<InternBackend>;
+pub type StringInterner = string_interner::StringInterner<InternBackend, InternHashBuilder>;
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InternStr {

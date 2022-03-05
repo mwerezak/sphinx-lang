@@ -6,16 +6,15 @@ use log;
 
 use clap::{App, Arg};
 
-use string_interner::StringInterner;
 
 use rlo_interpreter::source::{ModuleSource, SourceType, ParseContext};
 use rlo_interpreter::frontend::render_parser_error;
-use rlo_interpreter::debug::symbol::DebugSymbol;
 use rlo_interpreter::debug::symbol::DebugSymbolResolver;
 use rlo_interpreter::language;
 use rlo_interpreter::interpreter;
 use rlo_interpreter::parser::stmt::{StmtVariant};
 use rlo_interpreter::runtime::Runtime;
+use rlo_interpreter::runtime::data::StringInterner;
 
 
 fn main() {
@@ -53,7 +52,7 @@ fn main() {
     
     if let Some(module) = module {
         let lexer_factory = language::create_default_lexer_rules();
-        let mut interner = StringInterner::default();
+        let mut interner = StringInterner::new();
         
         let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
         let source_text = module.source_text().expect("error reading source");
@@ -169,7 +168,7 @@ impl Repl {
                                 
                                 println!("{}", buf);
                             },
-                            Err(error) => { /* TODO */ },
+                            Err(_error) => { /* TODO */ },
                         }
                     },
                     stmt => {

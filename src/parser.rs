@@ -12,8 +12,8 @@ pub use errors::{ParserError, ContextFrame};
 use log::debug;
 
 use crate::source::ModuleSource;
-use crate::runtime::data::StringInterner;
 use crate::lexer::{TokenMeta, Token, LexerError};
+use crate::runtime::data::StringInterner;
 use crate::debug::symbol::DebugSymbol;
 
 use expr::{Expr, ExprVariant};
