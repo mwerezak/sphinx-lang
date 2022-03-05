@@ -20,31 +20,20 @@ impl<'a, 'r> ExecContext<'a, 'r> {
     pub fn exec(&mut self, stmt: &StmtVariant) -> ExecResult<()> {
         match stmt {
             StmtVariant::Echo(expr) => {
+                let value = interpreter::eval(&mut self.env, expr)?;
+                
+                let mut buf = String::new();
+                value.write_repr(&mut buf, self.env.runtime())?;
+                println!("{}", buf);
             },
             
             StmtVariant::Expression(expr) => {
                 // eval an expression just for side effects
-                interpreter::eval(&mut self.env, expr)
-                    .map_err(|err| RuntimeError::from(err))?;
+                interpreter::eval(&mut self.env, expr)?;
             }
         }
         
         Ok(())
     }
-    
-    // Placeholder until a better system exists
-    fn echo_value(&self, value: &Variant) {
-        match value {
-            Variant::Nil => println!("nil"),
-            Variant::EmptyTuple => println!("()"),
-            Variant::BoolTrue => println!("true"),
-            Variant::BoolFalse => println!("false"),
-            Variant::Integer(value) => println!("{}", *value),
-            Variant::Float(value) => println!("{}", *value),
-            Variant::InternStr(sym) => {
-                let s = self.env.runtime().resolve_str(sym);
-                println!("\"{}\"", s);
-            },
-        }
-    }
+
 }

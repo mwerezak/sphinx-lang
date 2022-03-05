@@ -1,6 +1,8 @@
 use std::fmt;
+use crate::utils;
 use crate::language::{IntType, FloatType};
 use crate::runtime::data::InternStr;
+use crate::runtime::Runtime;
 
 
 // Fundamental data value type
@@ -45,8 +47,20 @@ impl Variant {
         }
     }
     
-    // pub fn string_value(&self) -> ... { }
-
+    // write a string representation of this value
+    pub fn write_repr(&self, dst: &mut impl fmt::Write, runtime: &Runtime) -> fmt::Result {
+        match self {
+            Self::Nil => dst.write_str("nil"),
+            Self::EmptyTuple => dst.write_str("()"),
+            Self::BoolTrue => dst.write_str("true"),
+            Self::BoolFalse => dst.write_str("false"),
+            Self::Integer(value) => write!(dst, "{}", *value),
+            Self::Float(value) => write!(dst, "{}", *value),
+            Self::InternStr(sym) => {
+                write!(dst, "\"{}\"", runtime.resolve_str(sym))
+            },
+        }
+    }
 }
 
 
@@ -70,5 +84,3 @@ impl From<FloatType> for Variant {
 impl From<InternStr> for Variant {
     fn from(sym: InternStr) -> Self { Variant::InternStr(sym) }
 }
-
-

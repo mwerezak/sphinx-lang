@@ -160,6 +160,17 @@ impl Repl {
                     StmtVariant::Expression(expr) => {
                         let eval_result = interpreter::eval(&mut env, &expr);
                         log::debug!("{:?}", eval_result);
+                        
+                        match eval_result {
+                            Ok(value) => {
+                                let mut buf = String::new();
+                                value.write_repr(&mut buf, env.runtime())
+                                    .expect("could not write to string buffer");
+                                
+                                println!("{}", buf);
+                            },
+                            Err(error) => { /* TODO */ },
+                        }
                     },
                     stmt => {
                         let exec_result = interpreter::exec(&mut env, &stmt);
