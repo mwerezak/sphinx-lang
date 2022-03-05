@@ -1,16 +1,17 @@
 use std::io;
 use std::io::Write;
 use std::path::PathBuf;
+
+use log::debug;
+
 use clap::{App, Arg};
 
 use string_interner::StringInterner;
 
 use rlo_interpreter::source::{ModuleSource, SourceType, ParseContext};
-
 use rlo_interpreter::frontend::render_parser_error;
 use rlo_interpreter::debug::symbol::DebugSymbol;
 use rlo_interpreter::debug::symbol::DebugSymbolResolver;
-
 use rlo_interpreter::language;
 use rlo_interpreter::interpreter;
 use rlo_interpreter::parser::stmt::{StmtVariant};
@@ -160,11 +161,11 @@ impl Repl {
                 match stmt.variant() {
                     StmtVariant::Expression(expr) => {
                         let eval_result = interpreter::eval(&mut env, &expr);
-                        println!("{:?}", eval_result);
+                        debug!("{:?}", eval_result);
                     },
                     stmt => {
                         let exec_result = interpreter::exec(&mut env, &stmt);
-                        println!("{:?}", exec_result);
+                        debug!("{:?}", exec_result);
                     },
                 }
             }
