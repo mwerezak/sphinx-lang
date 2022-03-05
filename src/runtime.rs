@@ -35,7 +35,7 @@ impl Runtime {
     }
     
     pub fn resolve_str(&self, sym: &InternStr) -> &str {
-        self.string_table.resolve(*sym.symbol()).unwrap()
+        self.string_table.resolve((*sym).into()).unwrap()
     }
 }
 
