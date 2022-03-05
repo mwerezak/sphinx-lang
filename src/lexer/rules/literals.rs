@@ -123,7 +123,7 @@ impl HexIntegerLiteralRule {
     pub fn new() -> Self {
         HexIntegerLiteralRule {
             buf: String::new(),
-            prefix: StrMatcher::case_insensitive("0x"),
+            prefix: StrMatcher::ascii_case_insensitive("0x"),
         }
     }
 }

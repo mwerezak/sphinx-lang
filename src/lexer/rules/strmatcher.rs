@@ -5,10 +5,17 @@ use crate::lexer::rules::MatchResult;
 
 // Helper struct to match an exact string
 
+#[derive(Debug, Clone, Copy)]
+pub enum MatchCase {
+    Sensitive,
+    AsciiInsensitive,
+    // Insensitive,  // too complicated
+}
+
 #[derive(Debug, Clone)]
 pub struct StrMatcher<'a> {
     target: &'a str,
-    ignore_ascii_case: bool,
+    match_case: MatchCase,
     
     chars: Chars<'a>,
     peek: VecDeque<Option<char>>,
@@ -18,10 +25,10 @@ pub struct StrMatcher<'a> {
 }
 
 impl<'a> StrMatcher<'a> {
-    pub fn new(target: &'a str, ignore_ascii_case: bool) -> Self {
+    pub fn new(target: &'a str, match_case: MatchCase) -> Self {
         StrMatcher {
             target,
-            ignore_ascii_case,
+            match_case,
             
             chars: target.chars(),
             peek: VecDeque::new(),
@@ -30,12 +37,12 @@ impl<'a> StrMatcher<'a> {
             count: 0,
         }
     }
-    pub fn case_sensitive(target: &'a str) -> Self { StrMatcher::new(target, false) }
-    pub fn case_insensitive(target: &'a str) -> Self { StrMatcher::new(target, true) }
+    pub fn case_sensitive(target: &'a str) -> Self { StrMatcher::new(target, MatchCase::Sensitive) }
+    pub fn ascii_case_insensitive(target: &'a str) -> Self { StrMatcher::new(target, MatchCase::AsciiInsensitive) }
     
     
     pub fn target(&self) -> &'a str { self.target }
-    pub fn ignore_ascii_case(&self) -> bool { self.ignore_ascii_case }
+    pub fn match_case(&self) -> MatchCase { self.match_case }
     
     pub fn last_match_result(&self) -> MatchResult { self.last_result }
     pub fn count(&self) -> usize { self.count }
@@ -67,6 +74,13 @@ impl<'a> StrMatcher<'a> {
         }
     }
     
+    fn compare_chars(&self, a: &char, b: &char) -> bool {
+        match self.match_case {
+            MatchCase::Sensitive => a == b,
+            MatchCase::AsciiInsensitive => a.eq_ignore_ascii_case(b),
+        }
+    }
+    
     pub fn peek_match(&mut self, next: char) -> MatchResult {
         // if the match already failed, don't bother looking at any further input
         if !self.last_result.is_match() {
@@ -74,7 +88,7 @@ impl<'a> StrMatcher<'a> {
         }
         
         match self.peek_nth(0) {
-            Some(this_ch) if this_ch == next => {
+            Some(this_ch) if self.compare_chars(&this_ch, &next) => {
                 if self.peek_nth(1).is_none() {
                     MatchResult::CompleteMatch
                 } else {
