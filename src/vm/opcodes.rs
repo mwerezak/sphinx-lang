@@ -1,4 +1,4 @@
-use crate::runtime::variant::Variant;
+use crate::runtime::Variant;
 
 // Opcodes
 

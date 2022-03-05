@@ -1,9 +1,10 @@
 use std::fmt;
 use std::fmt::Formatter;
 use crate::runtime::Variant;
-use crate::runtime::data::{Chunk, ConstID};
-use crate::runtime::opcodes::OpCode;
-use crate::debug::symbol::ChunkDebugSymbols;
+use crate::vm::chunk::{Chunk, ConstID};
+use crate::vm::opcodes::OpCode;
+use crate::source::ModuleSource;
+use crate::debug::symbol::DebugSymbol;
 
 
 pub struct Disassembler<'c> {
@@ -89,6 +90,40 @@ impl fmt::Display for Variant {
             Self::Integer(value) => write!(fmt, "{}", value),
             Self::Float(value) => write!(fmt, "{:.6}", value),
             Self::InternStr(sym) => write!(fmt, "$({:?})", sym),
+        }
+    }
+}
+
+
+
+// Container for debug symbols generated for bytecode
+// Should contain a DebugSymbol for each opcode in the 
+// associated Chunk, and in the same order.
+#[derive(Clone)]
+pub struct ChunkDebugSymbols {
+    source: ModuleSource,
+    symbols: Vec<(DebugSymbol, u8)>,  // run length encoding
+}
+
+impl ChunkDebugSymbols {
+    pub fn new(source: ModuleSource) -> Self {
+        ChunkDebugSymbols {
+            source, symbols: Vec::new(),
+        }
+    }
+    
+    pub fn symbols(&self) -> impl Iterator<Item=&DebugSymbol> { 
+        self.symbols.iter().flat_map(
+            |(sym, count)| std::iter::repeat(sym).take(usize::from(*count))
+        )
+    }
+    
+    pub fn push(&mut self, symbol: DebugSymbol) {
+        match self.symbols.last_mut() {
+            Some((last, ref mut count)) if *last == symbol && *count < u8::MAX => { 
+                *count += 1 
+            },
+            _ => { self.symbols.push((symbol, 1)) }
         }
     }
 }

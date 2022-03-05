@@ -3,13 +3,11 @@ mod variant;
 pub use variant::Variant;
 
 pub mod data;
-pub mod opcodes;
 pub mod ops;
 pub mod types;
 pub mod errors;
 
 mod tests;
-
 
 use crate::language;
 use crate::lexer::LexerBuilder;
@@ -19,6 +17,7 @@ use crate::runtime::data::{StringInterner, InternStr};
 pub struct Runtime {
     pub string_table: StringInterner,
     pub lexer_factory: LexerBuilder,
+    // env_stack
 }
 
 impl Runtime {
