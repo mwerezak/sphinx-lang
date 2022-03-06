@@ -163,7 +163,7 @@ impl Repl {
                         match eval_result {
                             Ok(value) => {
                                 let mut buf = String::new();
-                                value.write_repr(&mut buf, env.runtime())
+                                value.write_repr(&mut buf, env.runtime().string_table())
                                     .expect("could not write to string buffer");
                                 
                                 println!("{}", buf);

@@ -1,8 +1,10 @@
 use std::fmt;
-use crate::utils;
+use std::mem::Discriminant;
+use std::hash::{Hash, Hasher};
+use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::data::InternStr;
-use crate::runtime::Runtime;
+use crate::runtime::data::{InternStr, StringInterner};
+use crate::runtime::errors::{ExecResult, RuntimeErrorKind};
 
 
 // Fundamental data value type
@@ -14,8 +16,10 @@ pub enum Variant {
     BoolFalse,
     Integer(IntType),
     Float(FloatType),
-    InternStr(InternStr),
-    //GCObject(GCHandle),
+    InternStr(InternStr),  // TODO include reference to string table
+    //String(GCHandle),
+    //TUple(GCHandle),
+    //Object(GCHandle),
 }
 
 impl Variant {
@@ -38,8 +42,7 @@ impl Variant {
     
     pub fn float_value(&self) -> FloatType {
         match self {
-            // if we switch to 64-bit ints, this will become a lossy conversion
-            // this method should always succeed for numeric primitive types
+            // it'r okay if this is a lossy conversion
             Self::Integer(value) => (*value) as FloatType,
             Self::Float(value) => *value,
             
@@ -48,7 +51,7 @@ impl Variant {
     }
     
     // write a string representation of this value
-    pub fn write_repr(&self, dst: &mut impl fmt::Write, runtime: &Runtime) -> fmt::Result {
+    pub fn write_repr(&self, dst: &mut impl fmt::Write, string_table: &StringInterner) -> fmt::Result {
         match self {
             Self::Nil => dst.write_str("nil"),
             Self::EmptyTuple => dst.write_str("()"),
@@ -57,12 +60,12 @@ impl Variant {
             Self::Integer(value) => write!(dst, "{}", *value),
             Self::Float(value) => write!(dst, "{}", *value),
             Self::InternStr(sym) => {
-                write!(dst, "\"{}\"", runtime.resolve_str(sym))
+                let sym = (*sym).into();
+                write!(dst, "\"{}\"", string_table.resolve(sym).unwrap())
             },
         }
     }
 }
-
 
 impl From<bool> for Variant {
     fn from(value: bool) -> Self {
@@ -83,4 +86,84 @@ impl From<FloatType> for Variant {
 
 impl From<InternStr> for Variant {
     fn from(sym: InternStr) -> Self { Variant::InternStr(sym) }
+}
+
+
+
+// Wrapper type for use as keys in VariantMap
+
+#[derive(Debug, Clone, Copy)]
+pub enum VariantKey<'r> {
+    Nil,
+    EmptyTuple, // the empty tuple value
+    BoolTrue,
+    BoolFalse,
+    Integer(IntType),
+    String(u64, StringRepr<'r>)
+    // Object(u64, GCHandle), // use user-defined hash and equality
+}
+
+impl Hash for VariantKey<'_> {
+    fn hash<H>(&self, state: &mut H) where H: Hasher {
+        let discriminant = std::mem::discriminant(self);
+        discriminant.hash(state);
+        
+        match self {
+            Self::Integer(value) => value.hash(state),
+            Self::String(strhash, _) => strhash.hash(state),
+            _ => { }
+        }
+    }
+}
+
+impl Eq for VariantKey<'_> { }
+
+impl<'r> PartialEq for VariantKey<'r> {
+    fn eq(&self, other: &VariantKey<'r>) -> bool {
+        match (self, other) {
+            (Self::Nil, Self::Nil) => true,
+            (Self::EmptyTuple, Self::EmptyTuple) => true,
+            (Self::BoolTrue, Self::BoolTrue) => true,
+            (Self::BoolFalse, Self::BoolFalse) => true,
+            
+            (Self::Integer(self_value), Self::Integer(other_value)) 
+                => self_value == other_value,
+            
+            (Self::String(.., self_string), Self::String(.., other_string)) 
+                => self_string == other_string,
+                
+            _ => false,
+        }
+    }
+}
+
+// Enum over the different string representations
+
+#[derive(Debug, Clone, Copy)]
+pub enum StringRepr<'r> {
+    Interned(InternStr, &'r StringInterner),
+    // StrObject(GCHandle),
+}
+
+impl Eq for StringRepr<'_> { }
+
+impl<'r> PartialEq for StringRepr<'r> {
+    #[inline]
+    fn eq(&self, other: &StringRepr<'r>) -> bool {
+        match (self, other) {
+            (Self::Interned(self_sym, _), Self::Interned(other_sym, _)) => self_sym == other_sym,
+            // (_, _) => self.as_str() == other.as_str(),
+        }
+    }
+}
+
+impl StringRepr<'_> {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Interned(sym, string_table) => {
+                let sym = (*sym).into();
+                string_table.resolve(sym).unwrap()
+            }
+        }
+    }
 }

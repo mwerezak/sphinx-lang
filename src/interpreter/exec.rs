@@ -23,7 +23,9 @@ impl<'a, 'r> ExecContext<'a, 'r> {
                 let value = interpreter::eval(&mut self.env, expr)?;
                 
                 let mut buf = String::new();
-                value.write_repr(&mut buf, self.env.runtime())?;
+                value.write_repr(&mut buf, self.env.runtime().string_table())
+                    .map_err(|err| RuntimeError::new(err))?;
+                
                 println!("{}", buf);
             },
             

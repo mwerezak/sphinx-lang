@@ -28,13 +28,11 @@ impl Runtime {
         }
     }
     
+    pub fn string_table(&self) -> &StringInterner { &self.string_table }
+    
     // TODO return global env, and get local env from global
     pub fn placeholder_env(&mut self) -> Environment<'_> {
         Environment { runtime: self }
-    }
-    
-    pub fn resolve_str(&self, sym: &InternStr) -> &str {
-        self.string_table.resolve((*sym).into()).unwrap()
     }
 }
 

@@ -45,30 +45,51 @@ impl fmt::Display for EvalError {
 
 use std::any::Any;
 
-// Runtime errors are so wide in scope, this is just a smart pointer to an error trait object
-
 pub type ExecResult<T> = Result<T, RuntimeError>;
 
 #[derive(Debug)]
+pub enum RuntimeErrorKind {
+    EvalError,
+    UnhashableType,
+    Other,
+}
+
+impl From<RuntimeErrorKind> for RuntimeError {
+    fn from(kind: RuntimeErrorKind) -> Self {
+        RuntimeError { kind, cause: None }
+    }
+}
+
+#[derive(Debug)]
 pub struct RuntimeError {
-    error: Box<dyn Error>,
-}
-
-impl<E> From<E> for RuntimeError where E: Error + 'static {
-    fn from(error: E) -> Self {
-        RuntimeError { error: Box::new(error) }
-    }
-}
-
-impl std::ops::Deref for RuntimeError {
-    type Target = dyn Error;
-    fn deref(&self) -> &Self::Target {
-        &*self.error
-    }
+    kind: RuntimeErrorKind,
+    cause: Option<Box<dyn Error>>,
 }
 
 impl RuntimeError {
-    pub fn downcast<E>(self) -> Result<Box<E>, Box<(dyn Error + 'static)>> where E: Error + 'static {
-        self.error.downcast::<E>()
+    pub fn new(error: impl Error + 'static) -> Self {
+        RuntimeError::from(RuntimeErrorKind::Other).caused_by(error)
+    }
+    
+    pub fn caused_by(mut self, cause: impl Error + 'static) -> Self {
+        self.cause = Some(Box::new(cause)); self
+    }
+}
+
+impl Error for RuntimeError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.cause.as_ref().map(|o| o.as_ref())
+    }
+}
+
+impl fmt::Display for RuntimeError {
+    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        unimplemented!()
+    }
+}
+
+impl From<EvalError> for RuntimeError {
+    fn from(error: EvalError) -> Self {
+        RuntimeError::from(RuntimeErrorKind::EvalError).caused_by(error)
     }
 }
