@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use std::hash::{Hasher, BuildHasher};
-use crate::runtime::data::FxHashBuilder;
+use crate::runtime::strings::FxHashBuilder;
 
 use std::hash::BuildHasherDefault;
 use std::collections::hash_map::DefaultHasher;

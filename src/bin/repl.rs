@@ -14,7 +14,7 @@ use rlo_interpreter::language;
 use rlo_interpreter::interpreter;
 use rlo_interpreter::parser::stmt::{StmtVariant};
 use rlo_interpreter::runtime::Runtime;
-use rlo_interpreter::runtime::data::StringInterner;
+use rlo_interpreter::runtime::strings::StringInterner;
 
 
 fn main() {

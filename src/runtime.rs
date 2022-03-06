@@ -2,7 +2,7 @@ mod variant;
 
 pub use variant::{Variant, VariantKey, VariantMap};
 
-pub mod data;
+pub mod strings;
 pub mod ops;
 pub mod types;
 pub mod errors;
@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use crate::language;
 use crate::source::ParseContext;
 use crate::lexer::LexerBuilder;
-use crate::runtime::data::{StringInterner, DefaultBuildHasher};
+use crate::runtime::strings::{StringInterner, DefaultBuildHasher};
 
 
 pub struct Runtime {

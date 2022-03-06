@@ -1,4 +1,4 @@
-use crate::runtime::data::Chunk;
+use crate::runtime::strings::Chunk;
 use crate::runtime::opcodes::OpCode;
 
 
