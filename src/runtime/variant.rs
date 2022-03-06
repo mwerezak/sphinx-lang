@@ -3,7 +3,7 @@ use std::mem::Discriminant;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::data::{InternStr, StringInterner};
+use crate::runtime::data::{InternSymbol, StringRepr, StringInterner};
 use crate::runtime::errors::{ExecResult, RuntimeErrorKind};
 
 
@@ -16,9 +16,9 @@ pub enum Variant {
     BoolFalse,
     Integer(IntType),
     Float(FloatType),
-    InternStr(InternStr),  // TODO include reference to string table
-    //String(GCHandle),
-    //TUple(GCHandle),
+    InternStr(InternSymbol),  // TODO include reference to string table
+    //StrObject(GCHandle),
+    //Tuple(GCHandle),
     //Object(GCHandle),
 }
 
@@ -84,8 +84,8 @@ impl From<FloatType> for Variant {
     fn from(value: FloatType) -> Self { Variant::Float(value) }
 }
 
-impl From<InternStr> for Variant {
-    fn from(sym: InternStr) -> Self { Variant::InternStr(sym) }
+impl From<InternSymbol> for Variant {
+    fn from(sym: InternSymbol) -> Self { Variant::InternStr(sym) }
 }
 
 
@@ -137,33 +137,3 @@ impl<'r> PartialEq for VariantKey<'r> {
     }
 }
 
-// Enum over the different string representations
-
-#[derive(Debug, Clone, Copy)]
-pub enum StringRepr<'r> {
-    Interned(InternStr, &'r StringInterner),
-    // StrObject(GCHandle),
-}
-
-impl Eq for StringRepr<'_> { }
-
-impl<'r> PartialEq for StringRepr<'r> {
-    #[inline]
-    fn eq(&self, other: &StringRepr<'r>) -> bool {
-        match (self, other) {
-            (Self::Interned(self_sym, _), Self::Interned(other_sym, _)) => self_sym == other_sym,
-            // (_, _) => self.as_str() == other.as_str(),
-        }
-    }
-}
-
-impl StringRepr<'_> {
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Interned(sym, string_table) => {
-                let sym = (*sym).into();
-                string_table.resolve(sym).unwrap()
-            }
-        }
-    }
-}

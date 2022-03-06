@@ -24,11 +24,11 @@ pub type StringInterner = string_interner::StringInterner<InternBackend, Default
 
 // TODO rename to InternSymbol
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InternStr(DefaultSymbol);
+pub struct InternSymbol(DefaultSymbol);
 
-impl InternStr {
+impl InternSymbol {
     pub fn from_str(s: &str, interner: &mut StringInterner) -> Self {
-        InternStr(interner.get_or_intern(s))
+        InternSymbol(interner.get_or_intern(s))
     }
     
     pub fn to_usize(&self) -> usize {
@@ -36,14 +36,45 @@ impl InternStr {
     }
 }
 
-impl From<InternStr> for DefaultSymbol {
-    fn from(intern: InternStr) -> Self {
+impl From<InternSymbol> for DefaultSymbol {
+    fn from(intern: InternSymbol) -> Self {
         intern.0
     }
 }
 
-impl From<DefaultSymbol> for InternStr {
+impl From<DefaultSymbol> for InternSymbol {
     fn from(symbol: DefaultSymbol) -> Self {
         Self(symbol)
+    }
+}
+
+// Enum over the different string representations
+
+#[derive(Debug, Clone, Copy)]
+pub enum StringRepr<'r> {
+    InternStr(InternSymbol, &'r StringInterner),
+    // StrObject(GCHandle),
+}
+
+impl Eq for StringRepr<'_> { }
+
+impl<'r> PartialEq for StringRepr<'r> {
+    #[inline]
+    fn eq(&self, other: &StringRepr<'r>) -> bool {
+        match (self, other) {
+            (Self::InternStr(self_sym, _), Self::InternStr(other_sym, _)) => self_sym == other_sym,
+            // (_, _) => self.as_str() == other.as_str(),
+        }
+    }
+}
+
+impl StringRepr<'_> {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::InternStr(sym, string_table) => {
+                let sym = (*sym).into();
+                string_table.resolve(sym).unwrap()
+            }
+        }
     }
 }

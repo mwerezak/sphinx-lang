@@ -85,6 +85,7 @@ pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> bool {
         (Variant::BoolFalse, Variant::BoolFalse) => true,
         
         (Variant::InternStr(lhs_value), Variant::InternStr(rhs_value)) => *lhs_value == *rhs_value,
+        // GCString <-> InternStr comparison handled by metamethod
         
         // numeric equality
         (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => *lhs_value == *rhs_value,

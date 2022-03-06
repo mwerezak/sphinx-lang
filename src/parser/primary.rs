@@ -1,6 +1,6 @@
 use std::fmt;
 use crate::language;
-use crate::runtime::data::{InternStr, StringInterner};
+use crate::runtime::data::{InternSymbol, StringInterner};
 use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::structs::ObjectConstructor;
 
@@ -13,13 +13,13 @@ pub enum Atom {
     EmptyTuple,
     Self_,
     Super,
-    Identifier(InternStr),
-    UpvalIdentifier(InternStr),
-    GlobalIdentifier(InternStr),
+    Identifier(InternSymbol),
+    UpvalIdentifier(InternSymbol),
+    GlobalIdentifier(InternSymbol),
     BooleanLiteral(bool),
     IntegerLiteral(language::IntType),
     FloatLiteral(language::FloatType),
-    StringLiteral(InternStr),
+    StringLiteral(InternSymbol),
     Group(Box<ExprVariant>), // type annotation
 }
 
@@ -37,19 +37,19 @@ impl Atom {
     }
     
     pub fn identifier(name: &str, interner: &mut StringInterner) -> Self {
-        Self::Identifier(InternStr::from_str(name, interner))
+        Self::Identifier(InternSymbol::from_str(name, interner))
     }
     
     pub fn global_identifier(name: &str, interner: &mut StringInterner) -> Self {
-        Self::GlobalIdentifier(InternStr::from_str(name, interner))
+        Self::GlobalIdentifier(InternSymbol::from_str(name, interner))
     }
     
     pub fn upval_identifier(name: &str, interner: &mut StringInterner) -> Self {
-        Self::UpvalIdentifier(InternStr::from_str(name, interner))
+        Self::UpvalIdentifier(InternSymbol::from_str(name, interner))
     }
     
     pub fn string_literal(value: &str, interner: &mut StringInterner) -> Self {
-        Self::StringLiteral(InternStr::from_str(value, interner))
+        Self::StringLiteral(InternSymbol::from_str(value, interner))
     }
     
     pub fn group(expr: ExprVariant) -> Self {
@@ -61,7 +61,7 @@ impl Atom {
 // These are the highest precedence operations in the language
 #[derive(Debug, Clone)]
 pub enum AccessItem {
-    Access(InternStr),
+    Access(InternSymbol),
     Index(Box<Expr>),
     Invoke(),       // TODO
     Construct(ObjectConstructor),
@@ -103,7 +103,7 @@ impl Primary {
     }
     
     pub fn push_access_member(&mut self, name: &str, interner: &mut StringInterner) {
-        self.path.push(AccessItem::Access(InternStr::from_str(name, interner)))
+        self.path.push(AccessItem::Access(InternSymbol::from_str(name, interner)))
     }
     
     pub fn push_access_index(&mut self, expr: Expr) {
