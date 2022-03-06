@@ -4,8 +4,8 @@
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison};
-use crate::runtime::errors::{EvalResult, EvalError, EvalErrorKind};
+use crate::runtime::types::operator::UnaryOp;
+use crate::runtime::errors::{EvalResult, EvalErrorKind};
 
 
 #[inline(always)]

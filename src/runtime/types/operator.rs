@@ -1,8 +1,5 @@
 // High level operator defs used by the type system
 
-use crate::parser::operator::{UnaryOp as ParserUnary, BinaryOp as ParserBinary};
-
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operator {
     Unary(UnaryOp),

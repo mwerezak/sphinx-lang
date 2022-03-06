@@ -1,7 +1,6 @@
 use std::fmt;
 use std::io;
 use std::io::BufRead;
-use std::path::Path;
 use std::collections::VecDeque;
 
 // useful for writing string literals, to ensure that a gigantic string doesnt swamp the output

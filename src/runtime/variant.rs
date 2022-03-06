@@ -1,5 +1,4 @@
 use std::fmt;
-use std::mem::Discriminant;
 use std::hash::{Hash, Hasher, BuildHasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};

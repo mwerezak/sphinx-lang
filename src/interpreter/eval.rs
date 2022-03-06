@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 
-use crate::parser::expr::{Expr, ExprVariant};
+use crate::parser::expr::ExprVariant;
 use crate::parser::primary::{Primary, Atom};
 use crate::runtime::{Environment, Variant};
 use crate::runtime::ops::*;

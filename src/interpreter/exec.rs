@@ -1,7 +1,6 @@
 
-use std::io::{self, Write};
 use crate::parser::stmt::StmtVariant;
-use crate::runtime::{Environment, Variant};
+use crate::runtime::Environment;
 use crate::runtime::errors::{ExecResult, RuntimeError};
 use crate::interpreter;
 

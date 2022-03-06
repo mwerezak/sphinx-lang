@@ -1,6 +1,5 @@
 use std::fmt;
 use std::error::Error;
-use crate::utils;
 
 pub type EvalResult<T> = Result<T, EvalError>;
 
@@ -42,8 +41,6 @@ impl fmt::Display for EvalError {
     }
 }
 
-
-use std::any::Any;
 
 pub type ExecResult<T> = Result<T, RuntimeError>;
 

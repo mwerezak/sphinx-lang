@@ -1,17 +1,11 @@
-use std::hash::{BuildHasherDefault, BuildHasher, Hasher, Hash};
-use std::collections::HashMap;
-
 use ahash::{self, AHasher};
 // use rustc_hash::FxHasher;
 
 use string_interner;
 use string_interner::symbol::Symbol;
-use string_interner::backend::Backend;
 
 use string_interner::DefaultSymbol;
 use string_interner::DefaultBackend;
-
-use crate::runtime::Variant;
 
 
 pub type DefaultHasher = AHasher;

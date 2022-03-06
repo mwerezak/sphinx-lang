@@ -1,5 +1,3 @@
-use crate::runtime::Variant;
-
 // Opcodes
 
 // Rust enums are not like C enums! They're more like unions.

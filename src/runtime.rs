@@ -11,7 +11,7 @@ mod tests;
 
 use crate::language;
 use crate::lexer::LexerBuilder;
-use crate::runtime::data::{StringInterner, InternSymbol};
+use crate::runtime::data::StringInterner;
 
 
 pub struct Runtime {

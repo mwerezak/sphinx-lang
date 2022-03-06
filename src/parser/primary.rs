@@ -1,4 +1,3 @@
-use std::fmt;
 use crate::language;
 use crate::runtime::data::{InternSymbol, StringInterner};
 use crate::parser::expr::{Expr, ExprVariant};

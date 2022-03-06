@@ -14,7 +14,6 @@ use log::debug;
 use crate::source::ModuleSource;
 use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::runtime::data::StringInterner;
-use crate::debug::symbol::DebugSymbol;
 
 use expr::{Expr, ExprVariant};
 use stmt::{Stmt, StmtVariant};

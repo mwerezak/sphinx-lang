@@ -1,5 +1,5 @@
 use crate::debug::symbol::DebugSymbol;
-use crate::parser::expr::{ExprVariant, Expr};
+use crate::parser::expr::ExprVariant;
 
 
 #[derive(Debug, Clone)]
