@@ -130,7 +130,7 @@ impl Repl {
                 break;
             }
             
-            let mut parse_ctx = ParseContext::new(&self.runtime.lexer_factory, &mut self.runtime.string_table);
+            let mut parse_ctx = self.runtime.parse_context();
             let module = ModuleSource::new("<repl>", SourceType::String(input));
             let source_text = module.source_text().expect("error reading source");
             let parse_result = parse_ctx.parse_ast(source_text);

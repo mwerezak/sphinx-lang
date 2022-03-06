@@ -1,6 +1,6 @@
 mod variant;
 
-pub use variant::Variant;
+pub use variant::{Variant, VariantKey, VariantMap};
 
 pub mod data;
 pub mod ops;
@@ -9,14 +9,17 @@ pub mod errors;
 
 mod tests;
 
+use std::collections::HashMap;
+
 use crate::language;
+use crate::source::ParseContext;
 use crate::lexer::LexerBuilder;
-use crate::runtime::data::StringInterner;
+use crate::runtime::data::{StringInterner, DefaultBuildHasher};
 
 
 pub struct Runtime {
-    pub string_table: StringInterner,
-    pub lexer_factory: LexerBuilder,
+    string_table: StringInterner,
+    lexer_factory: LexerBuilder,
     // env_stack
 }
 
@@ -30,14 +33,20 @@ impl Runtime {
     
     pub fn string_table(&self) -> &StringInterner { &self.string_table }
     
+    pub fn parse_context(&mut self) -> ParseContext {
+        ParseContext::new(&self.lexer_factory, &mut self.string_table)
+    }
+    
     // TODO return global env, and get local env from global
     pub fn placeholder_env(&mut self) -> Environment<'_> {
-        Environment { runtime: self }
+        Environment { runtime: self, values: VariantMap::with_hasher(DefaultBuildHasher::default()) }
     }
 }
 
+
 pub struct Environment<'e> {
     runtime: &'e mut Runtime,
+    values: VariantMap<'e>,
 }
 
 impl<'e> Environment<'e> {
