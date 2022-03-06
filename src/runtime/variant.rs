@@ -1,10 +1,11 @@
 use std::fmt;
 use std::mem::Discriminant;
-use std::hash::{Hash, Hasher};
+use std::hash::{Hash, Hasher, BuildHasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::data::{InternSymbol, StringRepr, StringInterner};
-use crate::runtime::errors::{ExecResult, RuntimeErrorKind};
+use crate::runtime::Runtime;
+use crate::runtime::data::{InternSymbol, StringRepr};
+use crate::runtime::errors::{ExecResult, RuntimeErrorKind as ErrorKind};
 
 
 // Fundamental data value type
@@ -23,6 +24,7 @@ pub enum Variant {
 }
 
 impl Variant {
+    
     // Only "nil" and "false" have a truth value of false.
     pub fn truth_value(&self) -> bool {
         !matches!(self, Self::Nil | Self::BoolFalse)
@@ -51,7 +53,7 @@ impl Variant {
     }
     
     // write a string representation of this value
-    pub fn write_repr(&self, dst: &mut impl fmt::Write, string_table: &StringInterner) -> fmt::Result {
+    pub fn write_repr(&self, dst: &mut impl fmt::Write, runtime: &Runtime) -> fmt::Result {
         match self {
             Self::Nil => dst.write_str("nil"),
             Self::EmptyTuple => dst.write_str("()"),
@@ -61,9 +63,14 @@ impl Variant {
             Self::Float(value) => write!(dst, "{}", *value),
             Self::InternStr(sym) => {
                 let sym = (*sym).into();
-                write!(dst, "\"{}\"", string_table.resolve(sym).unwrap())
+                let string = runtime.string_table().resolve(sym).unwrap();
+                write!(dst, "\"{}\"", string)
             },
         }
+    }
+    
+    pub fn into_key<'r>(self, runtime: &'r Runtime, hasher_factory: &impl BuildHasher) -> ExecResult<VariantKey<'r>> {
+        VariantKey::new(self, runtime, hasher_factory)
     }
 }
 
@@ -100,6 +107,7 @@ pub enum VariantKey<'r> {
     BoolFalse,
     Integer(IntType),
     String(u64, StringRepr<'r>)
+    // Tuple
     // Object(u64, GCHandle), // use user-defined hash and equality
 }
 
@@ -137,3 +145,30 @@ impl<'r> PartialEq for VariantKey<'r> {
     }
 }
 
+impl<'r> VariantKey<'r> {
+    pub fn new(value: Variant, runtime: &'r Runtime, hasher_factory: &impl BuildHasher) -> ExecResult<Self> {
+        let key = match value {
+            Variant::Nil => Self::Nil,
+            Variant::EmptyTuple => Self::EmptyTuple,
+            Variant::BoolTrue => Self::BoolTrue,
+            Variant::BoolFalse => Self::BoolFalse,
+            
+            Variant::Integer(value) => Self::Integer(value),
+            
+            Variant::InternStr(sym) => {
+                let string = StringRepr::InternStr(sym, runtime.string_table());
+                
+                let mut hasher = hasher_factory.build_hasher();
+                string.as_str().hash(&mut hasher);
+                let hash = hasher.finish();
+                
+                Self::String(hash, string)
+            },
+            
+            Variant::Float(..) => return Err(ErrorKind::UnhashableType.into()),  // for now
+            // Object - check if __hash is available
+        };
+        Ok(key)
+    }
+    
+}
