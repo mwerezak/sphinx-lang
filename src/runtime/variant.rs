@@ -166,5 +166,17 @@ impl<'r> VariantKey<'r> {
         };
         Ok(key)
     }
-    
+}
+
+impl From<VariantKey<'_>> for Variant {
+    fn from(key: VariantKey) -> Self {
+        match key {
+            VariantKey::Nil => Self::Nil,
+            VariantKey::EmptyTuple => Self::EmptyTuple,
+            VariantKey::BoolTrue => Self::BoolTrue,
+            VariantKey::BoolFalse => Self::BoolFalse,
+            VariantKey::Integer(value) => Self::Integer(value),
+            VariantKey::String(value) => Self::String(value.into()),
+        }
+    }
 }

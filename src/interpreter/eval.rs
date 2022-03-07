@@ -3,7 +3,7 @@
 
 use crate::parser::expr::ExprVariant;
 use crate::parser::primary::{Primary, Atom};
-use crate::runtime::{Environment, Variant};
+use crate::runtime::{Runtime, Variant};
 use crate::runtime::ops::*;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::errors::EvalResult;
@@ -13,12 +13,12 @@ use crate::runtime::errors::EvalResult;
 pub struct EvalContext<'a, 'r> {
     // very important to keep 'a and 'r separate
     // otherwise EvalContext would be forced to live as long as 'r!
-    env: &'a mut Environment<'r>,
+    runtime: &'a mut Runtime<'r>,
 }
 
-impl<'a, 'r> From<&'a mut Environment<'r>> for EvalContext<'a, 'r> {
-    fn from(env: &'a mut Environment<'r>) -> Self {
-        EvalContext { env }
+impl<'a, 'r> From<&'a mut Runtime<'r>> for EvalContext<'a, 'r> {
+    fn from(runtime: &'a mut Runtime<'r>) -> Self {
+        EvalContext { runtime }
     }
 }
 
@@ -152,6 +152,5 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         // TODO defer to lhs's type metamethods, or rhs's type reflected metamethod
         unimplemented!()
     }
-    
 }
 

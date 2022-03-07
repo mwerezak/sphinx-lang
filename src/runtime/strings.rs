@@ -98,6 +98,12 @@ impl Hash for StringKey<'_> {
 }
 
 impl<'s> StringKey<'s> {
+    pub fn new(value: StringValue, str_table: &'s StringInterner, hasher: &impl BuildHasher) -> Self {
+        match value {
+            StringValue::Intern(sym) => Self::from_intern(sym, str_table, hasher),
+        }
+    }
+    
     pub fn from_intern(sym: InternSymbol, str_table: &'s StringInterner, hasher: &impl BuildHasher) -> Self {
         let string = str_table.resolve(sym.into()).unwrap();
         
@@ -123,5 +129,13 @@ impl<'s> StringKey<'s> {
 impl fmt::Display for StringKey<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.write_str(self.as_str())
+    }
+}
+
+impl From<StringKey<'_>> for StringValue {
+    fn from(strkey: StringKey<'_>) -> Self {
+        match strkey {
+            StringKey::Intern { sym, .. } => Self::Intern(sym),
+        }
     }
 }

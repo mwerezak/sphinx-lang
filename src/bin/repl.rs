@@ -13,7 +13,7 @@ use rlo_interpreter::debug::symbol::DebugSymbolResolver;
 use rlo_interpreter::language;
 use rlo_interpreter::interpreter;
 use rlo_interpreter::parser::stmt::{StmtVariant};
-use rlo_interpreter::runtime::Runtime;
+use rlo_interpreter::runtime::*;
 use rlo_interpreter::runtime::strings::StringInterner;
 
 
@@ -92,12 +92,12 @@ fn main() {
 }
 
 
-struct Repl {
+struct Repl<'r> {
     prompt: &'static str,
-    runtime: Runtime,
+    runtime: Runtime<'r>,
 }
 
-impl Repl {
+impl<'r> Repl<'r> {
     pub fn new(prompt: &'static str) -> Self {
         Repl { 
             prompt,
@@ -153,30 +153,30 @@ impl Repl {
                 },
             };
             
-            let mut env = self.runtime.placeholder_env();
-            for stmt in stmts.iter() {
-                match stmt.variant() {
-                    StmtVariant::Expression(expr) => {
-                        let eval_result = interpreter::eval(&mut env, &expr);
-                        log::debug!("{:?}", eval_result);
+            // let mut env = self.runtime.placeholder_env();
+            // for stmt in stmts.iter() {
+            //     match stmt.variant() {
+            //         StmtVariant::Expression(expr) => {
+            //             let eval_result = interpreter::eval(&mut env, &expr);
+            //             log::debug!("{:?}", eval_result);
                         
-                        match eval_result {
-                            Ok(value) => {
-                                let mut buf = String::new();
-                                value.write_repr(&mut buf, env.runtime())
-                                    .expect("could not write to string buffer");
+            //             match eval_result {
+            //                 Ok(value) => {
+            //                     let mut buf = String::new();
+            //                     value.write_repr(&mut buf, env.runtime())
+            //                         .expect("could not write to string buffer");
                                 
-                                println!("{}", buf);
-                            },
-                            Err(_error) => { /* TODO */ },
-                        }
-                    },
-                    stmt => {
-                        let exec_result = interpreter::exec(&mut env, &stmt);
-                        log::debug!("{:?}", exec_result);
-                    },
-                }
-            }
+            //                     println!("{}", buf);
+            //                 },
+            //                 Err(_error) => { /* TODO */ },
+            //             }
+            //         },
+            //         stmt => {
+            //             let exec_result = interpreter::exec(&mut env, &stmt);
+            //             log::debug!("{:?}", exec_result);
+            //         },
+            //     }
+            // }
             
         }
         
