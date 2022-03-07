@@ -125,7 +125,8 @@ class-def ::= (* TODO *) ;
 
 (***** Non left-recursive version of `expression` for implementation *****)
 
-tuple-constructor ::= expression ( "," expression )+ | "(" expression "," ")" | "(" ")" ;
+(* Single-element tuple literals are not allowed. Use a built-in constructor function to create single element tuples *)
+tuple-constructor ::= expression ( "," expression )+ | "(" ")" ;
 
 primary-expression ::= immediate-expression | primary | tuple-constructor | "(" expression ")" ;
 
