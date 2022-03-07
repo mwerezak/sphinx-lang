@@ -1,6 +1,6 @@
 mod variant;
 
-pub use variant::{Variant, VariantKey, VariantMap};
+pub use variant::{Variant, VariantKey};
 
 pub mod strings;
 pub mod ops;
@@ -17,13 +17,24 @@ use ahash::{self, AHasher};
 use crate::language;
 use crate::source::ParseContext;
 use crate::lexer::LexerBuilder;
-use crate::runtime::strings::StringInterner;
+
+use strings::{StringInterner, StringKey};
 
 
 // Default Hasher
 
 pub type DefaultHasher = AHasher;
 pub type DefaultBuildHasher = ahash::RandomState;
+pub type Dictionary<'r> = HashMap<VariantKey<'r>, Variant, DefaultBuildHasher>;
+pub type Namespace<'r> = HashMap<StringKey<'r>, Variant, DefaultBuildHasher>;
+
+pub fn new_dictionary<'r>() -> Dictionary<'r> {
+    Dictionary::with_hasher(DefaultBuildHasher::default())
+}
+
+pub fn new_namespace<'r>() -> Namespace<'r> {
+    Namespace::with_hasher(DefaultBuildHasher::default())
+}
 
 
 pub struct Runtime {
@@ -48,14 +59,14 @@ impl Runtime {
     
     // TODO return global env, and get local env from global
     pub fn placeholder_env(&mut self) -> Environment<'_> {
-        Environment { runtime: self, values: VariantMap::with_hasher(DefaultBuildHasher::default()) }
+        Environment { runtime: self, values: new_namespace() }
     }
 }
 
 
 pub struct Environment<'e> {
     runtime: &'e mut Runtime,
-    values: VariantMap<'e>,
+    values: Namespace<'e>,
 }
 
 impl<'e> Environment<'e> {

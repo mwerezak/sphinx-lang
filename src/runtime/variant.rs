@@ -1,14 +1,11 @@
 use std::fmt;
 use std::hash::{Hash, Hasher, BuildHasher};
 use std::cmp::{PartialEq, Eq};
-use std::collections::HashMap;
 use crate::language::{IntType, FloatType};
-use crate::runtime::{Runtime, DefaultBuildHasher};
+use crate::runtime::Runtime;
 use crate::runtime::strings::{StringValue, StringKey};
 use crate::runtime::errors::{ExecResult, RuntimeErrorKind as ErrorKind};
 
-
-pub type VariantMap<'r> = HashMap<VariantKey<'r>, Variant, DefaultBuildHasher>;
 
 // Fundamental data value type
 #[derive(Debug, Clone, Copy)]
