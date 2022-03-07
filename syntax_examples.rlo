@@ -127,65 +127,50 @@ end
 
 # Variable declaration and assignment
 
-# Assignments come in two flavors: expression or statement
+# Declarations are used to create new variables.
+# They are written just like assignments except the 
+# variable name expression (lvalue) is preceeded by 
+# either "let" or "var":
 
-# Assignment expressions are expressions using the assignment operator
-# variables can be freely assigned or reassigned
-im_a_variable = "here is my value"
-i_am_nil = nil  # initializer is required
-im_a_float: Float = 3.14159  # assignment with type annotation
+let im_a_variable = "here is my value"  # immutable variable
+let i_am_nil = nil  # initializer is required
 
-# Assignment statements start with the "var" keyword
-# while more restricted, they allows you to destructure tuples
+var i_can_be_mutated = "initial_value"
+i_can_be_mutated = "another_value"
+
+let im_a_float: Float = 3.14159  # with type annotation
+
+# destructure tuples
 var first, second = "abc", "def"
-var second, first = first, second
+second, first = first, second
 
 # destructuring assignment with type annotations
-var index: Int, val: String = 0, "example" 
+let (index: Int, val: String) = 0, "example" 
 
-# assignment versions of all binary operators are supported
-# however they require the variable to be defined first before use
+# assignment expressions are expressions, and so can be chained
+var b = 0
+var c = 1
+let a = b += c = let d = 1  # chaining assignment (right associative)
+let a = (b += (c = (let d = 1))) # previous expression is equivalent to this
+
+# assignment versions of all binary operators are supported for assignment expressions only
 inc = 0
 inc -= 1  # arithmetic assignment
 
-breakfast = "bagels"
+# variables can be freely redeclared (shadowed)
+let breakfast = "bagels"
 echo breakfast # "bagels".
 
+var breakfast = breakfast
 breakfast = "beignets"
 echo breakfast # "beignets".
 
-# assignment expressions are expressions, and so can be chained
-b = 0
-c = 1
-a = b += c = d = 1  # chaining assignment (right associative)
-
 del a  # drop a variable from the current scope
+del collection[key]  # mostly useful for removing values from objects
 
 # assigment expressions bind weaker than operator expressions
 3 * b += c    # Error, assignment target is not an lvalue
 3 * (b += c)  # Ok
-
-# variables in global scope can be read but trying to assign to them will only hide them with a local variable
-# to assign to a global the "global" keyword has to be used in an assignment statement
-# otherwise variables in enclosing scopes can be accessed to freely
-
-tree = "spruce"
-fruit = "alderberry"
-
-begin
-  echo tree         # spruce
-
-  tree = "oak"      # hides tree from global scope
-  global fruit = "mango"
-
-  echo fruit        # mango
-  echo tree         # oak
-  
-  echo global tree  # spruce
-end
-
-echo tree  # spruce
-
 
 
 # Control Flow
@@ -228,7 +213,7 @@ if cond then a += 1 else b += 1 end  # works
 
 # loops support both break and continue statements
 
-a = 1
+var a = 1
 while a < 10 do
   if exitcond then 
     break
@@ -303,6 +288,11 @@ fun echo_sum(a, b)
   echo a + b
 end
 
+# function parameters can be let or var, just like other variables (let can be omitted)
+fun mutable_params(a, var b)
+  b = a
+end
+
 # unlike python, default arguments are re-evaluated with each invocation
 fun echo_default(thing = "default")
   echo thing
@@ -327,49 +317,43 @@ end
 
 echo identity(add_pair)(1, 2) # echos "3".
 
-fun outerFunction()
-  fun localFunction()
+fun outer_function()
+  fun local_function()
     echo "I'm local!"
   end
 
-  localFunction()
+  local_function()
 end
 
-fun returnFunctions()
+fun return_functions()
   var outside = "outside"
 
-  fun inner()
+  fun print_value()
     echo outside
   end
 
-  # "upval" is similar to the "global" keyword, but accesses the 
-  # nearest enclosing scope instead of global scope
-
-  fun hideOutside()
-    outside = "local"
+  fun hide_outside()
+    let outside = "local"
     echo outside
-    echo upval outside
   end
   
-  fun setOutside(newValue)
-    upval outside = "inside"
+  fun set_outside()
+    outside = "inside"
   end
 
-  return inner, setOutside
+  return print_value, hide_outside, set_outside
 end
 
-var fn, hide, set = returnFunctions()
-
-fn()   # prints "outside"
-hide() # prints "local" then "outside"
-fn()   # prints "outside"
+let print, hide, set = return_functions()
+print()   # prints "outside"
+hide()    # prints "local"
+print()   # prints "outside"
 set()
-fn()   # prints "inside"
-hide() # prints "local" then "inside"
+print()   # prints "inside"
 
 
-var anonFn = fun(x) x + 1 end
-var a = anonFn(3)
+let anon_func = fun(x) x + 1 end
+let a = anon_func(3)
 
 
 # Commenting this out because its kind of experimental
@@ -414,6 +398,10 @@ class Breakfast
     echo "Eggs a-fryin'!"
   end
   
+  fun mutates_self(var self, value)
+    self.field = value
+  end
+  
   # even when created using an anonymous function
   var serve = fun(self, who)
     echo "Enjoy your breakfast, " + who + "."
@@ -428,24 +416,24 @@ end
 
 
 # Store it in variables.
-var someVariable = Breakfast
+let someVariable = Breakfast
 
 # Pass it to functions.
 someFunction(Breakfast)
 
-var breakfast = new Breakfast {}  # object initializer
+let breakfast = Breakfast {}  # object initializer
 echo breakfast # "Breakfast instance".
 
 # Instantiation and initialization
 
 # originally initializers used { name: value }, but I want to reserve colons for future type hinting
-var breakfast = new Breakfast { meat = "sausage", bread = "sourdough" }
+var breakfast = Breakfast { meat = "sausage", bread = "sourdough" }
 breakfast.drink = "coffee"
 
 del breakfast.bread  # remove an object member
 
-var a = 0
-var anonymous = new { some = a = 1, data = 2 }
+let a = 0
+let anonymous = { some = a = 1, data = 2 }
 
 class Breakfast
   fun serve(self, who)
@@ -459,7 +447,7 @@ end
 class Breakfast
   # constructor function
   fun new(meat, bread)
-    return new Breakfast { meat = meat, bread = bread }
+    return Breakfast { meat = meat, bread = bread }
   end
 
 end

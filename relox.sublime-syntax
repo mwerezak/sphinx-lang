@@ -19,7 +19,7 @@ contexts:
     - match: \b(end)\b
       scope: invalid
     - include: early-expressions
-    - include: misc-statement-keywords
+    - include: misc-keywords
     - include: blocks
     - include: while-statements
     - include: for-statements
@@ -37,7 +37,7 @@ contexts:
     - include: reserved-names
     - include: numbers
     - include: operators
-    - include: assignments
+    - include: declaration-keywords
     - include: strings
     - include: tuples
     - include: parens
@@ -50,17 +50,18 @@ contexts:
       scope: punctuation.separator
 
   late-expressions:
-    # - include: variable-defs
     - include: function-defs
     - include: function-calls
     - include: class-defs
     - include: identifiers
 
   # other keywords
-  misc-statement-keywords:
-    - match: \b(var)\b
+  declaration-keywords:
+    - match: \b(let|var)\b
       scope: keyword.declaration.other
-    - match: \b(global|upval|del|echo)\b
+
+  misc-keywords:
+    - match: \b(del|echo)\b
       scope: keyword.other
 
   control-flow-keywords:
@@ -99,27 +100,12 @@ contexts:
       scope: keyword.operator.comparison
     - match: \b(not|and|or)\b
       scope: keyword.operator.logical
-    # - match: '@'
-    #   scope: keyword.operator
-
-  assignments:
-    - match: ((:)\s*({{identifier}}))?\s*(\+\=|-\=|\*\=|/\=|%\=)
-      captures:
-        2: punctuation.separator
-        3: storage.type
-        4: keyword.operator.arithmetic keyword.operator.assignment
-
-    - match: ((:)\s*({{identifier}}))?\s*(\~\=|&\=|\|\=|\^\=|>>\=|<<\=)
-      captures:
-        2: punctuation.separator
-        3: storage.type
-        4: keyword.operator.bitwise keyword.operator.assignment
-
-    - match: ((:)\s*({{identifier}}))?\s*(\=)
-      captures:
-        2: punctuation.separator
-        3: storage.type
-        4: keyword.operator.assignment
+    - match: \+\=|-\=|\*\=|/\=|%\=
+      scope: keyword.operator.arithmetic keyword.operator.assignment
+    - match: \~\=|&\=|\|\=|\^\=|>>\=|<<\=
+      scope: keyword.operator.bitwise keyword.operator.assignment
+    - match: \=
+      scope: keyword.operator.assignment
 
   strings:
     # Strings begin and end with quotes, and use backslashes as an escape
@@ -178,6 +164,7 @@ contexts:
       scope: variable.other
     - match: \.
       scope: punctuation.accessor
+    - include: type_annotation
 
   type_annotation:
     - match: (:)\s*({{identifier}})
@@ -318,15 +305,6 @@ contexts:
       pop: true
     - include: statements
 
-  # variable-defs:
-  #   - match: \b(var)\b
-  #     scope: keyword.declaration.other
-  #     push:
-  #       - meta_content_scope: variable.other
-  #       - match: \=
-  #         scope: keyword.operator.assignment
-  #         pop: true
-
   function-defs:
     - match: \b(fun)\b
       scope: keyword.declaration.function
@@ -349,6 +327,8 @@ contexts:
       scope: punctuation.separator
     - match: \b(self)\b  # method descriptor syntax
       scope: variable.language
+
+    - include: declaration-keywords
     - match: ({{identifier}})(\.\.\.)?
       captures:
         1: variable.parameter
@@ -447,8 +427,6 @@ contexts:
           set: function-param-list
 
   object-initializers:
-    - match: \bnew\b
-      scope: keyword.other
     - match: \{
       scope: punctuation.section.braces.begin
       push: object-initializer-lvalue
