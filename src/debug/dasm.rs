@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 use crate::runtime::Variant;
+use crate::runtime::strings::StringValue;
 use crate::vm::chunk::{Chunk, ConstID};
 use crate::vm::opcodes::OpCode;
 use crate::source::ModuleSource;
@@ -89,7 +90,7 @@ impl fmt::Display for Variant {
             Self::BoolFalse => fmt.write_str("false"),
             Self::Integer(value) => write!(fmt, "{}", value),
             Self::Float(value) => write!(fmt, "{:.6}", value),
-            Self::InternStr(sym) => write!(fmt, "$({:?})", sym),
+            Self::String(StringValue::Intern(sym)) => write!(fmt, "$({:?})", sym),
         }
     }
 }

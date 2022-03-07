@@ -59,7 +59,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
             Atom::BooleanLiteral(false) => Variant::BoolFalse,
             Atom::IntegerLiteral(value) => Variant::Integer(*value),
             Atom::FloatLiteral(value) => Variant::Float(*value),
-            Atom::StringLiteral(value) => Variant::InternStr(*value),
+            Atom::StringLiteral(sym) => Variant::String((*sym).into()),
             
             Atom::Identifier(name) => unimplemented!(),
             Atom::UpvalIdentifier(name) => unimplemented!(),

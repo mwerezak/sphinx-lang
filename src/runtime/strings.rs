@@ -1,3 +1,5 @@
+use std::fmt;
+use std::hash::{Hash, Hasher, BuildHasher};
 use ahash::{self, AHasher};
 // use rustc_hash::FxHasher;
 
@@ -8,6 +10,7 @@ use string_interner::DefaultSymbol;
 use string_interner::DefaultBackend;
 
 
+//  TODO move elsewhere
 pub type DefaultHasher = AHasher;
 pub type DefaultBuildHasher = ahash::RandomState;
 
@@ -42,33 +45,88 @@ impl From<DefaultSymbol> for InternSymbol {
     }
 }
 
-// Enum over the different string representations
+// For use with Variant
 
+// Enum over the different string representations
 #[derive(Debug, Clone, Copy)]
-pub enum StringRepr<'r> {
-    InternStr(InternSymbol, &'r StringInterner),
-    // StrObject(GCHandle),
+pub enum StringValue {
+    Intern(InternSymbol),
+    //Object(GCHandle),
 }
 
-impl Eq for StringRepr<'_> { }
-
-impl<'r> PartialEq for StringRepr<'r> {
+impl From<InternSymbol> for StringValue {
     #[inline]
-    fn eq(&self, other: &StringRepr<'r>) -> bool {
+    fn from(sym: InternSymbol) -> Self { Self::Intern(sym) }
+}
+
+impl StringValue {
+    // only string values of the same representation can be compared directly
+    // otherwise we will need outside help to compare them
+    pub fn try_eq(&self, other: &StringValue) -> Option<bool> {
         match (self, other) {
-            (Self::InternStr(self_sym, _), Self::InternStr(other_sym, _)) => self_sym == other_sym,
+            (Self::Intern(self_sym), Self::Intern(other_sym)) 
+                => Some(self_sym == other_sym),
+            // (Self::Object(..), Self::Object(..))
+            //     => unimplemented!(),
+            // _ => None,
+        }
+    }
+}
+
+// For use with VariantKey
+
+#[derive(Debug, Clone, Copy)]
+pub enum StringKey<'r> {
+    Intern { hash: u64, sym: InternSymbol, str_table: &'r StringInterner },
+    // StrObject { hash: u64, handle: GCHandle },
+}
+
+impl Eq for StringKey<'_> { }
+
+impl<'r> PartialEq for StringKey<'r> {
+    #[inline]
+    fn eq(&self, other: &StringKey<'r>) -> bool {
+        match (self, other) {
+            (Self::Intern { sym: self_sym, .. }, Self::Intern { sym: other_sym, .. }) 
+                => self_sym == other_sym,
             // (_, _) => self.as_str() == other.as_str(),
         }
     }
 }
 
-impl StringRepr<'_> {
+impl Hash for StringKey<'_> {
+    fn hash<H>(&self, state: &mut H) where H: Hasher {
+        match self {
+            Self::Intern { hash, .. } => hash.hash(state),
+        }
+    }
+}
+
+impl<'s> StringKey<'s> {
+    pub fn from_intern(sym: InternSymbol, str_table: &'s StringInterner, hasher: &impl BuildHasher) -> Self {
+        let string = str_table.resolve(sym.into()).unwrap();
+        
+        let mut hasher = hasher.build_hasher();
+        string.hash(&mut hasher);
+        let hash = hasher.finish();
+        
+        Self::Intern {
+            hash, sym, str_table,
+        }
+    }
+    
     pub fn as_str(&self) -> &str {
         match self {
-            Self::InternStr(sym, string_table) => {
+            Self::Intern { sym, str_table, .. } => {
                 let sym = (*sym).into();
-                string_table.resolve(sym).unwrap()
+                str_table.resolve(sym).unwrap()
             }
         }
+    }
+}
+
+impl fmt::Display for StringKey<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.write_str(self.as_str())
     }
 }

@@ -4,7 +4,7 @@ use std::cmp::{PartialEq, Eq};
 use std::collections::HashMap;
 use crate::language::{IntType, FloatType};
 use crate::runtime::Runtime;
-use crate::runtime::strings::{InternSymbol, StringRepr, DefaultBuildHasher};
+use crate::runtime::strings::{StringValue, StringKey, DefaultBuildHasher};
 use crate::runtime::errors::{ExecResult, RuntimeErrorKind as ErrorKind};
 
 
@@ -19,8 +19,7 @@ pub enum Variant {
     BoolFalse,
     Integer(IntType),
     Float(FloatType),
-    InternStr(InternSymbol),  // TODO include reference to string table
-    //StrObject(GCHandle),
+    String(StringValue),
     //Tuple(GCHandle),
     //Object(GCHandle),
 }
@@ -63,7 +62,7 @@ impl Variant {
             Self::BoolFalse => dst.write_str("false"),
             Self::Integer(value) => write!(dst, "{}", *value),
             Self::Float(value) => write!(dst, "{}", *value),
-            Self::InternStr(sym) => {
+            Self::String(StringValue::Intern(sym)) => {
                 let sym = (*sym).into();
                 let string = runtime.string_table().resolve(sym).unwrap();
                 write!(dst, "\"{}\"", string)
@@ -93,8 +92,8 @@ impl From<FloatType> for Variant {
     fn from(value: FloatType) -> Self { Variant::Float(value) }
 }
 
-impl From<InternSymbol> for Variant {
-    fn from(sym: InternSymbol) -> Self { Variant::InternStr(sym) }
+impl From<StringValue> for Variant {
+    fn from(strval: StringValue) -> Self { Variant::String(strval) }
 }
 
 
@@ -108,7 +107,7 @@ pub enum VariantKey<'r> {
     BoolTrue,
     BoolFalse,
     Integer(IntType),
-    String(u64, StringRepr<'r>)
+    String(StringKey<'r>)
     // Tuple
     // Object(u64, GCHandle), // use user-defined hash and equality
 }
@@ -120,7 +119,7 @@ impl Hash for VariantKey<'_> {
         
         match self {
             Self::Integer(value) => value.hash(state),
-            Self::String(strhash, _) => strhash.hash(state),
+            Self::String(strkey) => strkey.hash(state),
             _ => { }
         }
     }
@@ -139,8 +138,8 @@ impl<'r> PartialEq for VariantKey<'r> {
             (Self::Integer(self_value), Self::Integer(other_value)) 
                 => self_value == other_value,
             
-            (Self::String(.., self_string), Self::String(.., other_string)) 
-                => self_string == other_string,
+            (Self::String(self_str), Self::String(other_str)) 
+                => self_str == other_str,
                 
             _ => false,
         }
@@ -157,14 +156,12 @@ impl<'r> VariantKey<'r> {
             
             Variant::Integer(value) => Self::Integer(value),
             
-            Variant::InternStr(sym) => {
-                let string = StringRepr::InternStr(sym, runtime.string_table());
+            Variant::String(strval) => {
+                let strkey = match strval {
+                    StringValue::Intern(sym) => StringKey::from_intern(sym, runtime.string_table(), hasher_factory),
+                };
                 
-                let mut hasher = hasher_factory.build_hasher();
-                string.as_str().hash(&mut hasher);
-                let hash = hasher.finish();
-                
-                Self::String(hash, string)
+                Self::String(strkey)
             },
             
             Variant::Float(..) => return Err(ErrorKind::UnhashableType.into()),  // for now
