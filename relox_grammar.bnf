@@ -14,7 +14,6 @@ type-expression ::= (* TODO *) ;
 (*** Statements ***)
 
 statement ::= ";"
-            | assignment-statement
             | while-loop
             | do-while-loop
             | for-loop 
@@ -43,6 +42,7 @@ expression ::= primary
              | UNARY_OP expression
              | expression BINARY_OP expression
              | assignment-expression
+             | declaration-expression
              | object-constructor
              | tuple-constructor ;
 
@@ -75,14 +75,19 @@ block-expression ::= ( label )? "begin" ( statement | control-flow | "break" ( l
 *)
 
 (* right associative *)
-lvalue ::= identifier | primary index-access | primary member-access ; 
-lvalue-annotated ::= lvalue-primary ( ":" type-expression )? ; 
+lvalue ::= identifier | primary index-access | primary member-access ;
+
+lvalue-expression ::= lvalue | lvalue-list | "(" lvalue ")" ;   (* basically just lvalues, and tuples of lvalues *)
+lvalue-list ::= lvalue-expression ( "," lvalue-expression )* ;
+
+lvalue-annotated ::= lvalue-expression ( ":" type-expression )? ; 
 
 assignment-op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-assignment-expression ::= lvalue-annotated ( "=" | assignment-op ) expression ;
+assignment-expression ::= lvalue-annotated assignment-op expression ;
 
-assignment-statement ::= "var" lvalue-list  "=" expression-list ;
-lvalue-list ::= lvalue-annotated ( "," lvalue-annotated )* ;
+declaration-expression ::= ( "let" | "var" ) assignment-expression ;
+
+
 
 (*** Function/Method Calls ***)
 
@@ -110,7 +115,7 @@ function-def ::= "fun" ( lvalue )?  parameter-list ( "->" type-expression ":" )?
 
 parameter-list ::= "(" ")" | "(" parameter ( "," parameter )* ( parameter "..." )? ")" ;
 
-parameter ::= IDENTIFIER ( ":" type-expression )? ( "=" expression )? ;
+parameter ::= ( "var" )? IDENTIFIER ( ":" type-expression )? ( "=" expression )? ;
 
 
 (*** Class Defs ***)
@@ -120,7 +125,7 @@ class-def ::= (* TODO *) ;
 
 (***** Non left-recursive version of `expression` for implementation *****)
 
-tuple-constructor ::= "(" expression ( "," expression )+ ")" | "(" ")" ;
+tuple-constructor ::= expression ( "," expression )+ | "(" expression "," ")" | "(" ")" ;
 
 primary-expression ::= immediate-expression | primary | tuple-constructor | "(" expression ")" ;
 
@@ -151,8 +156,11 @@ unary-expression ::= UNARY_OP unary-expression | primary-expression ;
 
 operand[1] ::= unary-expression ;
 operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
-
-assignment ::= assignment-expression | operand[10] ;
+binary-op ::= operand[10] ;
 
 (* top-level tuples don't require parens - however, single element tuples are not allowed here, use tuple-constructor instead *)
-expression ::= assignment ( "," assignment )*;
+naked-tuple ::= binary-op ( "," binary-op )*;
+
+assignment ::= naked-tuple | assignment-expression | declaration-expression ;
+
+expression ::= assignment (* top level of recursive descent *)
