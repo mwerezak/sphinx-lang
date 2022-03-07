@@ -29,8 +29,7 @@ pub enum Token {
     // Keywords
     And, Or, Not,
     True, False, Nil,
-    Var, Del,
-    Global, Upval,
+    Let, Var, Del,
     If, Then, Elif, Else,
     Begin, For, While, Do,
     Continue, Break, Return,

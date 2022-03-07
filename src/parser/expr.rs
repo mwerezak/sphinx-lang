@@ -1,17 +1,10 @@
 use crate::debug::symbol::DebugSymbol;
 use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::Primary;
+use crate::parser::assign::{Assignment, Declaration};
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::stmt::{Stmt, StmtVariant};
 
-
-#[derive(Debug, Clone)]
-pub struct AssignmentInfo {
-    pub lhs: Primary,
-    pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
-    pub rhs: ExprVariant,
-    // type annotation
-}
 
 #[derive(Debug, Clone)]
 pub enum ExprVariant {
@@ -22,7 +15,9 @@ pub enum ExprVariant {
     
     BinaryOp(BinaryOp, Box<ExprVariant>, Box<ExprVariant>),
     
-    Assignment(Box<AssignmentInfo>), // use a box to keep size of Expr down
+    Assignment(Box<Assignment>), // use a box to keep size of Expr down
+    
+    Declaration(Box<Declaration>),
     
     Tuple(Vec<Expr>),
     
@@ -48,9 +43,12 @@ impl ExprVariant {
         Self::BinaryOp(op, Box::new(lhs), Box::new(rhs))
     }
     
-    pub fn assignment(lhs: Primary, op: Option<BinaryOp>, rhs: ExprVariant) -> Self {
-        debug_assert!(lhs.is_lvalue());
-        Self::Assignment(Box::new(AssignmentInfo { lhs, op, rhs }))
+    pub fn assignment(assign: Assignment) -> Self {
+        Self::Assignment(Box::new(assign))
+    }
+    
+    pub fn declaration(decl: Declaration) -> Self {
+        Self::Declaration(Box::new(decl))
     }
     
     pub fn tuple(exprs: impl Iterator<Item=Expr>) -> Self {

@@ -13,8 +13,6 @@ pub enum Atom {
     Self_,
     Super,
     Identifier(InternSymbol),
-    UpvalIdentifier(InternSymbol),
-    GlobalIdentifier(InternSymbol),
     BooleanLiteral(bool),
     IntegerLiteral(language::IntType),
     FloatLiteral(language::FloatType),
@@ -39,14 +37,6 @@ impl Atom {
         Self::Identifier(InternSymbol::from_str(name, interner))
     }
     
-    pub fn global_identifier(name: &str, interner: &mut StringInterner) -> Self {
-        Self::GlobalIdentifier(InternSymbol::from_str(name, interner))
-    }
-    
-    pub fn upval_identifier(name: &str, interner: &mut StringInterner) -> Self {
-        Self::UpvalIdentifier(InternSymbol::from_str(name, interner))
-    }
-    
     pub fn string_literal(value: &str, interner: &mut StringInterner) -> Self {
         Self::StringLiteral(InternSymbol::from_str(value, interner))
     }
@@ -60,7 +50,7 @@ impl Atom {
 // These are the highest precedence operations in the language
 #[derive(Debug, Clone)]
 pub enum AccessItem {
-    Access(InternSymbol),
+    Attribute(InternSymbol),
     Index(Box<Expr>),
     Invoke(),       // TODO
     Construct(ObjectConstructor),
@@ -82,27 +72,17 @@ impl Primary {
     }
     
     pub fn atom(&self) -> &Atom { &self.atom }
+    pub fn take_atom(self) -> Atom { self.atom }
+    
+    pub fn has_path(&self) -> bool { !self.path.is_empty() }
+    pub fn path_len(&self) -> usize { self.path.len() }
     
     pub fn iter_path(&self) -> impl Iterator<Item=&AccessItem> {
         self.path.iter()
     }
     
-    /*
-        Check if this primary expression is also an lvalue.
-        
-        lvalue ::= IDENTIFIER | "global" IDENTIFIER | primary subscript | primary access ;
-    */
-    pub fn is_lvalue(&self) -> bool {
-        if self.path.is_empty() {
-            matches!(self.atom, Atom::Identifier(..) | Atom::GlobalIdentifier(..))
-        } else {
-            let last_op = self.path.last().unwrap();
-            matches!(last_op, AccessItem::Access(..) | AccessItem::Index(..))
-        }
-    }
-    
-    pub fn push_access_member(&mut self, name: &str, interner: &mut StringInterner) {
-        self.path.push(AccessItem::Access(InternSymbol::from_str(name, interner)))
+    pub fn push_access_name(&mut self, name: &str, interner: &mut StringInterner) {
+        self.path.push(AccessItem::Attribute(InternSymbol::from_str(name, interner)))
     }
     
     pub fn push_access_index(&mut self, expr: Expr) {
@@ -113,6 +93,10 @@ impl Primary {
     
     pub fn push_construct(&mut self, ctor: ObjectConstructor) {
         self.path.push(AccessItem::Construct(ctor))
+    }
+    
+    pub fn pop_path(&mut self) -> Option<AccessItem> {
+        self.path.pop()
     }
 }
 

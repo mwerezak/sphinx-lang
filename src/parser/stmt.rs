@@ -5,7 +5,6 @@ use crate::parser::expr::ExprVariant;
 #[derive(Debug, Clone)]
 pub enum StmtVariant {
     
-    // Assignment
     // WhileLoop
     // DoWhileLoop
     // ForLoop

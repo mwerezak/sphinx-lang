@@ -4,6 +4,7 @@ mod tests;
 pub mod expr;
 pub mod stmt;
 pub mod primary;
+pub mod assign;
 pub mod operator;
 pub mod structs;
 
@@ -18,6 +19,7 @@ use crate::runtime::strings::StringInterner;
 use expr::{Expr, ExprVariant};
 use stmt::{Stmt, StmtVariant};
 use primary::{Primary, Atom};
+use assign::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use structs::{ObjectConstructor};
 use errors::{ErrorPrototype, ErrorKind, ErrorContext, ContextTag};
@@ -200,82 +202,142 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         Ok(Expr::new(variant, symbol))
     }
     
+    // the top of the recursive descent stack for expressions
     fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
-        let first_expr = self.parse_inner_expr(ctx)?;
+        let next = self.peek()?;
+        
+        if let Token::Let | Token::Var = next.token {
+            self.parse_vardecl_expr(ctx)
+        } else {
+            self.parse_assignment_expr(ctx)
+        }
+    }
+    
+    // fn parse_inner_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    //     ctx.push(ContextTag::Expr);
+        
+    //     let variant = self.parse_inner_expr_variant(ctx)?;
+    //     let symbol = ctx.frame().as_debug_symbol().unwrap();
+        
+    //     ctx.pop_extend();
+    //     Ok(Expr::new(variant, symbol))
+    // }
+    
+    // // parse an expression that cannot be a tuple
+    // fn parse_inner_expr_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
+    //     self.parse_binop_expr(ctx)
+    // }
+    
+    /*
+        Assignment Expression syntax:
+        
+        lvalue ::= identifier | primary index-access | primary member-access ;
+
+        lvalue-expression ::= lvalue | lvalue-list | "(" lvalue ")" ;   (* basically just lvalues, and tuples of lvalues *)
+        lvalue-list ::= lvalue-expression ( "," lvalue-expression )* ;
+
+        lvalue-annotated ::= lvalue-expression ( ":" type-expression )? ; 
+
+        assignment-op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
+        assignment-expression ::= lvalue-annotated assignment-op expression ;
+    */
+    
+    fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
+        
+        let expr = self.parse_tuple_expr(ctx)?;
+        
+        let next = self.peek()?;
+        if let Some(op) = Self::which_assignment_op(&next.token) {
+            // consume assign_op token
+            ctx.push_continuation(ContextTag::AssignmentExpr);
+            ctx.set_end(&self.advance().unwrap());
+            
+            // LHS of assignment has to be an lvalue
+            let lhs = LValue::try_from(expr).map_err(|_| ErrorPrototype::from(ErrorKind::InvalidAssignment))?;
+            let rhs = self.parse_expr_variant(ctx)?;
+            
+            ctx.pop_extend();
+            return Ok(ExprVariant::assignment(Assignment::new(lhs, op, rhs)));
+        }
+        
+        Ok(expr)
+    }
+    
+    /*
+        declaration-expression ::= ( "let" | "var" ) assignment-expression ;
+    */
+    fn parse_vardecl_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
+        ctx.push(ContextTag::VarDeclExpr);
+        
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        let decl_type = match next.token {
+            Token::Let => DeclType::Immutable,
+            Token::Var => DeclType::Mutable,
+            _ => panic!("parse_vardecl_expr() called but next token was neither let or var"),
+        };
+        
+        let expr = self.parse_tuple_expr(ctx)?;
+        let lhs = LValue::try_from(expr).map_err(|_| ErrorPrototype::from(ErrorKind::InvalidAssignment))?;
+        
+        // check for and consume "="
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        if let Some(op) = Self::which_assignment_op(&next.token) {
+            if op.is_some() {
+                return Err(ErrorKind::InvalidDeclAssignment.into());
+            }
+        } else {
+            return Err(ErrorKind::DeclMissingInitializer.into());
+        }
+        
+        let init = self.parse_expr_variant(ctx)?;
+        
+        ctx.pop_extend();
+        return Ok(ExprVariant::declaration(Declaration::new(decl_type, lhs, init)));
+    }
+    
+    fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
+        
+        // descend recursively into binops
+        let mut first_expr = Some(self.parse_binop_expr(ctx)?); // might be taken into tuple later
         
         // check for tuple constructor
-        let mut rest_exprs = Vec::<Expr>::new();
+        let mut tuple_exprs = Vec::<Expr>::new();
         loop {
             let next = self.peek()?;
             if !matches!(next.token, Token::Comma) {
                 break;
             }
             
-            if rest_exprs.is_empty() {
-                ctx.push_continuation(ContextTag::TupleCtor);
+            if let Some(first_expr) = first_expr.take() {
+                ctx.push_continuation(ContextTag::Expr);  // retroactivly get debug symbol
+                let symbol = ctx.frame().as_debug_symbol().unwrap();
+                ctx.pop_extend();
+                
+                tuple_exprs.push(Expr::new(first_expr, symbol));
+                
+                ctx.push_continuation(ContextTag::TupleCtor); // enter the tuple context
             }
+            
             ctx.set_end(&self.advance().unwrap()); // consume comma
             
-            let next_expr = self.parse_inner_expr(ctx)?;
-            rest_exprs.push(next_expr);
-        }
-        
-        if rest_exprs.is_empty() {
-            Ok(first_expr.take_variant())
-        } else {
-            rest_exprs.insert(0, first_expr);
-            ctx.pop_extend(); // pop the TupleCtor context frame
-            
-            Ok(ExprVariant::Tuple(rest_exprs))
-        }
-    }
-    
-    // parse an expression that cannot be a tuple (without grouping)
-    fn parse_inner_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
-        ctx.push(ContextTag::Expr);
-        
-        let variant = self.parse_inner_expr_variant(ctx)?;
-        let symbol = ctx.frame().as_debug_symbol().unwrap();
-        
-        ctx.pop_extend();
-        Ok(Expr::new(variant, symbol))
-    }
-    
-    fn parse_inner_expr_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
-        self.parse_assignment_expr(ctx)  // the top of the recursive descent stack for expressions
-    }
-    
-    /*
-        Assignment Expression syntax:
-        
-        assignment-expression ::= assignment-target ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ) expression ;
-        assignment-target ::= ( "var" )? lvalue ; 
-    */
-    
-    fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
-        
-        // descend recursively
-        let expr = self.parse_binop_expr(ctx, PRECEDENCE_START)?;
-        
-        let next = self.peek()?;
-        if let Some(assign_op) = Self::which_assignment_op(&next.token) {
-            // consume assign_op token
-            ctx.push_continuation(ContextTag::AssignmentExpr);
-            ctx.set_end(&self.advance().unwrap());
-            
-            // LHS of assignment has to be an lvalue
-            let lhs = match expr {
-                ExprVariant::Primary(lhs) if lhs.is_lvalue() => lhs,
-                _ => return Err(ErrorKind::InvalidAssignmentLHS.into()),
-            };
-
-            let rhs_expr = self.parse_inner_expr_variant(ctx)?;
-            
+            ctx.push(ContextTag::Expr);
+            let next_expr = self.parse_binop_expr(ctx)?;
+            let symbol = ctx.frame().as_debug_symbol().unwrap();
             ctx.pop_extend();
-            return Ok(ExprVariant::assignment(*lhs, assign_op.map(|op| op.into()), rhs_expr));
+            
+            tuple_exprs.push(Expr::new(next_expr, symbol));
         }
         
-        Ok(expr)
+        if let Some(expr) = first_expr {
+            Ok(expr)
+        } else {
+            ctx.pop_extend(); // pop the TupleCtor context frame
+            Ok(ExprVariant::Tuple(tuple_exprs))
+        }
     }
     
     /*
@@ -285,12 +347,16 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         operand[8] ::= comparison ;
         operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
     */
-    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext, level: Precedence) -> InternalResult<ExprVariant> {
+    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
+        self.parse_binop_expr_levels(ctx, PRECEDENCE_START)
+    }
+    
+    fn parse_binop_expr_levels(&mut self, ctx: &mut ErrorContext, level: Precedence) -> InternalResult<ExprVariant> {
         if level == PRECEDENCE_END {
             return self.parse_unary_expr(ctx);  // exit binop precedence recursion
         }
         
-        let mut expr = self.parse_binop_expr(ctx, level - 1)?;
+        let mut expr = self.parse_binop_expr_levels(ctx, level - 1)?;
         
         loop {
             let next = self.peek()?;
@@ -308,7 +374,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             ctx.push_continuation(ContextTag::BinaryOpExpr);
             ctx.set_end(&self.advance().unwrap()); // consume binary_op token
             
-            let rhs_expr = self.parse_binop_expr(ctx, level - 1)?;
+            let rhs_expr = self.parse_binop_expr_levels(ctx, level - 1)?;
             
             expr = ExprVariant::binary_op(binary_op.into(), expr, rhs_expr);
             
@@ -469,7 +535,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
-                        primary.push_access_member(name.as_str(), self.interner);
+                        primary.push_access_name(name.as_str(), self.interner);
                     } else {
                         return Err(ErrorKind::ExpectedIdentifier.into());
                     }
@@ -548,22 +614,6 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let atom = match next.token {
                 // Identifiers
                 Token::Identifier(name) => Atom::identifier(name.as_str(), self.interner),
-                Token::Global | Token::Upval => {
-                    let scope = next.token;
-                    let next = self.advance()?;
-                    ctx.set_end(&next);
-                    
-                    if let Token::Identifier(name) = next.token {
-                        match scope {
-                            Token::Global => Atom::global_identifier(name.as_str(), self.interner),
-                            Token::Upval => Atom::upval_identifier(name.as_str(), self.interner),
-                            _ => unreachable!(),
-                        }
-                        
-                    } else {
-                        return Err(ErrorKind::ExpectedIdentifier.into())
-                    }
-                },
                 
                 // Literals
                 Token::Nil   => Atom::Nil,
@@ -599,50 +649,17 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             return Ok(Atom::EmptyTuple);
         }
         
-        // need to duplicate some of the tuple parsing logic here because the only way to
-        // identify a single-element tuple is by a comma followed by a closing paren.
-        // and parse_expr_variant() only deals with naked tuples
+        let expr = self.parse_expr_variant(ctx)?;
         
-        let mut expr = Some(self.parse_inner_expr(ctx)?); // may be taken by tuple_expr later
-        let mut tuple_exprs = Vec::<Expr>::new();
-        
-        // loop through expressions in case this is a tuple
-        loop {
-            let next = self.advance()?;
-            ctx.set_end(&next);
-            
-            match next.token {
-                
-                // end of group
-                Token::CloseParen => break,
-                
-                // single-element tuples
-                Token::Comma => if tuple_exprs.is_empty() {
-                    tuple_exprs.push(expr.take().unwrap());
-                    
-                    // comma followed by paren
-                    if let Token::CloseParen = self.peek()?.token {
-                        continue;
-                    }
-                }
-                
-                _ => {
-                    return Err(ErrorKind::ExpectedCloseParen.into());
-                }
-            }
-            
-            let next_expr = self.parse_inner_expr(ctx)?;
-            tuple_exprs.push(next_expr);
+        // Consume and check closing paren
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        if !matches!(next.token, Token::CloseParen) {
+            return Err(ErrorKind::ExpectedCloseParen.into());
         }
         
-        let group = if tuple_exprs.is_empty() {
-            Atom::group(expr.unwrap().take_variant())
-        } else {
-            Atom::group(ExprVariant::Tuple(tuple_exprs))
-        };
-        
         ctx.pop_extend();
-        Ok(group)
+        Ok(Atom::group(expr))
     }
     
 }

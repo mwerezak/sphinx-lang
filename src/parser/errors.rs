@@ -18,7 +18,9 @@ pub enum ParserErrorKind {
     ExpectedCloseSquare,
     ExpectedCloseBrace,
     ExpectedIdentifier,
-    InvalidAssignmentLHS,   // the LHS of an assignment was not a valid lvalue
+    InvalidAssignment,      // the LHS of an assignment was not a valid lvalue
+    InvalidDeclAssignment,  // only "=" allowed in variable decls
+    DeclMissingInitializer, 
 }
 
 // Provide information about the type of syntactic construct from which the error originated
@@ -30,6 +32,7 @@ pub enum ContextTag {
     Stmt,
     Expr,
     AssignmentExpr,
+    VarDeclExpr,
     BinaryOpExpr,
     UnaryOpExpr,
     PrimaryExpr,
@@ -124,7 +127,9 @@ impl fmt::Display for ParserError<'_> {
             ParserErrorKind::ExpectedCloseSquare  => "missing closing ']'",
             ParserErrorKind::ExpectedCloseBrace   => "missing closing '}'",
             ParserErrorKind::ExpectedIdentifier   => "invalid identifier",
-            ParserErrorKind::InvalidAssignmentLHS => "invalid assignment",
+            ParserErrorKind::InvalidAssignment    => "invalid assignment",
+            ParserErrorKind::InvalidDeclAssignment  => "only '=' is allowed when initializing a newly declared variable",
+            ParserErrorKind::DeclMissingInitializer => "missing '=' initializer for variable declaration",
         };
         
         utils::format_error(fmt, "syntax error", Some(message), self.source())

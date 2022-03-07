@@ -35,6 +35,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
             ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op((*op).into(), lhs, rhs),
             
             ExprVariant::Assignment(assignment) => unimplemented!(),
+            ExprVariant::Declaration(declaration) => unimplemented!(),
             
             ExprVariant::Tuple(expr_list) => unimplemented!(),
             ExprVariant::ObjectCtor(ctor) => unimplemented!(),
@@ -62,8 +63,6 @@ impl<'a, 'r> EvalContext<'a, 'r> {
             Atom::StringLiteral(sym) => Variant::String((*sym).into()),
             
             Atom::Identifier(name) => unimplemented!(),
-            Atom::UpvalIdentifier(name) => unimplemented!(),
-            Atom::GlobalIdentifier(name) => unimplemented!(),
             
             Atom::Self_ => unimplemented!(),
             Atom::Super => unimplemented!(),
