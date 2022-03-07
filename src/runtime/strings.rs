@@ -1,7 +1,5 @@
 use std::fmt;
 use std::hash::{Hash, Hasher, BuildHasher};
-use ahash::{self, AHasher};
-// use rustc_hash::FxHasher;
 
 use string_interner;
 use string_interner::symbol::Symbol;
@@ -9,10 +7,7 @@ use string_interner::symbol::Symbol;
 use string_interner::DefaultSymbol;
 use string_interner::DefaultBackend;
 
-
-//  TODO move elsewhere
-pub type DefaultHasher = AHasher;
-pub type DefaultBuildHasher = ahash::RandomState;
+use crate::runtime::DefaultBuildHasher;
 
 // Interned Strings
 pub type InternBackend = DefaultBackend<DefaultSymbol>;

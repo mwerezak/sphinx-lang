@@ -11,10 +11,19 @@ mod tests;
 
 use std::collections::HashMap;
 
+use ahash::{self, AHasher};
+// use rustc_hash::FxHasher;
+
 use crate::language;
 use crate::source::ParseContext;
 use crate::lexer::LexerBuilder;
-use crate::runtime::strings::{StringInterner, DefaultBuildHasher};
+use crate::runtime::strings::StringInterner;
+
+
+// Default Hasher
+
+pub type DefaultHasher = AHasher;
+pub type DefaultBuildHasher = ahash::RandomState;
 
 
 pub struct Runtime {
