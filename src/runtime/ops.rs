@@ -5,7 +5,7 @@
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::types::operator::UnaryOp;
-use crate::runtime::errors::{EvalResult, EvalErrorKind};
+use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
 #[inline(always)]
@@ -22,7 +22,7 @@ pub fn is_bitwise_primitive(value: &Variant) -> bool {
 // Unary Operators
 
 #[inline]
-pub fn eval_neg(operand: &Variant) -> EvalResult<Variant> {
+pub fn eval_neg(operand: &Variant) -> ExecResult<Variant> {
     let value = match operand {
         Variant::Integer(value) => (-value).into(),
         Variant::Float(value) => (-value).into(),
@@ -32,7 +32,7 @@ pub fn eval_neg(operand: &Variant) -> EvalResult<Variant> {
 }
 
 #[inline]
-pub fn eval_pos(operand: &Variant) -> EvalResult<Variant> {
+pub fn eval_pos(operand: &Variant) -> ExecResult<Variant> {
     let value = match operand {
         // No-op for arithmetic primitives
         Variant::Integer(value) => (*value).into(),
@@ -43,7 +43,7 @@ pub fn eval_pos(operand: &Variant) -> EvalResult<Variant> {
 }
 
 #[inline]
-pub fn eval_inv(operand: &Variant) -> EvalResult<Variant> {
+pub fn eval_inv(operand: &Variant) -> ExecResult<Variant> {
     let value = match operand {
         Variant::BoolTrue => Variant::BoolFalse,
         Variant::BoolFalse => Variant::BoolTrue,
@@ -54,12 +54,12 @@ pub fn eval_inv(operand: &Variant) -> EvalResult<Variant> {
 }
 
 #[inline]
-pub fn eval_not(operand: &Variant) -> EvalResult<Variant> {
+pub fn eval_not(operand: &Variant) -> ExecResult<Variant> {
     return Ok(Variant::from(!operand.truth_value()))
 }
 
 
-fn eval_unary_from_meta(_op: UnaryOp, _operand: &Variant) -> EvalResult<Variant> {
+fn eval_unary_from_meta(_op: UnaryOp, _operand: &Variant) -> ExecResult<Variant> {
     // TODO defer to the operand's type's metamethods
     unimplemented!()
 }
@@ -109,7 +109,7 @@ pub fn eval_ne(lhs: &Variant, rhs: &Variant) -> bool {
 // Numeric Operations
 
 // These are used to short-circuit the general metamethod lookup path to evaluate of binary operators
-// They always succeed (due to the way the numeric coercion rules are set up), and hence don't use EvalResult. 
+// They always succeed (due to the way the numeric coercion rules are set up), and hence don't use ExecResult. 
 // Instead, they produce an Option and return None if the operands aren't the right type to short-circuit
 
 
@@ -119,7 +119,7 @@ macro_rules! eval_binary_arithmetic {
     ($name:tt, $int_name:tt, $float_name:tt) => {
         
         #[inline]
-        pub fn $name (lhs: &Variant, rhs: &Variant) -> EvalResult<Option<Variant>> {
+        pub fn $name (lhs: &Variant, rhs: &Variant) -> ExecResult<Option<Variant>> {
             let value = match (lhs, rhs) {
                 (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => $int_name (*lhs_value, *rhs_value)?,
                 _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) => $float_name (lhs.float_value(), rhs.float_value())?,
@@ -136,30 +136,30 @@ macro_rules! checked_int_math {
     ( $method:tt, $lhs:expr, $rhs:expr ) => {
         match $lhs.$method($rhs) {
             (value, false) => Ok(Variant::Integer(value)),
-            (_, true) => Err(EvalErrorKind::OverflowError.into()),
+            (_, true) => Err(ErrorKind::OverflowError.into()),
         }
     };
 }
 
 eval_binary_arithmetic!(eval_mul, int_mul, float_mul);
-#[inline(always)] fn int_mul(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { checked_int_math!(overflowing_mul, lhs, rhs) }
-#[inline(always)] fn float_mul(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs * rhs)) }
+#[inline(always)] fn int_mul(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(overflowing_mul, lhs, rhs) }
+#[inline(always)] fn float_mul(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs * rhs)) }
 
 eval_binary_arithmetic!(eval_div, int_div, float_div);
-#[inline(always)] fn int_div(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { checked_int_math!(overflowing_div, lhs, rhs) }
-#[inline(always)] fn float_div(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs / rhs)) }
+#[inline(always)] fn int_div(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(overflowing_div, lhs, rhs) }
+#[inline(always)] fn float_div(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs / rhs)) }
 
 eval_binary_arithmetic!(eval_mod, int_mod, float_mod);
-#[inline(always)] fn int_mod(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { Ok(Variant::Integer(lhs % rhs)) }
-#[inline(always)] fn float_mod(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs % rhs)) }
+#[inline(always)] fn int_mod(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { Ok(Variant::Integer(lhs % rhs)) }
+#[inline(always)] fn float_mod(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs % rhs)) }
 
 eval_binary_arithmetic!(eval_add, int_add, float_add);
-#[inline(always)] fn int_add(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { checked_int_math!(overflowing_add, lhs, rhs) }
-#[inline(always)] fn float_add(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs + rhs)) }
+#[inline(always)] fn int_add(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(overflowing_add, lhs, rhs) }
+#[inline(always)] fn float_add(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs + rhs)) }
 
 eval_binary_arithmetic!(eval_sub, int_sub, float_sub);
-#[inline(always)] fn int_sub(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { checked_int_math!(overflowing_sub, lhs, rhs) }
-#[inline(always)] fn float_sub(lhs: FloatType, rhs: FloatType) -> EvalResult<Variant> { Ok(Variant::Float(lhs - rhs)) }
+#[inline(always)] fn int_sub(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(overflowing_sub, lhs, rhs) }
+#[inline(always)] fn float_sub(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs - rhs)) }
 
 // Comparison - uses similar coercion rules as Arithmetic, may only produce boolean results
 macro_rules! eval_binary_comparison {
@@ -237,7 +237,7 @@ macro_rules! eval_binary_shift {
     ($name:tt, $int_name:tt) => {
         
         #[inline]
-        pub fn $name (lhs: &Variant, rhs: &Variant) -> EvalResult<Option<Variant>> {
+        pub fn $name (lhs: &Variant, rhs: &Variant) -> ExecResult<Option<Variant>> {
             let value = match (lhs, rhs) {
                 (_, Variant::Integer(shift)) if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), *shift)?,
                 (_, Variant::BoolTrue)  if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), 1)?,
@@ -252,18 +252,18 @@ macro_rules! eval_binary_shift {
 
 eval_binary_shift!(eval_shl, int_shl);
 #[inline]
-fn int_shl(lhs: IntType, rhs: IntType) -> EvalResult<Variant> { 
+fn int_shl(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { 
     if rhs < 0 { 
-        return Err(EvalErrorKind::NegativeShiftCount.into()); 
+        return Err(ErrorKind::NegativeShiftCount.into()); 
     }
     checked_int_math!(overflowing_shl, lhs, rhs.try_into().unwrap()) 
 }
 
 eval_binary_shift!(eval_shr, int_shr);
 #[inline]
-fn int_shr(lhs: IntType, rhs: IntType) -> EvalResult<Variant> {
+fn int_shr(lhs: IntType, rhs: IntType) -> ExecResult<Variant> {
     if rhs < 0 { 
-        return Err(EvalErrorKind::NegativeShiftCount.into()); 
+        return Err(ErrorKind::NegativeShiftCount.into()); 
     }
     checked_int_math!(overflowing_shr, lhs, rhs.try_into().unwrap()) 
 }

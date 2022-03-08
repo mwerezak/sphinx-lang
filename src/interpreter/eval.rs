@@ -9,7 +9,7 @@ use crate::runtime::{Runtime, Variant};
 use crate::runtime::strings::StringValue;
 use crate::runtime::ops::*;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
-use crate::runtime::errors::{EvalResult, EvalErrorKind as ErrorKind};
+use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
 // tracks the local scope and the innermost Expr
@@ -26,11 +26,11 @@ impl<'a, 'r> From<&'a mut Runtime<'r>> for EvalContext<'a, 'r> {
 }
 
 impl<'a, 'r> EvalContext<'a, 'r> {
-    pub fn eval(&mut self, expr: &ExprVariant) -> EvalResult<Variant> {
+    pub fn eval(&mut self, expr: &ExprVariant) -> ExecResult<Variant> {
         self.eval_inner_expr(expr)
     }
     
-    fn lookup_value(&self, name: StringValue) -> EvalResult<Variant> {
+    fn lookup_value(&self, name: StringValue) -> ExecResult<Variant> {
         self.runtime.lookup_value(name)
             .ok_or_else(|| {
                 let mut string = String::new();
@@ -39,7 +39,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
             })
     }
     
-    fn eval_inner_expr(&mut self, expr: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_inner_expr(&mut self, expr: &ExprVariant) -> ExecResult<Variant> {
         match expr {
             ExprVariant::Primary(primary) => self.eval_primary(primary),
             
@@ -54,7 +54,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         }
     }
 
-    fn eval_primary(&mut self, primary: &Primary) -> EvalResult<Variant> {
+    fn eval_primary(&mut self, primary: &Primary) -> ExecResult<Variant> {
         let mut value = self.eval_atom(primary.atom())?;
         
         for item in primary.iter_path() {
@@ -64,7 +64,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         Ok(value)
     }
 
-    fn eval_atom(&mut self, atom: &Atom) -> EvalResult<Variant> {
+    fn eval_atom(&mut self, atom: &Atom) -> ExecResult<Variant> {
         let value = match atom {
             Atom::Nil => Variant::Nil,
             Atom::EmptyTuple => Variant::EmptyTuple,
@@ -84,7 +84,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         Ok(value)
     }
     
-    fn eval_short_circuit_logic(&mut self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_short_circuit_logic(&mut self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> ExecResult<Variant> {
         let lhs_value = self.eval_inner_expr(lhs)?;
         
         let cond = match op {
@@ -99,7 +99,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         }
     }
     
-    fn eval_unary_op(&mut self, op: UnaryOp, expr: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_unary_op(&mut self, op: UnaryOp, expr: &ExprVariant) -> ExecResult<Variant> {
         let operand = self.eval_inner_expr(expr)?;
         
         match op {
@@ -110,7 +110,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         }
     }
     
-    fn eval_binary_op(&mut self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> EvalResult<Variant> {
+    fn eval_binary_op(&mut self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> ExecResult<Variant> {
         if let BinaryOp::Logical(logic) = op {
             return self.eval_short_circuit_logic(logic, lhs, rhs);
         }
@@ -121,7 +121,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         self.eval_binary_op_values(op, &lhs_value, &rhs_value)
     }
     
-    fn eval_binary_op_values(&mut self, op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Variant> {
+    fn eval_binary_op_values(&mut self, op: BinaryOp, lhs: &Variant, rhs: &Variant) -> ExecResult<Variant> {
         let result = match op {
             BinaryOp::Arithmetic(op) => match op {
                 Arithmetic::Mul    => eval_mul(&lhs, &rhs)?,
@@ -164,13 +164,13 @@ impl<'a, 'r> EvalContext<'a, 'r> {
     }
     
     // This will probably be replaced once type system is implemented
-    fn eval_binary_from_type(_op: BinaryOp, _lhs: &Variant, _rhs: &Variant) -> EvalResult<Variant> {
+    fn eval_binary_from_type(_op: BinaryOp, _lhs: &Variant, _rhs: &Variant) -> ExecResult<Variant> {
         // TODO defer to lhs's type metamethods, or rhs's type reflected metamethod
         unimplemented!()
     }
     
     
-    fn eval_assignment(&mut self, assignment: &Assignment) -> EvalResult<Variant> {
+    fn eval_assignment(&mut self, assignment: &Assignment) -> ExecResult<Variant> {
         if let LValue::Identifier(name) = assignment.lhs {
             let name = StringValue::from(name);
             let lhs_value = self.lookup_value(name)?;
@@ -188,7 +188,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         }
     }
     
-    fn eval_declaration(&mut self, declaration: &Declaration) -> EvalResult<Variant> {
+    fn eval_declaration(&mut self, declaration: &Declaration) -> ExecResult<Variant> {
         
         if let LValue::Identifier(name) = declaration.lhs {
             let name = StringValue::from(name);
@@ -202,7 +202,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         
     }
     
-    // fn eval_lvalue(&mut self, lvalue: &LValue) -> EvalResult<()> {
+    // fn eval_lvalue(&mut self, lvalue: &LValue) -> ExecResult<()> {
         
     // }
 }

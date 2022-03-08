@@ -1,53 +1,17 @@
 use std::fmt;
 use std::error::Error;
 
-pub type EvalResult<T> = Result<T, EvalError>;
+pub type ExecResult<T> = Result<T, RuntimeError>;
+
+pub type ErrorKind = RuntimeErrorKind;
 
 #[derive(Debug)]
-pub enum EvalErrorKind {
+pub enum RuntimeErrorKind {
     InvalidUnaryOperand,  // unsupported operand for type
     InvalidBinaryOperand,
     OverflowError,
     NegativeShiftCount,
     NameNotDefined(String),
-}
-
-impl From<EvalErrorKind> for EvalError {
-    fn from(kind: EvalErrorKind) -> Self {
-        EvalError { kind, cause: None }
-    }
-}
-
-#[derive(Debug)]
-pub struct EvalError {
-    kind: EvalErrorKind,
-    cause: Option<Box<dyn Error>>,
-}
-
-impl EvalError {
-    pub fn caused_by(mut self, cause: impl Error + 'static) -> Self {
-        self.cause = Some(Box::new(cause)); self
-    }
-}
-
-impl Error for EvalError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.cause.as_ref().map(|o| o.as_ref())
-    }
-}
-
-impl fmt::Display for EvalError {
-    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        unimplemented!()
-    }
-}
-
-
-pub type ExecResult<T> = Result<T, RuntimeError>;
-
-#[derive(Debug)]
-pub enum RuntimeErrorKind {
-    EvalError,
     UnhashableType,
     Other,
 }
@@ -83,11 +47,5 @@ impl Error for RuntimeError {
 impl fmt::Display for RuntimeError {
     fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         unimplemented!()
-    }
-}
-
-impl From<EvalError> for RuntimeError {
-    fn from(error: EvalError) -> Self {
-        RuntimeError::from(RuntimeErrorKind::EvalError).caused_by(error)
     }
 }
