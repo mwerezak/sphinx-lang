@@ -3,7 +3,7 @@ use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::Primary;
 use crate::parser::assign::{Assignment, Declaration};
 use crate::parser::structs::{ObjectConstructor};
-use crate::parser::stmt::{Stmt, StmtVariant};
+use crate::parser::stmt::{Stmt, StmtVariant, Label};
 
 
 #[derive(Debug, Clone)]
@@ -13,49 +13,24 @@ pub enum ExprVariant {
     
     UnaryOp(UnaryOp, Box<ExprVariant>),
     
-    BinaryOp(BinaryOp, Box<ExprVariant>, Box<ExprVariant>),
+    BinaryOp(BinaryOp, Box<(ExprVariant, ExprVariant)>),
     
     Assignment(Box<Assignment>), // use a box to keep size of Expr down
     
     Declaration(Box<Declaration>),
-    
+
     Tuple(Vec<Expr>),
     
     ObjectCtor(Box<ObjectConstructor>),
     
     // IfExpr
-    // BlockExpr
+    
+    Block(Vec<Stmt>, Option<Label>), // TODO label
     
     // FunctionDef
     // ClassDef
 }
 
-impl ExprVariant {
-    pub fn primary(primary: Primary) -> Self {
-        Self::Primary(Box::new(primary))
-    }
-    
-    pub fn unary_op(op: UnaryOp, expr: ExprVariant) -> Self {
-        Self::UnaryOp(op, Box::new(expr))
-    }
-    
-    pub fn binary_op(op: BinaryOp, lhs: ExprVariant, rhs: ExprVariant) -> Self {
-        Self::BinaryOp(op, Box::new(lhs), Box::new(rhs))
-    }
-    
-    pub fn assignment(assign: Assignment) -> Self {
-        Self::Assignment(Box::new(assign))
-    }
-    
-    pub fn declaration(decl: Declaration) -> Self {
-        Self::Declaration(Box::new(decl))
-    }
-    
-    pub fn tuple(exprs: impl Iterator<Item=Expr>) -> Self {
-        let exprs = exprs.collect();
-        Self::Tuple(exprs)
-    }
-}
 
 // Use Expr instead of ExprVariant when we want to capture a debug symbol
 // This should be for: 

@@ -31,6 +31,7 @@ pub enum ContextTag {
     Sync,
     Stmt,
     Expr,
+    BlockExpr,
     AssignmentExpr,
     VarDeclExpr,
     BinaryOpExpr,

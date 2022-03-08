@@ -1,24 +1,29 @@
+use crate::runtime::strings::InternSymbol;
 use crate::debug::symbol::DebugSymbol;
 use crate::parser::expr::ExprVariant;
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Label(InternSymbol);
 
 
 #[derive(Debug, Clone)]
 pub enum StmtVariant {
     
+    Expression(ExprVariant),
+    
     // WhileLoop
     // DoWhileLoop
     // ForLoop
-    Expression(ExprVariant),
     
-    // Continue
-    // Break
-    // Return
+    // Continue(Option<Label>)
+    // Break(Option<Label>, Option<ExprVariant>)
+    // Return(Option<ExprVariant>)
     
     Echo(ExprVariant),
 }
 
-impl StmtVariant {
-}
+impl StmtVariant { }
 
 #[derive(Debug, Clone)]
 pub struct Stmt {

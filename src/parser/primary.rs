@@ -20,33 +20,6 @@ pub enum Atom {
     Group(Box<ExprVariant>), // type annotation
 }
 
-impl Atom {
-    pub fn boolean(value: bool) -> Self {
-        Self::BooleanLiteral(value) 
-    }
-    
-    pub fn integer(value: language::IntType) -> Self {
-        Self::IntegerLiteral(value)
-    }
-    
-    pub fn float(value: language::FloatType) -> Self {
-        Self::FloatLiteral(value) 
-    }
-    
-    pub fn identifier(name: &str, interner: &mut StringInterner) -> Self {
-        Self::Identifier(InternSymbol::from_str(name, interner))
-    }
-    
-    pub fn string_literal(value: &str, interner: &mut StringInterner) -> Self {
-        Self::StringLiteral(InternSymbol::from_str(value, interner))
-    }
-    
-    pub fn group(expr: ExprVariant) -> Self {
-        Self::Group(Box::new(expr))
-    }
-    
-}
-
 // These are the highest precedence operations in the language
 #[derive(Debug, Clone)]
 pub enum AccessItem {
@@ -81,8 +54,8 @@ impl Primary {
         self.path.iter()
     }
     
-    pub fn push_access_name(&mut self, name: &str, interner: &mut StringInterner) {
-        self.path.push(AccessItem::Attribute(InternSymbol::from_str(name, interner)))
+    pub fn push_access_attr(&mut self, name: InternSymbol) {
+        self.path.push(AccessItem::Attribute(name))
     }
     
     pub fn push_access_index(&mut self, expr: Expr) {

@@ -14,10 +14,10 @@ use log::debug;
 
 use crate::source::ModuleSource;
 use crate::lexer::{TokenMeta, Token, LexerError};
-use crate::runtime::strings::StringInterner;
+use crate::runtime::strings::{StringInterner, InternSymbol};
 
 use expr::{Expr, ExprVariant};
-use stmt::{Stmt, StmtVariant};
+use stmt::{Stmt, StmtVariant, Label};
 use primary::{Primary, Atom};
 use assign::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
@@ -212,21 +212,6 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         }
     }
     
-    // fn parse_inner_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
-    //     ctx.push(ContextTag::Expr);
-        
-    //     let variant = self.parse_inner_expr_variant(ctx)?;
-    //     let symbol = ctx.frame().as_debug_symbol().unwrap();
-        
-    //     ctx.pop_extend();
-    //     Ok(Expr::new(variant, symbol))
-    // }
-    
-    // // parse an expression that cannot be a tuple
-    // fn parse_inner_expr_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
-    //     self.parse_binop_expr(ctx)
-    // }
-    
     /*
         Assignment Expression syntax:
         
@@ -258,7 +243,8 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             ctx.pop_extend();
             
             let op = op.map(|op| op.into());
-            return Ok(ExprVariant::assignment(Assignment { lhs, op, rhs }));
+            let assign = Box::new(Assignment { lhs, op, rhs });
+            return Ok(ExprVariant::Assignment(assign));
         }
         
         Ok(expr)
@@ -297,7 +283,9 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         let init = self.parse_expr_variant(ctx)?;
         
         ctx.pop_extend();
-        return Ok(ExprVariant::declaration(Declaration { decl, lhs, init }));
+        
+        let decl = Box::new(Declaration { decl, lhs, init });
+        return Ok(ExprVariant::Declaration(decl));
     }
     
     fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
@@ -377,7 +365,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             
             let rhs_expr = self.parse_binop_expr_levels(ctx, level - 1)?;
             
-            expr = ExprVariant::binary_op(binary_op.into(), expr, rhs_expr);
+            expr = ExprVariant::BinaryOp(binary_op.into(), Box::new((expr, rhs_expr)));
             
             ctx.pop_extend();
         }
@@ -399,27 +387,10 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let expr = self.parse_primary_expr(ctx)?;
             
             ctx.pop_extend();
-            return Ok(ExprVariant::unary_op(unary_op.into(), expr));
+            return Ok(ExprVariant::UnaryOp(unary_op.into(), Box::new(expr)));
         }
         
         self.parse_primary_expr(ctx)
-    }
-    
-    /*
-        Here we parse all the things that are tighter binding than either unary or binary operator expressions.
-        We look for anything that can be immediately identified from the next token, or else fall back to a primary expression.
-    */
-    fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
-        match self.peek()?.token {
-            Token::Class => unimplemented!(),
-            Token::Fun => unimplemented!(),
-            Token::If => unimplemented!(),
-            Token::Begin => unimplemented!(),
-            
-            // Token::OpenBrace => Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?)),
-            
-            _ => Ok(ExprVariant::primary(self.parse_primary(ctx)?)),
-        }
     }
 
     fn which_unary_op(token: &Token) -> Option<UnaryOp> {
@@ -484,6 +455,39 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     }
     
     /*
+        Here we parse all the things that are tighter binding than either unary or binary operator expressions.
+        We look for anything that can be immediately identified from the next token, or else fall back to a primary expression.
+    */
+    fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
+        let expr = match self.peek()?.token {
+            Token::Class => unimplemented!(),
+            Token::Fun => unimplemented!(),
+            Token::If => unimplemented!(),
+            Token::Begin | Token::Label(..) => self.parse_block_expr(ctx)?,
+            
+            // Token::OpenBrace => Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?)),
+            
+            _ => ExprVariant::Primary(Box::new(self.parse_primary(ctx)?)),
+        };
+        Ok(expr)
+    }
+    
+    fn parse_block_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
+        ctx.push(ContextTag::BlockExpr);
+        
+        // // check for label
+        // let label = 
+        //     if let Token::Label(label) = self.peek()?.token {
+        //         self.interner.
+        //     }
+        //     else { None };
+        
+        
+        
+        unimplemented!()
+    }
+    
+    /*
         Object Constructor syntax:
         
         object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
@@ -536,7 +540,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
-                        primary.push_access_name(name.as_str(), self.interner);
+                        primary.push_access_attr(InternSymbol::from_str(name.as_str(), self.interner))
                     } else {
                         return Err(ErrorKind::ExpectedIdentifier.into());
                     }
@@ -614,16 +618,22 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             
             let atom = match next.token {
                 // Identifiers
-                Token::Identifier(name) => Atom::identifier(name.as_str(), self.interner),
+                Token::Identifier(name) => {
+                    let name = InternSymbol::from_str(name.as_str(), self.interner);
+                    Atom::Identifier(name)
+                },
                 
                 // Literals
                 Token::Nil   => Atom::Nil,
-                Token::True  => Atom::boolean(true),
-                Token::False => Atom::boolean(false),
+                Token::True  => Atom::BooleanLiteral(true),
+                Token::False => Atom::BooleanLiteral(false),
                 
-                Token::IntegerLiteral(value) => Atom::integer(value),
-                Token::FloatLiteral(value)   => Atom::float(value),
-                Token::StringLiteral(value)   => Atom::string_literal(value.as_str(), self.interner),
+                Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
+                Token::FloatLiteral(value)   => Atom::FloatLiteral(value),
+                Token::StringLiteral(value)   => {
+                    let value = InternSymbol::from_str(value.as_str(), self.interner);
+                    Atom::StringLiteral(value)
+                },
                 
                 _ => { 
                     return Err(ErrorKind::ExpectedStartOfExpr.into())
@@ -660,7 +670,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         }
         
         ctx.pop_extend();
-        Ok(Atom::group(expr))
+        Ok(Atom::Group(Box::new(expr)))
     }
     
 }

@@ -44,13 +44,18 @@ impl<'a, 'r> EvalContext<'a, 'r> {
             ExprVariant::Primary(primary) => self.eval_primary(primary),
             
             ExprVariant::UnaryOp(op, expr) => self.eval_unary_op((*op).into(), expr),
-            ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op((*op).into(), lhs, rhs),
+            ExprVariant::BinaryOp(op, exprs) => {
+                let (ref lhs, ref rhs) = **exprs;
+                self.eval_binary_op((*op).into(), lhs, rhs)
+            },
             
             ExprVariant::Assignment(assignment) => self.eval_assignment(assignment),
             ExprVariant::Declaration(declaration) => self.eval_declaration(declaration),
             
             ExprVariant::Tuple(expr_list) => unimplemented!(),
             ExprVariant::ObjectCtor(ctor) => unimplemented!(),
+            
+            ExprVariant::Block(suite, label) => unimplemented!(),
         }
     }
 

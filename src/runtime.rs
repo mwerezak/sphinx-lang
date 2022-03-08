@@ -127,6 +127,7 @@ impl<'r> Runtime<'r> {
 
 #[derive(Debug)]
 pub struct Environment<'r> {
+    // TODO name for traceback
     string_table: &'r StringTable,
     namespace: Namespace<'r>,
 }
