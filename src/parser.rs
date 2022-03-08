@@ -170,7 +170,6 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         ctx.push(ContextTag::Stmt);
         
         let stmt = match self.peek()?.token {
-            Token::Var => unimplemented!(),
             Token::While => unimplemented!(),
             Token::Do => unimplemented!(),
             Token::For => unimplemented!(),
@@ -257,6 +256,8 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let rhs = self.parse_expr_variant(ctx)?;
             
             ctx.pop_extend();
+            
+            let op = op.map(|op| op.into());
             return Ok(ExprVariant::assignment(Assignment { lhs, op, rhs }));
         }
         

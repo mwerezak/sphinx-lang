@@ -13,21 +13,30 @@ use crate::runtime::errors::{EvalResult, EvalErrorKind as ErrorKind};
 
 
 // tracks the local scope and the innermost Expr
-pub struct EvalContext<'a, 'r> where 'r: 'a {
+pub struct EvalContext<'a, 'r> {
     // very important to keep 'a and 'r separate
     // otherwise EvalContext would be forced to live as long as 'r!
     runtime: &'a mut Runtime<'r>,
 }
 
-impl<'a, 'r> From<&'a mut Runtime<'r>> for EvalContext<'a, 'r> where 'r: 'a {
+impl<'a, 'r> From<&'a mut Runtime<'r>> for EvalContext<'a, 'r> {
     fn from(runtime: &'a mut Runtime<'r>) -> Self {
         EvalContext { runtime }
     }
 }
 
-impl<'a, 'r> EvalContext<'a, 'r> where 'r: 'a {
+impl<'a, 'r> EvalContext<'a, 'r> {
     pub fn eval(&mut self, expr: &ExprVariant) -> EvalResult<Variant> {
         self.eval_inner_expr(expr)
+    }
+    
+    fn lookup_value(&self, name: StringValue) -> EvalResult<Variant> {
+        self.runtime.lookup_value(name)
+            .ok_or_else(|| {
+                let mut string = String::new();
+                name.write_str(&mut string, self.runtime.string_table()).unwrap();
+                ErrorKind::NameNotDefined(string).into()
+            })
     }
     
     fn eval_inner_expr(&mut self, expr: &ExprVariant) -> EvalResult<Variant> {
@@ -37,8 +46,8 @@ impl<'a, 'r> EvalContext<'a, 'r> where 'r: 'a {
             ExprVariant::UnaryOp(op, expr) => self.eval_unary_op((*op).into(), expr),
             ExprVariant::BinaryOp(op, lhs, rhs) => self.eval_binary_op((*op).into(), lhs, rhs),
             
-            ExprVariant::Assignment(assignment) => unimplemented!(),
-            ExprVariant::Declaration(declaration) => unimplemented!(),
+            ExprVariant::Assignment(assignment) => self.eval_assignment(assignment),
+            ExprVariant::Declaration(declaration) => self.eval_declaration(declaration),
             
             ExprVariant::Tuple(expr_list) => unimplemented!(),
             ExprVariant::ObjectCtor(ctor) => unimplemented!(),
@@ -65,13 +74,7 @@ impl<'a, 'r> EvalContext<'a, 'r> where 'r: 'a {
             Atom::FloatLiteral(value) => Variant::Float(*value),
             Atom::StringLiteral(sym) => Variant::String((*sym).into()),
             
-            Atom::Identifier(name) => {
-                let name = StringValue::from(*name);
-                self.runtime.lookup_value(name)
-                    .ok_or_else(|| ErrorKind::NameNotDefined(
-                        name.as_str(self.runtime.string_table()).to_string()
-                    ))?
-            },
+            Atom::Identifier(name) => self.lookup_value(StringValue::from(*name))?,
             
             Atom::Self_ => unimplemented!(),
             Atom::Super => unimplemented!(),
@@ -115,34 +118,38 @@ impl<'a, 'r> EvalContext<'a, 'r> where 'r: 'a {
         let lhs_value = self.eval_inner_expr(lhs)?;
         let rhs_value = self.eval_inner_expr(rhs)?;
         
+        self.eval_binary_op_values(op, &lhs_value, &rhs_value)
+    }
+    
+    fn eval_binary_op_values(&mut self, op: BinaryOp, lhs: &Variant, rhs: &Variant) -> EvalResult<Variant> {
         let result = match op {
             BinaryOp::Arithmetic(op) => match op {
-                Arithmetic::Mul    => eval_mul(&lhs_value, &rhs_value)?,
-                Arithmetic::Div    => eval_div(&lhs_value, &rhs_value)?,
-                Arithmetic::Mod    => eval_mod(&lhs_value, &rhs_value)?,
-                Arithmetic::Add    => eval_add(&lhs_value, &rhs_value)?,
-                Arithmetic::Sub    => eval_sub(&lhs_value, &rhs_value)?,
+                Arithmetic::Mul    => eval_mul(&lhs, &rhs)?,
+                Arithmetic::Div    => eval_div(&lhs, &rhs)?,
+                Arithmetic::Mod    => eval_mod(&lhs, &rhs)?,
+                Arithmetic::Add    => eval_add(&lhs, &rhs)?,
+                Arithmetic::Sub    => eval_sub(&lhs, &rhs)?,
             },
             
             BinaryOp::Bitwise(op) => match op {
-                Bitwise::And => eval_and(&lhs_value, &rhs_value),
-                Bitwise::Xor => eval_xor(&lhs_value, &rhs_value),
-                Bitwise::Or  => eval_or(&lhs_value, &rhs_value),
+                Bitwise::And => eval_and(&lhs, &rhs),
+                Bitwise::Xor => eval_xor(&lhs, &rhs),
+                Bitwise::Or  => eval_or(&lhs, &rhs),
             },
             
             BinaryOp::Shift(op) => match op {
-                Shift::Left => eval_shl(&lhs_value, &rhs_value)?,
-                Shift::Right => eval_shr(&lhs_value, &rhs_value)?,
+                Shift::Left => eval_shl(&lhs, &rhs)?,
+                Shift::Right => eval_shr(&lhs, &rhs)?,
             }
             
             BinaryOp::Comparison(op) => match op {
-                Comparison::LT     => eval_lt(&lhs_value, &rhs_value),
-                Comparison::GT     => eval_gt(&lhs_value, &rhs_value),
-                Comparison::LE     => eval_le(&lhs_value, &rhs_value),
-                Comparison::GE     => eval_ge(&lhs_value, &rhs_value),
+                Comparison::LT     => eval_lt(&lhs, &rhs),
+                Comparison::GT     => eval_gt(&lhs, &rhs),
+                Comparison::LE     => eval_le(&lhs, &rhs),
+                Comparison::GE     => eval_ge(&lhs, &rhs),
                 
-                Comparison::EQ     => Some(eval_eq(&lhs_value, &rhs_value)),
-                Comparison::NE     => Some(eval_ne(&lhs_value, &rhs_value)),
+                Comparison::EQ     => Some(eval_eq(&lhs, &rhs)),
+                Comparison::NE     => Some(eval_ne(&lhs, &rhs)),
             
             }.map(Variant::from),
             
@@ -152,7 +159,7 @@ impl<'a, 'r> EvalContext<'a, 'r> where 'r: 'a {
         if let Some(value) = result {
             Ok(value)
         } else {
-            Self::eval_binary_from_type(op, &lhs_value, &rhs_value)
+            Self::eval_binary_from_type(op, &lhs, &rhs)
         }
     }
     
@@ -164,7 +171,21 @@ impl<'a, 'r> EvalContext<'a, 'r> where 'r: 'a {
     
     
     fn eval_assignment(&mut self, assignment: &Assignment) -> EvalResult<Variant> {
-        unimplemented!()
+        if let LValue::Identifier(name) = assignment.lhs {
+            let name = StringValue::from(name);
+            let lhs_value = self.lookup_value(name)?;
+            let mut rhs_value = self.eval_inner_expr(&assignment.rhs)?;
+            
+            if let Some(op) = assignment.op {
+                rhs_value = self.eval_binary_op_values(op, &lhs_value, &rhs_value)?;
+            }
+            
+            let store_env = self.runtime.lookup_env_mut(name).unwrap();
+            store_env.store_value(name, rhs_value);
+            Ok(rhs_value)
+        } else {
+            unimplemented!()
+        }
     }
     
     fn eval_declaration(&mut self, declaration: &Declaration) -> EvalResult<Variant> {
@@ -172,14 +193,12 @@ impl<'a, 'r> EvalContext<'a, 'r> where 'r: 'a {
         if let LValue::Identifier(name) = declaration.lhs {
             let name = StringValue::from(name);
             let value = self.eval_inner_expr(&declaration.init)?;
-            self.runtime.store_value(name, value);
-            // let local_env = self.runtime.local_env_mut();
-            // local_env.store_value(name, value, &self.runtime);
+            let local_env = self.runtime.local_env_mut();
+            local_env.store_value(name, value);
             Ok(value)
         } else {
             unimplemented!()
         }
-        // unimplemented!()
         
     }
     

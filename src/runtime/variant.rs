@@ -61,7 +61,8 @@ impl Variant {
             Self::Float(value) => write!(dst, "{}", *value),
             Self::String(StringValue::Intern(sym)) => {
                 let sym = (*sym).into();
-                let string = runtime.string_table().resolve(sym).unwrap();
+                let interner = runtime.string_table().interner_ref();
+                let string = interner.resolve(sym).unwrap();
                 write!(dst, "\"{}\"", string)
             },
         }

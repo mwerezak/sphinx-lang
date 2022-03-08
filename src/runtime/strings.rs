@@ -1,4 +1,5 @@
 use std::fmt;
+use std::cell::{RefCell, Ref, RefMut};
 use std::hash::{Hash, Hasher, BuildHasher};
 
 use string_interner;
@@ -12,6 +13,33 @@ use crate::runtime::DefaultBuildHasher;
 // Interned Strings
 pub type InternBackend = DefaultBackend<DefaultSymbol>;
 pub type StringInterner = string_interner::StringInterner<InternBackend, DefaultBuildHasher>;
+
+
+
+// Typically the string interner needs to be borrowed to resolve an InternSymbol
+// On occasion it will need to be borrowed mutably when loading a new module or (sometimes) when creating a new string
+// These should never happen at the same time, but the compiler cannot check that, so we need to use RefCell
+#[derive(Debug)]
+pub struct StringTable {
+    // TODO add RwLock if we ever need this to be Sync
+    interner: RefCell<StringInterner>,
+}
+
+impl StringTable {
+    pub fn new() -> Self {
+        StringTable {
+            interner: RefCell::new(StringInterner::new())
+        }
+    }
+    
+    pub fn interner_ref(&self) -> Ref<StringInterner> {
+        self.interner.borrow()
+    }
+    
+    pub fn interner_mut(&self) -> RefMut<StringInterner> {
+        self.interner.borrow_mut()
+    }
+}
 
 
 // TODO rename to InternSymbol
@@ -67,11 +95,11 @@ impl StringValue {
         }
     }
     
-    pub fn as_str<'s>(&self, str_table: &'s StringInterner) -> &'s str {
+    pub fn write_str<'s>(&self, buf: &mut impl fmt::Write, string_table: &'s StringTable) -> fmt::Result {
         match self {
             Self::Intern(sym) => {
-                let sym = (*sym).into();
-                str_table.resolve(sym).unwrap()
+                let interner = string_table.interner_ref();
+                buf.write_str(interner.resolve((*sym).into()).unwrap())
             }
         }
     }
@@ -80,16 +108,16 @@ impl StringValue {
 // For use with VariantKey
 
 #[derive(Debug, Clone, Copy)]
-pub enum StringKey<'r> {
-    Intern { hash: u64, sym: InternSymbol, str_table: &'r StringInterner },
+pub enum StringKey<'s> {
+    Intern { hash: u64, sym: InternSymbol, string_table: &'s StringTable },
     // StrObject { hash: u64, handle: GCHandle },
 }
 
 impl Eq for StringKey<'_> { }
 
-impl<'r> PartialEq for StringKey<'r> {
+impl<'s> PartialEq for StringKey<'s> {
     #[inline]
-    fn eq(&self, other: &StringKey<'r>) -> bool {
+    fn eq(&self, other: &StringKey<'s>) -> bool {
         match (self, other) {
             (Self::Intern { sym: self_sym, .. }, Self::Intern { sym: other_sym, .. }) 
                 => self_sym == other_sym,
@@ -107,37 +135,34 @@ impl Hash for StringKey<'_> {
 }
 
 impl<'s> StringKey<'s> {
-    pub fn new(value: StringValue, str_table: &'s StringInterner, hasher: &impl BuildHasher) -> Self {
+    pub fn new(value: StringValue, string_table: &'s StringTable, hasher: &impl BuildHasher) -> Self {
         match value {
-            StringValue::Intern(sym) => Self::from_intern(sym, str_table, hasher),
+            StringValue::Intern(sym) => Self::from_intern(sym, string_table, hasher),
         }
     }
     
-    pub fn from_intern(sym: InternSymbol, str_table: &'s StringInterner, hasher: &impl BuildHasher) -> Self {
-        let string = str_table.resolve(sym.into()).unwrap();
+    pub fn from_intern(sym: InternSymbol, string_table: &'s StringTable, hasher: &impl BuildHasher) -> Self {
+        let interner = string_table.interner_ref();
+        let string = interner.resolve(sym.into()).unwrap();
         
         let mut hasher = hasher.build_hasher();
         string.hash(&mut hasher);
         let hash = hasher.finish();
         
         Self::Intern {
-            hash, sym, str_table,
-        }
-    }
-    
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Intern { sym, str_table, .. } => {
-                let sym = (*sym).into();
-                str_table.resolve(sym).unwrap()
-            }
+            hash, sym, string_table,
         }
     }
 }
 
 impl fmt::Display for StringKey<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.write_str(self.as_str())
+        match self {
+            Self::Intern { sym, string_table, .. } => {
+                let interner = string_table.interner_ref();
+                fmt.write_str(interner.resolve((*sym).into()).unwrap())
+            }
+        }
     }
 }
 

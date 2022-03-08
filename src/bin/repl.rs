@@ -14,7 +14,7 @@ use rlo_interpreter::language;
 use rlo_interpreter::interpreter;
 use rlo_interpreter::parser::stmt::{StmtVariant};
 use rlo_interpreter::runtime::*;
-use rlo_interpreter::runtime::strings::StringInterner;
+use rlo_interpreter::runtime::strings::StringTable;
 
 
 fn main() {
@@ -52,7 +52,7 @@ fn main() {
     
     if let Some(module) = module {
         let lexer_factory = language::create_default_lexer_rules();
-        let mut interner = StringInterner::new();
+        let mut interner = StringTable::new();
         
         let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
         let source_text = module.source_text().expect("error reading source");
@@ -86,7 +86,8 @@ fn main() {
         
     } else {
         println!("\nReLox Interpreter {}\n", version);
-        let mut repl = Repl::new(">>> ");
+        let string_table = StringTable::new();
+        let mut repl = Repl::new(">>> ", &string_table);
         repl.run();
     }
 }
@@ -94,18 +95,24 @@ fn main() {
 
 struct Repl<'r> {
     prompt: &'static str,
+    string_table: &'r StringTable,
     runtime: Runtime<'r>,
 }
 
 impl<'r> Repl<'r> {
-    pub fn new(prompt: &'static str) -> Self {
+    pub fn new(prompt: &'static str, string_table: &'r StringTable) -> Self {
         Repl { 
             prompt,
-            runtime: Runtime::new(),
+            string_table,
+            runtime: Runtime::new(&string_table),
         }
     }
     
     pub fn run(&mut self) {
+        // Temporary
+        let lexer_factory = language::create_default_lexer_rules();
+        
+        
         
         loop {
             io::stdout().write(self.prompt.as_bytes()).unwrap();
@@ -130,7 +137,7 @@ impl<'r> Repl<'r> {
                 break;
             }
             
-            let mut parse_ctx = self.runtime.parse_context();
+            let mut parse_ctx = ParseContext::new(&lexer_factory, &mut self.string_table);
             let module = ModuleSource::new("<repl>", SourceType::String(input));
             let source_text = module.source_text().expect("error reading source");
             let parse_result = parse_ctx.parse_ast(source_text);
