@@ -421,7 +421,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
         }
         
         let rule = &mut self.rules[rule_id];
-        if let MatchResult::CompleteMatch = rule.current_state() {
+        if matches!(rule.current_state(), MatchResult::CompleteMatch) {
             let token = rule.get_token()
                 .map_err(|err| self.inner_error(err, ErrorKind::CouldNotReadToken, token_start))?;
             

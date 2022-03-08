@@ -45,6 +45,7 @@ pub enum Token {
     FloatLiteral(language::FloatType),
     
     // Misc
+    Label(String),
     Comment,
     EOF,
 }

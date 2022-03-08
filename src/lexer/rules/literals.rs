@@ -8,6 +8,14 @@ use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Identifiers
 
+fn at_word_start(prev: Option<char>, next: char) -> bool {
+    match prev {
+        Some(prev) => !prev.is_word_ascii_alphanumeric() && next.is_word_ascii_alphabetic(),
+        None => true,
+    }
+}
+
+
 #[derive(Debug, Clone)]
 pub struct IdentifierRule {
     buf: String,
@@ -35,19 +43,13 @@ impl LexerRule for IdentifierRule {
     
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
         let valid = 
-            if self.buf.is_empty() {
-                let at_word_boundary = match prev {
-                    Some(ch) => !ch.is_word_alphanumeric(),
-                    None => true,
-                };
-                at_word_boundary && next.is_word_ascii_alphabetic()
-            } else {
-                next.is_word_ascii_alphanumeric()
-            };
+            if self.buf.is_empty() { at_word_start(prev, next) }
+            else { next.is_word_ascii_alphanumeric() };
         
         if valid {
             self.buf.push(next);
-            self.current_state()
+            
+            MatchResult::CompleteMatch
         } else {
             MatchResult::NoMatch
         }
@@ -56,6 +58,63 @@ impl LexerRule for IdentifierRule {
     fn get_token(&self) -> Result<Token, TokenError> {
         debug_assert!(self.current_state().is_complete_match());
         Ok(Token::Identifier(self.buf.clone()))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockLabelRule {
+    buf: String,
+    prefix: StrMatcher<'static>,
+}
+
+impl BlockLabelRule {
+    pub fn new(prefix: &'static str) -> Self {
+        BlockLabelRule {
+            buf: String::new(),
+            prefix: StrMatcher::case_sensitive(prefix),
+        }
+    }
+}
+
+impl LexerRule for BlockLabelRule {
+    fn reset(&mut self) {
+        self.buf.clear();
+        self.prefix.reset();
+    }
+    
+    fn current_state(&self) -> MatchResult {
+        let match_result = self.prefix.last_match_result();
+        
+        if !match_result.is_complete_match() {
+            match_result
+        } else if self.buf.is_empty() {
+            MatchResult::IncompleteMatch
+        } else {
+            MatchResult::CompleteMatch
+        }
+    }
+    
+    fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
+        if self.prefix.count() == 0 && !at_word_start(prev, next) {
+            return MatchResult::NoMatch;
+        }
+        
+        if !self.prefix.last_match_result().is_complete_match() {
+            return self.prefix.try_match(next);
+        }
+        
+        if next.is_word_ascii_alphanumeric() {
+            self.buf.push(next);
+            
+            MatchResult::CompleteMatch
+        } else {
+            MatchResult::NoMatch
+        }
+    }
+    
+    fn get_token(&self) -> Result<Token, TokenError> {
+        debug_assert!(self.current_state().is_complete_match());
+        Ok(Token::Label(self.buf.clone()))
     }
 }
 
