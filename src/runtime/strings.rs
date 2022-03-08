@@ -66,6 +66,15 @@ impl StringValue {
             // _ => None,
         }
     }
+    
+    pub fn as_str<'s>(&self, str_table: &'s StringInterner) -> &'s str {
+        match self {
+            Self::Intern(sym) => {
+                let sym = (*sym).into();
+                str_table.resolve(sym).unwrap()
+            }
+        }
+    }
 }
 
 // For use with VariantKey

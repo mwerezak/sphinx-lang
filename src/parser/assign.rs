@@ -13,15 +13,9 @@ pub enum LValue {
 
 #[derive(Debug, Clone)]
 pub struct Assignment {
-    lhs: LValue,
-    op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
-    rhs: ExprVariant,
-}
-
-impl Assignment {
-    pub fn new(lhs: LValue, op: Option<BinaryOp>, rhs: ExprVariant) -> Self {
-        Assignment { lhs, op, rhs }
-    }
+    pub lhs: LValue,
+    pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
+    pub rhs: ExprVariant,
 }
 
 #[derive(Debug, Clone)]
@@ -32,15 +26,9 @@ pub enum DeclType {
 
 #[derive(Debug, Clone)]
 pub struct Declaration {
-    decl: DeclType,
-    lhs: LValue,
-    init: ExprVariant,
-}
-
-impl Declaration {
-    pub fn new(decl: DeclType, lhs: LValue, init: ExprVariant) -> Self {
-        Declaration { decl, lhs, init }
-    }
+    pub decl: DeclType,
+    pub lhs: LValue,
+    pub init: ExprVariant,
 }
 
 // Convert expressions to LValues...

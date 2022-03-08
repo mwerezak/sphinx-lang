@@ -257,7 +257,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let rhs = self.parse_expr_variant(ctx)?;
             
             ctx.pop_extend();
-            return Ok(ExprVariant::assignment(Assignment::new(lhs, op, rhs)));
+            return Ok(ExprVariant::assignment(Assignment { lhs, op, rhs }));
         }
         
         Ok(expr)
@@ -272,7 +272,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         let next = self.advance()?;
         ctx.set_end(&next);
         
-        let decl_type = match next.token {
+        let decl = match next.token {
             Token::Let => DeclType::Immutable,
             Token::Var => DeclType::Mutable,
             _ => panic!("parse_vardecl_expr() called but next token was neither let or var"),
@@ -296,7 +296,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         let init = self.parse_expr_variant(ctx)?;
         
         ctx.pop_extend();
-        return Ok(ExprVariant::declaration(Declaration::new(decl_type, lhs, init)));
+        return Ok(ExprVariant::declaration(Declaration { decl, lhs, init }));
     }
     
     fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {

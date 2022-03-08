@@ -3,26 +3,29 @@
 
 use crate::parser::expr::ExprVariant;
 use crate::parser::primary::{Primary, Atom};
+use crate::parser::assign::{Declaration, Assignment, LValue};
+
 use crate::runtime::{Runtime, Variant};
+use crate::runtime::strings::StringValue;
 use crate::runtime::ops::*;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
-use crate::runtime::errors::EvalResult;
+use crate::runtime::errors::{EvalResult, EvalErrorKind as ErrorKind};
 
 
 // tracks the local scope and the innermost Expr
-pub struct EvalContext<'a, 'r> {
+pub struct EvalContext<'a, 'r> where 'r: 'a {
     // very important to keep 'a and 'r separate
     // otherwise EvalContext would be forced to live as long as 'r!
     runtime: &'a mut Runtime<'r>,
 }
 
-impl<'a, 'r> From<&'a mut Runtime<'r>> for EvalContext<'a, 'r> {
+impl<'a, 'r> From<&'a mut Runtime<'r>> for EvalContext<'a, 'r> where 'r: 'a {
     fn from(runtime: &'a mut Runtime<'r>) -> Self {
         EvalContext { runtime }
     }
 }
 
-impl<'a, 'r> EvalContext<'a, 'r> {
+impl<'a, 'r> EvalContext<'a, 'r> where 'r: 'a {
     pub fn eval(&mut self, expr: &ExprVariant) -> EvalResult<Variant> {
         self.eval_inner_expr(expr)
     }
@@ -62,7 +65,13 @@ impl<'a, 'r> EvalContext<'a, 'r> {
             Atom::FloatLiteral(value) => Variant::Float(*value),
             Atom::StringLiteral(sym) => Variant::String((*sym).into()),
             
-            Atom::Identifier(name) => unimplemented!(),
+            Atom::Identifier(name) => {
+                let name = StringValue::from(*name);
+                self.runtime.lookup_value(name)
+                    .ok_or_else(|| ErrorKind::NameNotDefined(
+                        name.as_str(self.runtime.string_table()).to_string()
+                    ))?
+            },
             
             Atom::Self_ => unimplemented!(),
             Atom::Super => unimplemented!(),
@@ -152,5 +161,30 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         // TODO defer to lhs's type metamethods, or rhs's type reflected metamethod
         unimplemented!()
     }
+    
+    
+    fn eval_assignment(&mut self, assignment: &Assignment) -> EvalResult<Variant> {
+        unimplemented!()
+    }
+    
+    fn eval_declaration(&mut self, declaration: &Declaration) -> EvalResult<Variant> {
+        
+        if let LValue::Identifier(name) = declaration.lhs {
+            let name = StringValue::from(name);
+            let value = self.eval_inner_expr(&declaration.init)?;
+            self.runtime.store_value(name, value);
+            // let local_env = self.runtime.local_env_mut();
+            // local_env.store_value(name, value, &self.runtime);
+            Ok(value)
+        } else {
+            unimplemented!()
+        }
+        // unimplemented!()
+        
+    }
+    
+    // fn eval_lvalue(&mut self, lvalue: &LValue) -> EvalResult<()> {
+        
+    // }
 }
 

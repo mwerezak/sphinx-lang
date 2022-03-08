@@ -84,13 +84,27 @@ impl<'r> Runtime<'r> {
     
     pub fn lookup_value(&self, name: StringValue) -> Option<Variant> {
         for local_env in self.env_stack.iter().rev() {
-            let value = local_env.lookup_value(name, &self);
+            let value = local_env.lookup_value(name, &self.string_table);
             if value.is_some() {
                 return value;
             }
         }
-        
-        self.globals.lookup_value(name, &self)
+        self.globals.lookup_value(name, &self.string_table)
+    }
+    
+    // find the index of the last Environment that has the given name, or None
+    fn search_env(&self, name: StringValue) -> Option<usize> {
+        for (idx, local_env) in self.env_stack.iter().enumerate().rev() {
+            if local_env.has_name(name, &self.string_table) {
+                return Some(idx);
+            }
+        }
+        return None;
+    }
+    
+    pub fn store_value(&'r mut self, name: StringValue, value: Variant) -> Option<Variant> {
+        let local_env = self.env_stack.last_mut().unwrap_or(&mut self.globals);
+        local_env.store_value(name, value, &self.string_table)
     }
 }
 
@@ -104,18 +118,20 @@ impl<'r> Environment<'r> {
         Environment { namespace: new_namespace() }
     }
     
-    pub fn has_name(&self, name: StringValue, runtime: &Runtime) -> bool {
-        let name_key = StringKey::new(name, &runtime.string_table, self.namespace.hasher());
+    pub fn has_name(&self, name: StringValue, string_table: &StringInterner) -> bool {
+        let name_key = StringKey::new(name, string_table, self.namespace.hasher());
         self.namespace.contains_key(&name_key)
     }
     
-    pub fn lookup_value(&self, name: StringValue, runtime: &Runtime) -> Option<Variant> {
-        let name_key = StringKey::new(name, &runtime.string_table, self.namespace.hasher());
+    pub fn lookup_value(&self, name: StringValue, string_table: &StringInterner) -> Option<Variant> {
+        let name_key = StringKey::new(name, string_table, self.namespace.hasher());
         self.namespace.get(&name_key).map(|value| *value)
     }
     
-    pub fn store_value(&mut self, name: StringValue, value: Variant, runtime: &'r Runtime<'r>) -> Option<Variant> {
-        let name_key = StringKey::new(name, &runtime.string_table, self.namespace.hasher());
+    pub fn store_value(&mut self, name: StringValue, value: Variant, string_table: &'r StringInterner) -> Option<Variant> {
+        let name_key = StringKey::new(name, string_table, self.namespace.hasher());
         self.namespace.insert(name_key, value)
     }
+    
+    // pub fn remove_name()
 }

@@ -9,6 +9,7 @@ pub enum EvalErrorKind {
     InvalidBinaryOperand,
     OverflowError,
     NegativeShiftCount,
+    NameNotDefined(String),
 }
 
 impl From<EvalErrorKind> for EvalError {
