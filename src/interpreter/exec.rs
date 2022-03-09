@@ -33,7 +33,9 @@ impl<'a, 'r> ExecContext<'a, 'r> {
                 interpreter::eval(&mut self.runtime, expr)?;
             }
             
+            StmtVariant::Continue(_label) => unimplemented!(),
             StmtVariant::Break(_label, _value) => unimplemented!(),
+            StmtVariant::Return(_value) => unimplemented!(),
         }
         
         Ok(())

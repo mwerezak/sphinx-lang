@@ -21,9 +21,9 @@ pub enum StmtVariant {
     // DoWhileLoop
     // ForLoop
     
-    // Continue(Option<Label>)
+    Continue(Option<Label>),
     Break(Option<Label>, Option<ExprVariant>),
-    // Return(Option<ExprVariant>)
+    Return(Option<ExprVariant>),
     
     Echo(ExprVariant),
     

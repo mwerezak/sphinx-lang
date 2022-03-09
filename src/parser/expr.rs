@@ -15,7 +15,7 @@ pub enum ExprVariant {
     
     BinaryOp(BinaryOp, Box<(ExprVariant, ExprVariant)>),
     
-    Assignment(Box<Assignment>), // use a box to keep size of Expr down
+    Assignment(Box<Assignment>), // box the whole Assignment (instead of just lhs ExprVariant) to keep size of Expr down
     
     Declaration(Box<Declaration>),
 

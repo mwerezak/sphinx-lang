@@ -102,11 +102,11 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         
         let result = match self.parse_stmt(&mut ctx) {
             Ok(stmt) => {
-                debug!("parser: {:#?}", stmt); 
+                debug!("parser: {:?}", stmt); 
                 Ok(stmt)
             },
             Err(err) => {
-                debug!("{:#?}", ctx);
+                debug!("{:?}", ctx);
                 let error = ParserError::from_prototype(err, ctx);
                 debug!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
                     error.kind(), error.context(), 
@@ -116,6 +116,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 debug!("sync to next stmt...");
                 let mut ctx = ErrorContext::new(self.module, ContextTag::Sync);
                 self.synchronize_stmt(&mut ctx);
+                debug!("done.");
                 
                 Err(error)
             },
@@ -181,16 +182,115 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             Token::While => unimplemented!(),
             Token::Do => unimplemented!(),
             Token::For => unimplemented!(),
-            Token::Continue => unimplemented!(),
-            Token::Break => unimplemented!(),
-            Token::Return => unimplemented!(),
             Token::Echo => {
                 ctx.set_end(&self.advance().unwrap());
                 StmtVariant::Echo(self.parse_expr_variant(ctx)?)
             },
+            
+            // only allowed at the end of a statement list
+            Token::Continue | Token::Break | Token::Return => {
+                ctx.push(ContextTag::ControlFlow);
+                ctx.set_start(&self.advance().unwrap());
+                return Err(ErrorKind::ControlFlowOutsideOfBlock.into());
+            },
+            
             _ => StmtVariant::Expression(self.parse_expr_variant(ctx)?),
         };
         Ok(stmt)
+    }
+    
+    fn parse_statement_list(&mut self, ctx: &mut ErrorContext) -> InternalResult<Vec<Stmt>> {
+        ctx.push(ContextTag::StmtList);
+        let mut suite = Vec::new();
+        
+        loop {
+            
+            let next = self.peek()?;
+            if matches!(next.token, Token::End) {
+                break;
+            }
+            
+            if let Some(stmt) = self.try_parse_control_flow_stmt(ctx)? {
+                suite.push(stmt);
+                
+                let next = self.peek()?;
+                if matches!(next.token, Token::End) {
+                    return Err(ErrorKind::ExpectedEndAfterControlFlow.into());
+                }
+                
+                break;
+            }
+            
+            suite.push(self.parse_stmt(ctx)?);
+        }
+        
+        ctx.set_end(&self.advance().unwrap());
+        
+        ctx.pop_extend();
+        Ok(suite)
+    }
+    
+    fn try_parse_label(&mut self, _ctx: &mut ErrorContext) -> InternalResult<Option<Label>> {
+        let next = self.peek()?;
+        
+        let label = if let Token::Label(..) = next.token {
+            let next = self.advance().unwrap();
+            
+            if let Token::Label(name) = next.token {
+                let name = InternSymbol::from_str(name.as_str(), self.interner);
+                Some(Label::new(name))
+            } else { unreachable!() }
+            
+        } else { None };
+        Ok(label)
+    }
+    
+    fn try_parse_control_flow_stmt(&mut self, ctx: &mut ErrorContext) -> InternalResult<Option<Stmt>> {
+        let next = self.peek()?;
+        
+        let stmt = match next.token {
+            Token::Continue => {
+                ctx.push(ContextTag::ControlFlow);
+                ctx.set_start(&self.advance().unwrap());
+                
+                let label = self.try_parse_label(ctx)?;
+                
+                StmtVariant::Continue(label)
+            },
+            
+            Token::Break => {
+                ctx.push(ContextTag::ControlFlow);
+                ctx.set_start(&self.advance().unwrap());
+                
+                let label = self.try_parse_label(ctx)?;
+                
+                let expr = 
+                    if !matches!(self.peek()?.token, Token::End | Token::Semicolon) {
+                        Some(self.parse_expr_variant(ctx)?)
+                    } else { None };
+                
+                StmtVariant::Break(label, expr)
+            },
+            
+            Token::Return => {
+                ctx.push(ContextTag::ControlFlow);
+                ctx.set_start(&self.advance().unwrap());
+                
+                let expr = 
+                    if !matches!(self.peek()?.token, Token::End | Token::Semicolon) {
+                        Some(self.parse_expr_variant(ctx)?)
+                    } else { None };
+                
+                StmtVariant::Return(expr)
+            }
+            
+            _ => return Ok(None),
+        };
+        
+        let symbol = ctx.frame().as_debug_symbol().unwrap();
+        
+        ctx.pop_extend();
+        Ok(Some(Stmt::new(stmt, symbol)))
     }
     
     /*** Expression Parsing ***/
@@ -481,6 +581,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     */
     fn parse_block_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         ctx.push(ContextTag::BlockExpr);
+        ctx.set_start(self.peek()?);
         
         // check for label
         let block_label = self.try_parse_label(ctx)?;
@@ -492,80 +593,10 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             return Err(ErrorKind::ExpectedItemAfterLabel.into());
         }
         
-        let mut suite = Vec::new();
-        loop {
-            let next = self.peek()?;
-            if matches!(next.token, Token::End) {
-                ctx.set_end(&self.advance().unwrap());
-                break;
-            }
-            
-            // "break" with value allowed in block expressions
-            if matches!(next.token, Token::Break) {
-                ctx.push(ContextTag::Stmt);
-                ctx.set_start(&self.advance().unwrap());
-                
-                let break_label = self.try_parse_label(ctx)?;
-                
-                // parsing the break value is a little tricky
-                // we try to parse a statement, if it is anything other than an expression statement
-                // then we assume there was no value supplied and the statement we got is actually the next statement
-                
-                // in case the next statement doesn't belong to the break
-                // we need to capture the debug symbol now
-                let mut symbol = ctx.frame().as_debug_symbol().unwrap();
-                
-                let mut next_stmt = None;
-                let break_expr = 
-                    if matches!(self.peek()?.token, Token::Semicolon) { None }
-                    else {
-                        let stmt = self.parse_stmt(ctx)?;
-                        if matches!(stmt.variant(), StmtVariant::Expression(..)) {
-                            if let StmtVariant::Expression(expr) = stmt.take_variant() {
-                                symbol = ctx.frame().as_debug_symbol().unwrap(); // update symbol
-                                Some(expr) 
-                            } else { unreachable!() }
-                        } else { 
-                            next_stmt.replace(stmt);
-                            None
-                        }
-                    };
-                
-                ctx.pop_extend();
-                
-                let break_stmt = StmtVariant::Break(break_label, break_expr);
-                suite.push(Stmt::new(break_stmt, symbol));
-                
-                if let Some(stmt) = next_stmt {
-                    suite.push(stmt);
-                }
-                
-            } else {
-                
-                suite.push(self.parse_stmt(ctx)?);
-            }
-            
-        }
+        let suite = self.parse_statement_list(ctx)?;
         
         ctx.pop_extend();
         Ok(ExprVariant::Block(suite, block_label))
-    }
-    
-    fn try_parse_label(&mut self, ctx: &mut ErrorContext) -> InternalResult<Option<Label>> {
-        let next = self.peek()?;
-        ctx.set_start(&next);
-        
-        let label = if let Token::Label(..) = next.token {
-            let next = self.advance().unwrap();
-            ctx.set_end(&next);
-            
-            if let Token::Label(name) = next.token {
-                let name = InternSymbol::from_str(name.as_str(), self.interner);
-                Some(Label::new(name))
-            } else { unreachable!() }
-            
-        } else { None };
-        Ok(label)
     }
     
     /*

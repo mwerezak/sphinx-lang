@@ -21,6 +21,8 @@ pub enum ParserErrorKind {
     ExpectedItemAfterLabel,   // expected either begin, while, for after label
     InvalidAssignment,      // the LHS of an assignment was not a valid lvalue
     InvalidDeclAssignment,  // only "=" allowed in variable decls
+    ControlFlowOutsideOfBlock,
+    ExpectedEndAfterControlFlow,
     DeclMissingInitializer, 
 }
 
@@ -31,6 +33,8 @@ pub enum ContextTag {
     TopLevel,
     Sync,
     Stmt,
+    StmtList,
+    ControlFlow,
     Expr,
     BlockExpr,
     AssignmentExpr,
@@ -134,6 +138,8 @@ impl fmt::Display for ParserError<'_> {
             ErrorKind::InvalidDeclAssignment  => "only '=' is allowed when initializing a newly declared variable",
             ErrorKind::DeclMissingInitializer => "missing '=' initializer for variable declaration",
             ErrorKind::ExpectedItemAfterLabel => "expected loop statement or block expression after label",
+            ErrorKind::ControlFlowOutsideOfBlock => "'return', 'break', or 'continue' are only allowed at the end of a statement block",
+            ErrorKind::ExpectedEndAfterControlFlow => "'return', 'break', or 'continue' must be the last statement in a statement block",
         };
         
         utils::format_error(fmt, "syntax error", Some(message), self.source())
