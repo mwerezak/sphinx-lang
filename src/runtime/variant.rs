@@ -57,7 +57,13 @@ impl Variant {
             Self::BoolTrue => dst.write_str("true"),
             Self::BoolFalse => dst.write_str("false"),
             Self::Integer(value) => write!(dst, "{}", *value),
-            Self::Float(value) => write!(dst, "{}", *value),
+            Self::Float(value) => {
+                if value.trunc() != *value {
+                    write!(dst, "{}", *value)
+                } else {
+                    write!(dst, "{}.0", value)
+                }
+            },
             Self::String(StringValue::Intern(sym)) => {
                 let sym = (*sym).into();
                 let interner = string_table.interner_ref();
