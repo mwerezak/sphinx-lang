@@ -1,6 +1,7 @@
 use std::fmt;
 use std::error::Error;
 
+// TODO box error
 pub type ExecResult<T> = Result<T, RuntimeError>;
 
 pub type ErrorKind = RuntimeErrorKind;
@@ -49,3 +50,16 @@ impl fmt::Display for RuntimeError {
         unimplemented!()
     }
 }
+
+/*
+Probably declare these in the debug module...
+
+pub struct Frame {
+    symbol: DebugSymbol,
+    context: ...,
+}
+
+pub struct Traceback {
+    frames: Vec<Frame>,
+}
+*/

@@ -26,10 +26,10 @@ use strings::{StringTable, StringKey, StringValue};
 
 pub type DefaultHasher = AHasher;
 pub type DefaultBuildHasher = ahash::RandomState;
-pub type Dictionary<'r> = HashMap<VariantKey<'r>, Variant, DefaultBuildHasher>;
+pub type Dictionary<'s> = HashMap<VariantKey<'s>, Variant, DefaultBuildHasher>;
 pub type Namespace<'s> = HashMap<StringKey<'s>, Variant, DefaultBuildHasher>;
 
-pub fn new_dictionary<'r>() -> Dictionary<'r> {
+pub fn new_dictionary<'s>() -> Dictionary<'s> {
     Dictionary::with_hasher(DefaultBuildHasher::default())
 }
 
@@ -38,117 +38,99 @@ pub fn new_namespace<'s>() -> Namespace<'s> {
 }
 
 
-#[derive(Debug)]
-pub struct Runtime<'r> {
-    string_table: &'r StringTable,
-    globals: Environment<'r>,
-    env_stack: Vec<Environment<'r>>,
+// #[derive(Debug)]
+// pub struct Runtime<'r, 's> {
+//     string_table: &'s StringTable,
+    
+//     // TODO when modules are implemented this will be replaced
+//     root_env: Environment<'r, 's>,
+// }
+
+// impl<'s> Runtime<'_, 's> {
+//     pub fn new(string_table: &'s StringTable) -> Self {
+//         let root_env = Environment { 
+//             string_table, 
+//             namespace: new_namespace(),
+//             parent: None,
+//         };
+        
+//         Runtime {
+//             string_table,
+//             root_env,
+//         }
+//     }
+    
+//     pub fn string_table(&self) -> &StringTable { self.string_table }
+    
+// }
+
+pub fn placeholder_new_env<'r, 's>(string_table: &'s StringTable) -> Environment<'r, 's> {
+    Environment {
+        parent: None,
+        namespace: RefCell::new(new_namespace()),
+        string_table,
+    }
 }
 
-impl<'r> Runtime<'r> {
-    pub fn new(string_table: &'r StringTable) -> Self {
-        let globals = Environment { 
-            string_table, namespace: new_namespace(),
-        };
-        
-        Runtime {
-            string_table,
-            globals,
-            env_stack: Vec::new(),
-        }
-    }
-    
+#[derive(Debug)]
+pub struct Environment<'r, 's> {
+    parent: Option<&'r Environment<'r, 's>>,
+    namespace: RefCell<Namespace<'s>>,
+    string_table: &'s StringTable,
+}
+
+impl<'r, 's> Environment<'r, 's> {
     pub fn string_table(&self) -> &StringTable { self.string_table }
     
-    // Environments and Variable Lookup
-    
-    pub fn global_env(&self) -> &Environment<'r> { &self.globals }
-    pub fn global_env_mut(&mut self) -> &mut Environment<'r> { &mut self.globals }
-    
-    pub fn local_env(&self) -> &Environment<'r> {
-        self.env_stack.last().unwrap_or(&self.globals)
-    }
-    pub fn local_env_mut(&mut self) -> &mut Environment<'r> {
-        self.env_stack.last_mut().unwrap_or(&mut self.globals)
+    /// Check if the name exists in this Environment
+    pub fn has_name(&self, name: StringValue) -> bool {
+        let local_store = self.namespace.borrow();
+        let name_key = StringKey::new(name, self.string_table, local_store.hasher());
+        local_store.contains_key(&name_key)
     }
     
-    pub fn push_env(&'r mut self) {
-        let new_env = Environment { 
-            string_table: self.string_table,
-            namespace: new_namespace(),
-        };
-        
-        self.env_stack.push(new_env);
+    /// Find the innermost Environment that has the given name, or None
+    pub fn find_name<'a>(&'a self, name: StringValue) -> Option<&'a Environment<'r, 's>> {
+        let mut next_env = Some(self);
+        while let Some(env) = next_env {
+            if env.has_name(name) {
+                return next_env
+            }
+            next_env = self.parent;
+        }
+        None
     }
     
-    pub fn pop_env(&mut self) {
-        self.env_stack.pop(); // TODO close upvalues
-    }
-    
+    /// Lookup a value for the given name in this Environment
     pub fn lookup_value(&self, name: StringValue) -> Option<Variant> {
-        for local_env in self.env_stack.iter().rev() {
-            let value = local_env.lookup_value(name);
+        let local_store = self.namespace.borrow();
+        let name_key = StringKey::new(name, self.string_table, local_store.hasher());
+        local_store.get(&name_key).map(|value| *value)
+    }
+    
+    /// Lookup a value for the given name in the innermost Environment in which it can be found.
+    pub fn find_value(&self, name: StringValue) -> Option<Variant> {
+        let mut next_env = Some(self);
+        while let Some(env) = next_env {
+            let value = env.lookup_value(name);
             if value.is_some() {
                 return value;
             }
+            next_env = self.parent;
         }
-        self.globals.lookup_value(name)
+        None
     }
     
-    // returns the innermost env that contains the name, or None
-    pub fn lookup_env(&self, name: StringValue) -> Option<&Environment<'r>> {
-        if let Some(index) = self.search_env(name) {
-            Some(&self.env_stack[index])
-        } else if self.globals.has_name(name) {
-            Some(&self.globals)
-        } else {
-            None
-        }
+    /// Store a value in this Environment
+    pub fn insert_value(&self, name: StringValue, value: Variant) -> Option<Variant> {
+        let mut local_store = self.namespace.borrow_mut();
+        let name_key = StringKey::new(name, self.string_table, local_store.hasher());
+        local_store.insert(name_key, value)
     }
     
-    pub fn lookup_env_mut(&mut self, name: StringValue) -> Option<&mut Environment<'r>> {
-        if let Some(index) = self.search_env(name) {
-            Some(&mut self.env_stack[index])
-        } else if self.globals.has_name(name) {
-            Some(&mut self.globals)
-        } else {
-            None
-        }
+    pub fn remove_value(&self, name: StringValue) -> Option<Variant> {
+        let mut local_store = self.namespace.borrow_mut();
+        let name_key = StringKey::new(name, self.string_table, local_store.hasher());
+        local_store.remove(&name_key)
     }
-    
-    fn search_env(&self, name: StringValue) -> Option<usize> {
-        for (idx, local_env) in self.env_stack.iter().enumerate().rev() {
-            if local_env.has_name(name) {
-                return Some(idx);
-            }
-        }
-        return None;
-    }
-}
-
-
-#[derive(Debug)]
-pub struct Environment<'r> {
-    // TODO name for traceback
-    string_table: &'r StringTable,
-    namespace: Namespace<'r>,
-}
-
-impl<'r> Environment<'r> {
-    pub fn has_name(&self, name: StringValue) -> bool {
-        let name_key = StringKey::new(name, self.string_table, self.namespace.hasher());
-        self.namespace.contains_key(&name_key)
-    }
-    
-    pub fn lookup_value(&self, name: StringValue) -> Option<Variant> {
-        let name_key = StringKey::new(name, self.string_table, self.namespace.hasher());
-        self.namespace.get(&name_key).map(|value| *value)
-    }
-    
-    pub fn store_value(&mut self, name: StringValue, value: Variant) -> Option<Variant> {
-        let name_key = StringKey::new(name, self.string_table, self.namespace.hasher());
-        self.namespace.insert(name_key, value)
-    }
-    
-    // pub fn _name()
 }

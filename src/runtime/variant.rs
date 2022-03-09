@@ -2,8 +2,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher, BuildHasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::Runtime;
-use crate::runtime::strings::{StringValue, StringKey};
+use crate::runtime::strings::{StringValue, StringKey, StringTable};
 use crate::runtime::errors::{ExecResult, RuntimeErrorKind as ErrorKind};
 
 
@@ -42,7 +41,7 @@ impl Variant {
     
     pub fn float_value(&self) -> FloatType {
         match self {
-            // it'r okay if this is a lossy conversion
+            // it's okay if this is a lossy conversion
             Self::Integer(value) => (*value) as FloatType,
             Self::Float(value) => *value,
             
@@ -51,7 +50,7 @@ impl Variant {
     }
     
     // write a string representation of this value
-    pub fn write_repr(&self, dst: &mut impl fmt::Write, runtime: &Runtime) -> fmt::Result {
+    pub fn write_repr(&self, dst: &mut impl fmt::Write, string_table: &StringTable) -> fmt::Result {
         match self {
             Self::Nil => dst.write_str("nil"),
             Self::EmptyTuple => dst.write_str("()"),
@@ -61,15 +60,15 @@ impl Variant {
             Self::Float(value) => write!(dst, "{}", *value),
             Self::String(StringValue::Intern(sym)) => {
                 let sym = (*sym).into();
-                let interner = runtime.string_table().interner_ref();
+                let interner = string_table.interner_ref();
                 let string = interner.resolve(sym).unwrap();
                 write!(dst, "\"{}\"", string)
             },
         }
     }
     
-    pub fn into_key<'r>(self, runtime: &'r Runtime, hasher_factory: &impl BuildHasher) -> ExecResult<VariantKey<'r>> {
-        VariantKey::new(self, runtime, hasher_factory)
+    pub fn into_key<'s>(self, string_table: &'s StringTable, hasher_factory: &impl BuildHasher) -> ExecResult<VariantKey<'s>> {
+        VariantKey::new(self, string_table, hasher_factory)
     }
 }
 
@@ -99,13 +98,13 @@ impl From<StringValue> for Variant {
 // Wrapper type for use as keys in VariantMap
 
 #[derive(Debug, Clone, Copy)]
-pub enum VariantKey<'r> {
+pub enum VariantKey<'s> {
     Nil,
     EmptyTuple, // the empty tuple value
     BoolTrue,
     BoolFalse,
     Integer(IntType),
-    String(StringKey<'r>)
+    String(StringKey<'s>)
     // Tuple
     // Object(u64, GCHandle), // use user-defined hash and equality
 }
@@ -125,8 +124,8 @@ impl Hash for VariantKey<'_> {
 
 impl Eq for VariantKey<'_> { }
 
-impl<'r> PartialEq for VariantKey<'r> {
-    fn eq(&self, other: &VariantKey<'r>) -> bool {
+impl<'s> PartialEq for VariantKey<'s> {
+    fn eq(&self, other: &VariantKey<'s>) -> bool {
         match (self, other) {
             (Self::Nil, Self::Nil) => true,
             (Self::EmptyTuple, Self::EmptyTuple) => true,
@@ -144,8 +143,8 @@ impl<'r> PartialEq for VariantKey<'r> {
     }
 }
 
-impl<'r> VariantKey<'r> {
-    pub fn new(value: Variant, runtime: &'r Runtime, hasher_factory: &impl BuildHasher) -> ExecResult<Self> {
+impl<'s> VariantKey<'s> {
+    pub fn new(value: Variant, string_table: &'s StringTable, hasher_factory: &impl BuildHasher) -> ExecResult<Self> {
         let key = match value {
             Variant::Nil => Self::Nil,
             Variant::EmptyTuple => Self::EmptyTuple,
@@ -156,7 +155,7 @@ impl<'r> VariantKey<'r> {
             
             Variant::String(strval) => {
                 let strkey = match strval {
-                    StringValue::Intern(sym) => StringKey::from_intern(sym, runtime.string_table(), hasher_factory),
+                    StringValue::Intern(sym) => StringKey::from_intern(sym, string_table, hasher_factory),
                 };
                 
                 Self::String(strkey)

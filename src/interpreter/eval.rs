@@ -1,45 +1,51 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 
-use crate::parser::expr::ExprVariant;
+use crate::parser::expr::{Expr, ExprVariant};
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::assign::{Declaration, Assignment, LValue};
 
-use crate::runtime::{Runtime, Variant};
+use crate::runtime::{Environment, Variant};
 use crate::runtime::strings::StringValue;
 use crate::runtime::ops::*;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
-// tracks the local scope and the innermost Expr
-pub struct EvalContext<'a, 'r> {
-    // very important to keep 'a and 'r separate
-    // otherwise EvalContext would be forced to live as long as 'r!
-    runtime: &'a mut Runtime<'r>,
+// These will differ more once tracebacks are implemented
+pub fn eval_expr<'a>(local_env: &'a Environment<'_, '_>, expr: &Expr) -> ExecResult<Variant> {
+    let mut ctx = EvalContext::from(local_env);
+    ctx.eval(expr)
 }
 
-impl<'a, 'r> From<&'a mut Runtime<'r>> for EvalContext<'a, 'r> {
-    fn from(runtime: &'a mut Runtime<'r>) -> Self {
-        EvalContext { runtime }
+pub fn eval_expr_variant<'a>(local_env: &'a Environment<'_, '_>, expr: &ExprVariant) -> ExecResult<Variant> {
+    let mut ctx = EvalContext::from(local_env);
+    ctx.eval_variant(expr)
+}
+
+// tracks the local scope and the innermost Expr
+pub struct EvalContext<'a, 'r, 's> {
+    // very important to keep 'a and 'r separate
+    // otherwise EvalContext would be forced to live as long as 'r!
+    local_env: &'a Environment<'r, 's>,
+}
+
+impl<'a, 'r, 's> From<&'a Environment<'r, 's>> for EvalContext<'a, 'r, 's> {
+    fn from(local_env: &'a Environment<'r, 's>) -> Self {
+        EvalContext { local_env }
     }
 }
 
-impl<'a, 'r> EvalContext<'a, 'r> {
-    pub fn eval(&mut self, expr: &ExprVariant) -> ExecResult<Variant> {
+impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
+    pub fn eval(&self, expr: &Expr) -> ExecResult<Variant> {
+        self.eval_inner_expr(expr.variant())
+    }
+    
+    pub fn eval_variant(&self, expr: &ExprVariant) -> ExecResult<Variant> {
         self.eval_inner_expr(expr)
     }
     
-    fn lookup_value(&self, name: StringValue) -> ExecResult<Variant> {
-        self.runtime.lookup_value(name)
-            .ok_or_else(|| {
-                let mut string = String::new();
-                name.write_str(&mut string, self.runtime.string_table()).unwrap();
-                ErrorKind::NameNotDefined(string).into()
-            })
-    }
-    
-    fn eval_inner_expr(&mut self, expr: &ExprVariant) -> ExecResult<Variant> {
+    fn eval_inner_expr(&self, expr: &ExprVariant) -> ExecResult<Variant> {
         match expr {
             ExprVariant::Atom(atom) => self.eval_atom(atom),
             
@@ -61,7 +67,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         }
     }
 
-    fn eval_primary(&mut self, primary: &Primary) -> ExecResult<Variant> {
+    fn eval_primary(&self, primary: &Primary) -> ExecResult<Variant> {
         let mut value = self.eval_atom(primary.atom())?;
         
         for item in primary.path().iter() {
@@ -71,7 +77,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         Ok(value)
     }
 
-    fn eval_atom(&mut self, atom: &Atom) -> ExecResult<Variant> {
+    fn eval_atom(&self, atom: &Atom) -> ExecResult<Variant> {
         let value = match atom {
             Atom::Nil => Variant::Nil,
             Atom::EmptyTuple => Variant::EmptyTuple,
@@ -81,7 +87,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
             Atom::FloatLiteral(value) => Variant::Float(*value),
             Atom::StringLiteral(sym) => Variant::String((*sym).into()),
             
-            Atom::Identifier(name) => self.lookup_value(StringValue::from(*name))?,
+            Atom::Identifier(name) => self.find_value(StringValue::from(*name))?,
             
             Atom::Self_ => unimplemented!(),
             Atom::Super => unimplemented!(),
@@ -91,7 +97,16 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         Ok(value)
     }
     
-    fn eval_short_circuit_logic(&mut self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> ExecResult<Variant> {
+    fn find_value(&self, name: StringValue) -> ExecResult<Variant> {
+        self.local_env.find_value(name)
+            .ok_or_else(|| {
+                let mut string = String::new();
+                name.write_str(&mut string, self.local_env.string_table()).unwrap();
+                ErrorKind::NameNotDefined(string).into()
+            })
+    }
+    
+    fn eval_short_circuit_logic(&self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> ExecResult<Variant> {
         let lhs_value = self.eval_inner_expr(lhs)?;
         
         let cond = match op {
@@ -106,7 +121,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         }
     }
     
-    fn eval_unary_op(&mut self, op: UnaryOp, expr: &ExprVariant) -> ExecResult<Variant> {
+    fn eval_unary_op(&self, op: UnaryOp, expr: &ExprVariant) -> ExecResult<Variant> {
         let operand = self.eval_inner_expr(expr)?;
         
         match op {
@@ -117,7 +132,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         }
     }
     
-    fn eval_binary_op(&mut self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> ExecResult<Variant> {
+    fn eval_binary_op(&self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> ExecResult<Variant> {
         if let BinaryOp::Logical(logic) = op {
             return self.eval_short_circuit_logic(logic, lhs, rhs);
         }
@@ -128,7 +143,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         self.eval_binary_op_values(op, &lhs_value, &rhs_value)
     }
     
-    fn eval_binary_op_values(&mut self, op: BinaryOp, lhs: &Variant, rhs: &Variant) -> ExecResult<Variant> {
+    fn eval_binary_op_values(&self, op: BinaryOp, lhs: &Variant, rhs: &Variant) -> ExecResult<Variant> {
         let result = match op {
             BinaryOp::Arithmetic(op) => match op {
                 Arithmetic::Mul    => eval_mul(&lhs, &rhs)?,
@@ -176,32 +191,40 @@ impl<'a, 'r> EvalContext<'a, 'r> {
         unimplemented!()
     }
     
+    fn find_env(&'a self, name: StringValue) -> ExecResult<&'a Environment<'r, 's>> {
+        self.local_env.find_name(name)
+            .ok_or_else(|| {
+                let mut string = String::new();
+                name.write_str(&mut string, self.local_env.string_table()).unwrap();
+                ErrorKind::NameNotDefined(string).into()
+            })
+    }
     
-    fn eval_assignment(&mut self, assignment: &Assignment) -> ExecResult<Variant> {
+    fn eval_assignment(&self, assignment: &Assignment) -> ExecResult<Variant> {
         if let LValue::Identifier(name) = assignment.lhs {
             let name = StringValue::from(name);
-            let lhs_value = self.lookup_value(name)?;
+            let store_env = self.find_env(name)?;
+            
+            let lhs_value = store_env.lookup_value(name).unwrap();
             let mut rhs_value = self.eval_inner_expr(&assignment.rhs)?;
             
             if let Some(op) = assignment.op {
                 rhs_value = self.eval_binary_op_values(op, &lhs_value, &rhs_value)?;
             }
             
-            let store_env = self.runtime.lookup_env_mut(name).unwrap();
-            store_env.store_value(name, rhs_value);
+            store_env.insert_value(name, rhs_value);
             Ok(rhs_value)
         } else {
             unimplemented!()
         }
     }
     
-    fn eval_declaration(&mut self, declaration: &Declaration) -> ExecResult<Variant> {
+    fn eval_declaration(&self, declaration: &Declaration) -> ExecResult<Variant> {
         
         if let LValue::Identifier(name) = declaration.lhs {
             let name = StringValue::from(name);
             let value = self.eval_inner_expr(&declaration.init)?;
-            let local_env = self.runtime.local_env_mut();
-            local_env.store_value(name, value);
+            self.local_env.insert_value(name, value);
             Ok(value)
         } else {
             unimplemented!()

@@ -70,8 +70,23 @@ impl From<Expr> for (ExprVariant, DebugSymbol) {
 // create an expression-statement
 
 impl From<Expr> for Stmt {
+    #[inline]
     fn from(expr: Expr) -> Self {
         let variant = StmtVariant::Expression(expr.variant);
         Stmt::new(variant, expr.symbol)
+    }
+}
+
+impl TryFrom<Stmt> for Expr {
+    type Error = ();
+    
+    #[inline]
+    fn try_from(stmt: Stmt) -> Result<Self, Self::Error> {
+        let (stmt, symbol) = stmt.take();
+        if let StmtVariant::Expression(expr) = stmt {
+            Ok(Expr::new(expr, symbol))
+        } else {
+            Err(())
+        }
     }
 }

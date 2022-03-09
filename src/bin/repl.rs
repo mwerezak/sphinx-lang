@@ -87,7 +87,7 @@ fn main() {
     } else {
         println!("\nReLox Interpreter {}\n", version);
         let string_table = StringTable::new();
-        let mut repl = Repl::new(">>> ", &string_table);
+        let repl = Repl::new(">>> ", &string_table);
         repl.run();
     }
 }
@@ -96,7 +96,7 @@ fn main() {
 struct Repl<'r> {
     prompt: &'static str,
     string_table: &'r StringTable,
-    runtime: Runtime<'r>,
+    root_env: Environment<'r, 'r>,
 }
 
 impl<'r> Repl<'r> {
@@ -104,11 +104,11 @@ impl<'r> Repl<'r> {
         Repl { 
             prompt,
             string_table,
-            runtime: Runtime::new(&string_table),
+            root_env: placeholder_new_env(string_table),
         }
     }
     
-    pub fn run(&mut self) {
+    pub fn run(&self) {
         // Temporary
         let lexer_factory = language::create_default_lexer_rules();
         
@@ -137,7 +137,7 @@ impl<'r> Repl<'r> {
                 break;
             }
             
-            let mut parse_ctx = ParseContext::new(&lexer_factory, &mut self.string_table);
+            let mut parse_ctx = ParseContext::new(&lexer_factory, &self.string_table);
             let module = ModuleSource::new("<repl>", SourceType::String(input));
             let source_text = module.source_text().expect("error reading source");
             let parse_result = parse_ctx.parse_ast(source_text);
@@ -163,13 +163,13 @@ impl<'r> Repl<'r> {
             for stmt in stmts.iter() {
                 match stmt.variant() {
                     StmtVariant::Expression(expr) => {
-                        let eval_result = interpreter::eval(&mut self.runtime, &expr);
+                        let eval_result = interpreter::eval_expr_variant(&self.root_env, &expr);
                         log::debug!("{:?}", eval_result);
                         
                         match eval_result {
                             Ok(value) => {
                                 let mut buf = String::new();
-                                value.write_repr(&mut buf, &self.runtime)
+                                value.write_repr(&mut buf, &self.string_table)
                                     .expect("could not write to string buffer");
                                 
                                 println!("{}", buf);
@@ -179,8 +179,9 @@ impl<'r> Repl<'r> {
                             },
                         }
                     },
-                    stmt => {
-                        let exec_result = interpreter::exec(&mut self.runtime, &stmt);
+                    _ => {
+                        let exec_ctx = interpreter::ExecContext::from(&self.root_env);
+                        let exec_result = exec_ctx.exec(&stmt);
                         log::debug!("{:?}", exec_result);
                     },
                 }

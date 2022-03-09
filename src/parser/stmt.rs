@@ -46,4 +46,9 @@ impl Stmt {
     pub fn take_variant(self) -> StmtVariant { self.variant }
     
     pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
+    pub fn take_symbol(self) -> DebugSymbol { self.symbol }
+    
+    pub fn take(self) -> (StmtVariant, DebugSymbol) {
+        (self.variant, self.symbol)
+    }
 }

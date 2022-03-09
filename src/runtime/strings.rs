@@ -73,7 +73,7 @@ impl From<DefaultSymbol> for InternSymbol {
 // Enum over the different string representations
 #[derive(Debug, Clone, Copy)]
 pub enum StringValue {
-    Intern(InternSymbol),
+    Intern(InternSymbol),  // TODO store hash to make conversion to StringKey cheaper
     //Object(GCHandle),
 }
 
