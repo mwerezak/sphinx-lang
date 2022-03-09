@@ -23,20 +23,31 @@ pub type StringInterner = string_interner::StringInterner<InternBackend, Default
 pub struct StringTable {
     // TODO add RwLock if we ever need this to be Sync
     interner: RefCell<StringInterner>,
+    // hasher_factory: DefaultBuildHasher,
 }
 
 impl StringTable {
     pub fn new() -> Self {
         StringTable {
-            interner: RefCell::new(StringInterner::new())
+            interner: RefCell::new(StringInterner::new()),
+            // hasher_factory: DefaultBuildHasher::default(),
         }
     }
     
-    pub fn interner_ref(&self) -> Ref<StringInterner> {
-        self.interner.borrow()
+    // pub fn hasher(&self) -> &impl BuildHasher { return &self.hasher_factory }
+    
+    pub fn get_or_intern(&self, string: &str) -> InternSymbol {
+        let mut interner = self.interner.borrow_mut();
+        interner.get_or_intern(string).into()
     }
     
-    pub fn interner_mut(&self) -> RefMut<StringInterner> {
+    pub fn resolve(&self, sym: &InternSymbol) -> Ref<'_, str> {
+        let interner = self.interner.borrow();
+        Ref::map(interner, |interner| interner.resolve(sym.0).unwrap())
+    }
+    
+    // used when parsing for performance (as we likely will need to intern many identifiers)
+    pub fn borrow_interner_mut(&self) -> RefMut<StringInterner> {
         self.interner.borrow_mut()
     }
 }
@@ -47,10 +58,6 @@ impl StringTable {
 pub struct InternSymbol(DefaultSymbol);
 
 impl InternSymbol {
-    pub fn from_str(s: &str, interner: &mut StringInterner) -> Self {
-        InternSymbol(interner.get_or_intern(s))
-    }
-    
     pub fn to_usize(&self) -> usize {
         self.0.to_usize()
     }
@@ -98,8 +105,7 @@ impl StringValue {
     pub fn write_str<'s>(&self, buf: &mut impl fmt::Write, string_table: &'s StringTable) -> fmt::Result {
         match self {
             Self::Intern(sym) => {
-                let interner = string_table.interner_ref();
-                buf.write_str(interner.resolve((*sym).into()).unwrap())
+                buf.write_str(&string_table.resolve(sym))
             }
         }
     }
@@ -142,8 +148,7 @@ impl<'s> StringKey<'s> {
     }
     
     pub fn from_intern(sym: InternSymbol, string_table: &'s StringTable, hasher: &impl BuildHasher) -> Self {
-        let interner = string_table.interner_ref();
-        let string = interner.resolve(sym.into()).unwrap();
+        let string = string_table.resolve(&sym);
         
         let mut hasher = hasher.build_hasher();
         string.hash(&mut hasher);
@@ -159,8 +164,7 @@ impl fmt::Display for StringKey<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Intern { sym, string_table, .. } => {
-                let interner = string_table.interner_ref();
-                fmt.write_str(interner.resolve((*sym).into()).unwrap())
+                fmt.write_str(&string_table.resolve(sym))
             }
         }
     }

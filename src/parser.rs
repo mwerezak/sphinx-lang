@@ -239,8 +239,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let next = self.advance().unwrap();
             
             if let Token::Label(name) = next.token {
-                let name = InternSymbol::from_str(name.as_str(), self.interner);
-                Some(Label::new(name))
+                Some(Label::new(self.interner.get_or_intern(name.as_str()).into()))
             } else { unreachable!() }
             
         } else { None };
@@ -655,8 +654,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
-                        let name = InternSymbol::from_str(name.as_str(), self.interner);
-                        items.push(AccessItem::Attribute(name));
+                        items.push(AccessItem::Attribute(self.interner.get_or_intern(name.as_str()).into()));
                     } else {
                         return Err(ErrorKind::ExpectedIdentifier.into());
                     }
@@ -741,8 +739,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             let atom = match next.token {
                 // Identifiers
                 Token::Identifier(name) => {
-                    let name = InternSymbol::from_str(name.as_str(), self.interner);
-                    Atom::Identifier(name)
+                    Atom::Identifier(self.interner.get_or_intern(name.as_str()).into())
                 },
                 
                 // Literals
@@ -753,8 +750,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
                 Token::FloatLiteral(value)   => Atom::FloatLiteral(value),
                 Token::StringLiteral(value)   => {
-                    let value = InternSymbol::from_str(value.as_str(), self.interner);
-                    Atom::StringLiteral(value)
+                    Atom::StringLiteral(self.interner.get_or_intern(value.as_str()).into())
                 },
                 
                 _ => { 

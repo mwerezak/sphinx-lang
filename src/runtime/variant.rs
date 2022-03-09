@@ -65,10 +65,7 @@ impl Variant {
                 }
             },
             Self::String(StringValue::Intern(sym)) => {
-                let sym = (*sym).into();
-                let interner = string_table.interner_ref();
-                let string = interner.resolve(sym).unwrap();
-                write!(dst, "\"{}\"", string)
+                write!(dst, "\"{}\"", string_table.resolve(sym))
             },
         }
     }

@@ -102,13 +102,13 @@ impl<'f, 's> ParseContext<'f, 's> {
                 chars.extend(text.chars().map(Ok));
                 
                 let lexer = self.lexer_factory.build(chars.into_iter());
-                let mut interner_mut = self.string_table.interner_mut();
+                let mut interner_mut = self.string_table.borrow_interner_mut();
                 let parser = Parser::new(module, &mut interner_mut, lexer);
                 parser.collect()
             }
             SourceText::File { module, text } => {
                 let lexer = self.lexer_factory.build(text);
-                let mut interner_mut = self.string_table.interner_mut();
+                let mut interner_mut = self.string_table.borrow_interner_mut();
                 let parser = Parser::new(module, &mut interner_mut, lexer);
                 parser.collect()
             },
