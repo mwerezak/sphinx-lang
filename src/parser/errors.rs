@@ -18,6 +18,7 @@ pub enum ParserErrorKind {
     ExpectedCloseSquare,
     ExpectedCloseBrace,
     ExpectedIdentifier,
+    ExpectedItemAfterLabel,   // expected either begin, while, for after label
     InvalidAssignment,      // the LHS of an assignment was not a valid lvalue
     InvalidDeclAssignment,  // only "=" allowed in variable decls
     DeclMissingInitializer, 
@@ -43,6 +44,7 @@ pub enum ContextTag {
     TupleCtor,
     Atom,
     Group,
+    Label,
 }
 
 // Since ErrorContext can share references with the Parser, we need to use 
@@ -121,16 +123,17 @@ impl fmt::Display for ParserError<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         
         let message = match self.kind() {
-            ParserErrorKind::LexerError => "",
-            ParserErrorKind::EndofTokenStream => "unexpected end of token stream",
-            ParserErrorKind::ExpectedStartOfExpr  => "expected an expression here",
-            ParserErrorKind::ExpectedCloseParen   => "missing closing ')'",
-            ParserErrorKind::ExpectedCloseSquare  => "missing closing ']'",
-            ParserErrorKind::ExpectedCloseBrace   => "missing closing '}'",
-            ParserErrorKind::ExpectedIdentifier   => "invalid identifier",
-            ParserErrorKind::InvalidAssignment    => "invalid assignment",
-            ParserErrorKind::InvalidDeclAssignment  => "only '=' is allowed when initializing a newly declared variable",
-            ParserErrorKind::DeclMissingInitializer => "missing '=' initializer for variable declaration",
+            ErrorKind::LexerError => "",
+            ErrorKind::EndofTokenStream => "unexpected end of token stream",
+            ErrorKind::ExpectedStartOfExpr  => "expected an expression here",
+            ErrorKind::ExpectedCloseParen   => "missing closing ')'",
+            ErrorKind::ExpectedCloseSquare  => "missing closing ']'",
+            ErrorKind::ExpectedCloseBrace   => "missing closing '}'",
+            ErrorKind::ExpectedIdentifier   => "invalid identifier",
+            ErrorKind::InvalidAssignment    => "invalid assignment",
+            ErrorKind::InvalidDeclAssignment  => "only '=' is allowed when initializing a newly declared variable",
+            ErrorKind::DeclMissingInitializer => "missing '=' initializer for variable declaration",
+            ErrorKind::ExpectedItemAfterLabel => "expected loop statement or block expression after label",
         };
         
         utils::format_error(fmt, "syntax error", Some(message), self.source())

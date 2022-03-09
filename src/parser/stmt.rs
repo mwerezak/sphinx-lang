@@ -6,6 +6,11 @@ use crate::parser::expr::ExprVariant;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Label(InternSymbol);
 
+impl Label {
+    pub fn new(name: InternSymbol) -> Self { Label(name) }
+    pub fn name(&self) -> &InternSymbol { &self.0 }
+}
+
 
 #[derive(Debug, Clone)]
 pub enum StmtVariant {
@@ -17,10 +22,11 @@ pub enum StmtVariant {
     // ForLoop
     
     // Continue(Option<Label>)
-    // Break(Option<Label>, Option<ExprVariant>)
+    Break(Option<Label>, Option<ExprVariant>),
     // Return(Option<ExprVariant>)
     
     Echo(ExprVariant),
+    
 }
 
 impl StmtVariant { }

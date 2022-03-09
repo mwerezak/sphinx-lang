@@ -32,6 +32,8 @@ impl<'a, 'r> ExecContext<'a, 'r> {
                 // eval an expression just for side effects
                 interpreter::eval(&mut self.runtime, expr)?;
             }
+            
+            StmtVariant::Break(_label, _value) => unimplemented!(),
         }
         
         Ok(())

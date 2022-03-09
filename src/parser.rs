@@ -100,9 +100,9 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             },
         }
         
-        let result = match self.parse_stmt_variant(&mut ctx) {
+        let result = match self.parse_stmt(&mut ctx) {
             Ok(stmt) => {
-                debug!("parser: {:?}", stmt); 
+                debug!("parser: {:#?}", stmt); 
                 Ok(stmt)
             },
             Err(err) => {
@@ -161,7 +161,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     
     /*** Statement Parsing ***/
     
-    fn parse_stmt_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<Stmt> {
+    fn parse_stmt(&mut self, ctx: &mut ErrorContext) -> InternalResult<Stmt> {
         // skip statement separators
         while let Token::Semicolon = self.peek()?.token {
             self.advance()?;
@@ -169,6 +169,14 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         
         ctx.push(ContextTag::Stmt);
         
+        let stmt = self.parse_stmt_variant(ctx)?;
+        let symbol = ctx.frame().as_debug_symbol().unwrap();
+        
+        ctx.pop_extend();
+        Ok(Stmt::new(stmt, symbol))
+    }
+    
+    fn parse_stmt_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<StmtVariant> {
         let stmt = match self.peek()?.token {
             Token::While => unimplemented!(),
             Token::Do => unimplemented!(),
@@ -182,11 +190,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             },
             _ => StmtVariant::Expression(self.parse_expr_variant(ctx)?),
         };
-        
-        let symbol = ctx.frame().as_debug_symbol().unwrap();
-        
-        ctx.pop();
-        Ok(Stmt::new(stmt, symbol))
+        Ok(stmt)
     }
     
     /*** Expression Parsing ***/
@@ -472,19 +476,96 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         Ok(expr)
     }
     
+    /*
+        block-expression ::= ( label )? "begin" ( statement | control-flow | "break" ( label )? expression )* "end" ;  (* break can be supplied a value inside of begin-blocks *)
+    */
     fn parse_block_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> {
         ctx.push(ContextTag::BlockExpr);
         
-        // // check for label
-        // let label = 
-        //     if let Token::Label(label) = self.peek()?.token {
-        //         self.interner.
-        //     }
-        //     else { None };
+        // check for label
+        let block_label = self.try_parse_label(ctx)?;
         
+        // consume "begin"
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        if !matches!(next.token, Token::Begin) {
+            return Err(ErrorKind::ExpectedItemAfterLabel.into());
+        }
         
+        let mut suite = Vec::new();
+        loop {
+            let next = self.peek()?;
+            if matches!(next.token, Token::End) {
+                ctx.set_end(&self.advance().unwrap());
+                break;
+            }
+            
+            // "break" with value allowed in block expressions
+            if matches!(next.token, Token::Break) {
+                ctx.push(ContextTag::Stmt);
+                ctx.set_start(&self.advance().unwrap());
+                
+                let break_label = self.try_parse_label(ctx)?;
+                
+                // parsing the break value is a little tricky
+                // we try to parse a statement, if it is anything other than an expression statement
+                // then we assume there was no value supplied and the statement we got is actually the next statement
+                
+                // in case the next statement doesn't belong to the break
+                // we need to capture the debug symbol now
+                let mut symbol = ctx.frame().as_debug_symbol().unwrap();
+                
+                let mut next_stmt = None;
+                let break_expr = 
+                    if matches!(self.peek()?.token, Token::Semicolon) { None }
+                    else {
+                        let stmt = self.parse_stmt(ctx)?;
+                        if matches!(stmt.variant(), StmtVariant::Expression(..)) {
+                            if let StmtVariant::Expression(expr) = stmt.take_variant() {
+                                symbol = ctx.frame().as_debug_symbol().unwrap(); // update symbol
+                                Some(expr) 
+                            } else { unreachable!() }
+                        } else { 
+                            next_stmt.replace(stmt);
+                            None
+                        }
+                    };
+                
+                ctx.pop_extend();
+                
+                let break_stmt = StmtVariant::Break(break_label, break_expr);
+                suite.push(Stmt::new(break_stmt, symbol));
+                
+                if let Some(stmt) = next_stmt {
+                    suite.push(stmt);
+                }
+                
+            } else {
+                
+                suite.push(self.parse_stmt(ctx)?);
+            }
+            
+        }
         
-        unimplemented!()
+        ctx.pop_extend();
+        Ok(ExprVariant::Block(suite, block_label))
+    }
+    
+    fn try_parse_label(&mut self, ctx: &mut ErrorContext) -> InternalResult<Option<Label>> {
+        let next = self.peek()?;
+        ctx.set_start(&next);
+        
+        let label = if let Token::Label(..) = next.token {
+            let next = self.advance().unwrap();
+            ctx.set_end(&next);
+            
+            if let Token::Label(name) = next.token {
+                let name = InternSymbol::from_str(name.as_str(), self.interner);
+                Some(Label::new(name))
+            } else { unreachable!() }
+            
+        } else { None };
+        Ok(label)
     }
     
     /*

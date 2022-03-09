@@ -68,6 +68,10 @@ impl Primary {
         self.path.push(AccessItem::Construct(ctor))
     }
     
+    pub fn push_path(&mut self, item: AccessItem) {
+        self.path.push(item);
+    }
+    
     pub fn pop_path(&mut self) -> Option<AccessItem> {
         self.path.pop()
     }
