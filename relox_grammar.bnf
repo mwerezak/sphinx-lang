@@ -19,11 +19,11 @@ statement ::= ";"
             | for-loop 
             | expression ;
 
-statement-block ::= ( statement | control-flow )* ;
-control-flow ::= "continue" ( label )? | "break" ( label )? | "return" expression ;
+statement-list ::= ( statement )* ( control-flow )? ;  (* control flow only allowed at end of block, much like Lua *)
+control-flow ::= "continue" ( label )? | "break" ( label )? ( expression )? | "return" ( expression )? ;
 
-while-loop ::=  ( label )? "while" expression "do" statement-block "end" ;
-do-while-loop ::= ( label )? "do" statement-block "while" expression "end" ;
+while-loop ::=  ( label )? "while" expression "do" statement-list "end" ;
+do-while-loop ::= ( label )? "do" statement-list "while" expression "end" ;
 
 for-loop ::= ( label )? "for" lvalue-list "in" expression "end" ;
 
@@ -62,8 +62,8 @@ group ::= "(" expression ( ":" type-expression )? ")" ; (* can be type annotated
 
 (*** if/block Expressions ***)
 
-if-expression ::= "if" expression "then" block ( "elseif" block )* ( "else" block )? "end" ;
-block-expression ::= ( label )? "begin" ( statement | control-flow | "break" ( label )? expression )* "end" ;  (* break can be supplied a value inside of begin-blocks *)
+if-expression ::= "if" expression "then" statement-list ( "elseif" statement-list )* ( "else" statement-list )? "end" ;
+block-expression ::= ( label )? "begin" ( statement )* ( control-flow )? "end" ;  (* break can be supplied a value inside of begin-blocks *)
 
 (*** Assignment ***)
 
@@ -111,7 +111,7 @@ tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
 
 (*** Function Defs ***)
 
-function-def ::= "fun" ( lvalue )?  parameter-list ( "->" type-expression ":" )?  statement-block "end" ;
+function-def ::= "fun" ( lvalue )?  parameter-list ( "->" type-expression ":" )?  statement-list "end" ;
 
 parameter-list ::= "(" ")" | "(" parameter ( "," parameter )* ( parameter "..." )? ")" ;
 
