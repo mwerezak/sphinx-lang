@@ -92,6 +92,7 @@ greater_than >= or_equal
 
 # booleans are not implicitly integers (but all expressions do have a "truth" value)
 true == 1 # false
+true == bool(1) # true
 
 # Logical operators
 
