@@ -34,9 +34,14 @@ impl LexerRule for IdentifierRule {
     }
     
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
-        let at_word_start = prev.map(|c| !c.is_word_ascii_alphanumeric()).unwrap_or(true);
         
-        let valid = at_word_start && next.is_word_ascii_alphanumeric();
+        let valid;
+        if self.buf.is_empty() {
+            let at_word_start = prev.map(|c| !c.is_word_ascii_alphanumeric()).unwrap_or(true);
+            valid = at_word_start && next.is_word_ascii_alphabetic();
+        } else {
+            valid = next.is_word_ascii_alphanumeric();
+        }
         
         if valid {
             self.buf.push(next);
