@@ -89,17 +89,27 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         let mut ctx = ErrorContext::new(self.module, ContextTag::TopLevel);
         
         // check stop conditions
-        match self.peek() {
-            Err(error) if matches!(error.kind(), ErrorKind::EndofTokenStream) => return None,
-            Err(error) => return {
-                let error = ParserError::from_prototype(error, ctx);
-                Some(Err(error))
-            },
-            
-            Ok(next) if matches!(next.token, Token::EOF) => return None,
-            Ok(next) => {
-                debug!("parsing stmt at index {}...", next.span.index);
-            },
+        loop {
+            match self.peek() {
+                Err(error) if matches!(error.kind(), ErrorKind::EndofTokenStream) => return None,
+                Err(error) => return {
+                    let error = ParserError::from_prototype(error, ctx);
+                    Some(Err(error))
+                },
+                
+                Ok(next) if matches!(next.token, Token::EOF) => return None,
+                
+                // skip statement separators
+                Ok(next) if matches!(next.token, Token::Semicolon) => {
+                    self.advance().unwrap();
+                    continue;
+                },
+                
+                Ok(next) => {
+                    debug!("parsing stmt at index {}...", next.span.index);
+                    break;
+                },
+            }
         }
         
         let result = match self.parse_stmt(&mut ctx) {
