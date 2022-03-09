@@ -106,7 +106,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 Ok(stmt)
             },
             Err(err) => {
-                debug!("{:?}", ctx);
+                debug!("{:#?}", ctx);
                 let error = ParserError::from_prototype(err, ctx);
                 debug!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
                     error.kind(), error.context(), 
@@ -214,7 +214,9 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 suite.push(stmt);
                 
                 let next = self.peek()?;
-                if matches!(next.token, Token::End) {
+                if !matches!(next.token, Token::End) {
+                    // consume the unexpected token so that it is included in the error message
+                    ctx.set_end(&self.advance().unwrap());
                     return Err(ErrorKind::ExpectedEndAfterControlFlow.into());
                 }
                 

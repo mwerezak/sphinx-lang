@@ -59,8 +59,8 @@ fn main() {
         let parse_result = parse_ctx.parse_ast(source_text);
         
         match parse_result {
-            Ok(_stmts) => {
-                // TODO
+            Ok(stmts) => {
+                println!("{:#?}", stmts);
             },
             Err(errors) => { 
                 println!("Errors in file \"{}\":\n", module.name());

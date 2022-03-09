@@ -120,7 +120,7 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(HexIntegerLiteralRule::new())
     .add_rule(FloatLiteralRule::new())
     .add_rule(StringLiteralRule::new(ESCAPE_SEQUENCES.iter().map(|esc| esc.as_ref())))
-    .add_rule(BlockLabelRule::new("::"))
+    .add_rule(LabelRule::new("::"))
     
 
 }

@@ -138,8 +138,8 @@ impl fmt::Display for ParserError<'_> {
             ErrorKind::InvalidDeclAssignment  => "only '=' is allowed when initializing a newly declared variable",
             ErrorKind::DeclMissingInitializer => "missing '=' initializer for variable declaration",
             ErrorKind::ExpectedItemAfterLabel => "expected loop statement or block expression after label",
-            ErrorKind::ControlFlowOutsideOfBlock => "'return', 'break', or 'continue' are only allowed at the end of a statement block",
-            ErrorKind::ExpectedEndAfterControlFlow => "'return', 'break', or 'continue' must be the last statement in a statement block",
+            ErrorKind::ControlFlowOutsideOfBlock => "found 'return', 'break', or 'continue' outside of a block",
+            ErrorKind::ExpectedEndAfterControlFlow => "'return', 'break', or 'continue' must be the last statement in a block",
         };
         
         utils::format_error(fmt, "syntax error", Some(message), self.source())

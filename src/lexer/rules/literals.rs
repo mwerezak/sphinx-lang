@@ -8,14 +8,6 @@ use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Identifiers
 
-fn at_word_start(prev: Option<char>, next: char) -> bool {
-    match prev {
-        Some(prev) => !prev.is_word_ascii_alphanumeric() && next.is_word_ascii_alphabetic(),
-        None => true,
-    }
-}
-
-
 #[derive(Debug, Clone)]
 pub struct IdentifierRule {
     buf: String,
@@ -42,9 +34,9 @@ impl LexerRule for IdentifierRule {
     }
     
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
-        let valid = 
-            if self.buf.is_empty() { at_word_start(prev, next) }
-            else { next.is_word_ascii_alphanumeric() };
+        let at_word_start = prev.map(|c| !c.is_word_ascii_alphanumeric()).unwrap_or(true);
+        
+        let valid = at_word_start && next.is_word_ascii_alphanumeric();
         
         if valid {
             self.buf.push(next);
@@ -62,21 +54,21 @@ impl LexerRule for IdentifierRule {
 }
 
 #[derive(Debug, Clone)]
-pub struct BlockLabelRule {
+pub struct LabelRule {
     buf: String,
     prefix: StrMatcher<'static>,
 }
 
-impl BlockLabelRule {
+impl LabelRule {
     pub fn new(prefix: &'static str) -> Self {
-        BlockLabelRule {
+        LabelRule {
             buf: String::new(),
             prefix: StrMatcher::case_sensitive(prefix),
         }
     }
 }
 
-impl LexerRule for BlockLabelRule {
+impl LexerRule for LabelRule {
     fn reset(&mut self) {
         self.buf.clear();
         self.prefix.reset();
@@ -95,12 +87,19 @@ impl LexerRule for BlockLabelRule {
     }
     
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
-        if self.prefix.count() == 0 && !at_word_start(prev, next) {
+        // don't match if the last char was word alphanumeric
+        let at_word_start = prev.map(|c| !c.is_word_ascii_alphanumeric()).unwrap_or(true);
+        
+        if self.buf.is_empty() && self.prefix.count() == 0 && !at_word_start {
             return MatchResult::NoMatch;
         }
         
         if !self.prefix.last_match_result().is_complete_match() {
-            return self.prefix.try_match(next);
+            let match_result = self.prefix.try_match(next);
+            if match_result.is_complete_match() {
+                return MatchResult::IncompleteMatch;
+            }
+            return match_result;
         }
         
         if next.is_word_ascii_alphanumeric() {
