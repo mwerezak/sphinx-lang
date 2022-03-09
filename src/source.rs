@@ -6,7 +6,7 @@ use crate::utils::ReadChars;
 use crate::lexer::LexerBuilder;
 use crate::parser::{Parser, ParserError};
 use crate::parser::stmt::StmtMeta;
-use crate::runtime::strings::StringTable;
+use crate::runtime::strings::StringTableCell;
 
 type ReadFileChars = ReadChars<io::BufReader<fs::File>>;
 
@@ -72,11 +72,11 @@ impl ModuleSource {
 // Container for state required for parsing
 pub struct ParseContext<'f, 's> {
     lexer_factory: &'f LexerBuilder,
-    string_table: &'s StringTable
+    string_table: &'s StringTableCell
 }
 
 impl<'f, 's> ParseContext<'f, 's> {
-    pub fn new(lexer_factory: &'f LexerBuilder, string_table: &'s StringTable) -> Self {
+    pub fn new(lexer_factory: &'f LexerBuilder, string_table: &'s StringTableCell) -> Self {
         ParseContext {
             lexer_factory, string_table,
         }
@@ -102,14 +102,14 @@ impl<'f, 's> ParseContext<'f, 's> {
                 chars.extend(text.chars().map(Ok));
                 
                 let lexer = self.lexer_factory.build(chars.into_iter());
-                let mut interner_mut = self.string_table.borrow_interner_mut();
-                let parser = Parser::new(module, &mut interner_mut, lexer);
+                let mut string_table = self.string_table.borrow_mut();
+                let parser = Parser::new(module, &mut string_table, lexer);
                 parser.collect()
             }
             SourceText::File { module, text } => {
                 let lexer = self.lexer_factory.build(text);
-                let mut interner_mut = self.string_table.borrow_interner_mut();
-                let parser = Parser::new(module, &mut interner_mut, lexer);
+                let mut string_table = self.string_table.borrow_mut();
+                let parser = Parser::new(module, &mut string_table, lexer);
                 parser.collect()
             },
         }

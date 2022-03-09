@@ -14,7 +14,7 @@ use rlo_interpreter::language;
 use rlo_interpreter::interpreter;
 use rlo_interpreter::parser::stmt::{Stmt};
 use rlo_interpreter::runtime::*;
-use rlo_interpreter::runtime::strings::StringTable;
+use rlo_interpreter::runtime::strings::{StringTable, StringTableCell};
 
 
 fn main() {
@@ -95,12 +95,12 @@ fn main() {
 
 struct Repl<'r> {
     prompt: &'static str,
-    string_table: &'r StringTable,
+    string_table: &'r StringTableCell,
     root_env: Environment<'r, 'r>,
 }
 
 impl<'r> Repl<'r> {
-    pub fn new(prompt: &'static str, string_table: &'r StringTable) -> Self {
+    pub fn new(prompt: &'static str, string_table: &'r StringTableCell) -> Self {
         Repl { 
             prompt,
             string_table,

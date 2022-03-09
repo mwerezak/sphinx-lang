@@ -2,7 +2,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher, BuildHasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::strings::{StringValue, StringKey, StringTable};
+use crate::runtime::strings::{StringValue, StringKey, StringTableCell};
 use crate::runtime::errors::{ExecResult, RuntimeErrorKind as ErrorKind};
 
 
@@ -50,7 +50,7 @@ impl Variant {
     }
     
     // write a string representation of this value
-    pub fn write_repr(&self, dst: &mut impl fmt::Write, string_table: &StringTable) -> fmt::Result {
+    pub fn write_repr(&self, dst: &mut impl fmt::Write, string_table: &StringTableCell) -> fmt::Result {
         match self {
             Self::Nil => dst.write_str("nil"),
             Self::EmptyTuple => dst.write_str("()"),
@@ -65,13 +65,13 @@ impl Variant {
                 }
             },
             Self::String(StringValue::Intern(sym)) => {
-                write!(dst, "\"{}\"", string_table.resolve(sym))
+                write!(dst, "\"{}\"", string_table.borrow().resolve(*sym).unwrap())
             },
         }
     }
     
-    pub fn into_key<'s>(self, string_table: &'s StringTable, hasher_factory: &impl BuildHasher) -> ExecResult<VariantKey<'s>> {
-        VariantKey::new(self, string_table, hasher_factory)
+    pub fn into_key<'s>(self, string_table: &'s StringTableCell) -> ExecResult<VariantKey<'s>> {
+        VariantKey::new(self, string_table)
     }
 }
 
@@ -147,7 +147,7 @@ impl<'s> PartialEq for VariantKey<'s> {
 }
 
 impl<'s> VariantKey<'s> {
-    pub fn new(value: Variant, string_table: &'s StringTable, hasher_factory: &impl BuildHasher) -> ExecResult<Self> {
+    pub fn new(value: Variant, string_table: &'s StringTableCell) -> ExecResult<Self> {
         let key = match value {
             Variant::Nil => Self::Nil,
             Variant::EmptyTuple => Self::EmptyTuple,
@@ -158,7 +158,7 @@ impl<'s> VariantKey<'s> {
             
             Variant::String(strval) => {
                 let strkey = match strval {
-                    StringValue::Intern(sym) => StringKey::from_intern(sym, string_table, hasher_factory),
+                    StringValue::Intern(sym) => StringKey::from_intern(sym, string_table),
                 };
                 
                 Self::String(strkey)

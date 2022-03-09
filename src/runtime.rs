@@ -19,7 +19,7 @@ use crate::language;
 use crate::source::ParseContext;
 use crate::lexer::LexerBuilder;
 
-use strings::{StringTable, StringKey, StringValue};
+use strings::{StringTableCell, StringKey, StringValue};
 
 
 // Default Hasher
@@ -64,7 +64,7 @@ pub fn new_namespace<'s>() -> Namespace<'s> {
     
 // }
 
-pub fn placeholder_new_env<'r, 's>(string_table: &'s StringTable) -> Environment<'r, 's> {
+pub fn placeholder_new_env<'r, 's>(string_table: &'s StringTableCell) -> Environment<'r, 's> {
     Environment {
         parent: None,
         namespace: RefCell::new(new_namespace()),
@@ -76,16 +76,16 @@ pub fn placeholder_new_env<'r, 's>(string_table: &'s StringTable) -> Environment
 pub struct Environment<'r, 's> {
     parent: Option<&'r Environment<'r, 's>>,
     namespace: RefCell<Namespace<'s>>,
-    string_table: &'s StringTable,
+    string_table: &'s StringTableCell,
 }
 
 impl<'r, 's> Environment<'r, 's> {
-    pub fn string_table(&self) -> &StringTable { self.string_table }
+    pub fn string_table(&self) -> &StringTableCell { self.string_table }
     
     /// Check if the name exists in this Environment
     pub fn has_name(&self, name: StringValue) -> bool {
         let local_store = self.namespace.borrow();
-        let name_key = StringKey::new(name, self.string_table, local_store.hasher());
+        let name_key = StringKey::new(name, self.string_table);
         local_store.contains_key(&name_key)
     }
     
@@ -104,7 +104,7 @@ impl<'r, 's> Environment<'r, 's> {
     /// Lookup a value for the given name in this Environment
     pub fn lookup_value(&self, name: StringValue) -> Option<Variant> {
         let local_store = self.namespace.borrow();
-        let name_key = StringKey::new(name, self.string_table, local_store.hasher());
+        let name_key = StringKey::new(name, self.string_table);
         local_store.get(&name_key).map(|value| *value)
     }
     
@@ -124,13 +124,13 @@ impl<'r, 's> Environment<'r, 's> {
     /// Store a value in this Environment
     pub fn insert_value(&self, name: StringValue, value: Variant) -> Option<Variant> {
         let mut local_store = self.namespace.borrow_mut();
-        let name_key = StringKey::new(name, self.string_table, local_store.hasher());
+        let name_key = StringKey::new(name, self.string_table);
         local_store.insert(name_key, value)
     }
     
     pub fn remove_value(&self, name: StringValue) -> Option<Variant> {
         let mut local_store = self.namespace.borrow_mut();
-        let name_key = StringKey::new(name, self.string_table, local_store.hasher());
+        let name_key = StringKey::new(name, self.string_table);
         local_store.remove(&name_key)
     }
 }
