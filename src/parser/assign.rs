@@ -2,13 +2,13 @@
 use crate::runtime::strings::InternSymbol;
 use crate::parser::primary::{Primary, AccessItem, Atom};
 use crate::runtime::types::operator::BinaryOp;
-use crate::parser::expr::{ExprVariant, Expr};
+use crate::parser::expr::{Expr, ExprMeta};
 
 #[derive(Debug, Clone)]
 pub enum LValue {
     Identifier(InternSymbol),
     Attribute(Primary, InternSymbol), // receiver, attribute name
-    Index(Primary, Expr), // receiver, index expression
+    Index(Primary, ExprMeta), // receiver, index expression
     Tuple(Vec<LValue>),
 }
 
@@ -16,7 +16,7 @@ pub enum LValue {
 pub struct Assignment {
     pub lhs: LValue,
     pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
-    pub rhs: ExprVariant,
+    pub rhs: Expr,
 }
 
 #[derive(Debug, Clone)]
@@ -29,7 +29,7 @@ pub enum DeclType {
 pub struct Declaration {
     pub decl: DeclType,
     pub lhs: LValue,
-    pub init: ExprVariant,
+    pub init: Expr,
 }
 
 // Convert expressions to LValues...
@@ -68,15 +68,15 @@ impl TryFrom<Primary> for LValue {
     }
 }
 
-impl TryFrom<ExprVariant> for LValue {
+impl TryFrom<Expr> for LValue {
     type Error = ();
-    fn try_from(expr: ExprVariant) -> Result<Self, Self::Error> {
+    fn try_from(expr: Expr) -> Result<Self, Self::Error> {
         match expr {
-            ExprVariant::Atom(atom) => atom.try_into(),
+            Expr::Atom(atom) => atom.try_into(),
             
-            ExprVariant::Primary(primary) => primary.try_into(),
+            Expr::Primary(primary) => primary.try_into(),
             
-            ExprVariant::Tuple(expr_list) => {
+            Expr::Tuple(expr_list) => {
                 let mut lvalue_list = Vec::<LValue>::new();
                 
                 for expr in expr_list.into_iter() {

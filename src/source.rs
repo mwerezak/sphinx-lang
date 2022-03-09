@@ -5,7 +5,7 @@ use crate::utils::ReadChars;
 
 use crate::lexer::LexerBuilder;
 use crate::parser::{Parser, ParserError};
-use crate::parser::stmt::Stmt;
+use crate::parser::stmt::StmtMeta;
 use crate::runtime::strings::StringTable;
 
 type ReadFileChars = ReadChars<io::BufReader<fs::File>>;
@@ -83,7 +83,7 @@ impl<'f, 's> ParseContext<'f, 's> {
     }
     
     // Returns a Vec of parsed Stmts (if no error occurred) or a Vec or errors
-    pub fn parse_ast<'m>(&mut self, source: SourceText<'m>) -> Result<Vec<Stmt>, Vec<ParserError<'m>>> {
+    pub fn parse_ast<'m>(&mut self, source: SourceText<'m>) -> Result<Vec<StmtMeta>, Vec<ParserError<'m>>> {
         
         let output = self.collect_parser_output(source);
         
@@ -95,7 +95,7 @@ impl<'f, 's> ParseContext<'f, 's> {
     }
 
     // Helper to deal with the separate branches for parsing SourceText
-    fn collect_parser_output<'m>(&mut self, source: SourceText<'m>) -> Vec<Result<Stmt, ParserError<'m>>> {
+    fn collect_parser_output<'m>(&mut self, source: SourceText<'m>) -> Vec<Result<StmtMeta, ParserError<'m>>> {
         match source {
             SourceText::String { module, text } => {
                 let mut chars = Vec::new();

@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 
-use crate::parser::expr::{Expr, ExprVariant};
+use crate::parser::expr::{ExprMeta, Expr};
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::assign::{Declaration, Assignment, LValue};
 
@@ -13,17 +13,17 @@ use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
 // These will differ more once tracebacks are implemented
-pub fn eval_expr<'a>(local_env: &'a Environment<'_, '_>, expr: &Expr) -> ExecResult<Variant> {
+pub fn eval_expr<'a>(local_env: &'a Environment<'_, '_>, expr: &ExprMeta) -> ExecResult<Variant> {
     let mut ctx = EvalContext::from(local_env);
     ctx.eval(expr)
 }
 
-pub fn eval_expr_variant<'a>(local_env: &'a Environment<'_, '_>, expr: &ExprVariant) -> ExecResult<Variant> {
+pub fn eval_expr_variant<'a>(local_env: &'a Environment<'_, '_>, expr: &Expr) -> ExecResult<Variant> {
     let mut ctx = EvalContext::from(local_env);
     ctx.eval_variant(expr)
 }
 
-// tracks the local scope and the innermost Expr
+// tracks the local scope and the innermost ExprMeta
 pub struct EvalContext<'a, 'r, 's> {
     // very important to keep 'a and 'r separate
     // otherwise EvalContext would be forced to live as long as 'r!
@@ -37,33 +37,33 @@ impl<'a, 'r, 's> From<&'a Environment<'r, 's>> for EvalContext<'a, 'r, 's> {
 }
 
 impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
-    pub fn eval(&self, expr: &Expr) -> ExecResult<Variant> {
+    pub fn eval(&self, expr: &ExprMeta) -> ExecResult<Variant> {
         self.eval_inner_expr(expr.variant())
     }
     
-    pub fn eval_variant(&self, expr: &ExprVariant) -> ExecResult<Variant> {
+    pub fn eval_variant(&self, expr: &Expr) -> ExecResult<Variant> {
         self.eval_inner_expr(expr)
     }
     
-    fn eval_inner_expr(&self, expr: &ExprVariant) -> ExecResult<Variant> {
+    fn eval_inner_expr(&self, expr: &Expr) -> ExecResult<Variant> {
         match expr {
-            ExprVariant::Atom(atom) => self.eval_atom(atom),
+            Expr::Atom(atom) => self.eval_atom(atom),
             
-            ExprVariant::Primary(primary) => self.eval_primary(primary),
+            Expr::Primary(primary) => self.eval_primary(primary),
             
-            ExprVariant::UnaryOp(op, expr) => self.eval_unary_op((*op).into(), expr),
-            ExprVariant::BinaryOp(op, exprs) => {
+            Expr::UnaryOp(op, expr) => self.eval_unary_op((*op).into(), expr),
+            Expr::BinaryOp(op, exprs) => {
                 let (ref lhs, ref rhs) = **exprs;
                 self.eval_binary_op((*op).into(), lhs, rhs)
             },
             
-            ExprVariant::Assignment(assignment) => self.eval_assignment(assignment),
-            ExprVariant::Declaration(declaration) => self.eval_declaration(declaration),
+            Expr::Assignment(assignment) => self.eval_assignment(assignment),
+            Expr::Declaration(declaration) => self.eval_declaration(declaration),
             
-            ExprVariant::Tuple(expr_list) => unimplemented!(),
-            ExprVariant::ObjectCtor(ctor) => unimplemented!(),
+            Expr::Tuple(expr_list) => unimplemented!(),
+            Expr::ObjectCtor(ctor) => unimplemented!(),
             
-            ExprVariant::Block(suite, label) => unimplemented!(),
+            Expr::Block(suite, label) => unimplemented!(),
         }
     }
 
@@ -106,7 +106,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             })
     }
     
-    fn eval_short_circuit_logic(&self, op: Logical, lhs: &ExprVariant, rhs: &ExprVariant) -> ExecResult<Variant> {
+    fn eval_short_circuit_logic(&self, op: Logical, lhs: &Expr, rhs: &Expr) -> ExecResult<Variant> {
         let lhs_value = self.eval_inner_expr(lhs)?;
         
         let cond = match op {
@@ -121,7 +121,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         }
     }
     
-    fn eval_unary_op(&self, op: UnaryOp, expr: &ExprVariant) -> ExecResult<Variant> {
+    fn eval_unary_op(&self, op: UnaryOp, expr: &Expr) -> ExecResult<Variant> {
         let operand = self.eval_inner_expr(expr)?;
         
         match op {
@@ -132,7 +132,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         }
     }
     
-    fn eval_binary_op(&self, op: BinaryOp, lhs: &ExprVariant, rhs: &ExprVariant) -> ExecResult<Variant> {
+    fn eval_binary_op(&self, op: BinaryOp, lhs: &Expr, rhs: &Expr) -> ExecResult<Variant> {
         if let BinaryOp::Logical(logic) = op {
             return self.eval_short_circuit_logic(logic, lhs, rhs);
         }

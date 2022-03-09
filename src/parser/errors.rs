@@ -32,10 +32,10 @@ pub enum ContextTag {
     Token,  // errors retrieving the actual tokens
     TopLevel,
     Sync,
-    Stmt,
+    StmtMeta,
     StmtList,
     ControlFlow,
-    Expr,
+    ExprMeta,
     BlockExpr,
     AssignmentExpr,
     VarDeclExpr,

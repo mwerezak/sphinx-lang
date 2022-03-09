@@ -1,6 +1,6 @@
 
-use crate::parser::expr::Expr;
-use crate::parser::stmt::{Stmt, StmtVariant};
+use crate::parser::expr::ExprMeta;
+use crate::parser::stmt::{StmtMeta, Stmt};
 use crate::runtime::Environment;
 use crate::runtime::errors::{ExecResult, RuntimeError};
 use crate::interpreter;
@@ -17,9 +17,9 @@ impl<'a, 'r, 's> From<&'a Environment<'r, 's>> for ExecContext<'a, 'r, 's> {
 }
 
 impl ExecContext<'_, '_, '_> {
-    pub fn exec(&self, stmt: &Stmt) -> ExecResult<()> {
+    pub fn exec(&self, stmt: &StmtMeta) -> ExecResult<()> {
         match stmt.variant() {
-            StmtVariant::Echo(expr) => {
+            Stmt::Echo(expr) => {
                 let value = interpreter::eval_expr_variant(&self.local_env, &expr)?;
                 
                 let mut buf = String::new();
@@ -29,14 +29,14 @@ impl ExecContext<'_, '_, '_> {
                 println!("{}", buf);
             },
             
-            StmtVariant::Expression(expr) => {
+            Stmt::Expression(expr) => {
                 // eval an expression just for side effects
                 interpreter::eval_expr_variant(&self.local_env, &expr)?;
             }
             
-            StmtVariant::Continue(_label) => unimplemented!(),
-            StmtVariant::Break(_label, _value) => unimplemented!(),
-            StmtVariant::Return(_value) => unimplemented!(),
+            Stmt::Continue(_label) => unimplemented!(),
+            Stmt::Break(_label, _value) => unimplemented!(),
+            Stmt::Return(_value) => unimplemented!(),
         }
         
         Ok(())

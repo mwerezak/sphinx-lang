@@ -12,7 +12,7 @@ use rlo_interpreter::frontend::render_parser_error;
 use rlo_interpreter::debug::symbol::DebugSymbolResolver;
 use rlo_interpreter::language;
 use rlo_interpreter::interpreter;
-use rlo_interpreter::parser::stmt::{StmtVariant};
+use rlo_interpreter::parser::stmt::{Stmt};
 use rlo_interpreter::runtime::*;
 use rlo_interpreter::runtime::strings::StringTable;
 
@@ -162,7 +162,7 @@ impl<'r> Repl<'r> {
             
             for stmt in stmts.iter() {
                 match stmt.variant() {
-                    StmtVariant::Expression(expr) => {
+                    Stmt::Expression(expr) => {
                         let eval_result = interpreter::eval_expr_variant(&self.root_env, &expr);
                         log::debug!("{:?}", eval_result);
                         

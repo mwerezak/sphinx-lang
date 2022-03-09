@@ -3,78 +3,70 @@ use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration};
 use crate::parser::structs::{ObjectConstructor};
-use crate::parser::stmt::{Stmt, StmtVariant, Label};
+use crate::parser::stmt::{StmtMeta, Stmt, Label};
 
 
 #[derive(Debug, Clone)]
-pub enum ExprVariant {
+pub enum Expr {
     
     Atom(Atom),
     
     Primary(Primary),
     
-    UnaryOp(UnaryOp, Box<ExprVariant>),
+    UnaryOp(UnaryOp, Box<Expr>),
     
-    BinaryOp(BinaryOp, Box<(ExprVariant, ExprVariant)>),
+    BinaryOp(BinaryOp, Box<(Expr, Expr)>),
     
-    Assignment(Box<Assignment>), // box the whole Assignment (instead of just lhs ExprVariant) to keep size of Expr down
+    Assignment(Box<Assignment>), // box the whole Assignment (instead of just lhs Expr) to keep size of ExprMeta down
     
     Declaration(Box<Declaration>),
 
-    Tuple(Vec<Expr>),
+    Tuple(Vec<ExprMeta>),
     
     ObjectCtor(Box<ObjectConstructor>),
     
     // IfExpr
     
-    Block(Vec<Stmt>, Option<Label>), // TODO label
+    Block(Vec<StmtMeta>, Option<Label>), // TODO label
     
     // FunctionDef
     // ClassDef
 }
 
 
-// Use Expr instead of ExprVariant when we want to capture a debug symbol
-// This should be for: 
-//      top-level expressions like if/while conditions and statement expressions
-//      innner expressions in tuples and [] indexing,
-//      function arguments,
-//      object constructor initializers,
-
+// Expr + DebugSymbol
 
 #[derive(Debug, Clone)]
-pub struct Expr {
-    variant: ExprVariant,
+pub struct ExprMeta {
+    variant: Expr,
     symbol: DebugSymbol,
 }
 
-impl Expr {
-    pub fn new(variant: ExprVariant, symbol: DebugSymbol) -> Self {
-        Expr { variant, symbol }
+impl ExprMeta {
+    pub fn new(variant: Expr, symbol: DebugSymbol) -> Self {
+        ExprMeta { variant, symbol }
     }
     
-    pub fn variant(&self) -> &ExprVariant { &self.variant }
-    pub fn take_variant(self) -> ExprVariant { self.variant }
-    
-    pub fn replace_variant(&mut self, variant: ExprVariant) -> ExprVariant { 
-        std::mem::replace(&mut self.variant, variant)
-    }
+    pub fn variant(&self) -> &Expr { &self.variant }
+    pub fn take_variant(self) -> Expr { self.variant }
     
     pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
+    pub fn take_symbol(self) -> DebugSymbol { self.symbol }
+    
+    pub fn take(self) -> (Expr, DebugSymbol) { (self.variant, self.symbol) }
 }
 
-impl From<Expr> for (ExprVariant, DebugSymbol) {
-    fn from(expr: Expr) -> Self { (expr.variant, expr.symbol) }
+impl From<ExprMeta> for (Expr, DebugSymbol) {
+    fn from(expr: ExprMeta) -> Self { (expr.variant, expr.symbol) }
 }
 
-// create an expression-statement
+
+
+// conversion to/from expression-statements
 
 impl From<Expr> for Stmt {
     #[inline]
-    fn from(expr: Expr) -> Self {
-        let variant = StmtVariant::Expression(expr.variant);
-        Stmt::new(variant, expr.symbol)
-    }
+    fn from(expr: Expr) -> Self { Stmt::Expression(expr) }
 }
 
 impl TryFrom<Stmt> for Expr {
@@ -82,11 +74,26 @@ impl TryFrom<Stmt> for Expr {
     
     #[inline]
     fn try_from(stmt: Stmt) -> Result<Self, Self::Error> {
+        if let Stmt::Expression(expr) = stmt { Ok(expr) }
+        else { Err(()) }
+    }
+}
+
+
+impl From<ExprMeta> for StmtMeta {
+    #[inline]
+    fn from(expr: ExprMeta) -> Self {
+        let (expr, symbol) = expr.take();
+        StmtMeta::new(expr.into(), symbol)
+    }
+}
+
+impl TryFrom<StmtMeta> for ExprMeta {
+    type Error = ();
+    
+    #[inline]
+    fn try_from(stmt: StmtMeta) -> Result<Self, Self::Error> {
         let (stmt, symbol) = stmt.take();
-        if let StmtVariant::Expression(expr) = stmt {
-            Ok(Expr::new(expr, symbol))
-        } else {
-            Err(())
-        }
+        Ok(ExprMeta::new(stmt.try_into()?, symbol))
     }
 }

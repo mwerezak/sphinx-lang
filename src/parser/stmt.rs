@@ -1,6 +1,6 @@
 use crate::runtime::strings::InternSymbol;
 use crate::debug::symbol::DebugSymbol;
-use crate::parser::expr::ExprVariant;
+use crate::parser::expr::Expr;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -13,42 +13,41 @@ impl Label {
 
 
 #[derive(Debug, Clone)]
-pub enum StmtVariant {
+pub enum Stmt {
     
-    Expression(ExprVariant),
+    Expression(Expr),
     
     // WhileLoop
     // DoWhileLoop
     // ForLoop
     
     Continue(Option<Label>),
-    Break(Option<Label>, Option<ExprVariant>),
-    Return(Option<ExprVariant>),
+    Break(Option<Label>, Option<Expr>),
+    Return(Option<Expr>),
     
-    Echo(ExprVariant),
+    Echo(Expr),
     
 }
 
-impl StmtVariant { }
+impl Stmt { }
 
+// Stmt + DebugSymbol
 #[derive(Debug, Clone)]
-pub struct Stmt {
-    variant: StmtVariant,
+pub struct StmtMeta {
+    variant: Stmt,
     symbol: DebugSymbol,
 }
 
-impl Stmt {
-    pub fn new(variant: StmtVariant, symbol: DebugSymbol) -> Self {
-        Stmt { variant, symbol }
+impl StmtMeta {
+    pub fn new(variant: Stmt, symbol: DebugSymbol) -> Self {
+        StmtMeta { variant, symbol }
     }
     
-    pub fn variant(&self) -> &StmtVariant { &self.variant }
-    pub fn take_variant(self) -> StmtVariant { self.variant }
+    pub fn variant(&self) -> &Stmt { &self.variant }
+    pub fn take_variant(self) -> Stmt { self.variant }
     
     pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
     pub fn take_symbol(self) -> DebugSymbol { self.symbol }
     
-    pub fn take(self) -> (StmtVariant, DebugSymbol) {
-        (self.variant, self.symbol)
-    }
+    pub fn take(self) -> (Stmt, DebugSymbol) { (self.variant, self.symbol) }
 }
