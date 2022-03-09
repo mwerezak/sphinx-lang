@@ -18,7 +18,7 @@ use crate::runtime::strings::{StringInterner, InternSymbol};
 
 use expr::{Expr, ExprVariant};
 use stmt::{Stmt, StmtVariant, Label};
-use primary::{Primary, Atom};
+use primary::{Primary, Atom, AccessItem};
 use assign::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use structs::{ObjectConstructor};
@@ -573,7 +573,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
             
             // Token::OpenBrace => Ok(Expr::ObjectCtor(self.parse_object_constructor(ctx)?)),
             
-            _ => ExprVariant::Primary(Box::new(self.parse_primary(ctx)?)),
+            _ => self.parse_primary(ctx)?,
         };
         Ok(expr)
     }
@@ -636,11 +636,12 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         invocation ::= "(" ... ")" ;  (* WIP *)
         object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
     */
-    fn parse_primary(&mut self, ctx: &mut ErrorContext) -> InternalResult<Primary> { 
+    fn parse_primary(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprVariant> { 
         ctx.push(ContextTag::PrimaryExpr);
         
-        let mut primary = Primary::new(self.parse_atom(ctx)?);
+        let atom = self.parse_atom(ctx)?;
         
+        let mut items = Vec::new();
         loop {
             let next = self.peek()?;
             match next.token {
@@ -654,7 +655,8 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
-                        primary.push_access_attr(InternSymbol::from_str(name.as_str(), self.interner))
+                        let name = InternSymbol::from_str(name.as_str(), self.interner);
+                        items.push(AccessItem::Attribute(name));
                     } else {
                         return Err(ErrorKind::ExpectedIdentifier.into());
                     }
@@ -673,7 +675,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     ctx.set_end(&next);
                     
                     if matches!(next.token, Token::CloseSquare) {
-                        primary.push_access_index(index_expr);
+                        items.push(AccessItem::Index(index_expr));
                     } else {
                         return Err(ErrorKind::ExpectedCloseSquare.into());
                     }
@@ -693,29 +695,35 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 
                 // object-constructor ::= "{" ... "}"
                 Token::OpenBrace => {
-                    ctx.push(ContextTag::ObjectCtor);
-                    ctx.set_start(&self.advance().unwrap());
+                    unimplemented!()
+                    // ctx.push(ContextTag::ObjectCtor);
+                    // ctx.set_start(&self.advance().unwrap());
                     
-                    let obj_ctor = self.parse_object_constructor(ctx)?;
+                    // let obj_ctor = self.parse_object_constructor(ctx)?;
                     
-                    let next = self.advance()?;
-                    ctx.set_end(&next);
+                    // let next = self.advance()?;
+                    // ctx.set_end(&next);
                     
-                    if matches!(next.token, Token::CloseParen) {
-                        primary.push_construct(obj_ctor);
-                    } else {
-                        return Err(ErrorKind::ExpectedCloseBrace.into());
-                    }
+                    // if matches!(next.token, Token::CloseParen) {
+                    //     primary.push_construct(obj_ctor);
+                    // } else {
+                    //     return Err(ErrorKind::ExpectedCloseBrace.into());
+                    // }
                     
-                    ctx.pop_extend();
+                    // ctx.pop_extend();
                 }
                 
                 _ => break,
             };
         }
-    
+        
         ctx.pop_extend();
-        Ok(primary)
+        
+        if items.is_empty() {
+            Ok(ExprVariant::Atom(atom))
+        } else {
+            Ok(ExprVariant::Primary(Primary::new(atom, items)))
+        }
     }
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;

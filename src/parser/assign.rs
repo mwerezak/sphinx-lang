@@ -2,12 +2,13 @@
 use crate::runtime::strings::InternSymbol;
 use crate::parser::primary::{Primary, AccessItem, Atom};
 use crate::runtime::types::operator::BinaryOp;
-use crate::parser::expr::ExprVariant;
+use crate::parser::expr::{ExprVariant, Expr};
 
 #[derive(Debug, Clone)]
 pub enum LValue {
     Identifier(InternSymbol),
-    Primary(Box<Primary>), // type annotation
+    Attribute(Primary, InternSymbol), // receiver, attribute name
+    Index(Primary, Expr), // receiver, index expression
     Tuple(Vec<LValue>),
 }
 
@@ -40,21 +41,30 @@ pub struct Declaration {
     lvalue-list ::= lvalue-expression ( "," lvalue-expression )* ;
 */
 
-impl TryFrom<Primary> for LValue {
+impl TryFrom<Atom> for LValue {
     type Error = ();
-    fn try_from(primary: Primary) -> Result<Self, Self::Error> {
-        if let Some(tail) = primary.iter_path().last() {
-            if matches!(tail, AccessItem::Attribute(..) | AccessItem::Index(..)) {
-                return Ok(LValue::Primary(Box::new(primary)));
-            }
-            return Err(());
-        }
-        
-        match primary.take_atom() {
-            Atom::Group(expr) => (*expr).try_into(),
+    fn try_from(atom: Atom) -> Result<Self, Self::Error> {
+        match atom {
             Atom::Identifier(name) => Ok(LValue::Identifier(name)),
+            Atom::Group(expr) => (*expr).try_into(),
             _ => Err(())
         }
+    }
+}
+
+impl TryFrom<Primary> for LValue {
+    type Error = ();
+    fn try_from(mut primary: Primary) -> Result<Self, Self::Error> {
+        // remove the last item so that primary will eval to the reciever
+        let tail = primary.path_mut().pop();
+        
+        let lvalue = match tail {
+            Some(AccessItem::Attribute(name)) => LValue::Attribute(primary, name),
+            Some(AccessItem::Index(index)) => LValue::Index(primary, index),
+            _ => return Err(()),
+        };
+        
+        Ok(lvalue)
     }
 }
 
@@ -62,15 +72,21 @@ impl TryFrom<ExprVariant> for LValue {
     type Error = ();
     fn try_from(expr: ExprVariant) -> Result<Self, Self::Error> {
         match expr {
-            ExprVariant::Primary(primary) => (*primary).try_into(),
+            ExprVariant::Atom(atom) => atom.try_into(),
+            
+            ExprVariant::Primary(primary) => primary.try_into(),
+            
             ExprVariant::Tuple(expr_list) => {
                 let mut lvalue_list = Vec::<LValue>::new();
+                
                 for expr in expr_list.into_iter() {
                     let lvalue = expr.take_variant().try_into()?;
                     lvalue_list.push(lvalue);
                 }
+                
                 Ok(Self::Tuple(lvalue_list))
             },
+            
             _ => Err(()),
         }
     }

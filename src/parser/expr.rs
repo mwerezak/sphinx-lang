@@ -1,6 +1,6 @@
 use crate::debug::symbol::DebugSymbol;
 use crate::runtime::types::operator::{BinaryOp, UnaryOp};
-use crate::parser::primary::Primary;
+use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration};
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::stmt::{Stmt, StmtVariant, Label};
@@ -9,7 +9,9 @@ use crate::parser::stmt::{Stmt, StmtVariant, Label};
 #[derive(Debug, Clone)]
 pub enum ExprVariant {
     
-    Primary(Box<Primary>),
+    Atom(Atom),
+    
+    Primary(Primary),
     
     UnaryOp(UnaryOp, Box<ExprVariant>),
     

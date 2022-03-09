@@ -41,6 +41,8 @@ impl<'a, 'r> EvalContext<'a, 'r> {
     
     fn eval_inner_expr(&mut self, expr: &ExprVariant) -> ExecResult<Variant> {
         match expr {
+            ExprVariant::Atom(atom) => self.eval_atom(atom),
+            
             ExprVariant::Primary(primary) => self.eval_primary(primary),
             
             ExprVariant::UnaryOp(op, expr) => self.eval_unary_op((*op).into(), expr),
@@ -62,7 +64,7 @@ impl<'a, 'r> EvalContext<'a, 'r> {
     fn eval_primary(&mut self, primary: &Primary) -> ExecResult<Variant> {
         let mut value = self.eval_atom(primary.atom())?;
         
-        for item in primary.iter_path() {
+        for item in primary.path().iter() {
             unimplemented!();
         }
         

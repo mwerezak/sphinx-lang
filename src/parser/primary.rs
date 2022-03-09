@@ -24,7 +24,7 @@ pub enum Atom {
 #[derive(Debug, Clone)]
 pub enum AccessItem {
     Attribute(InternSymbol),
-    Index(Box<Expr>),
+    Index(Expr),
     Invoke(),       // TODO
     Construct(ObjectConstructor),
 }
@@ -36,44 +36,15 @@ pub struct Primary {
 }
 
 impl Primary {
-    pub fn new(atom: Atom) -> Self {
-        Primary { atom, path: Vec::new() }
-    }
-    
-    pub fn with_path<I>(atom: Atom, path: impl Iterator<Item=AccessItem>) -> Self {
-        Primary { atom, path: path.collect() }
+    pub fn new(atom: Atom, path: Vec<AccessItem>) -> Self {
+        debug_assert!(!path.is_empty());
+        Primary { atom, path }
     }
     
     pub fn atom(&self) -> &Atom { &self.atom }
     pub fn take_atom(self) -> Atom { self.atom }
     
-    pub fn has_path(&self) -> bool { !self.path.is_empty() }
-    pub fn path_len(&self) -> usize { self.path.len() }
-    
-    pub fn iter_path(&self) -> impl Iterator<Item=&AccessItem> {
-        self.path.iter()
-    }
-    
-    pub fn push_access_attr(&mut self, name: InternSymbol) {
-        self.path.push(AccessItem::Attribute(name))
-    }
-    
-    pub fn push_access_index(&mut self, expr: Expr) {
-        self.path.push(AccessItem::Index(Box::new(expr)))
-    }
-    
-    //pub fn push_invoke(&mut self, )
-    
-    pub fn push_construct(&mut self, ctor: ObjectConstructor) {
-        self.path.push(AccessItem::Construct(ctor))
-    }
-    
-    pub fn push_path(&mut self, item: AccessItem) {
-        self.path.push(item);
-    }
-    
-    pub fn pop_path(&mut self) -> Option<AccessItem> {
-        self.path.pop()
-    }
+    pub fn path(&self) -> &Vec<AccessItem> { &self.path }
+    pub fn path_mut(&mut self) -> &mut Vec<AccessItem> { &mut self.path }
 }
 

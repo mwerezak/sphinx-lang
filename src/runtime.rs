@@ -47,7 +47,10 @@ pub struct Runtime<'r> {
 
 impl<'r> Runtime<'r> {
     pub fn new(string_table: &'r StringTable) -> Self {
-        let globals = Self::new_env(string_table);
+        let globals = Environment { 
+            string_table, namespace: new_namespace(),
+        };
+        
         Runtime {
             string_table,
             globals,
@@ -70,7 +73,12 @@ impl<'r> Runtime<'r> {
     }
     
     pub fn push_env(&'r mut self) {
-        self.env_stack.push(Self::new_env(self.string_table));
+        let new_env = Environment { 
+            string_table: self.string_table,
+            namespace: new_namespace(),
+        };
+        
+        self.env_stack.push(new_env);
     }
     
     pub fn pop_env(&mut self) {
@@ -115,12 +123,6 @@ impl<'r> Runtime<'r> {
             }
         }
         return None;
-    }
-
-    fn new_env(string_table: &'r StringTable) -> Environment<'r> {
-        Environment { 
-            string_table, namespace: new_namespace(),
-        }
     }
 }
 
