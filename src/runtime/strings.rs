@@ -5,7 +5,6 @@ use std::ops::Deref;
 use std::hash::{Hash, Hasher, BuildHasher};
 
 mod inline;
-use inline::InlineStr;
 
 pub mod string_table;
 pub use string_table::StringSymbol;
@@ -39,17 +38,23 @@ impl Deref for StrRef<'_> {
 /// to hash, compare, or even just check the length of the string.
 
 const INLINE_SIZE: usize = 8;  // TODO figure out size
+pub type InlineStr = inline::InlineStr<INLINE_SIZE>;
 
 #[derive(Debug, Clone)]
 pub enum StringValue {
     Intern(StringSymbol),
-    Inline(InlineStr<INLINE_SIZE>),
-    CowRc(Rc<str>),  // uses COW semantics, no need to GC these
+    Inline(InlineStr),
+    CowRc(Rc<str>),
 }
 
 impl From<StringSymbol> for StringValue {
     #[inline]
     fn from(sym: StringSymbol) -> Self { Self::Intern(sym) }
+}
+
+impl From<InlineStr> for StringValue {
+    #[inline]
+    fn from(in_str: InlineStr) -> Self { Self::Inline(in_str) }
 }
 
 impl From<&str> for StringValue {
@@ -72,6 +77,7 @@ impl StringValue {
         }
     }
     
+    #[inline]
     pub fn into_key<'s>(self, string_table: &'s StringTableGuard) -> StringKey<'s> {
         StringKey::new(self, string_table)
     }
@@ -90,8 +96,8 @@ impl StringValue {
             _ => return None,
         };
         Some(value)
-
     }
+    
 }
 
 
@@ -100,7 +106,7 @@ impl StringValue {
 #[derive(Debug, Clone)]
 pub enum StringKey<'s> {
     Intern(StringSymbol, &'s StringTableGuard),
-    Inline(InlineStr<INLINE_SIZE>, u64),
+    Inline(InlineStr, u64),
     CowRc(Rc<str>, u64),
 }
 
