@@ -12,6 +12,7 @@ use rlo_interpreter::frontend::render_parser_error;
 use rlo_interpreter::debug::symbol::DebugSymbolResolver;
 use rlo_interpreter::language;
 use rlo_interpreter::interpreter;
+use rlo_interpreter::lexer::LexerBuilder;
 use rlo_interpreter::parser::stmt::{Stmt};
 use rlo_interpreter::runtime::*;
 use rlo_interpreter::runtime::strings::{StringTable, StringTableCell};
@@ -87,57 +88,105 @@ fn main() {
     } else {
         println!("\nReLox Interpreter {}\n", version);
         let string_table = StringTable::new();
-        let repl = Repl::new(">>> ", &string_table);
+        let repl = Repl::new(&string_table);
         repl.run();
     }
 }
 
 
+const PROMT_START: &str = ">>> ";
+const PROMT_CONTINUE: &str = "... ";
+
 struct Repl<'r> {
-    prompt: &'static str,
     string_table: &'r StringTableCell,
+    lexer_factory: LexerBuilder,
     root_env: Environment<'r, 'r>,
 }
 
+
+enum ReadLine {
+    Ok(String),
+    Empty,
+    Restart,
+    Quit,
+}
+
 impl<'r> Repl<'r> {
-    pub fn new(prompt: &'static str, string_table: &'r StringTableCell) -> Self {
+    pub fn new(string_table: &'r StringTableCell) -> Self {
         Repl { 
-            prompt,
             string_table,
+            lexer_factory: language::create_default_lexer_rules(),
             root_env: placeholder_new_env(string_table),
         }
     }
     
+    fn read_line(&self, prompt: &'static str) -> ReadLine {
+        io::stdout().write(prompt.as_bytes()).unwrap();
+        io::stdout().flush().unwrap();
+        
+        let mut input = String::new();
+        let result = io::stdin().read_line(&mut input);
+        if result.is_err() {
+            println!("Could not read input: {}", result.unwrap_err());
+            return ReadLine::Restart;
+        }
+        
+        while let Some('\n' | '\r') = input.chars().next_back() {
+            input.pop();
+        }
+        
+        if input.is_empty() {
+            return ReadLine::Empty;
+        }
+        
+        if input.chars().last().unwrap() == '\x04' || input == "quit" {
+            return ReadLine::Quit;
+        }
+        
+        ReadLine::Ok(input)
+    }
+    
+    fn is_input_complete(&self, input: &str) -> bool {
+        // This is fairly hacky. If we can't parse the input without errors, then we assume we need to continue
+        let mut parse_ctx = ParseContext::new(&self.lexer_factory, &self.string_table);
+        let module = ModuleSource::new("<repl>", SourceType::String(input.to_string()));
+        let source_text = module.source_text().expect("error reading source");
+        let parse_result = parse_ctx.parse_ast(source_text);
+        parse_result.is_ok()
+    }
+    
     pub fn run(&self) {
-        // Temporary
-        let lexer_factory = language::create_default_lexer_rules();
-        
-        
         
         loop {
-            io::stdout().write(self.prompt.as_bytes()).unwrap();
-            io::stdout().flush().unwrap();
-            
             let mut input = String::new();
-            let result = io::stdin().read_line(&mut input);
-            if result.is_err() {
-                println!("Could not read input: {}", result.unwrap_err());
-                continue;
+            
+            loop {
+                let prompt =
+                    if input.is_empty() { PROMT_START }
+                    else { PROMT_CONTINUE };
+                
+                match self.read_line(prompt) {
+                    ReadLine::Quit => return,
+                    ReadLine::Restart => continue,
+                    ReadLine::Empty => {
+                        if input.is_empty() { continue }
+                        else { break }
+                    },
+                    ReadLine::Ok(line) => {
+                        input.push_str(&line);
+                        
+                        if line.trim_end().ends_with(';') {
+                            break
+                        }
+                        
+                        if self.is_input_complete(input.as_str()) {
+                            break
+                        }
+                    }
+                }
             }
             
-            while let Some('\n' | '\r') = input.chars().next_back() {
-                input.pop();
-            }
-            
-            if input.is_empty() {
-                continue;
-            }
-            
-            if input.chars().last().unwrap() == '\x04' || input == "quit" {
-                break;
-            }
-            
-            let mut parse_ctx = ParseContext::new(&lexer_factory, &self.string_table);
+            let mut parse_ctx = ParseContext::new(&self.lexer_factory, &self.string_table);
             let module = ModuleSource::new("<repl>", SourceType::String(input));
             let source_text = module.source_text().expect("error reading source");
             let parse_result = parse_ctx.parse_ast(source_text);
