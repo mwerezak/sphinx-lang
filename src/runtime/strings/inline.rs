@@ -16,7 +16,7 @@ use std::fmt;
 // pub const STRING_SIZED_INLINE: usize = mem::size_of::<String>() - 2;
 
 #[derive(Clone, Copy)]
-pub(crate) struct InlineStr<const N: usize> {
+pub struct InlineStr<const N: usize> {
     data: [mem::MaybeUninit<u8>; N],
     len: u8,
 }
@@ -115,6 +115,13 @@ impl<const N: usize> fmt::Debug for InlineStr<N> {
     }
 }
 
+impl<const N: usize> fmt::Display for InlineStr<N> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        <str as fmt::Display>::fmt(self, f)
+    }
+}
+
 
 // Conversion from other string types
 
@@ -133,5 +140,56 @@ impl<'s, const N: usize> TryFrom<&'s str> for InlineStr<N> {
     #[inline]
     fn try_from(value: &'s str) -> Result<Self, Self::Error> {
         Self::try_new(value)
+    }
+}
+
+
+
+
+
+#[cfg(test)]
+mod tests {
+    use crate::runtime::strings::inline::InlineStr;
+
+    #[test]
+    fn empty() {
+        let lit = "";
+        let s: InlineStr<22> = lit.try_into().expect("bad inline str");
+        assert_eq!(&*s, lit);
+        assert_eq!(s.len(), lit.len())
+    }
+
+    #[test]
+    fn good_init() {
+        let lit = "inline";
+        let s: InlineStr<22> = lit.try_into().expect("bad inline str");
+        assert_eq!(&*s, lit);
+        assert_eq!(s.len(), lit.len())
+    }
+
+    #[test]
+    fn bad_init() {
+        let lit = "This is way too long to be an inline string!!!";
+        let s = <InlineStr<22>>::try_new(lit).unwrap_err();
+        assert_eq!(s, lit);
+        assert_eq!(s.len(), lit.len())
+    }
+
+    #[test]
+    fn good_concat() {
+        let lit = "Inline";
+        let lit2 = " me";
+        let mut s = <InlineStr<22>>::try_new(lit).expect("bad inline str");
+        assert!(s.try_concat(lit2));
+        assert_eq!(&*s, lit.to_string() + lit2);
+    }
+
+    #[test]
+    fn bad_concat() {
+        let lit = "This is";
+        let lit2 = " way too long to be an inline string!!!";
+        let mut s = <InlineStr<22>>::try_new(lit).expect("bad inline str");
+        assert!(!s.try_concat(lit2));
+        assert_eq!(&*s, lit);
     }
 }

@@ -99,7 +99,8 @@ impl fmt::Display for StringValue {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Intern(sym) => write!(fmt, "$({:?})", sym),
-            Self::CowRc(rc_str) => write!(fmt, "{:?}", rc_str),
+            Self::Inline(in_str) => write!(fmt, "$\"{:?}\"", in_str),
+            Self::CowRc(rc_str) => write!(fmt, "*\"{:?}\"", rc_str),
         }
     }
 }

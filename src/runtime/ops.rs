@@ -84,9 +84,10 @@ pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> bool {
         (Variant::BoolTrue, Variant::BoolTrue) => true,
         (Variant::BoolFalse, Variant::BoolFalse) => true,
         
-        (Variant::String(lhs_str), Variant::String(rhs_str)) => {
-            if let Some(result) = lhs_str.try_eq(&rhs_str) { result }
-            else { unimplemented!() }
+        (Variant::String(_lhs_str), Variant::String(_rhs_str)) => {
+            unimplemented!()
+            // if let Some(result) = lhs_str.try_eq(&rhs_str) { result }
+            // else { unimplemented!() }
         },
         
         // numeric equality
