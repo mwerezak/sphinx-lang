@@ -131,9 +131,7 @@ impl<'r> Repl<'r> {
             return ReadLine::Restart;
         }
         
-        while let Some('\n' | '\r') = input.chars().next_back() {
-            input.pop();
-        }
+        input = input.trim_end().to_string();
         
         if input.is_empty() {
             return ReadLine::Empty;
@@ -182,6 +180,8 @@ impl<'r> Repl<'r> {
                         if self.is_input_complete(input.as_str()) {
                             break
                         }
+                        
+                        input.push('\n')
                     }
                 }
             }
