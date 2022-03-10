@@ -86,7 +86,7 @@ fn main() {
         }
         
     } else {
-        println!("\nReLox Interpreter {}\n", version);
+        println!("\nSphinx Interpreter {}\n", version);
         let string_table = StringTable::new();
         let repl = Repl::new(&string_table);
         repl.run();

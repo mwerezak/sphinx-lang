@@ -2,8 +2,8 @@
 ---
 name: ReLox
 file_extensions:
-  - rlo
-scope: source.relox
+  - [sphinx sph]
+scope: source.sphinx
 
 variables:
   identifier: \b[a-zA-Z_][a-zA-Z0-9_]*\b # upper and lowercase

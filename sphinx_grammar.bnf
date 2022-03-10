@@ -95,7 +95,7 @@ declaration-expression ::= ( "let" | "var" ) assignment-expression ;
 Special case here: An invocation cannot be the first production following a new line. 
 This is the only situation where white space is considered when parsing RLO.
 This prevents function calls from splitting across lines (an issue that Lua also has, and our syntax is based on Lua).
-However RLO has tuples, so its important for us to deal with that.
+However Sphinx has tuples, so its important for us to deal with that.
 *)
 invocation ::= "(" ")" | "(" argument ( "," argument )* ")" ; 
 argument ::= ( "..." )? expression ;  (* "..." is for argument unpacking syntax *)

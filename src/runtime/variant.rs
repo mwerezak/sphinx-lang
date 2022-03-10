@@ -28,7 +28,7 @@ impl Variant {
     }
     
     // Note, bit_value() and float_value() are defined based on what is needed for the language *implementation*
-    // They do not reflect the semantics of the ReLox language
+    // They do not reflect the semantics of the Sphinx language
     
     pub fn bit_value(&self) -> IntType {
         match self {

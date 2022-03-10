@@ -4,7 +4,7 @@
 Cargo.lock
 
 *.lox
-*.rlo
+*.sph
 *.txt
 *.sublime-workspace
 *.sublime-syntax

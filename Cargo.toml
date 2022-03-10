@@ -1,5 +1,5 @@
 [package]
-name = "rlo-interpreter"
+name = "sphinx-interpreter"
 version = "0.1.0"
 edition = "2021"
 

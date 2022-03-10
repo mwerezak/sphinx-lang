@@ -1,6 +1,6 @@
-# RLO syntax examples
+# Sphinx syntax examples
 # If you use Sublime Text you can read this with syntax highlighting!
-# (highlighter for sublime text provided by relox.sublime-syntax)
+# (highlighter for sublime text provided by Sphinx.sublime-syntax)
 
 
 #{
@@ -8,7 +8,7 @@
    #{   Nesting!   }#
 }#
 
-# Your first ReLox program!
+# Your first Sphinx program!
 echo "Hello, world!"  # print() function will be available later once there is a builtin library
 
 # Semicolons are optional.
@@ -176,7 +176,7 @@ del collection[key]  # mostly useful for removing values from objects
 
 # Control Flow
 # branching constructs are expressions
-# looping constructs are statements - in fact, they are the only non-expression statements in ReLox
+# looping constructs are statements - in fact, they are the only non-expression statements in Sphinx
 
 if condition then
     echo "yes"

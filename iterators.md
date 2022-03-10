@@ -1,4 +1,4 @@
-# Iterators in ReLox
+# Iterators in Sphinx
 
 Iterators are a mechanism used for producing sequences of values. 
 They are used to support `for` loops and `...` argument unpacking syntax.
