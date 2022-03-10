@@ -22,35 +22,35 @@ pub fn is_bitwise_primitive(value: &Variant) -> bool {
 // Unary Operators
 
 #[inline]
-pub fn eval_neg(operand: &Variant) -> ExecResult<Variant> {
+pub fn eval_neg(operand: &Variant) -> ExecResult<Option<Variant>> {
     let value = match operand {
         Variant::Integer(value) => (-value).into(),
         Variant::Float(value) => (-value).into(),
-        _ => return eval_unary_from_meta(UnaryOp::Neg, operand),
+        _ => return Ok(None),
     };
-    Ok(value)
+    Ok(Some(value))
 }
 
 #[inline]
-pub fn eval_pos(operand: &Variant) -> ExecResult<Variant> {
+pub fn eval_pos(operand: &Variant) -> ExecResult<Option<Variant>> {
     let value = match operand {
         // No-op for arithmetic primitives
         Variant::Integer(value) => (*value).into(),
         Variant::Float(value) => (*value).into(),
-        _ => return eval_unary_from_meta(UnaryOp::Pos, operand),
+        _ => return Ok(None),
     };
-    Ok(value)
+    Ok(Some(value))
 }
 
 #[inline]
-pub fn eval_inv(operand: &Variant) -> ExecResult<Variant> {
+pub fn eval_inv(operand: &Variant) -> ExecResult<Option<Variant>> {
     let value = match operand {
         Variant::BoolTrue => Variant::BoolFalse,
         Variant::BoolFalse => Variant::BoolTrue,
         Variant::Integer(value) => Variant::from(!value),
-        _ => return eval_unary_from_meta(UnaryOp::Inv, operand),
+        _ => return Ok(None),
     };
-    Ok(value)
+    Ok(Some(value))
 }
 
 #[inline]
@@ -59,50 +59,40 @@ pub fn eval_not(operand: &Variant) -> ExecResult<Variant> {
 }
 
 
-fn eval_unary_from_meta(_op: UnaryOp, _operand: &Variant) -> ExecResult<Variant> {
-    // TODO defer to the operand's type's metamethods
-    unimplemented!()
-}
-
-
 // Binary Operators
 
 // Equality is handled specially
-// Note that even for GCObject we will always get a bool because the default is to fallback to reference equality
-// so there is no case where comparing two values for equality will fail, unlike most operators
 
 #[inline]
-pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> bool {
+pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> Option<bool> {
     match (lhs, rhs) {
         // nil always compares false
-        (Variant::Nil, _) => false,
-        (_, Variant::Nil) => false,
+        (Variant::Nil, _) => Some(false),
+        (_, Variant::Nil) => Some(false),
         
         // empty tuple is only equal with itself
-        (Variant::EmptyTuple, Variant::EmptyTuple) => true,
+        (Variant::EmptyTuple, Variant::EmptyTuple) => Some(true),
         
-        (Variant::BoolTrue, Variant::BoolTrue) => true,
-        (Variant::BoolFalse, Variant::BoolFalse) => true,
+        (Variant::BoolTrue, Variant::BoolTrue) => Some(true),
+        (Variant::BoolFalse, Variant::BoolFalse) => Some(true),
         
-        (Variant::String(_lhs_str), Variant::String(_rhs_str)) => {
-            unimplemented!()
-            // if let Some(result) = lhs_str.try_eq(&rhs_str) { result }
-            // else { unimplemented!() }
-        },
+        (Variant::String(lhs_str), Variant::String(rhs_str)) => lhs_str.try_eq(rhs_str),
         
         // numeric equality
-        (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => *lhs_value == *rhs_value,
-        (_, _) if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) => lhs.float_value() == rhs.float_value(),
+        (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) 
+            => Some(*lhs_value == *rhs_value),
         
-        // TODO GCObject
+        (_, _) if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) 
+            => Some(lhs.float_value() == rhs.float_value()),
+        
 
-        _ => false,
+        _ => None,
     }
 }
 
 #[inline(always)]
-pub fn eval_ne(lhs: &Variant, rhs: &Variant) -> bool {
-    !eval_eq(lhs, rhs)
+pub fn eval_ne(lhs: &Variant, rhs: &Variant) -> Option<bool> {
+    eval_eq(lhs, rhs).map(|result| !result)
 }
 
 

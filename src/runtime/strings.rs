@@ -75,6 +75,23 @@ impl StringValue {
     pub fn into_key<'s>(self, string_table: &'s StringTableGuard) -> StringKey<'s> {
         StringKey::new(self, string_table)
     }
+    
+    // Performs a comparison if it is possible to do so without a string table
+    pub fn try_eq(&self, other: &StringValue) -> Option<bool> {
+        let value = match (self, other) {
+            (Self::Intern(sym_a), Self::Intern(sym_b)) => sym_a == sym_b,
+            
+            (Self::Inline(in_a), Self::Inline(in_b)) => in_a.deref() == in_b.deref(),
+            (Self::CowRc(rc_a), Self::CowRc(rc_b)) => **rc_a == **rc_b,
+            
+            (Self::CowRc(rc_str), Self::Inline(in_str)) 
+            | (Self::Inline(in_str), Self::CowRc(rc_str)) => **rc_str == *in_str.deref(),
+            
+            _ => return None,
+        };
+        Some(value)
+
+    }
 }
 
 

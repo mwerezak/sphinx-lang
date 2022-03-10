@@ -189,12 +189,17 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         let operand = try_value!(self.eval_expr(expr)?);
         
         let result = match op {
-            UnaryOp::Neg => eval_neg(&operand),
-            UnaryOp::Pos => eval_pos(&operand),
-            UnaryOp::Inv => eval_inv(&operand),
-            UnaryOp::Not => eval_not(&operand),
+            UnaryOp::Neg => eval_neg(&operand)?,
+            UnaryOp::Pos => eval_pos(&operand)?,
+            UnaryOp::Inv => eval_inv(&operand)?,
+            UnaryOp::Not => Some(eval_not(&operand)?),
         };
-        result.map(|value| value.into())
+        
+        if let Some(value) = result {
+            return Ok(value.into());
+        }
+        
+        unimplemented!();
     }
     
     fn eval_binary_op(&self, op: BinaryOp, lhs: &Expr, rhs: &Expr) -> ExecResult<EvalResult> {
@@ -235,8 +240,8 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
                 Comparison::LE     => eval_le(&lhs, &rhs),
                 Comparison::GE     => eval_ge(&lhs, &rhs),
                 
-                Comparison::EQ     => Some(eval_eq(&lhs, &rhs)),
-                Comparison::NE     => Some(eval_ne(&lhs, &rhs)),
+                Comparison::EQ     => eval_eq(&lhs, &rhs),
+                Comparison::NE     => eval_ne(&lhs, &rhs),
             
             }.map(Variant::from),
             
