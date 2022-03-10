@@ -13,6 +13,6 @@ The plan is first - an interpreter, then compilation to bytecode and a VM - then
 
 # Safe Rust FFI
 
-Because Sphinx is implemented entirely in Safe Rust, it should be possible to provide a completely safe FFI with Rust code, adding the capabilities of a dynamic scripting language to a host Rust application.
+Because Sphinx is implemented entirely in Safe Rust, it should be possible to provide a completely safe FFI with Rust code. This would allow a host Rust application to gain the capabilities of an embedded dynamic scripting language.
 
 As a long term goal I would like to also leverage the rlua bindings to provide a Lua FFI in Sphinx, as well.
