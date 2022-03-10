@@ -139,7 +139,7 @@ impl From<InternSymbol> for StringValue {
 
 impl StringValue {
     // only string values of the same representation can be compared directly
-    // otherwise we will need outside help to compare them
+    // otherwise we will need the string table to compare them
     pub fn try_eq(&self, other: &StringValue) -> Option<bool> {
         match (self, other) {
             (Self::Intern(self_sym), Self::Intern(other_sym)) => Some(self_sym == other_sym),
@@ -148,15 +148,21 @@ impl StringValue {
         }
     }
     
+    pub fn eq(&self, other: &StringValue, string_table: &StringTableGuard) -> bool {
+        self.try_eq(other).unwrap_or_else(|| match (self, other) {
+            (Self::Intern(sym), Self::CowRc(rc_str)) | (Self::CowRc(rc_str), Self::Intern(sym)) => {
+                let intern_str = string_table.resolve(*sym);
+                rc_str.as_bytes() == intern_str.as_bytes()
+            },
+            _ => unreachable!(),
+        })
+    }
+    
     pub fn write_str<'s>(&self, buf: &mut impl fmt::Write, string_table: &'s StringTableGuard) -> fmt::Result {
         match self {
             Self::Intern(sym) => buf.write_str(&string_table.resolve(*sym)),
             Self::CowRc(rc_str) => buf.write_str(rc_str),
         }
-    }
-    
-    pub fn as_display<'s>(&'s self, string_table: &'s StringTableGuard) -> impl fmt::Display + 's {
-        utils::delegate_fmt(|fmt| self.write_str(fmt, string_table))
     }
 }
 
