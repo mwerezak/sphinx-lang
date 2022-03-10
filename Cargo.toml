@@ -22,5 +22,5 @@ lazy_static = "1.4"
 string-interner = "0.14"
 # rustc-hash = "1.1.0"
 ahash = "0.7.6"
-log = "0.4.0"
+log = { version = "0.4.0", features = ["release_max_level_off"] }
 env_logger = "0.8.4"
