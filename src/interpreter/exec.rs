@@ -25,11 +25,7 @@ impl<'a, 'r, 's> ExecContext<'a, 'r, 's> {
                 let eval_ctx = EvalContext::new(self.local_env);
                 let value = try_value!(eval_ctx.eval_expr(&expr)?);
                 
-                let mut buf = String::new();
-                value.write_repr(&mut buf, self.local_env.string_table())
-                    .map_err(|err| RuntimeError::new(err))?;
-                
-                println!("{}", buf);
+                println!("{}", value.repr(self.local_env.string_table()));
                 
                 ControlFlow::None
             },

@@ -74,18 +74,16 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
     fn find_value(&self, name: &StringValue) -> ExecResult<Variant> {
         self.local_env.find_value(name)
             .ok_or_else(|| {
-                let mut string = String::new();
-                name.write_str(&mut string, self.local_env.string_table()).unwrap();
-                ErrorKind::NameNotDefined(string).into()
+                let name = name.as_str(self.local_env.string_table()).to_string();
+                ErrorKind::NameNotDefined(name).into()
             })
     }
     
     fn find_env(&'a self, name: &StringValue) -> ExecResult<&'a Environment<'r, 's>> {
         self.local_env.find_name(name)
             .ok_or_else(|| {
-                let mut string = String::new();
-                name.write_str(&mut string, self.local_env.string_table()).unwrap();
-                ErrorKind::NameNotDefined(string).into()
+                let name = name.as_str(self.local_env.string_table()).to_string();
+                ErrorKind::NameNotDefined(name).into()
             })
     }
     

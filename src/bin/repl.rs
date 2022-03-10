@@ -218,11 +218,7 @@ impl<'r> Repl<'r> {
                         
                         match eval_result {
                             Ok(value) => {
-                                let mut buf = String::new();
-                                value.unwrap_value().write_repr(&mut buf, &self.string_table)
-                                    .expect("could not write to string buffer");
-                                
-                                println!("{}", buf);
+                                println!("{}", value.unwrap_value().repr(&self.string_table));
                             },
                             Err(error) => {
                                 println!("{:?}", error)

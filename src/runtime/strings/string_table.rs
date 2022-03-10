@@ -116,3 +116,4 @@ impl StringTable {
         self.hash_cache.get(DefaultSymbol::from(sym).to_usize()).map(|hash| *hash)
     }
 }
+

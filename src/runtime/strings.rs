@@ -1,5 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
+use std::cell::Ref;
 use std::ops::Deref;
 use std::hash::{Hash, Hasher, BuildHasher};
 
@@ -43,15 +44,33 @@ impl From<&str> for StringValue {
 }
 
 impl StringValue {
-    // pub fn as_str(&self, string_table: &StringTableGuard) -> impl Deref<Target=str> {
-    //     unimplemented!()
-    // }
-    
-    pub fn write_str<'s>(&self, buf: &mut impl fmt::Write, string_table: &'s StringTableGuard) -> fmt::Result {
+    pub fn as_str<'a, 's>(&'a self, string_table: &'s StringTableGuard) -> impl Deref<Target=str> + 'a where 's: 'a {
         match self {
-            Self::Inline(in_str) => buf.write_str(in_str),
-            Self::Intern(sym) => buf.write_str(&string_table.resolve(*sym)),
-            Self::CowRc(rc_str) => buf.write_str(rc_str),
+            Self::Inline(in_str) => StrRef::Slice(in_str),
+            Self::CowRc(rc_str) => StrRef::Slice(rc_str),
+            Self::Intern(sym) => StrRef::Ref(string_table.resolve(*sym)),
+        }
+    }
+    
+    pub fn into_key<'s>(self, string_table: &'s StringTableGuard) -> StringKey<'s> {
+        StringKey::new(self, string_table)
+    }
+}
+
+// Support for StringValue::as_ref()
+enum StrRef<'a> {
+    Slice(&'a str),
+    Ref(Ref<'a, str>),
+}
+
+impl Deref for StrRef<'_> {
+    type Target = str;
+    
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Slice(string) => string,
+            Self::Ref(str_ref) => str_ref,
         }
     }
 }

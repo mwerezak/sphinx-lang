@@ -50,33 +50,12 @@ impl Variant {
         }
     }
     
-    // write a string representation of this value
-    pub fn write_repr(&self, buf: &mut impl fmt::Write, string_table: &StringTableGuard) -> fmt::Result {
-        match self {
-            Self::Nil => buf.write_str("nil"),
-            Self::EmptyTuple => buf.write_str("()"),
-            Self::BoolTrue => buf.write_str("true"),
-            Self::BoolFalse => buf.write_str("false"),
-            
-            Self::Integer(value) => write!(buf, "{}", *value),
-            Self::Float(value) => {
-                if value.trunc() != *value {
-                    write!(buf, "{}", *value)
-                } else {
-                    write!(buf, "{}.0", value)
-                }
-            },
-            
-            Self::String(strval) => {
-                buf.write_char('"')?;
-                strval.write_str(buf, string_table)?;
-                buf.write_char('"')
-            },
-        }
-    }
-    
     pub fn into_key<'s>(self, string_table: &'s StringTableGuard) -> ExecResult<VariantKey<'s>> {
         VariantKey::new(self, string_table)
+    }
+    
+    pub fn repr<'a, 's>(&'a self, string_table: &'s StringTableGuard) -> impl fmt::Display + 'a where 's: 'a {
+        VariantRepr(self, string_table)
     }
 }
 
@@ -182,12 +161,34 @@ impl From<VariantKey<'_>> for Variant {
     }
 }
 
-pub struct VariantRepr<'s>(Variant, &'s StringTableGuard);
 
-impl fmt::Display for VariantRepr<'_> {
+struct VariantRepr<'a, 's>(&'a Variant, &'s StringTableGuard);
+
+impl fmt::Display for VariantRepr<'_, '_> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.write_repr(fmt, self.1)
+        let VariantRepr(value, string_table) = self;
+        match value {
+            Variant::Nil => fmt.write_str("nil"),
+            Variant::EmptyTuple => fmt.write_str("()"),
+            Variant::BoolTrue => fmt.write_str("true"),
+            Variant::BoolFalse => fmt.write_str("false"),
+            
+            Variant::Integer(value) => write!(fmt, "{}", *value),
+            Variant::Float(value) => {
+                if value.trunc() != *value {
+                    write!(fmt, "{}", *value)
+                } else {
+                    write!(fmt, "{}.0", value)
+                }
+            },
+            
+            Variant::String(strval) => {
+                let s = &strval.as_str(string_table) as &str;
+                write!(fmt, "\"{}\"", s)
+            },
+        }
     }
 }
+
 
 
