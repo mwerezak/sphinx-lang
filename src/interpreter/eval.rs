@@ -68,7 +68,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
     }
     
     pub fn eval(&self, expr: &ExprMeta) -> ExecResult<EvalResult> {
-        self.eval_variant(expr.variant())
+        self.eval_expr(expr.variant())
     }
     
     fn find_value(&self, name: StringValue) -> ExecResult<Variant> {
@@ -89,7 +89,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             })
     }
     
-    pub fn eval_variant(&self, expr: &Expr) -> ExecResult<EvalResult> {
+    pub fn eval_expr(&self, expr: &Expr) -> ExecResult<EvalResult> {
         match expr {
             Expr::Atom(atom) => self.eval_atom(atom),
             
@@ -167,13 +167,13 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             Atom::Self_ => unimplemented!(),
             Atom::Super => unimplemented!(),
             
-            Atom::Group(expr) => return self.eval_variant(expr),
+            Atom::Group(expr) => return self.eval_expr(expr),
         };
         Ok(value.into())
     }
     
     fn eval_short_circuit_logic(&self, op: Logical, lhs: &Expr, rhs: &Expr) -> ExecResult<EvalResult> {
-        let lhs_value = try_value!(self.eval_variant(lhs)?);
+        let lhs_value = try_value!(self.eval_expr(lhs)?);
         
         let cond = match op {
             Logical::And => !lhs_value.truth_value(),
@@ -183,12 +183,12 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         if cond {
             Ok(lhs_value.into())
         } else {
-            Ok(try_value!(self.eval_variant(rhs)?).into())
+            Ok(try_value!(self.eval_expr(rhs)?).into())
         }
     }
     
     fn eval_unary_op(&self, op: UnaryOp, expr: &Expr) -> ExecResult<EvalResult> {
-        let operand = try_value!(self.eval_variant(expr)?);
+        let operand = try_value!(self.eval_expr(expr)?);
         
         let result = match op {
             UnaryOp::Neg => eval_neg(&operand),
@@ -204,8 +204,8 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             return self.eval_short_circuit_logic(logic, lhs, rhs);
         }
         
-        let lhs_value = try_value!(self.eval_variant(lhs)?);
-        let rhs_value = try_value!(self.eval_variant(rhs)?);
+        let lhs_value = try_value!(self.eval_expr(lhs)?);
+        let rhs_value = try_value!(self.eval_expr(rhs)?);
         
         self.eval_binary_op_values(op, &lhs_value, &rhs_value).map(|value| value.into())
     }
@@ -264,7 +264,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             let store_env = self.find_env(name)?;
             
             let lhs_value = store_env.lookup_value(name).unwrap();
-            let mut rhs_value = try_value!(self.eval_variant(&assignment.rhs)?);
+            let mut rhs_value = try_value!(self.eval_expr(&assignment.rhs)?);
             
             if let Some(op) = assignment.op {
                 rhs_value = self.eval_binary_op_values(op, &lhs_value, &rhs_value)?;
@@ -281,7 +281,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         
         if let LValue::Identifier(name) = declaration.lhs {
             let name = StringValue::from(name);
-            let init_value = try_value!(self.eval_variant(&declaration.init)?);
+            let init_value = try_value!(self.eval_expr(&declaration.init)?);
             self.local_env.insert_value(name, init_value);
             Ok(init_value.into())
         } else {

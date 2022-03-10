@@ -213,7 +213,7 @@ impl<'r> Repl<'r> {
                 match stmt.variant() {
                     Stmt::Expression(expr) => {
                         let eval_ctx = EvalContext::new(&self.root_env);
-                        let eval_result = eval_ctx.eval_variant(&expr);
+                        let eval_result = eval_ctx.eval_expr(&expr);
                         log::debug!("{:?}", eval_result);
                         
                         match eval_result {

@@ -16,10 +16,14 @@ impl<'a, 'r, 's> ExecContext<'a, 'r, 's> {
     }
     
     pub fn exec(&self, stmt: &StmtMeta) -> ExecResult<ControlFlow> {
-        let control = match stmt.variant() {
+        self.exec_stmt(stmt.variant())
+    }
+    
+    pub fn exec_stmt(&self, stmt: &Stmt) -> ExecResult<ControlFlow> {
+        let control = match stmt {
             Stmt::Echo(expr) => {
                 let eval_ctx = EvalContext::new(self.local_env);
-                let value = try_value!(eval_ctx.eval_variant(&expr)?);
+                let value = try_value!(eval_ctx.eval_expr(&expr)?);
                 
                 let mut buf = String::new();
                 value.write_repr(&mut buf, self.local_env.string_table())
@@ -32,7 +36,7 @@ impl<'a, 'r, 's> ExecContext<'a, 'r, 's> {
             
             Stmt::Expression(expr) => {
                 let eval_ctx = EvalContext::new(self.local_env);
-                try_value!(eval_ctx.eval_variant(&expr)?);
+                try_value!(eval_ctx.eval_expr(&expr)?);
                 ControlFlow::None
             }
             
@@ -43,7 +47,7 @@ impl<'a, 'r, 's> ExecContext<'a, 'r, 's> {
                 
                 let value = try_value!(expr.as_ref().map_or(
                     Ok(Variant::Nil.into()), 
-                    |expr| eval_ctx.eval_variant(&expr)
+                    |expr| eval_ctx.eval_expr(&expr)
                 )?);
                 
                 ControlFlow::Break(*label, value)
@@ -54,7 +58,7 @@ impl<'a, 'r, 's> ExecContext<'a, 'r, 's> {
                 
                 let value = try_value!(expr.as_ref().map_or(
                     Ok(Variant::Nil.into()), 
-                    |expr| eval_ctx.eval_variant(&expr)
+                    |expr| eval_ctx.eval_expr(&expr)
                 )?);
                 
                 ControlFlow::Return(value)
