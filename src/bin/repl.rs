@@ -11,7 +11,7 @@ use sphinx_lang::source::{ModuleSource, SourceType, ParseContext};
 use sphinx_lang::frontend::render_parser_error;
 use sphinx_lang::debug::symbol::DebugSymbolResolver;
 use sphinx_lang::language;
-use sphinx_lang::interpreter;
+use sphinx_lang::interpreter::{EvalContext, ExecContext};
 use sphinx_lang::lexer::LexerBuilder;
 use sphinx_lang::parser::stmt::{Stmt};
 use sphinx_lang::runtime::*;
@@ -116,7 +116,7 @@ impl<'r> Repl<'r> {
         Repl { 
             string_table,
             lexer_factory: language::create_default_lexer_rules(),
-            root_env: placeholder_new_root_env(string_table),
+            root_env: new_root_env(string_table),
         }
     }
     
@@ -212,13 +212,14 @@ impl<'r> Repl<'r> {
             for stmt in stmts.iter() {
                 match stmt.variant() {
                     Stmt::Expression(expr) => {
-                        let eval_result = interpreter::eval_expr_variant(&self.root_env, &expr);
+                        let eval_ctx = EvalContext::new(&self.root_env);
+                        let eval_result = eval_ctx.eval_variant(&expr);
                         log::debug!("{:?}", eval_result);
                         
                         match eval_result {
                             Ok(value) => {
                                 let mut buf = String::new();
-                                value.write_repr(&mut buf, &self.string_table)
+                                value.unwrap_value().write_repr(&mut buf, &self.string_table)
                                     .expect("could not write to string buffer");
                                 
                                 println!("{}", buf);
@@ -229,7 +230,7 @@ impl<'r> Repl<'r> {
                         }
                     },
                     _ => {
-                        let exec_ctx = interpreter::ExecContext::from(&self.root_env);
+                        let exec_ctx = ExecContext::new(&self.root_env);
                         let exec_result = exec_ctx.exec(&stmt);
                         log::debug!("{:?}", exec_result);
                     },

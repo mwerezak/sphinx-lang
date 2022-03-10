@@ -2,6 +2,7 @@
 #![allow(unused_mut)]
 
 use crate::parser::expr::{ExprMeta, Expr};
+use crate::parser::stmt::{StmtMeta, Label};
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::assign::{Declaration, Assignment, LValue};
 
@@ -11,17 +12,48 @@ use crate::runtime::ops::*;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
+use crate::interpreter::{ControlFlow, ExecContext};
 
-// These will differ more once tracebacks are implemented
-pub fn eval_expr<'a>(local_env: &'a Environment<'_, '_>, expr: &ExprMeta) -> ExecResult<Variant> {
-    let mut ctx = EvalContext::from(local_env);
-    ctx.eval(expr)
+
+// evaluation can be interrupted by a control flow statement inside a block expression
+#[derive(Debug, Clone, Copy)]
+pub struct EvalResult(pub Result<Variant, ControlFlow>);
+
+impl From<Variant> for EvalResult {
+    fn from(value: Variant) -> Self { Self(Ok(value)) }
 }
 
-pub fn eval_expr_variant<'a>(local_env: &'a Environment<'_, '_>, expr: &Expr) -> ExecResult<Variant> {
-    let mut ctx = EvalContext::from(local_env);
-    ctx.eval_variant(expr)
+impl From<ControlFlow> for EvalResult {
+    fn from(control: ControlFlow) -> Self { Self(Err(control)) }
 }
+
+impl EvalResult {
+    pub fn is_value(&self) -> bool { self.0.is_ok() }
+    pub fn is_control(&self) -> bool { self.0.is_err() }
+    
+    pub fn unwrap_value(self) -> Variant { self.0.unwrap() }
+    pub fn unwrap_control(self) -> ControlFlow { self.0.unwrap_err() }
+    
+    pub fn value(self) -> Option<Variant> { self.0.ok() }
+    pub fn control(self) -> Option<ControlFlow> {
+        match self.0 {
+            Err(control) => Some(control),
+            Ok(..) => None,
+        }
+    }
+}
+
+// for use with functions that return -> Result<EvalResult, _>
+macro_rules! try_value {
+    ( $expr:expr ) => {
+        match $expr {
+            EvalResult(Ok(value)) => value,
+            EvalResult(Err(control)) => return Ok(control.into()),
+        }
+    };
+}
+pub (crate) use try_value;
+
 
 // tracks the local scope and the innermost ExprMeta
 pub struct EvalContext<'a, 'r, 's> {
@@ -30,22 +62,34 @@ pub struct EvalContext<'a, 'r, 's> {
     local_env: &'a Environment<'r, 's>,
 }
 
-impl<'a, 'r, 's> From<&'a Environment<'r, 's>> for EvalContext<'a, 'r, 's> {
-    fn from(local_env: &'a Environment<'r, 's>) -> Self {
+impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
+    pub fn new(local_env: &'a Environment<'r, 's>) -> Self {
         EvalContext { local_env }
     }
-}
-
-impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
-    pub fn eval(&self, expr: &ExprMeta) -> ExecResult<Variant> {
-        self.eval_inner_expr(expr.variant())
+    
+    pub fn eval(&self, expr: &ExprMeta) -> ExecResult<EvalResult> {
+        self.eval_variant(expr.variant())
     }
     
-    pub fn eval_variant(&self, expr: &Expr) -> ExecResult<Variant> {
-        self.eval_inner_expr(expr)
+    fn find_value(&self, name: StringValue) -> ExecResult<Variant> {
+        self.local_env.find_value(name)
+            .ok_or_else(|| {
+                let mut string = String::new();
+                name.write_str(&mut string, self.local_env.string_table()).unwrap();
+                ErrorKind::NameNotDefined(string).into()
+            })
     }
     
-    fn eval_inner_expr(&self, expr: &Expr) -> ExecResult<Variant> {
+    fn find_env(&'a self, name: StringValue) -> ExecResult<&'a Environment<'r, 's>> {
+        self.local_env.find_name(name)
+            .ok_or_else(|| {
+                let mut string = String::new();
+                name.write_str(&mut string, self.local_env.string_table()).unwrap();
+                ErrorKind::NameNotDefined(string).into()
+            })
+    }
+    
+    pub fn eval_variant(&self, expr: &Expr) -> ExecResult<EvalResult> {
         match expr {
             Expr::Atom(atom) => self.eval_atom(atom),
             
@@ -63,21 +107,52 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             Expr::Tuple(expr_list) => unimplemented!(),
             Expr::ObjectCtor(ctor) => unimplemented!(),
             
-            Expr::Block(suite, label) => unimplemented!(),
+            Expr::Block(suite, label) => self.eval_block(suite, label),
         }
     }
 
-    fn eval_primary(&self, primary: &Primary) -> ExecResult<Variant> {
-        let mut value = self.eval_atom(primary.atom())?;
+    fn eval_block(&self, suite: &Vec<StmtMeta>, block_label: &Option<Label>) -> ExecResult<EvalResult> {
+        let new_env = self.local_env.new_local();
+        let block_ctx = ExecContext::new(&new_env);
+        
+        let mut result = None;
+        for stmt in suite.iter() {
+            let control = block_ctx.exec(&stmt)?;
+            match control {
+                // these aren't used by block expressions and so must relate to an enclosing item
+                ControlFlow::Continue(..) | ControlFlow::Return(..) => return Ok(control.into()),
+                
+                ControlFlow::Break(target_label, value) => {
+                    // if a target label was supplied, check to see if it matches this block's label
+                    if let Some(target) = target_label {
+                        if block_label.map_or(true, |block| target != block) {
+                            return Ok(control.into())
+                        }
+                    }
+                    
+                    // if we get here, the break applies to this block
+                    result.replace(value);
+                    break;
+                }
+                
+                ControlFlow::None => { }
+            }
+        }
+
+        Ok(result.unwrap_or(Variant::Nil).into())
+    }
+
+    fn eval_primary(&self, primary: &Primary) -> ExecResult<EvalResult> {
+        let mut value = try_value!(self.eval_atom(primary.atom())?);
         
         for item in primary.path().iter() {
             unimplemented!();
         }
         
-        Ok(value)
+        Ok(value.into())
     }
 
-    fn eval_atom(&self, atom: &Atom) -> ExecResult<Variant> {
+    fn eval_atom(&self, atom: &Atom) -> ExecResult<EvalResult> {
         let value = match atom {
             Atom::Nil => Variant::Nil,
             Atom::EmptyTuple => Variant::EmptyTuple,
@@ -92,22 +167,13 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             Atom::Self_ => unimplemented!(),
             Atom::Super => unimplemented!(),
             
-            Atom::Group(expr) => self.eval_inner_expr(expr)?,
+            Atom::Group(expr) => return self.eval_variant(expr),
         };
-        Ok(value)
+        Ok(value.into())
     }
     
-    fn find_value(&self, name: StringValue) -> ExecResult<Variant> {
-        self.local_env.find_value(name)
-            .ok_or_else(|| {
-                let mut string = String::new();
-                name.write_str(&mut string, self.local_env.string_table()).unwrap();
-                ErrorKind::NameNotDefined(string).into()
-            })
-    }
-    
-    fn eval_short_circuit_logic(&self, op: Logical, lhs: &Expr, rhs: &Expr) -> ExecResult<Variant> {
-        let lhs_value = self.eval_inner_expr(lhs)?;
+    fn eval_short_circuit_logic(&self, op: Logical, lhs: &Expr, rhs: &Expr) -> ExecResult<EvalResult> {
+        let lhs_value = try_value!(self.eval_variant(lhs)?);
         
         let cond = match op {
             Logical::And => !lhs_value.truth_value(),
@@ -115,32 +181,33 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         };
         
         if cond {
-            Ok(lhs_value)
+            Ok(lhs_value.into())
         } else {
-            self.eval_inner_expr(rhs)
+            Ok(try_value!(self.eval_variant(rhs)?).into())
         }
     }
     
-    fn eval_unary_op(&self, op: UnaryOp, expr: &Expr) -> ExecResult<Variant> {
-        let operand = self.eval_inner_expr(expr)?;
+    fn eval_unary_op(&self, op: UnaryOp, expr: &Expr) -> ExecResult<EvalResult> {
+        let operand = try_value!(self.eval_variant(expr)?);
         
-        match op {
+        let result = match op {
             UnaryOp::Neg => eval_neg(&operand),
             UnaryOp::Pos => eval_pos(&operand),
             UnaryOp::Inv => eval_inv(&operand),
             UnaryOp::Not => eval_not(&operand),
-        }
+        };
+        result.map(|value| value.into())
     }
     
-    fn eval_binary_op(&self, op: BinaryOp, lhs: &Expr, rhs: &Expr) -> ExecResult<Variant> {
+    fn eval_binary_op(&self, op: BinaryOp, lhs: &Expr, rhs: &Expr) -> ExecResult<EvalResult> {
         if let BinaryOp::Logical(logic) = op {
             return self.eval_short_circuit_logic(logic, lhs, rhs);
         }
         
-        let lhs_value = self.eval_inner_expr(lhs)?;
-        let rhs_value = self.eval_inner_expr(rhs)?;
+        let lhs_value = try_value!(self.eval_variant(lhs)?);
+        let rhs_value = try_value!(self.eval_variant(rhs)?);
         
-        self.eval_binary_op_values(op, &lhs_value, &rhs_value)
+        self.eval_binary_op_values(op, &lhs_value, &rhs_value).map(|value| value.into())
     }
     
     fn eval_binary_op_values(&self, op: BinaryOp, lhs: &Variant, rhs: &Variant) -> ExecResult<Variant> {
@@ -191,41 +258,32 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         unimplemented!()
     }
     
-    fn find_env(&'a self, name: StringValue) -> ExecResult<&'a Environment<'r, 's>> {
-        self.local_env.find_name(name)
-            .ok_or_else(|| {
-                let mut string = String::new();
-                name.write_str(&mut string, self.local_env.string_table()).unwrap();
-                ErrorKind::NameNotDefined(string).into()
-            })
-    }
-    
-    fn eval_assignment(&self, assignment: &Assignment) -> ExecResult<Variant> {
+    fn eval_assignment(&self, assignment: &Assignment) -> ExecResult<EvalResult> {
         if let LValue::Identifier(name) = assignment.lhs {
             let name = StringValue::from(name);
             let store_env = self.find_env(name)?;
             
             let lhs_value = store_env.lookup_value(name).unwrap();
-            let mut rhs_value = self.eval_inner_expr(&assignment.rhs)?;
+            let mut rhs_value = try_value!(self.eval_variant(&assignment.rhs)?);
             
             if let Some(op) = assignment.op {
                 rhs_value = self.eval_binary_op_values(op, &lhs_value, &rhs_value)?;
             }
             
             store_env.insert_value(name, rhs_value);
-            Ok(rhs_value)
+            Ok(rhs_value.into())
         } else {
             unimplemented!()
         }
     }
     
-    fn eval_declaration(&self, declaration: &Declaration) -> ExecResult<Variant> {
+    fn eval_declaration(&self, declaration: &Declaration) -> ExecResult<EvalResult> {
         
         if let LValue::Identifier(name) = declaration.lhs {
             let name = StringValue::from(name);
-            let value = self.eval_inner_expr(&declaration.init)?;
-            self.local_env.insert_value(name, value);
-            Ok(value)
+            let init_value = try_value!(self.eval_variant(&declaration.init)?);
+            self.local_env.insert_value(name, init_value);
+            Ok(init_value.into())
         } else {
             unimplemented!()
         }

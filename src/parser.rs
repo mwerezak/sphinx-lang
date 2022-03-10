@@ -605,6 +605,8 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         
         let suite = self.parse_statement_list(ctx)?;
         
+        // TODO syntatic sugar: if the last statement is an expression statement, it implicitly becomes a "break <expr>"
+        
         ctx.pop_extend();
         Ok(Expr::Block(suite, block_label))
     }
