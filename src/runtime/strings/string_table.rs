@@ -62,9 +62,14 @@ impl StringTableGuard {
         self.internal.borrow_mut()
     }
     
-    pub fn hasher(&self) -> Ref<impl BuildHasher> {
+    // pub fn hasher(&self) -> Ref<impl BuildHasher> {
+    //     let string_table = self.internal.borrow();
+    //     Ref::map(string_table, |string_table| string_table.hasher())
+    // }
+    
+    pub fn make_hash(&self, string: &str) -> u64 { 
         let string_table = self.internal.borrow();
-        Ref::map(string_table, |string_table| string_table.hasher())
+        string_table.make_hash(string)
     }
     
     // Option not supported by refcell
@@ -88,7 +93,7 @@ pub struct StringTable {
 }
 
 impl StringTable {
-    pub fn hasher(&self) -> &impl BuildHasher { return &self.hasher_factory }
+    // pub fn hasher(&self) -> &impl BuildHasher { return &self.hasher_factory }
     
     pub fn get_or_intern(&mut self, string: &str) -> StringSymbol {
         let symbol = self.interner.get_or_intern(string);
@@ -96,16 +101,16 @@ impl StringTable {
         let index = symbol.to_usize();
         if index >= self.hash_cache.len() {
             debug_assert!(index == self.hash_cache.len());
-            self.hash_cache.insert(index, self.hash_str(string));
+            self.hash_cache.insert(index, self.make_hash(string));
         }
         
         symbol.into()
     }
     
-    fn hash_str(&self, string: &str) -> u64 {
-        let mut hasher = self.hasher_factory.build_hasher();
-        string.hash(&mut hasher);
-        hasher.finish()
+    pub fn make_hash(&self, string: &str) -> u64 {
+        let mut state = self.hasher_factory.build_hasher();
+        string.hash(&mut state);
+        state.finish()
     }
     
     pub fn resolve(&self, sym: StringSymbol) -> Option<&str> {

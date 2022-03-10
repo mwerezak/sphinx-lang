@@ -12,6 +12,26 @@ pub use string_table::StringSymbol;
 use string_table::StringTableGuard;
 
 
+
+/// Provides support for `StringValue::as_str()` and `StringKey::as_str()`
+enum StrRef<'a> {
+    Slice(&'a str),
+    Ref(Ref<'a, str>),
+}
+
+impl Deref for StrRef<'_> {
+    type Target = str;
+    
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Slice(string) => string,
+            Self::Ref(str_ref) => str_ref,
+        }
+    }
+}
+
+
 /// Enum over the different string representations.
 /// `StringValue` is fairly opaque. That's because if we have an interned string, there aren't many operations
 /// we can actually do without having a reference to the `StringTable`. If you do have such a reference, you can
@@ -22,8 +42,8 @@ const INLINE_SIZE: usize = 8;  // TODO figure out size
 
 #[derive(Debug, Clone)]
 pub enum StringValue {
-    Inline(InlineStr<INLINE_SIZE>),
     Intern(StringSymbol),
+    Inline(InlineStr<INLINE_SIZE>),
     CowRc(Rc<str>),  // uses COW semantics, no need to GC these
 }
 
@@ -57,32 +77,14 @@ impl StringValue {
     }
 }
 
-// Support for StringValue::as_ref()
-enum StrRef<'a> {
-    Slice(&'a str),
-    Ref(Ref<'a, str>),
-}
-
-impl Deref for StrRef<'_> {
-    type Target = str;
-    
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Slice(string) => string,
-            Self::Ref(str_ref) => str_ref,
-        }
-    }
-}
-
 
 // For use with VariantKey
 
 #[derive(Debug, Clone)]
 pub enum StringKey<'s> {
-    Inline(InlineStr<INLINE_SIZE>),
     Intern(StringSymbol, &'s StringTableGuard),
-    CowRc(Rc<str>),
+    Inline(InlineStr<INLINE_SIZE>, u64),
+    CowRc(Rc<str>, u64),
 }
 
 
@@ -94,60 +96,74 @@ impl<'s> StringKey<'s> {
     pub fn new(value: StringValue, string_table: &'s StringTableGuard) -> Self {
         match value {
             StringValue::Intern(sym) => Self::Intern(sym, string_table),
-            StringValue::Inline(in_str) => Self::Inline(in_str),
-            StringValue::CowRc(rc_str) => Self::CowRc(rc_str),
+            
+            // For hash consistency with interned strings, we need to cache a hash produced by the string table
+            StringValue::Inline(in_str) => {
+                let hash = string_table.make_hash(&in_str);
+                Self::Inline(in_str, hash)
+            },
+            StringValue::CowRc(rc_str) => {
+                let hash = string_table.make_hash(&rc_str);
+                Self::CowRc(rc_str, hash)
+            },
         }
     }
     
-    // pub fn as_str(&self, string_table: &StringTableGuard) -> impl Deref<Target=str> {
-    //     unimplemented!()
-    // }
+    pub fn as_str<'a>(&'a self) -> impl Deref<Target=str> + 'a where 's: 'a {
+        match self {
+            Self::Inline(in_str, _) => StrRef::Slice(in_str),
+            Self::CowRc(rc_str, _) => StrRef::Slice(rc_str),
+            Self::Intern(sym, string_table) => StrRef::Ref(string_table.resolve(*sym)),
+        }
+    }
 }
 
 impl Hash for StringKey<'_> {
     fn hash<H>(&self, state: &mut H) where H: Hasher {
         match self {
-            Self::Inline(in_str) => <str as Hash>::hash(in_str, state),
-            Self::CowRc(rc_str) => <str as Hash>::hash(rc_str, state),
+            Self::Inline(_, hash) => hash.hash(state),
+            Self::CowRc(_, hash) => hash.hash(state),
             
             Self::Intern(sym, string_table) => {
                 let hash = string_table.resolve_hash(*sym).unwrap();
                 hash.hash(state);
             },
-            
-            
         }
     }
 }
 
 impl Eq for StringKey<'_> { }
 
-impl<'s> PartialEq for StringKey<'s> {
+impl PartialEq for StringKey<'_> {
     #[inline]
-    fn eq(&self, other: &StringKey<'s>) -> bool {
-        unimplemented!()
-        // match (self, other) {
-        //     (Self::Intern { sym: self_sym, .. }, Self::Intern { sym: other_sym, .. }) => self_sym == other_sym,
-        //     (Self::CowRc { string: self_str, .. }, Self::CowRc { string: other_str, .. }) => self_str == other_str,
-            
-        //     (Self::Intern { sym, string_table, .. }, Self::CowRc { string, .. })
-        //     | (Self::CowRc { string, .. }, Self::Intern { sym, string_table, .. }) => {
-        //         let intern_str = string_table.resolve(*sym);
-        //         intern_str.as_bytes() == string.as_bytes()
-        //     },
-        // }
+    fn eq(&self, other: &StringKey<'_>) -> bool {
+        let self_str = &self.as_str() as &str;
+        let other_str = &other.as_str() as &str;
+        self_str == other_str
     }
 }
 
 // TODO impl PartialOrd, Ord for StringKey
+impl PartialOrd for StringKey<'_> {
+    fn partial_cmp(&self, other: &StringKey<'_>) -> Option<std::cmp::Ordering> {
+        let self_str = &self.as_str() as &str;
+        let other_str = &other.as_str() as &str;
+        <&str as PartialOrd>::partial_cmp(&self_str, &other_str)
+    }
+}
+
+impl Ord for StringKey<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let self_str = &self.as_str() as &str;
+        let other_str = &other.as_str() as &str;
+        <&str as Ord>::cmp(&self_str, &other_str)
+    }
+}
+
 
 impl fmt::Display for StringKey<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unimplemented!()
-        // match self {
-        //     Self::Intern(sym, string_table, ..) => fmt.write_str(&string_table.resolve(*sym)),
-        //     Self::CowRc(rc_str) => fmt.write_str(string)
-        // }
+        fmt.write_str(&self.as_str())
     }
 }
 
@@ -156,8 +172,8 @@ impl From<StringKey<'_>> for StringValue {
     fn from(strkey: StringKey<'_>) -> Self {
         match strkey {
             StringKey::Intern(sym, _) => Self::Intern(sym),
-            StringKey::Inline(in_str) => Self::Inline(in_str),
-            StringKey::CowRc(rc_str) => Self::CowRc(rc_str),
+            StringKey::Inline(in_str, _) => Self::Inline(in_str),
+            StringKey::CowRc(rc_str, _) => Self::CowRc(rc_str),
         }
     }
 }
