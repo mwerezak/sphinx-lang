@@ -1,11 +1,9 @@
+use crate::runtime::errors::RuntimeError;
+
 pub mod chunk;
 pub mod opcodes;
-
-
 use chunk::Chunk;
 use opcodes::OpCode;
-
-use crate::runtime::errors::RuntimeError;
 
 
 // Stack-based Virtual Machine

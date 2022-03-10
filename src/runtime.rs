@@ -1,14 +1,3 @@
-mod variant;
-
-pub use variant::{Variant, VariantKey};
-
-pub mod strings;
-pub mod ops;
-pub mod types;
-pub mod errors;
-
-mod tests;
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -19,7 +8,17 @@ use crate::language;
 use crate::source::ParseContext;
 use crate::lexer::LexerBuilder;
 
+mod variant;
+pub use variant::{Variant, VariantKey};
+
+pub mod strings;
 use strings::{StringTableGuard, StringKey, StringValue};
+
+pub mod ops;
+pub mod types;
+pub mod errors;
+
+mod tests;
 
 
 // Default Hasher

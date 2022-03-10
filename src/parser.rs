@@ -1,15 +1,3 @@
-mod errors;
-mod tests;
-
-pub mod expr;
-pub mod stmt;
-pub mod primary;
-pub mod assign;
-pub mod operator;
-pub mod structs;
-
-pub use errors::{ParserError, ContextFrame};
-
 use std::collections::VecDeque;
 
 use log::debug;
@@ -27,6 +15,17 @@ use structs::{ObjectConstructor};
 use errors::{ErrorPrototype, ErrorKind, ErrorContext, ContextTag};
 
 
+mod errors;
+mod tests;
+
+pub mod expr;
+pub mod stmt;
+pub mod primary;
+pub mod assign;
+pub mod operator;
+pub mod structs;
+
+pub use errors::{ParserError, ContextFrame};
 
 
 // Recursive descent parser

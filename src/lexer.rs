@@ -1,19 +1,19 @@
+use std::io;
+use std::iter::{Iterator, Peekable};
+use crate::language;
+
+
 mod token;
 mod errors;
 mod tests;
 
 pub mod rules;
 pub use rules::MatchResult;
+use rules::LexerRule;
+use rules::comments::{LineCommentRule, BlockCommentRule};
 
 pub use token::*;
 pub use errors::*;
-
-use std::io;
-use std::iter::{Iterator, Peekable};
-use crate::language;
-
-use rules::LexerRule;
-use rules::comments::{LineCommentRule, BlockCommentRule};
 
 
 // Lexer Builder
