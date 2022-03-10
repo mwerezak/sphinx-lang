@@ -64,7 +64,7 @@ pub fn new_namespace<'s>() -> Namespace<'s> {
     
 // }
 
-pub fn placeholder_new_env<'r, 's>(string_table: &'s StringTableCell) -> Environment<'r, 's> {
+pub fn placeholder_new_root_env<'r, 's>(string_table: &'s StringTableCell) -> Environment<'r, 's> {
     Environment {
         parent: None,
         namespace: RefCell::new(new_namespace()),

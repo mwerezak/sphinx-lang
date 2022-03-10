@@ -1,7 +1,12 @@
 [package]
-name = "sphinx-interpreter"
+name = "sphinx-lang"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "An intepreter for a dynamic language inspired by Lua and Python, implemented in Rust"
+readme = "README.md"
+repository = "https://github.com/mwerezak/sphinx-lang"
+categories = ["compilers", "development-tools", "parser-implementations"]
 
 [lib]
 crate-type = ["lib"]
@@ -9,10 +14,10 @@ crate-type = ["lib"]
 [[bin]]
 name = "repl"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/maniefrust.html
 
 [dependencies]
-clap = "3.0"
+clap = "3.1.6"
 lazy_static = "1.4"
 string-interner = "0.14"
 # rustc-hash = "1.1.0"

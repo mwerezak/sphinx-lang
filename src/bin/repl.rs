@@ -4,24 +4,24 @@ use std::path::PathBuf;
 
 use log;
 
-use clap::{App, Arg};
+use clap::{Command, Arg};
 
 
-use rlo_interpreter::source::{ModuleSource, SourceType, ParseContext};
-use rlo_interpreter::frontend::render_parser_error;
-use rlo_interpreter::debug::symbol::DebugSymbolResolver;
-use rlo_interpreter::language;
-use rlo_interpreter::interpreter;
-use rlo_interpreter::lexer::LexerBuilder;
-use rlo_interpreter::parser::stmt::{Stmt};
-use rlo_interpreter::runtime::*;
-use rlo_interpreter::runtime::strings::{StringTable, StringTableCell};
+use sphinx_lang::source::{ModuleSource, SourceType, ParseContext};
+use sphinx_lang::frontend::render_parser_error;
+use sphinx_lang::debug::symbol::DebugSymbolResolver;
+use sphinx_lang::language;
+use sphinx_lang::interpreter;
+use sphinx_lang::lexer::LexerBuilder;
+use sphinx_lang::parser::stmt::{Stmt};
+use sphinx_lang::runtime::*;
+use sphinx_lang::runtime::strings::{StringTable, StringTableCell};
 
 
 fn main() {
     env_logger::init();
     
-    let app = App::new("repl")
+    let app = Command::new("repl")
         .version("0.0")
         .author("M. Werezak <mwerezak@gmail.com>")
         .about("Dynamic language interpreter")
@@ -116,7 +116,7 @@ impl<'r> Repl<'r> {
         Repl { 
             string_table,
             lexer_factory: language::create_default_lexer_rules(),
-            root_env: placeholder_new_env(string_table),
+            root_env: placeholder_new_root_env(string_table),
         }
     }
     

@@ -448,7 +448,6 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         Binary operator syntax:
         
         operand[1] ::= unary ;
-        operand[8] ::= comparison ;
         operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
     */
     fn parse_binop_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
