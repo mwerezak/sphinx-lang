@@ -50,22 +50,26 @@ impl Variant {
     }
     
     // write a string representation of this value
-    pub fn write_repr(&self, dst: &mut impl fmt::Write, string_table: &StringTableGuard) -> fmt::Result {
+    pub fn write_repr(&self, buf: &mut impl fmt::Write, string_table: &StringTableGuard) -> fmt::Result {
         match self {
-            Self::Nil => dst.write_str("nil"),
-            Self::EmptyTuple => dst.write_str("()"),
-            Self::BoolTrue => dst.write_str("true"),
-            Self::BoolFalse => dst.write_str("false"),
-            Self::Integer(value) => write!(dst, "{}", *value),
+            Self::Nil => buf.write_str("nil"),
+            Self::EmptyTuple => buf.write_str("()"),
+            Self::BoolTrue => buf.write_str("true"),
+            Self::BoolFalse => buf.write_str("false"),
+            
+            Self::Integer(value) => write!(buf, "{}", *value),
             Self::Float(value) => {
                 if value.trunc() != *value {
-                    write!(dst, "{}", *value)
+                    write!(buf, "{}", *value)
                 } else {
-                    write!(dst, "{}.0", value)
+                    write!(buf, "{}.0", value)
                 }
             },
-            Self::String(StringValue::Intern(sym)) => {
-                write!(dst, "\"{}\"", string_table.resolve(*sym))
+            
+            Self::String(strval) => {
+                buf.write_char('"')?;
+                strval.write_str(buf, string_table)?;
+                buf.write_char('"')
             },
         }
     }
@@ -155,14 +159,7 @@ impl<'s> VariantKey<'s> {
             Variant::BoolFalse => Self::BoolFalse,
             
             Variant::Integer(value) => Self::Integer(value),
-            
-            Variant::String(strval) => {
-                let strkey = match strval {
-                    StringValue::Intern(sym) => StringKey::from_intern(sym, string_table),
-                };
-                
-                Self::String(strkey)
-            },
+            Variant::String(strval) => Self::String(StringKey::new(strval, string_table)),
             
             Variant::Float(..) => return Err(ErrorKind::UnhashableType.into()),  // for now
             // Object - check if __hash is available

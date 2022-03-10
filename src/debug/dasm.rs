@@ -90,11 +90,19 @@ impl fmt::Display for Variant {
             Self::BoolFalse => fmt.write_str("false"),
             Self::Integer(value) => write!(fmt, "{}", value),
             Self::Float(value) => write!(fmt, "{:.6}", value),
-            Self::String(StringValue::Intern(sym)) => write!(fmt, "$({:?})", sym),
+            Self::String(strval) => write!(fmt, "{}", strval),
         }
     }
 }
 
+impl fmt::Display for StringValue {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Intern(sym) => write!(fmt, "$({:?})", sym),
+            Self::CowRc(rc_str) => write!(fmt, "{:?}", rc_str),
+        }
+    }
+}
 
 
 // Container for debug symbols generated for bytecode

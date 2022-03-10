@@ -9,6 +9,7 @@ use string_interner::symbol::Symbol;
 use string_interner::DefaultSymbol;
 use string_interner::DefaultBackend;
 
+use crate::utils;
 use crate::runtime::DefaultBuildHasher;
 
 
@@ -124,11 +125,11 @@ impl From<DefaultSymbol> for InternSymbol {
 
 // For use with Variant
 
-// Enum over the different string representations
+/// Enum over the different string representations
 #[derive(Debug, Clone)]
 pub enum StringValue {
-    Intern(InternSymbol),  // TODO store hash to make conversion to StringKey cheaper
-    // Immutable(Rc<String>),  //
+    Intern(InternSymbol),
+    CowRc(Rc<str>),  // uses COW semantics, no need to GC these
 }
 
 impl From<InternSymbol> for StringValue {
@@ -141,29 +142,31 @@ impl StringValue {
     // otherwise we will need outside help to compare them
     pub fn try_eq(&self, other: &StringValue) -> Option<bool> {
         match (self, other) {
-            (Self::Intern(self_sym), Self::Intern(other_sym)) 
-                => Some(self_sym == other_sym),
-            // (Self::Object(..), Self::Object(..))
-            //     => unimplemented!(),
-            // _ => None,
+            (Self::Intern(self_sym), Self::Intern(other_sym)) => Some(self_sym == other_sym),
+            (Self::CowRc(self_str), Self::CowRc(other_str)) => Some(self_str == other_str),
+            _ => None,
         }
     }
     
     pub fn write_str<'s>(&self, buf: &mut impl fmt::Write, string_table: &'s StringTableGuard) -> fmt::Result {
         match self {
-            Self::Intern(sym) => {
-                buf.write_str(&string_table.resolve(*sym))
-            }
+            Self::Intern(sym) => buf.write_str(&string_table.resolve(*sym)),
+            Self::CowRc(rc_str) => buf.write_str(rc_str),
         }
+    }
+    
+    pub fn as_display<'s>(&'s self, string_table: &'s StringTableGuard) -> impl fmt::Display + 's {
+        utils::delegate_fmt(|fmt| self.write_str(fmt, string_table))
     }
 }
 
+
 // For use with VariantKey
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum StringKey<'s> {
     Intern { hash: u64, sym: InternSymbol, string_table: &'s StringTableGuard },
-    // StrObject { hash: u64, handle: GCHandle },
+    CowRc { hash: u64, string: Rc<str> },
 }
 
 impl Eq for StringKey<'_> { }
@@ -172,9 +175,14 @@ impl<'s> PartialEq for StringKey<'s> {
     #[inline]
     fn eq(&self, other: &StringKey<'s>) -> bool {
         match (self, other) {
-            (Self::Intern { sym: self_sym, .. }, Self::Intern { sym: other_sym, .. }) 
-                => self_sym == other_sym,
-            // (_, _) => self.as_str() == other.as_str(),
+            (Self::Intern { sym: self_sym, .. }, Self::Intern { sym: other_sym, .. }) => self_sym == other_sym,
+            (Self::CowRc { string: self_str, .. }, Self::CowRc { string: other_str, .. }) => self_str == other_str,
+            
+            (Self::Intern { sym, string_table, .. }, Self::CowRc { string, .. })
+            | (Self::CowRc { string, .. }, Self::Intern { sym, string_table, .. }) => {
+                let intern_str = string_table.resolve(*sym);
+                intern_str.as_bytes() == string.as_bytes()
+            },
         }
     }
 }
@@ -183,36 +191,37 @@ impl Hash for StringKey<'_> {
     fn hash<H>(&self, state: &mut H) where H: Hasher {
         match self {
             Self::Intern { hash, .. } => hash.hash(state),
+            Self::CowRc { hash, .. } => hash.hash(state),
         }
     }
 }
 
 impl<'s> StringKey<'s> {
+    
+    /// A reference to the string table is required because we need to compute a hash specifically
+    /// using it's hasher in order to produce hashes compatible with interned strings
     pub fn new(value: StringValue, string_table: &'s StringTableGuard) -> Self {
         match value {
-            StringValue::Intern(sym) => Self::from_intern(sym, string_table),
+            StringValue::Intern(sym) => {
+                let hash = string_table.resolve_hash(sym).unwrap();
+                Self::Intern { hash, sym, string_table }
+            },
+            
+            StringValue::CowRc(rc_str) => {
+                let mut state = string_table.hasher().build_hasher();
+                rc_str.hash(&mut state);
+                let hash = state.finish();
+                Self::CowRc { hash, string: rc_str }
+            }
         }
     }
-    
-    pub fn from_intern(sym: InternSymbol, string_table: &'s StringTableGuard) -> Self {
-        let hash = string_table.resolve_hash(sym).unwrap();
-        
-        Self::Intern {
-            hash, sym, string_table,
-        }
-    }
-    
-    // reference to string table is required because we need to compute a hash specifically using it's hasher
-    // in order to produce hashes compatible with interned strings
-    // pub fn from_object(str_obj: GCHandle, string_table: &'s StringTableGuard) -> Self {
 }
 
 impl fmt::Display for StringKey<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Intern { sym, string_table, .. } => {
-                fmt.write_str(&string_table.resolve(*sym))
-            }
+            Self::Intern { sym, string_table, .. } => fmt.write_str(&string_table.resolve(*sym)),
+            Self::CowRc { string, .. } => fmt.write_str(string)
         }
     }
 }
@@ -221,6 +230,7 @@ impl From<StringKey<'_>> for StringValue {
     fn from(strkey: StringKey<'_>) -> Self {
         match strkey {
             StringKey::Intern { sym, .. } => Self::Intern(sym),
+            StringKey::CowRc { string, .. } => Self::CowRc(string),
         }
     }
 }
