@@ -1,13 +1,13 @@
 
-use crate::runtime::strings::InternSymbol;
+use crate::runtime::strings::StringSymbol;
 use crate::parser::primary::{Primary, AccessItem, Atom};
 use crate::runtime::types::operator::BinaryOp;
 use crate::parser::expr::{Expr, ExprMeta};
 
 #[derive(Debug, Clone)]
 pub enum LValue {
-    Identifier(InternSymbol),
-    Attribute(Primary, InternSymbol), // receiver, attribute name
+    Identifier(StringSymbol),
+    Attribute(Primary, StringSymbol), // receiver, attribute name
     Index(Primary, ExprMeta), // receiver, index expression
     Tuple(Vec<LValue>),
 }

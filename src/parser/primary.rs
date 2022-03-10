@@ -1,5 +1,5 @@
 use crate::language;
-use crate::runtime::strings::{InternSymbol, StringInterner};
+use crate::runtime::strings::{StringSymbol, StringInterner};
 use crate::parser::expr::{ExprMeta, Expr};
 use crate::parser::structs::ObjectConstructor;
 
@@ -12,18 +12,18 @@ pub enum Atom {
     EmptyTuple,
     Self_,
     Super,
-    Identifier(InternSymbol),
+    Identifier(StringSymbol),
     BooleanLiteral(bool),
     IntegerLiteral(language::IntType),
     FloatLiteral(language::FloatType),
-    StringLiteral(InternSymbol),
+    StringLiteral(StringSymbol),
     Group(Box<Expr>), // type annotation
 }
 
 // These are the highest precedence operations in the language
 #[derive(Debug, Clone)]
 pub enum AccessItem {
-    Attribute(InternSymbol),
+    Attribute(StringSymbol),
     Index(ExprMeta),
     Invoke(),       // TODO
     Construct(ObjectConstructor),
