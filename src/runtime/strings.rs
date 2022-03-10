@@ -37,7 +37,7 @@ impl Deref for StrRef<'_> {
 /// either use `StringValue::as_ref()` or do a cheap conversion to `StringKey` which will get you the ability 
 /// to hash, compare, or even just check the length of the string.
 
-const INLINE_SIZE: usize = 8;  // TODO figure out size
+const INLINE_SIZE: usize = 22;
 pub type InlineStr = inline::InlineStr<INLINE_SIZE>;
 
 #[derive(Debug, Clone)]

@@ -4,13 +4,30 @@ use crate::parser::primary::{Primary, AccessItem, Atom};
 use crate::runtime::types::operator::BinaryOp;
 use crate::parser::expr::{Expr, ExprMeta};
 
+
+// LValues
+
 #[derive(Debug, Clone)]
 pub enum LValue {
     Identifier(StringSymbol),
-    Attribute(Primary, StringSymbol), // receiver, attribute name
-    Index(Primary, ExprMeta), // receiver, index expression
+    Attribute(Box<AttributeTarget>), // receiver, attribute name
+    Index(Box<IndexTarget>), // receiver, index expression
     Tuple(Vec<LValue>),
 }
+
+#[derive(Debug, Clone)]
+pub struct AttributeTarget {
+    pub receiver: Primary,
+    pub name: StringSymbol,
+}
+
+#[derive(Debug, Clone)]
+pub struct IndexTarget {
+    pub receiver: Primary,
+    pub index: ExprMeta,
+}
+
+// Assignments
 
 #[derive(Debug, Clone)]
 pub struct Assignment {
@@ -18,6 +35,8 @@ pub struct Assignment {
     pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     pub rhs: Expr,
 }
+
+// Declarations
 
 #[derive(Debug, Clone)]
 pub enum DeclType {
@@ -59,8 +78,10 @@ impl TryFrom<Primary> for LValue {
         let tail = primary.path_mut().pop();
         
         let lvalue = match tail {
-            Some(AccessItem::Attribute(name)) => LValue::Attribute(primary, name),
-            Some(AccessItem::Index(index)) => LValue::Index(primary, index),
+            Some(AccessItem::Attribute(name)) 
+                => LValue::Attribute(Box::new(AttributeTarget { receiver: primary, name })),
+            Some(AccessItem::Index(index)) 
+                => LValue::Index(Box::new(IndexTarget { receiver: primary, index })),
             _ => return Err(()),
         };
         
