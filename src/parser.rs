@@ -10,10 +10,12 @@ pub mod structs;
 
 pub use errors::{ParserError, ContextFrame};
 
+use std::collections::VecDeque;
+
 use log::debug;
 
 use crate::source::ModuleSource;
-use crate::lexer::{TokenMeta, Token, LexerError};
+use crate::lexer::{TokenMeta, Token, TokenIndex, LexerError};
 use crate::runtime::strings::{StringTable, InternSymbol};
 
 use expr::{ExprMeta, Expr};
@@ -34,6 +36,7 @@ pub struct Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError
     interner: &'h mut StringTable,
     tokens: T,
     next: Option<Result<TokenMeta, LexerError>>,
+    errors: VecDeque<ErrorPrototype>,
 }
 
 impl<'m, T> Iterator for Parser<'m, '_, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
@@ -43,15 +46,25 @@ impl<'m, T> Iterator for Parser<'m, '_, T> where T: Iterator<Item=Result<TokenMe
 
 type InternalResult<T> = Result<T, ErrorPrototype>;
 
-impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
-    pub fn new(module: &'m ModuleSource, interner: &'h mut StringTable, tokens: T) -> Self {
+    pub fn new(module: &'m ModuleSource, interner: &'h mut StringTable, tokens: I) -> Self {
         Parser {
             module,
             interner,
             tokens,
             next: None,
+            errors: VecDeque::new(),
         }
+    }
+    
+    /// for debugging
+    fn current_index(&mut self) -> TokenIndex { self.peek().unwrap().span.index }
+    
+    /// Helper for methods that can't eagerly return with an error but must collect them into a sequence to return later
+    fn append_errors(&mut self, errors: impl Iterator<Item=ErrorPrototype>) -> Option<ErrorPrototype> {
+        self.errors.extend(errors);
+        self.errors.pop_front()
     }
     
     fn advance(&mut self) -> InternalResult<TokenMeta> {
@@ -88,6 +101,10 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     pub fn next_stmt(&mut self) -> Option<Result<StmtMeta, ParserError<'m>>> {
         let mut ctx = ErrorContext::new(self.module, ContextTag::TopLevel);
         
+        if let Some(error) = self.errors.pop_front() {
+            return Some(Err(Self::process_error(ctx, error)));
+        }
+        
         // check stop conditions
         loop {
             match self.peek() {
@@ -105,10 +122,7 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                     continue;
                 },
                 
-                Ok(next) => {
-                    debug!("parsing stmt at index {}...", next.span.index);
-                    break;
-                },
+                Ok(..) => break,
             }
         }
         
@@ -118,17 +132,9 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 Ok(stmt)
             },
             Err(err) => {
-                debug!("{:#?}", ctx);
-                let error = ParserError::from_prototype(err, ctx);
-                debug!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
-                    error.kind(), error.context(), 
-                    error.debug_symbol(),
-                );
+                let error = Self::process_error(ctx, err);
                 
-                debug!("sync to next stmt...");
-                let mut ctx = ErrorContext::new(self.module, ContextTag::Sync);
-                self.synchronize_stmt(&mut ctx);
-                debug!("done.");
+                self.synchronize_stmt(false);
                 
                 Err(error)
             },
@@ -136,11 +142,27 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         Some(result)
     }
     
+    fn process_error(ctx: ErrorContext<'m>, error: ErrorPrototype) -> ParserError<'m> {
+        debug!("{:#?}", ctx);
+        
+        let error = ParserError::from_prototype(error, ctx);
+        
+        debug!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
+            error.kind(), error.context(), 
+            error.debug_symbol(),
+        );
+        
+        error
+    }
+    
     // If we hit an error we need to synchronize back to a likely-valid state before we continue parsing again
     // To do this, just keep discarding tokens until we think we're at the start of a new statement
-    fn synchronize_stmt(&mut self, ctx: &mut ErrorContext) {
+    fn synchronize_stmt(&mut self, expect_end: bool) {
         // Check for either: a token that only appears at the start of a new statement
         // OR try to parse an expression. If we can do it without errors, assume we're in a good state. The expression can be discarded.
+        debug!("sync to next stmt...");
+        
+        let mut ctx = ErrorContext::new(self.module, ContextTag::Sync);
         
         loop {
 
@@ -154,20 +176,23 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 Ok(token) => token,
             };
 
-            if matches!(next.token, 
+            match next.token {
                 Token::EOF | Token::Semicolon | Token::Var | 
                 Token::While  | Token::Do | Token::For | 
                 Token::Continue | Token::Break | Token::Return | 
-                Token::Echo) {
+                Token::Echo 
+                    => break,
                 
-                break;
-            }
-
-            if self.parse_expr_variant(ctx).is_ok() {
-                break;
+                Token::End if expect_end => break,
+                
+                _ => if self.parse_expr_variant(&mut ctx).is_ok() {
+                    break;
+                },
             }
 
         }
+        
+        debug!("done.");
     }
     
     /*** Statement Parsing ***/
@@ -177,6 +202,8 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
         while let Token::Semicolon = self.peek()?.token {
             self.advance()?;
         }
+        
+        debug!("parsing stmt at index {}...", self.current_index());
         
         ctx.push(ContextTag::StmtMeta);
         
@@ -211,7 +238,11 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
     
     fn parse_statement_list(&mut self, ctx: &mut ErrorContext) -> InternalResult<Vec<StmtMeta>> {
         ctx.push(ContextTag::StmtList);
+        
         let mut suite = Vec::new();
+        let mut errors = Vec::new();
+        
+        debug!("enter stmt list at index {}...", self.current_index());
         
         loop {
             
@@ -220,23 +251,51 @@ impl<'m, 'h, T> Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, Lexer
                 break;
             }
             
-            if let Some(stmt) = self.try_parse_control_flow_stmt(ctx)? {
+            let stmt = match self.try_parse_control_flow_stmt(ctx) {
+                Ok(stmt) => stmt,
+                Err(error) => {
+                    errors.push(error.with_symbol_from_ctx(&ctx));
+                    self.synchronize_stmt(true);
+                    continue;
+                }
+            };
+            
+            if let Some(stmt) = stmt {
                 suite.push(stmt);
                 
                 let next = self.peek()?;
                 if !matches!(next.token, Token::End) {
                     // consume the unexpected token so that it is included in the error message
                     ctx.set_end(&self.advance().unwrap());
-                    return Err(ErrorKind::ExpectedEndAfterControlFlow.into());
+                    
+                    let error = ErrorPrototype::from(ErrorKind::ExpectedEndAfterControlFlow)
+                        .with_symbol_from_ctx(&ctx);
+                    
+                    errors.push(error);
                 }
                 
                 break;
             }
             
-            suite.push(self.parse_stmt(ctx)?);
+            let stmt = match self.parse_stmt(ctx) {
+                Ok(stmt) => stmt,
+                Err(error) => {
+                    errors.push(error.with_symbol_from_ctx(&ctx));
+                    self.synchronize_stmt(true);
+                    continue;
+                }
+            };
+            
+            suite.push(stmt);
         }
         
         ctx.set_end(&self.advance().unwrap());
+        
+        debug!("exit stmt list at {}...", self.current_index());
+        
+        if !errors.is_empty() {
+            return Err(self.append_errors(errors.into_iter()).unwrap());
+        }
         
         ctx.pop_extend();
         Ok(suite)

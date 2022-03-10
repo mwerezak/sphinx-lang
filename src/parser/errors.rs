@@ -57,16 +57,28 @@ pub enum ContextTag {
 #[derive(Debug)]
 pub struct ErrorPrototype {
     kind: ErrorKind,
+    symbol: Option<DebugSymbol>,
     lexer_error: Option<LexerError>,
 }
 
 impl ErrorPrototype {
     pub fn kind(&self) -> &ErrorKind { &self.kind }
+    
+    pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
+        self.symbol.replace(symbol); self 
+    }
+    
+    pub fn with_symbol_from_ctx(mut self, ctx: &ErrorContext) -> Self {
+        if let Some(symbol) = ctx.frame().as_debug_symbol() {
+            self.symbol.replace(symbol);
+        }
+        self
+    }
 }
 
 impl From<ParserErrorKind> for ErrorPrototype {
     fn from(kind: ParserErrorKind) -> Self {
-        ErrorPrototype { kind, lexer_error: None }
+        ErrorPrototype { kind, symbol: None, lexer_error: None }
     }
 }
 
@@ -74,7 +86,8 @@ impl From<LexerError> for ErrorPrototype {
     fn from(error: LexerError) -> Self {
         ErrorPrototype { 
             kind: ErrorKind::LexerError, 
-            lexer_error: Some(error) 
+            symbol: None,
+            lexer_error: Some(error),
         }
     }
 }
@@ -98,6 +111,9 @@ impl<'m> ParserError<'m> {
         if let Some(error) = proto.lexer_error {
             symbol = (&error.span).into();
             cause = Some(Box::new(error) as Box<dyn Error>);
+        } else if let Some(symb) = proto.symbol {
+            symbol = symb;
+            cause = None;
         } else {
             symbol = context.take_debug_symbol();
             cause = None;
