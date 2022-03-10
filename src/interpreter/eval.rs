@@ -16,7 +16,7 @@ use crate::interpreter::{ControlFlow, ExecContext};
 
 
 // evaluation can be interrupted by a control flow statement inside a block expression
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct EvalResult(pub Result<Variant, ControlFlow>);
 
 impl From<Variant> for EvalResult {
@@ -71,7 +71,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         self.eval_expr(expr.variant())
     }
     
-    fn find_value(&self, name: StringValue) -> ExecResult<Variant> {
+    fn find_value(&self, name: &StringValue) -> ExecResult<Variant> {
         self.local_env.find_value(name)
             .ok_or_else(|| {
                 let mut string = String::new();
@@ -80,7 +80,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             })
     }
     
-    fn find_env(&'a self, name: StringValue) -> ExecResult<&'a Environment<'r, 's>> {
+    fn find_env(&'a self, name: &StringValue) -> ExecResult<&'a Environment<'r, 's>> {
         self.local_env.find_name(name)
             .ok_or_else(|| {
                 let mut string = String::new();
@@ -126,7 +126,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
                     // if a target label was supplied, check to see if it matches this block's label
                     if let Some(target) = target_label {
                         if block_label.map_or(true, |block| target != block) {
-                            return Ok(control.into())
+                            return Ok(ControlFlow::Break(target_label, value).into())
                         }
                     }
                     
@@ -162,7 +162,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             Atom::FloatLiteral(value) => Variant::Float(*value),
             Atom::StringLiteral(sym) => Variant::String((*sym).into()),
             
-            Atom::Identifier(name) => self.find_value(StringValue::from(*name))?,
+            Atom::Identifier(name) => self.find_value(&StringValue::from(*name))?,
             
             Atom::Self_ => unimplemented!(),
             Atom::Super => unimplemented!(),
@@ -261,16 +261,16 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
     fn eval_assignment(&self, assignment: &Assignment) -> ExecResult<EvalResult> {
         if let LValue::Identifier(name) = assignment.lhs {
             let name = StringValue::from(name);
-            let store_env = self.find_env(name)?;
+            let store_env = self.find_env(&name)?;
             
-            let lhs_value = store_env.lookup_value(name).unwrap();
+            let lhs_value = store_env.lookup_value(&name).unwrap();
             let mut rhs_value = try_value!(self.eval_expr(&assignment.rhs)?);
             
             if let Some(op) = assignment.op {
                 rhs_value = self.eval_binary_op_values(op, &lhs_value, &rhs_value)?;
             }
             
-            store_env.insert_value(name, rhs_value);
+            store_env.insert_value(&name, &rhs_value);
             Ok(rhs_value.into())
         } else {
             unimplemented!()
@@ -282,7 +282,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         if let LValue::Identifier(name) = declaration.lhs {
             let name = StringValue::from(name);
             let init_value = try_value!(self.eval_expr(&declaration.init)?);
-            self.local_env.insert_value(name, init_value);
+            self.local_env.insert_value(&name, &init_value);
             Ok(init_value.into())
         } else {
             unimplemented!()

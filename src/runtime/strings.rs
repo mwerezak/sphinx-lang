@@ -1,4 +1,5 @@
 use std::fmt;
+use std::rc::Rc;
 use std::cell::{RefCell, Ref, RefMut};
 use std::hash::{Hash, Hasher, BuildHasher};
 
@@ -124,10 +125,10 @@ impl From<DefaultSymbol> for InternSymbol {
 // For use with Variant
 
 // Enum over the different string representations
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum StringValue {
     Intern(InternSymbol),  // TODO store hash to make conversion to StringKey cheaper
-    //Object(GCHandle),
+    // Immutable(Rc<String>),  //
 }
 
 impl From<InternSymbol> for StringValue {

@@ -213,12 +213,12 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
             
             // open symbols
             for (ref mut lines, ..) in active_symbols.values_mut() {
-                lines.push(line_rc.clone());
+                lines.push(Rc::clone(&line_rc));
             }
             
             // close all closing symbols
             for (symbol, (mut lines, lineno, start_index, end_index)) in closing_symbols.drain() {
-                lines.push(line_rc.clone());
+                lines.push(Rc::clone(&line_rc));
                 
                 let resolved = ResolvedSymbol::new(lines, lineno, start_index, end_index);
                 resolved_symbols.insert(symbol, Ok(resolved));

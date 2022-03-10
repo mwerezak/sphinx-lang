@@ -241,7 +241,7 @@ macro_rules! eval_binary_shift {
             let value = match (lhs, rhs) {
                 (_, Variant::Integer(shift)) if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), *shift)?,
                 (_, Variant::BoolTrue)  if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), 1)?,
-                (_, Variant::BoolFalse) if is_bitwise_primitive(lhs) => *lhs, // no-op
+                (_, Variant::BoolFalse) if is_bitwise_primitive(lhs) => lhs.clone(), // no-op, just copy the value to output
                 _ => return Ok(None),
             };
             Ok(Some(value))

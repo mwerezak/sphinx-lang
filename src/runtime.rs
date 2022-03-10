@@ -92,14 +92,14 @@ impl<'r, 's> Environment<'r, 's> {
     pub fn string_table(&self) -> &StringTableGuard { self.string_table }
     
     /// Check if the name exists in this Environment
-    pub fn has_name(&self, name: StringValue) -> bool {
+    pub fn has_name(&self, name: &StringValue) -> bool {
         let local_store = self.namespace.borrow();
-        let name_key = StringKey::new(name, self.string_table);
+        let name_key = StringKey::new(name.clone(), self.string_table);
         local_store.contains_key(&name_key)
     }
     
     /// Find the innermost Environment that has the given name, or None
-    pub fn find_name<'a>(&'a self, name: StringValue) -> Option<&'a Environment<'r, 's>> {
+    pub fn find_name<'a>(&'a self, name: &StringValue) -> Option<&'a Environment<'r, 's>> {
         let mut next_env = Some(self);
         while let Some(env) = next_env {
             if env.has_name(name) {
@@ -111,14 +111,14 @@ impl<'r, 's> Environment<'r, 's> {
     }
     
     /// Lookup a value for the given name in this Environment
-    pub fn lookup_value(&self, name: StringValue) -> Option<Variant> {
+    pub fn lookup_value(&self, name: &StringValue) -> Option<Variant> {
         let local_store = self.namespace.borrow();
-        let name_key = StringKey::new(name, self.string_table);
-        local_store.get(&name_key).map(|value| *value)
+        let name_key = StringKey::new(name.clone(), self.string_table);
+        local_store.get(&name_key).map(|value| value.clone())
     }
     
     /// Lookup a value for the given name in the innermost Environment in which it can be found.
-    pub fn find_value(&self, name: StringValue) -> Option<Variant> {
+    pub fn find_value(&self, name: &StringValue) -> Option<Variant> {
         let mut next_env = Some(self);
         while let Some(env) = next_env {
             let value = env.lookup_value(name);
@@ -131,15 +131,15 @@ impl<'r, 's> Environment<'r, 's> {
     }
     
     /// Store a value in this Environment
-    pub fn insert_value(&self, name: StringValue, value: Variant) -> Option<Variant> {
+    pub fn insert_value(&self, name: &StringValue, value: &Variant) -> Option<Variant> {
         let mut local_store = self.namespace.borrow_mut();
-        let name_key = StringKey::new(name, self.string_table);
-        local_store.insert(name_key, value)
+        let name_key = StringKey::new(name.clone(), self.string_table);
+        local_store.insert(name_key, value.clone())
     }
     
-    pub fn remove_value(&self, name: StringValue) -> Option<Variant> {
+    pub fn remove_value(&self, name: &StringValue) -> Option<Variant> {
         let mut local_store = self.namespace.borrow_mut();
-        let name_key = StringKey::new(name, self.string_table);
+        let name_key = StringKey::new(name.clone(), self.string_table);
         local_store.remove(&name_key)
     }
 }

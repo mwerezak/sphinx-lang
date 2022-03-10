@@ -8,7 +8,7 @@ use crate::parser::stmt::Label;
 use crate::runtime::Variant;
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ControlFlow {
     None,
     Continue(Option<Label>),

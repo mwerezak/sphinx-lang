@@ -7,7 +7,7 @@ use crate::runtime::errors::{ExecResult, RuntimeErrorKind as ErrorKind};
 
 
 // Fundamental data value type
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Variant {
     Nil,
     EmptyTuple, // the empty tuple value
@@ -100,7 +100,7 @@ impl From<StringValue> for Variant {
 
 // Wrapper type for use as keys in VariantMap
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum VariantKey<'s> {
     Nil,
     EmptyTuple, // the empty tuple value
