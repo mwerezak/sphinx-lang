@@ -15,7 +15,7 @@ use sphinx_lang::interpreter::{EvalContext, ExecContext};
 use sphinx_lang::lexer::LexerBuilder;
 use sphinx_lang::parser::stmt::{Stmt};
 use sphinx_lang::runtime::*;
-use sphinx_lang::runtime::strings::{StringTable, StringTableCell};
+use sphinx_lang::runtime::strings::StringTableGuard;
 
 
 fn main() {
@@ -53,9 +53,9 @@ fn main() {
     
     if let Some(module) = module {
         let lexer_factory = language::create_default_lexer_rules();
-        let mut interner = StringTable::new();
+        let string_table = StringTableGuard::new();
         
-        let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
+        let mut parse_ctx = ParseContext::new(&lexer_factory, &string_table);
         let source_text = module.source_text().expect("error reading source");
         let parse_result = parse_ctx.parse_ast(source_text);
         
@@ -87,7 +87,7 @@ fn main() {
         
     } else {
         println!("\nSphinx Interpreter {}\n", version);
-        let string_table = StringTable::new();
+        let string_table = StringTableGuard::new();
         let repl = Repl::new(&string_table);
         repl.run();
     }
@@ -98,7 +98,7 @@ const PROMT_START: &str = ">>> ";
 const PROMT_CONTINUE: &str = "... ";
 
 struct Repl<'r> {
-    string_table: &'r StringTableCell,
+    string_table: &'r StringTableGuard,
     lexer_factory: LexerBuilder,
     root_env: Environment<'r, 'r>,
 }
@@ -112,7 +112,7 @@ enum ReadLine {
 }
 
 impl<'r> Repl<'r> {
-    pub fn new(string_table: &'r StringTableCell) -> Self {
+    pub fn new(string_table: &'r StringTableGuard) -> Self {
         Repl { 
             string_table,
             lexer_factory: language::create_default_lexer_rules(),

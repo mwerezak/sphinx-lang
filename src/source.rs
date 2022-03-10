@@ -6,7 +6,7 @@ use crate::utils::ReadChars;
 use crate::lexer::LexerBuilder;
 use crate::parser::{Parser, ParserError};
 use crate::parser::stmt::StmtMeta;
-use crate::runtime::strings::StringTableCell;
+use crate::runtime::strings::StringTableGuard;
 
 type ReadFileChars = ReadChars<io::BufReader<fs::File>>;
 
@@ -72,11 +72,11 @@ impl ModuleSource {
 // Container for state required for parsing
 pub struct ParseContext<'f, 's> {
     lexer_factory: &'f LexerBuilder,
-    string_table: &'s StringTableCell
+    string_table: &'s StringTableGuard
 }
 
 impl<'f, 's> ParseContext<'f, 's> {
-    pub fn new(lexer_factory: &'f LexerBuilder, string_table: &'s StringTableCell) -> Self {
+    pub fn new(lexer_factory: &'f LexerBuilder, string_table: &'s StringTableGuard) -> Self {
         ParseContext {
             lexer_factory, string_table,
         }

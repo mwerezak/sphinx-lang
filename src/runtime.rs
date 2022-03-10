@@ -19,7 +19,7 @@ use crate::language;
 use crate::source::ParseContext;
 use crate::lexer::LexerBuilder;
 
-use strings::{StringTableCell, StringKey, StringValue};
+use strings::{StringTableGuard, StringKey, StringValue};
 
 
 // Default Hasher
@@ -64,7 +64,7 @@ pub fn new_namespace<'s>() -> Namespace<'s> {
     
 // }
 
-pub fn new_root_env<'r, 's>(string_table: &'s StringTableCell) -> Environment<'r, 's> {
+pub fn new_root_env<'r, 's>(string_table: &'s StringTableGuard) -> Environment<'r, 's> {
     Environment {
         parent: None,
         namespace: RefCell::new(new_namespace()),
@@ -76,7 +76,7 @@ pub fn new_root_env<'r, 's>(string_table: &'s StringTableCell) -> Environment<'r
 pub struct Environment<'r, 's> {
     parent: Option<&'r Environment<'r, 's>>,
     namespace: RefCell<Namespace<'s>>,
-    string_table: &'s StringTableCell,
+    string_table: &'s StringTableGuard,
 }
 
 impl<'r, 's> Environment<'r, 's> {
@@ -89,7 +89,7 @@ impl<'r, 's> Environment<'r, 's> {
         }
     }
     
-    pub fn string_table(&self) -> &StringTableCell { self.string_table }
+    pub fn string_table(&self) -> &StringTableGuard { self.string_table }
     
     /// Check if the name exists in this Environment
     pub fn has_name(&self, name: StringValue) -> bool {
