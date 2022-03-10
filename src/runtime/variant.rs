@@ -180,3 +180,13 @@ impl From<VariantKey<'_>> for Variant {
         }
     }
 }
+
+pub struct VariantRepr<'s>(Variant, &'s StringTableGuard);
+
+impl fmt::Display for VariantRepr<'_> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.write_repr(fmt, self.1)
+    }
+}
+
+
