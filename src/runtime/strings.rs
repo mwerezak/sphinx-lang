@@ -171,6 +171,10 @@ impl<'s> StringKey<'s> {
             hash, sym, string_table,
         }
     }
+    
+    // reference to string table is required because we need to compute a hash specifically using it's hasher
+    // in order to produce hashes compatible with interned strings
+    // pub fn from_object(str_obj: GCHandle, string_table: &'s StringTableCell) -> Self {
 }
 
 impl fmt::Display for StringKey<'_> {
