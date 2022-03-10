@@ -6,7 +6,7 @@ use crate::utils::ReadChars;
 use crate::lexer::LexerBuilder;
 use crate::parser::{Parser, ParserError};
 use crate::parser::stmt::StmtMeta;
-use crate::runtime::strings::StringTableGuard;
+use crate::runtime::string_table::StringTableGuard;
 
 type ReadFileChars = ReadChars<io::BufReader<fs::File>>;
 

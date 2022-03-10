@@ -4,15 +4,13 @@ use std::collections::HashMap;
 use ahash::{self, AHasher};
 // use rustc_hash::FxHasher;
 
-use crate::language;
-use crate::source::ParseContext;
-use crate::lexer::LexerBuilder;
-
 mod variant;
 pub use variant::{Variant, VariantKey};
 
 pub mod strings;
-use strings::{StringTableGuard, StringKey, StringValue};
+use strings::{StringKey, StringValue};
+pub use strings::string_table;
+use string_table::StringTableGuard;
 
 pub mod ops;
 pub mod types;

@@ -15,7 +15,7 @@ use sphinx_lang::interpreter::{EvalContext, ExecContext};
 use sphinx_lang::lexer::LexerBuilder;
 use sphinx_lang::parser::stmt::{Stmt};
 use sphinx_lang::runtime::*;
-use sphinx_lang::runtime::strings::StringTableGuard;
+use sphinx_lang::runtime::string_table::StringTableGuard;
 
 
 fn main() {

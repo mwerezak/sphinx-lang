@@ -2,9 +2,11 @@ use std::fmt;
 use std::rc::Rc;
 use std::hash::{Hash, Hasher, BuildHasher};
 
+mod inline;
 
-mod string_table;
-pub use string_table::*;
+pub mod string_table;
+pub use string_table::StringSymbol;
+use string_table::StringTableGuard;
 
 
 // For use with Variant

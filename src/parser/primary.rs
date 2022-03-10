@@ -1,5 +1,5 @@
 use crate::language;
-use crate::runtime::strings::{StringSymbol, StringInterner};
+use crate::runtime::strings::StringSymbol;
 use crate::parser::expr::{ExprMeta, Expr};
 use crate::parser::structs::ObjectConstructor;
 

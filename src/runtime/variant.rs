@@ -1,8 +1,9 @@
 use std::fmt;
-use std::hash::{Hash, Hasher, BuildHasher};
+use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::strings::{StringValue, StringKey, StringTableGuard};
+use crate::runtime::strings::{StringValue, StringKey};
+use crate::runtime::string_table::StringTableGuard;
 use crate::runtime::errors::{ExecResult, RuntimeErrorKind as ErrorKind};
 
 
