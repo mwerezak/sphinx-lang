@@ -556,7 +556,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             ctx.push(ContextTag::UnaryOpExpr);
             ctx.set_start(&self.advance().unwrap()); // consume unary_op token
             
-            let expr = self.parse_primary_expr(ctx)?;
+            let expr = self.parse_unary_expr(ctx)?;
             
             ctx.pop_extend();
             return Ok(Expr::UnaryOp(unary_op.into(), Box::new(expr)));
