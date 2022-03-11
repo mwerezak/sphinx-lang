@@ -849,6 +849,10 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 _ => return Err("invalid parameter".into()),
             }
             
+            if matches!(next.token, Token::Comma) {
+                ctx.set_end(&self.advance().unwrap());
+            }
+            
             ctx.pop_extend();
         }
         
