@@ -466,6 +466,9 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         
         let expr = self.parse_tuple_expr(ctx)?;
         let lhs = LValue::try_from(expr).map_err(|_| ErrorPrototype::from("can't assign to this"))?;
+        if !Self::is_lvalue_valid_for_decl(&lhs) {
+            return Err("only identifiers can be used in a variable declaration".into());
+        }
         
         // check for and consume "="
         let next = self.advance()?;
@@ -485,6 +488,15 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         
         let decl = Box::new(Declaration { decl, lhs, init });
         return Ok(Expr::Declaration(decl));
+    }
+    
+    fn is_lvalue_valid_for_decl(lvalue: &LValue) -> bool {
+        match lvalue {
+            LValue::Identifier(..) => true,
+            LValue::Tuple(lvalue_list) 
+                => lvalue_list.iter().all(|lvalue| Self::is_lvalue_valid_for_decl(lvalue)),
+            _ => false,
+        }
     }
     
     fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {

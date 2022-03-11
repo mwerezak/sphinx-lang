@@ -12,7 +12,7 @@ pub enum LValue {
     Identifier(StringSymbol),
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
-    Tuple(Vec<LValue>),
+    Tuple(Box<[LValue]>),
 }
 
 #[derive(Debug, Clone)]
@@ -105,7 +105,7 @@ impl TryFrom<Expr> for LValue {
                     lvalue_list.push(lvalue);
                 }
                 
-                Ok(Self::Tuple(lvalue_list))
+                Ok(Self::Tuple(lvalue_list.into_boxed_slice()))
             },
             
             _ => Err(()),

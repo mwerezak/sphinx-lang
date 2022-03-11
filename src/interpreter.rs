@@ -60,7 +60,7 @@ pub fn new_root_env<'r, 's>(string_table: &'s StringTable) -> Environment<'r, 's
 #[derive(Debug)]
 pub struct Environment<'r, 's> {
     parent: Option<&'r Environment<'r, 's>>,
-    namespace: RefCell<Namespace<'s>>,  // if we switch to Arc, use a mutex for this
+    namespace: RefCell<Namespace<'s>>,  // if we switch to Arc, use a RwLock for this
     string_table: &'s StringTable,
 }
 
