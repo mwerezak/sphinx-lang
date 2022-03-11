@@ -5,7 +5,7 @@ use crate::parser::assign::{Assignment, Declaration};
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::stmt::{StmtMeta, Stmt, Label};
 
-
+// TODO replace Vecs with boxed slices
 #[derive(Debug, Clone)]
 pub enum Expr {
     
@@ -27,15 +27,31 @@ pub enum Expr {
     
     // IfExpr
     
-    Block(Vec<StmtMeta>, Option<Label>), // TODO label
+    Block(Vec<StmtMeta>, Option<Label>), // TODO switch these
     
-    // FunctionDef
+    FunctionDef(FunSignature, Box<[StmtMeta]>),
+    
     // ClassDef
 }
 
+// Function Definitions
+use crate::runtime::strings::StringSymbol;
+use crate::parser::assign::DeclType;
 
-// Expr + DebugSymbol
+#[derive(Debug, Clone)]
+pub struct FunSignature {
+    params: Box<[FunParam]>,
+    variadic: Option<FunParam>,
+}
 
+#[derive(Debug, Clone)]
+pub struct FunParam {
+    name: StringSymbol,
+    decl: DeclType,
+}
+
+
+/// An `Expr` plus a `DebugSymbol`
 #[derive(Debug, Clone)]
 pub struct ExprMeta {
     variant: Expr,

@@ -669,6 +669,40 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         Ok(Expr::Block(suite, block_label))
     }
     
+    fn parse_function_def(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+        ctx.push(ContextTag::FunDefExpr);
+        
+        let next = self.advance()?;
+        ctx.set_start(&next);
+        debug_assert!(matches!(next.token, Token::Fun));
+        
+        // if the next token isn't an open paren, it must be a function name
+        let next = self.peek()?;
+        
+        let name = 
+            if !matches!(next.token, Token::OpenParen) {
+                let primary = self.parse_primary(ctx)
+                    .map_err(|_| ErrorPrototype::from(ErrorKind::InvalidFunctionAssign))?;
+                    
+                let lvalue = LValue::try_from(primary)
+                    .map_err(|_| ErrorPrototype::from(ErrorKind::InvalidFunctionAssign))?;
+                
+                Some(lvalue)
+            
+            } else { None };
+        
+        // expect open paren now
+        let next = self.advance().unwrap();
+        ctx.set_end(&next);
+        
+        if !matches!(next.token, Token::OpenParen) {
+            
+        }
+        
+        
+        unimplemented!()
+    }
+    
     /*
         Object Constructor syntax:
         

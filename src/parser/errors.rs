@@ -8,7 +8,7 @@ use crate::debug::symbol::{DebugSymbol, TokenIndex};
 
 pub type ErrorKind = ParserErrorKind;
 
-// Specifies the actual error that occurred
+// TODO change this to just using string messages instead
 #[derive(Debug)]
 pub enum ParserErrorKind {
     LexerError,
@@ -21,9 +21,11 @@ pub enum ParserErrorKind {
     ExpectedItemAfterLabel,   // expected either begin, while, for after label
     InvalidAssignment,      // the LHS of an assignment was not a valid lvalue
     InvalidDeclAssignment,  // only "=" allowed in variable decls
+    InvalidFunctionAssign,  
     ControlFlowOutsideOfBlock,
     ExpectedEndAfterControlFlow,
     DeclMissingInitializer, 
+    ExpectedOpenParenFuncDef,
 }
 
 // Provide information about the type of syntactic construct from which the error originated
@@ -37,6 +39,7 @@ pub enum ContextTag {
     ControlFlow,
     ExprMeta,
     BlockExpr,
+    FunDefExpr,
     AssignmentExpr,
     VarDeclExpr,
     BinaryOpExpr,
@@ -156,6 +159,7 @@ impl fmt::Display for ParserError<'_> {
             ErrorKind::ExpectedItemAfterLabel => "expected loop statement or block expression after label",
             ErrorKind::ControlFlowOutsideOfBlock => "found 'return', 'break', or 'continue' outside of a block",
             ErrorKind::ExpectedEndAfterControlFlow => "'return', 'break', or 'continue' must be the last statement in a block",
+            ErrorKind::InvalidFunctionAssign => "invalid function name or function assignment target",
         };
         
         utils::format_error(fmt, "syntax error", Some(message), self.source())
