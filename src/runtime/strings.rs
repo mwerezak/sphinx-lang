@@ -8,7 +8,7 @@ mod inline;
 
 pub mod string_table;
 pub use string_table::StringSymbol;
-use string_table::StringTableGuard;
+use string_table::StringTable;
 
 
 
@@ -69,7 +69,7 @@ impl From<&str> for StringValue {
 }
 
 impl StringValue {
-    pub fn as_str<'a, 's>(&'a self, string_table: &'s StringTableGuard) -> impl Deref<Target=str> + 'a where 's: 'a {
+    pub fn as_str<'a, 's>(&'a self, string_table: &'s StringTable) -> impl Deref<Target=str> + 'a where 's: 'a {
         match self {
             Self::Inline(in_str) => StrRef::Slice(in_str),
             Self::CowRc(rc_str) => StrRef::Slice(rc_str),
@@ -78,7 +78,7 @@ impl StringValue {
     }
     
     #[inline]
-    pub fn into_key<'s>(self, string_table: &'s StringTableGuard) -> StringKey<'s> {
+    pub fn into_key<'s>(self, string_table: &'s StringTable) -> StringKey<'s> {
         StringKey::new(self, string_table)
     }
     
@@ -105,7 +105,7 @@ impl StringValue {
 
 #[derive(Debug, Clone)]
 pub enum StringKey<'s> {
-    Intern(StringSymbol, &'s StringTableGuard),
+    Intern(StringSymbol, &'s StringTable),
     Inline(InlineStr, u64),
     CowRc(Rc<str>, u64),
 }
@@ -116,7 +116,7 @@ impl<'s> StringKey<'s> {
     /// A reference to the string table is required because we need to compute a hash specifically
     /// using it's hasher in order to produce hashes compatible with interned strings
     #[inline]
-    pub fn new(value: StringValue, string_table: &'s StringTableGuard) -> Self {
+    pub fn new(value: StringValue, string_table: &'s StringTable) -> Self {
         match value {
             StringValue::Intern(sym) => Self::Intern(sym, string_table),
             

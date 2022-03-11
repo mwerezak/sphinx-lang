@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
 use crate::runtime::strings::{StringValue, StringKey};
-use crate::runtime::string_table::StringTableGuard;
+use crate::runtime::string_table::StringTable;
 use crate::runtime::errors::{ExecResult, RuntimeErrorKind as ErrorKind};
 
 
@@ -50,11 +50,11 @@ impl Variant {
         }
     }
     
-    pub fn into_key<'s>(self, string_table: &'s StringTableGuard) -> ExecResult<VariantKey<'s>> {
+    pub fn into_key<'s>(self, string_table: &'s StringTable) -> ExecResult<VariantKey<'s>> {
         VariantKey::new(self, string_table)
     }
     
-    pub fn repr<'a, 's>(&'a self, string_table: &'s StringTableGuard) -> impl fmt::Display + 'a where 's: 'a {
+    pub fn repr<'a, 's>(&'a self, string_table: &'s StringTable) -> impl fmt::Display + 'a where 's: 'a {
         VariantRepr(self, string_table)
     }
 }
@@ -131,7 +131,7 @@ impl<'s> PartialEq for VariantKey<'s> {
 }
 
 impl<'s> VariantKey<'s> {
-    pub fn new(value: Variant, string_table: &'s StringTableGuard) -> ExecResult<Self> {
+    pub fn new(value: Variant, string_table: &'s StringTable) -> ExecResult<Self> {
         let key = match value {
             Variant::Nil => Self::Nil,
             Variant::EmptyTuple => Self::EmptyTuple,
@@ -162,7 +162,7 @@ impl From<VariantKey<'_>> for Variant {
 }
 
 
-struct VariantRepr<'a, 's>(&'a Variant, &'s StringTableGuard);
+struct VariantRepr<'a, 's>(&'a Variant, &'s StringTable);
 
 impl fmt::Display for VariantRepr<'_, '_> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

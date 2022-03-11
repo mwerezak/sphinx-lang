@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::parser::stmt::Label;
 use crate::runtime::{Variant, VariantKey, DefaultBuildHasher};
 use crate::runtime::strings::{StringKey, StringValue};
-use crate::runtime::string_table::StringTableGuard;
+use crate::runtime::string_table::StringTable;
 
 pub mod eval;
 pub mod exec;
@@ -21,13 +21,23 @@ pub enum ControlFlow {
     Return(Variant),
 }
 
-
 pub type Dictionary<'s> = HashMap<VariantKey<'s>, Variant, DefaultBuildHasher>;
-pub type Namespace<'s> = HashMap<StringKey<'s>, Variant, DefaultBuildHasher>;
-
 pub fn new_dictionary<'s>() -> Dictionary<'s> {
     Dictionary::with_hasher(DefaultBuildHasher::default())
 }
+
+
+pub enum Access {
+    ReadOnly,
+    ReadWrite,
+}
+
+pub struct Variable {
+    pub access: Access,
+    pub value: Variant,
+}
+
+pub type Namespace<'s> = HashMap<StringKey<'s>, Variant, DefaultBuildHasher>;
 
 pub fn new_namespace<'s>() -> Namespace<'s> {
     Namespace::with_hasher(DefaultBuildHasher::default())
@@ -35,7 +45,7 @@ pub fn new_namespace<'s>() -> Namespace<'s> {
 
 
 
-pub fn new_root_env<'r, 's>(string_table: &'s StringTableGuard) -> Environment<'r, 's> {
+pub fn new_root_env<'r, 's>(string_table: &'s StringTable) -> Environment<'r, 's> {
     Environment {
         parent: None,
         namespace: RefCell::new(new_namespace()),
@@ -47,7 +57,7 @@ pub fn new_root_env<'r, 's>(string_table: &'s StringTableGuard) -> Environment<'
 pub struct Environment<'r, 's> {
     parent: Option<&'r Environment<'r, 's>>,
     namespace: RefCell<Namespace<'s>>,
-    string_table: &'s StringTableGuard,
+    string_table: &'s StringTable,
 }
 
 impl<'r, 's> Environment<'r, 's> {
@@ -60,7 +70,7 @@ impl<'r, 's> Environment<'r, 's> {
         }
     }
     
-    pub fn string_table(&self) -> &StringTableGuard { self.string_table }
+    pub fn string_table(&self) -> &StringTable { self.string_table }
     
     /// Check if the name exists in this Environment
     pub fn has_name(&self, name: &StringValue) -> bool {

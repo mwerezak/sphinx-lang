@@ -40,25 +40,25 @@ impl From<InternSymbol> for StringSymbol {
 // These should never happen at the same time, but the compiler cannot check that, so we need to use RefCell
 
 #[derive(Debug)]
-pub struct StringTableGuard {
+pub struct StringTable {
     // TODO add RwLock if we ever need this to be Sync
-    internal: RefCell<StringTable>,
+    internal: RefCell<StringTableInternal>,
 }
 
-impl StringTableGuard {
+impl StringTable {
     pub fn new() -> Self {
-        let string_table = StringTable {
+        let string_table = StringTableInternal {
             hasher_factory: DefaultBuildHasher::default(),
             interner: StringInterner::new(),
             hash_cache: Vec::new(),
         };
         
-        StringTableGuard {
+        StringTable {
             internal: RefCell::new(string_table),
         }
     }
     
-    pub fn borrow_mut(&self) -> RefMut<StringTable> {
+    pub fn borrow_mut(&self) -> RefMut<StringTableInternal> {
         self.internal.borrow_mut()
     }
     
@@ -86,13 +86,13 @@ impl StringTableGuard {
 
 
 #[derive(Debug)]
-pub struct StringTable {
+pub struct StringTableInternal {
     hasher_factory: DefaultBuildHasher,
     interner: StringInterner,
     hash_cache: Vec<u64>,
 }
 
-impl StringTable {
+impl StringTableInternal {
     // pub fn hasher(&self) -> &impl BuildHasher { return &self.hasher_factory }
     
     pub fn get_or_intern(&mut self, string: &str) -> StringSymbol {
