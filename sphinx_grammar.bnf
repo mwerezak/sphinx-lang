@@ -1,69 +1,69 @@
 (* 
     Syntactic Grammer Definition
     
-    Notation is homebrew BNF (see bnf.sublime-syntax for highlighting).
+    Notation is homebrew BNF (see bnf.sublime_syntax for highlighting).
     
     I plan to implement a recursive descent parser, so care needs to be taken to avoid any left recursion in the grammar.
 *)
 
 (*** Type Annotations ***)
 
-type-expression ::= (* TODO *) ;
+type_expression ::= (* TODO *) ;
 
 
 (*** Statements ***)
 
 statement ::= ";"
-            | while-loop
-            | do-while-loop
-            | for-loop 
+            | while_loop
+            | do_while_loop
+            | for_loop 
             | expression ;
 
-statement-list ::= ( statement )* ( control-flow )? ;  (* control flow only allowed at end of block, much like Lua *)
-control-flow ::= "continue" ( label )? | "break" ( label )? ( expression )? | "return" ( expression )? ;
+statement_list ::= ( statement )* ( control_flow )? ;  (* control flow only allowed at end of block, much like Lua *)
+control_flow ::= "continue" ( label )? | "break" ( label )? ( expression )? | "return" ( expression )? ;
 
-while-loop ::=  ( label )? "while" expression "do" statement-list "end" ;
-do-while-loop ::= ( label )? "do" statement-list "while" expression "end" ;
+while_loop ::=  ( label )? "while" expression "do" statement_list "end" ;
+do_while_loop ::= ( label )? "do" statement_list "while" expression "end" ;
 
-for-loop ::= ( label )? "for" lvalue-list "in" expression "end" ;
+for_loop ::= ( label )? "for" lvalue_list "in" expression "end" ;
 
 label ::= "::" LABELNAME ;
 
 (*** Expressions ***)
 
 (* 
-    This expression production is left-recursive, and as such, the actual recursive descent parser implementation differs somewhat (see the bottom of this file)
+    This expression production is left_recursive, and as such, the actual recursive descent parser implementation differs somewhat (see the bottom of this file)
 *)
 expression ::= primary
-             | class-def
-             | function-def
-             | if-expression
-             | block-expression
+             | class_def
+             | function_def
+             | if_expression
+             | block_expression
              | UNARY_OP expression
              | expression BINARY_OP expression
-             | assignment-expression
-             | declaration-expression
-             | object-constructor
-             | tuple-constructor ;
+             | assignment_expression
+             | declaration_expression
+             | object_constructor
+             | tuple_constructor ;
 
-expression-list ::= expression ( "," expression )* ;
+expression_list ::= expression ( "," expression )* ;
 
 (*** Primary expressions ***)
 
 atom ::= LITERAL | identifier | "self" | "super" | group ;
 identifier ::= IDENTIFIER | "global" IDENTIFIER | "upval" IDENTIFIER ;
 
-primary ::= atom ( access-item )* ; 
-access-item ::= member-access | index-access | invocation | object-constructor ;
-index-access ::= "[" expression "]" ;
-member-access ::= "." IDENTIFIER ;
+primary ::= atom ( access_item )* ; 
+access_item ::= member_access | index_access | invocation | object_constructor ;
+index_access ::= "[" expression "]" ;
+member_access ::= "." IDENTIFIER ;
 
-group ::= "(" expression ( ":" type-expression )? ")" ; (* can be type annotated *)
+group ::= "(" expression ( ":" type_expression )? ")" ; (* can be type annotated *)
 
 (*** if/block Expressions ***)
 
-if-expression ::= "if" expression "then" statement-list ( "elseif" statement-list )* ( "else" statement-list )? "end" ;
-block-expression ::= ( label )? "begin" ( statement )* ( control-flow )? "end" ;  (* break can be supplied a value inside of begin-blocks *)
+if_expression ::= "if" expression "then" statement_list ( "elseif" statement_list )* ( "else" statement_list )? "end" ;
+block_expression ::= ( label )? "begin" ( statement )* ( control_flow )? "end" ;  (* break can be supplied a value inside of begin_blocks *)
 
 (*** Assignment ***)
 
@@ -75,17 +75,17 @@ block-expression ::= ( label )? "begin" ( statement )* ( control-flow )? "end" ;
 *)
 
 (* right associative *)
-lvalue ::= identifier | primary index-access | primary member-access ;
+lvalue ::= identifier | primary index_access | primary member_access ;
 
-lvalue-expression ::= lvalue | lvalue-list | "(" lvalue-expression ")" ;   (* lvalues, tuples of lvalues, and grouped lvalues *)
-lvalue-list ::= lvalue-expression ( "," lvalue-expression )* ;
+lvalue_expression ::= lvalue | lvalue_list | "(" lvalue_expression ")" ;   (* lvalues, tuples of lvalues, and grouped lvalues *)
+lvalue_list ::= lvalue_expression ( "," lvalue_expression )* ;
 
-lvalue-annotated ::= lvalue-expression ( ":" type-expression )? ; 
+lvalue_annotated ::= lvalue_expression ( ":" type_expression )? ; 
 
-assignment-op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-assignment-expression ::= lvalue-annotated assignment-op expression ;
+assignment_op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
+assignment_expression ::= lvalue_annotated assignment_op expression ;
 
-declaration-expression ::= ( "let" | "var" ) assignment-expression ;
+declaration_expression ::= ( "let" | "var" ) assignment_expression ;
 
 
 
@@ -102,41 +102,55 @@ argument ::= ( "..." )? expression ;  (* "..." is for argument unpacking syntax 
 
 (*** Constructors ***)
 
-object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
-member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ( ":" type-expression )? "=" expression ;
+object_constructor ::= "{" member_initializer ( "," member_initializer )* "}" ;
+member_initializer ::= ( IDENTIFIER | "[" primary "]" ) ( ":" type_expression )? "=" expression ;
 
 
-(* syntax for tuple-constructor has special casing for single-element tuples and the empty tuple *)
-tuple-constructor ::= expression-list | "(" expression "," ")" | "(" ")" ;
+(* syntax for tuple_constructor has special casing for single_element tuples and the empty tuple *)
+tuple_constructor ::= expression_list | "(" expression "," ")" | "(" ")" ;
 
 (*** Function Defs ***)
 
-function-def ::= "fun" ( lvalue )?  parameter-list ( "->" type-expression ":" )?  statement-list "end" ;
+function_def ::= "fun" ( lvalue )?  parameter_list ( "->" type_expression ":" )?  statement_list "end" ;
 
-parameter-list ::= "(" ")" | "(" parameter ( "," parameter )* ( parameter "..." )? ")" ;
+parameter_list ::= "(" ")" ;
 
-parameter ::= ( "var" )? IDENTIFIER ( ":" type-expression )? ( "=" expression )? ;
+
+
+parameter_list ::= "(" ")" 
+                 | "(" variadic_parameter ")"
+                 | "(" positional_params ( "," variadic_parameter | default_variadic )? ")"
+                 | "(" default_params ( "," default_variadic )? ")"
+                 | "(" positional_params default_params ( "," default_variadic )? ")" ;
+
+positional_params ::= parameter ( "," parameter )* ;
+default_params ::= default_positional ( "," default_positional )* ;
+
+parameter ::= ( "var" )? IDENTIFIER ( ":" type_expression )? ;
+variadic_parameter ::= ( "var" )? IDENTIFIER "..." ( ":" type_expression )? ;
+default_positional ::= parameter ( "=" expression ) ;
+default_variadic ::= default_parameter ( "=" expression ) ;
 
 
 (*** Class Defs ***)
 
-class-def ::= (* TODO *) ;
+class_def ::= (* TODO *) ;
 
 
-(***** Non left-recursive version of `expression` for implementation *****)
+(***** Non left_recursive version of `expression` for implementation *****)
 
-(* Single-element tuple literals are not allowed. Use a built-in constructor function to create single element tuples *)
-tuple-constructor ::= expression ( "," expression )+ | "(" ")" ;
+(* Single_element tuple literals are not allowed. Use a built_in constructor function to create single element tuples *)
+tuple_constructor ::= expression ( "," expression )+ | "(" ")" ;
 
-primary-expression ::= immediate-expression | primary | tuple-constructor | "(" expression ")" ;
+primary_expression ::= immediate_expression | primary | tuple_constructor | "(" expression ")" ;
 
 (* These expressions can all be identified by their first symbol *)
-immediate-expression ::= class-def
-                       | function-def
-                       | if-expression
-                       | object-constructor ;
+immediate_expression ::= class_def
+                       | function_def
+                       | if_expression
+                       | object_constructor ;
 
-unary-expression ::= UNARY_OP unary-expression | primary-expression ;
+unary_expression ::= UNARY_OP unary_expression | primary_expression ;
 
 (*
     Operator precendence in order from strong to weak binding
@@ -155,13 +169,13 @@ unary-expression ::= UNARY_OP unary-expression | primary-expression ;
 
 *)
 
-operand[1] ::= unary-expression ;
+operand[1] ::= unary_expression ;
 operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
-binary-op ::= operand[10] ;
+binary_op ::= operand[10] ;
 
-(* top-level tuples don't require parens - however, single element tuples are not allowed here, use tuple-constructor instead *)
-naked-tuple ::= binary-op ( "," binary-op )*;
+(* top_level tuples don't require parens - however, single element tuples are not allowed here, use tuple_constructor instead *)
+naked_tuple ::= binary_op ( "," binary_op )*;
 
-assignment ::= naked-tuple | assignment-expression | declaration-expression ;
+assignment ::= naked_tuple | assignment_expression | declaration_expression ;
 
 expression ::= assignment (* top level of recursive descent *)

@@ -486,6 +486,13 @@ fun variadic_fun(normal_arg, variadic...)
 
 end
 
+fun variadic_default(sequence... = ())
+  for item in sequence do
+    echo item
+  end
+end
+
+
 variadic_fun("red", "blue", "green")  # prints "red" then "blue" then "green"
 
 var mylist = list.new("red", "green", "blue")  # important use case: constructor functions for collection types
