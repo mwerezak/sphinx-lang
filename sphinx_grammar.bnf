@@ -50,8 +50,7 @@ expression_list ::= expression ( "," expression )* ;
 
 (*** Primary expressions ***)
 
-atom ::= LITERAL | identifier | "self" | "super" | group ;
-identifier ::= IDENTIFIER | "global" IDENTIFIER | "upval" IDENTIFIER ;
+atom ::= LITERAL | IDENTIFIER | "self" | "super" | group ;
 
 primary ::= atom ( access_item )* ; 
 access_item ::= member_access | index_access | invocation | object_constructor ;
@@ -75,7 +74,7 @@ block_expression ::= ( label )? "begin" ( statement )* ( control_flow )? "end" ;
 *)
 
 (* right associative *)
-lvalue ::= identifier | primary index_access | primary member_access ;
+lvalue ::= IDENTIFIER | primary index_access | primary member_access ;
 
 lvalue_expression ::= lvalue | lvalue_list | "(" lvalue_expression ")" ;   (* lvalues, tuples of lvalues, and grouped lvalues *)
 lvalue_list ::= lvalue_expression ( "," lvalue_expression )* ;
@@ -83,8 +82,12 @@ lvalue_list ::= lvalue_expression ( "," lvalue_expression )* ;
 lvalue_annotated ::= lvalue_expression ( ":" type_expression )? ; 
 
 assignment_op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-assignment_expression ::= lvalue_annotated assignment_op expression ;
+assignment_expression ::= ( "global" )? lvalue_annotated assignment_op expression ;
 
+(* 
+    it isn't captured here, as that would require duplicating all of the above, 
+    but the only lvalue allowed in a declaration are identifiers
+*)
 declaration_expression ::= ( "let" | "var" ) assignment_expression ;
 
 
