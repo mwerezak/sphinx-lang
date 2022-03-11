@@ -294,7 +294,7 @@ fun mutable_params(a, var b)
   b = a
 end
 
-# unlike python, default arguments are re-evaluated with each invocation
+# note: unlike Python, default arguments are re-evaluated with each invocation
 fun echo_default(thing = "default")
   echo thing
 end
