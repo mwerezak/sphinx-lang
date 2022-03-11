@@ -206,15 +206,15 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         
         ctx.push(ContextTag::StmtMeta);
         
-        let stmt = self.parse_stmt_variant(ctx)?;
+        let stmt = self.parse_toplevel_stmt(ctx)?;
         let symbol = ctx.frame().as_debug_symbol().unwrap();
         
         ctx.pop_extend();
         Ok(StmtMeta::new(stmt, symbol))
     }
     
-    fn parse_stmt_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<Stmt> {
-        let stmt = match self.peek()?.token {
+    fn parse_toplevel_stmt(&mut self, ctx: &mut ErrorContext) -> InternalResult<Stmt> {
+        let stmt = match  self.peek()?.token {
             Token::While => unimplemented!(),
             Token::Do => unimplemented!(),
             Token::For => unimplemented!(),
@@ -223,11 +223,21 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 Stmt::Echo(self.parse_expr_variant(ctx)?)
             },
             
-            // only allowed at the end of a statement list
             Token::Continue | Token::Break | Token::Return => {
                 ctx.push(ContextTag::ControlFlow);
-                ctx.set_start(&self.advance().unwrap());
-                return Err(ErrorKind::ControlFlowOutsideOfBlock.into());
+                
+                let next = self.advance().unwrap();
+                ctx.set_start(&next);
+                
+                let name = match next.token {
+                    Token::Continue => "continue",
+                    Token::Break => "break",
+                    Token::Return => "return",
+                    _ => unreachable!(),
+                };
+                
+                let message = format!("'{}' is not allowed here", name);
+                return Err(ErrorKind::SyntaxError(message).into());
             },
             
             _ => Stmt::Expression(self.parse_expr_variant(ctx)?),
@@ -250,7 +260,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 break;
             }
             
-            let stmt = match self.try_parse_control_flow_stmt(ctx) {
+            let control_stmt = match self.try_parse_control_flow_stmt(ctx) {
                 Ok(stmt) => stmt,
                 Err(error) => {
                     errors.push(error.with_symbol_from_ctx(&ctx));
@@ -259,18 +269,28 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 }
             };
             
-            if let Some(stmt) = stmt {
-                suite.push(stmt);
+            if let Some(control) = control_stmt {
                 
                 let next = self.peek()?;
                 if !matches!(next.token, Token::End) {
                     // consume the unexpected token so that it is included in the error message
                     ctx.set_end(&self.advance().unwrap());
                     
-                    let error = ErrorPrototype::from(ErrorKind::ExpectedEndAfterControlFlow)
+                    let name = match control.variant() {
+                        Stmt::Continue(..) => "continue",
+                        Stmt::Break(..) => "break",
+                        Stmt::Return(..) => "return",
+                        _ => unreachable!(),
+                    };
+                    
+                    let message = format!("'{}' must be the last statement in a block", name);
+                    let error = ErrorPrototype::from(ErrorKind::SyntaxError(message.into()))
                         .with_symbol_from_ctx(&ctx);
                     
                     errors.push(error);
+                
+                } else{
+                    suite.push(control);
                 }
                 
                 break;
@@ -410,7 +430,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             ctx.set_end(&self.advance().unwrap());
             
             // LHS of assignment has to be an lvalue
-            let lhs = LValue::try_from(expr).map_err(|_| ErrorPrototype::from(ErrorKind::InvalidAssignment))?;
+            let lhs = LValue::try_from(expr).map_err(|_| ErrorPrototype::from("can't assign to this"))?;
             let rhs = self.parse_expr_variant(ctx)?;
             
             ctx.pop_extend();
@@ -439,7 +459,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         };
         
         let expr = self.parse_tuple_expr(ctx)?;
-        let lhs = LValue::try_from(expr).map_err(|_| ErrorPrototype::from(ErrorKind::InvalidAssignment))?;
+        let lhs = LValue::try_from(expr).map_err(|_| ErrorPrototype::from("can't assign to this"))?;
         
         // check for and consume "="
         let next = self.advance()?;
@@ -447,10 +467,10 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         
         if let Some(op) = Self::which_assignment_op(&next.token) {
             if op.is_some() {
-                return Err(ErrorKind::InvalidDeclAssignment.into());
+                return Err("update-assignment is not allowed in a variable declaration".into());
             }
         } else {
-            return Err(ErrorKind::DeclMissingInitializer.into());
+            return Err("missing '=' in variable declaration".into());
         }
         
         let init = self.parse_expr_variant(ctx)?;
@@ -658,7 +678,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         let next = self.advance()?;
         ctx.set_end(&next);
         if !matches!(next.token, Token::Begin) {
-            return Err(ErrorKind::ExpectedItemAfterLabel.into());
+            return Err("block labels must be followed by either a block or a loop".into());
         }
         
         let suite = self.parse_statement_list(ctx)?;
@@ -682,10 +702,10 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         let name = 
             if !matches!(next.token, Token::OpenParen) {
                 let primary = self.parse_primary(ctx)
-                    .map_err(|_| ErrorPrototype::from(ErrorKind::InvalidFunctionAssign))?;
+                    .map_err(|_| ErrorPrototype::from("invalid function name or function assignment target"))?;
                     
                 let lvalue = LValue::try_from(primary)
-                    .map_err(|_| ErrorPrototype::from(ErrorKind::InvalidFunctionAssign))?;
+                    .map_err(|_| ErrorPrototype::from("invalid function name or function assignment target"))?;
                 
                 Some(lvalue)
             
@@ -759,7 +779,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                     if let Token::Identifier(name) = next.token {
                         items.push(AccessItem::Attribute(self.interner.get_or_intern(name.as_str()).into()));
                     } else {
-                        return Err(ErrorKind::ExpectedIdentifier.into());
+                        return Err("invalid Identifier".into());
                     }
                     
                     ctx.pop_extend();
@@ -778,7 +798,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                     if matches!(next.token, Token::CloseSquare) {
                         items.push(AccessItem::Index(index_expr));
                     } else {
-                        return Err(ErrorKind::ExpectedCloseSquare.into());
+                        return Err("missing closing ']'".into());
                     }
                     
                     ctx.pop_extend();
@@ -857,7 +877,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 },
                 
                 _ => { 
-                    return Err(ErrorKind::ExpectedStartOfExpr.into())
+                    return Err("expected an expression here".into())
                 },
             };
             
@@ -887,7 +907,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         let next = self.advance()?;
         ctx.set_end(&next);
         if !matches!(next.token, Token::CloseParen) {
-            return Err(ErrorKind::ExpectedCloseParen.into());
+            return Err("missing closing ')'".into());
         }
         
         ctx.pop_extend();

@@ -13,19 +13,13 @@ pub type ErrorKind = ParserErrorKind;
 pub enum ParserErrorKind {
     LexerError,
     EndofTokenStream,
-    ExpectedStartOfExpr,   // expected the start of an expression
-    ExpectedCloseParen,
-    ExpectedCloseSquare,
-    ExpectedCloseBrace,
-    ExpectedIdentifier,
-    ExpectedItemAfterLabel,   // expected either begin, while, for after label
-    InvalidAssignment,      // the LHS of an assignment was not a valid lvalue
-    InvalidDeclAssignment,  // only "=" allowed in variable decls
-    InvalidFunctionAssign,  
-    ControlFlowOutsideOfBlock,
-    ExpectedEndAfterControlFlow,
-    DeclMissingInitializer, 
-    ExpectedOpenParenFuncDef,
+    SyntaxError(String),
+}
+
+impl<S> From<S> for ParserErrorKind where S: ToString {
+    fn from(message: S) -> Self {
+        ErrorKind::SyntaxError(message.to_string())
+    }
 }
 
 // Provide information about the type of syntactic construct from which the error originated
@@ -82,6 +76,12 @@ impl ErrorPrototype {
 impl From<ParserErrorKind> for ErrorPrototype {
     fn from(kind: ParserErrorKind) -> Self {
         ErrorPrototype { kind, symbol: None, lexer_error: None }
+    }
+}
+
+impl From<&str> for ErrorPrototype {
+    fn from(message: &str) -> Self {
+        ErrorPrototype { kind: message.into(), symbol: None, lexer_error: None }
     }
 }
 
@@ -148,18 +148,7 @@ impl fmt::Display for ParserError<'_> {
         let message = match self.kind() {
             ErrorKind::LexerError => "",
             ErrorKind::EndofTokenStream => "unexpected end of token stream",
-            ErrorKind::ExpectedStartOfExpr  => "expected an expression here",
-            ErrorKind::ExpectedCloseParen   => "missing closing ')'",
-            ErrorKind::ExpectedCloseSquare  => "missing closing ']'",
-            ErrorKind::ExpectedCloseBrace   => "missing closing '}'",
-            ErrorKind::ExpectedIdentifier   => "invalid identifier",
-            ErrorKind::InvalidAssignment    => "invalid assignment",
-            ErrorKind::InvalidDeclAssignment  => "only '=' is allowed when initializing a newly declared variable",
-            ErrorKind::DeclMissingInitializer => "missing '=' initializer for variable declaration",
-            ErrorKind::ExpectedItemAfterLabel => "expected loop statement or block expression after label",
-            ErrorKind::ControlFlowOutsideOfBlock => "found 'return', 'break', or 'continue' outside of a block",
-            ErrorKind::ExpectedEndAfterControlFlow => "'return', 'break', or 'continue' must be the last statement in a block",
-            ErrorKind::InvalidFunctionAssign => "invalid function name or function assignment target",
+            ErrorKind::SyntaxError(message) => message,
         };
         
         utils::format_error(fmt, "syntax error", Some(message), self.source())
