@@ -718,14 +718,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         
         let name = 
             if !matches!(next.token, Token::OpenParen) {
-                let primary = self.parse_primary(ctx)
-                    .map_err(|_| ErrorPrototype::from("cannot assign a function to this"))?;
-                    
-                let lvalue = LValue::try_from(primary)
-                    .map_err(|_| ErrorPrototype::from("cannot assign a function to this"))?;
-                
-                Some(lvalue)
-            
+                Some(self.parse_function_assignment_target(ctx)?)
             } else { None };
         
         // expect open paren now
@@ -908,40 +901,10 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             match next.token {
                 
                 // access ::= "." IDENTIFIER ;
-                Token::OpAccess => {
-                    ctx.push(ContextTag::MemberAccess);
-                    ctx.set_start(&self.advance().unwrap());
-                    
-                    let next = self.advance()?;
-                    ctx.set_end(&next);
-                    
-                    if let Token::Identifier(name) = next.token {
-                        items.push(AccessItem::Attribute(self.get_str_symbol(name.as_str())));
-                    } else {
-                        return Err("invalid Identifier".into());
-                    }
-                    
-                    ctx.pop_extend();
-                },
+                Token::OpAccess => items.push(self.parse_member_access(ctx)?),
                 
                 // subscript ::= "[" expression "]" ;
-                Token::OpenSquare => {
-                    ctx.push(ContextTag::IndexAccess);
-                    ctx.set_start(&self.advance().unwrap());
-                    
-                    let index_expr = self.parse_expr(ctx)?;
-                    
-                    let next = self.advance()?;
-                    ctx.set_end(&next);
-                    
-                    if matches!(next.token, Token::CloseSquare) {
-                        items.push(AccessItem::Index(index_expr));
-                    } else {
-                        return Err("missing closing ']'".into());
-                    }
-                    
-                    ctx.pop_extend();
-                }
+                Token::OpenSquare => items.push(self.parse_index_access(ctx)?),
                 
                 // Invocation is a special case. 
                 // The parens containing the argument list are not allowed to be on a separate line
@@ -984,6 +947,77 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         } else {
             Ok(Expr::Primary(Primary::new(atom, items)))
         }
+    }
+    
+    // similar to parse_primary(), except we only allow member access and index access, and convert to an LValue after
+    fn parse_function_assignment_target(&mut self, ctx: &mut ErrorContext) -> InternalResult<LValue> {
+        ctx.push(ContextTag::PrimaryExpr);
+        
+        let atom = self.parse_atom(ctx)?;
+        
+        let mut items = Vec::new();
+        loop {
+            let next = self.peek()?;
+            match next.token {
+                
+                // access ::= "." IDENTIFIER ;
+                Token::OpAccess => items.push(self.parse_member_access(ctx)?),
+                
+                // subscript ::= "[" expression "]" ;
+                Token::OpenSquare => items.push(self.parse_index_access(ctx)?),
+                
+                _ => break,
+            };
+        }
+        
+        ctx.pop_extend();
+        
+        let lvalue =
+            if items.is_empty() { LValue::try_from(atom) } 
+            else { LValue::try_from(Primary::new(atom, items)) }
+            .map_err(|_| ErrorPrototype::from("cannot assign a function to this"))?;
+        
+        Ok(lvalue)
+    }
+    
+    // access ::= "." IDENTIFIER ;
+    fn parse_member_access(&mut self, ctx: &mut ErrorContext) -> InternalResult<AccessItem> {
+        ctx.push(ContextTag::MemberAccess);
+        ctx.set_start(&self.advance().unwrap());
+        
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        let item;
+        if let Token::Identifier(name) = next.token {
+            item = AccessItem::Attribute(self.get_str_symbol(name.as_str()));
+        } else {
+            return Err("invalid Identifier".into());
+        }
+        
+        ctx.pop_extend();
+        Ok(item)
+    }
+    
+    // subscript ::= "[" expression "]" ;
+    fn parse_index_access(&mut self, ctx: &mut ErrorContext) -> InternalResult<AccessItem> {
+        ctx.push(ContextTag::IndexAccess);
+        ctx.set_start(&self.advance().unwrap());
+        
+        let index_expr = self.parse_expr(ctx)?;
+        
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        let item;
+        if matches!(next.token, Token::CloseSquare) {
+            item = AccessItem::Index(index_expr);
+        } else {
+            return Err("missing closing ']'".into());
+        }
+        
+        ctx.pop_extend();
+        Ok(item)
     }
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
