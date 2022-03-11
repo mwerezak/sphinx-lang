@@ -4,14 +4,14 @@ use log::debug;
 
 use crate::source::ModuleSource;
 use crate::lexer::{TokenMeta, Token, TokenIndex, LexerError};
-use crate::runtime::string_table::StringTableInternal;
+use crate::runtime::string_table::{StringSymbol, StringTableInternal};
 
 use expr::{ExprMeta, Expr};
-use expr::{FunSignature, FunParam};
 use stmt::{StmtMeta, Stmt, Label};
 use primary::{Primary, Atom, AccessItem};
 use assign::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
+use fundef::{FunctionDef, FunSignature, FunParam};
 use structs::{ObjectConstructor};
 use errors::{ErrorPrototype, ErrorKind, ErrorContext, ContextTag};
 
@@ -24,6 +24,7 @@ pub mod stmt;
 pub mod primary;
 pub mod assign;
 pub mod operator;
+pub mod fundef;
 pub mod structs;
 
 pub use errors::{ParserError, ContextFrame};
@@ -65,6 +66,10 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
     fn append_errors(&mut self, errors: impl Iterator<Item=ErrorPrototype>) -> Option<ErrorPrototype> {
         self.errors.extend(errors);
         self.errors.pop_front()
+    }
+    
+    fn get_str_symbol(&mut self, string: &str) -> StringSymbol {
+        self.interner.get_or_intern(string)
     }
     
     fn advance(&mut self) -> InternalResult<TokenMeta> {
@@ -328,7 +333,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             let next = self.advance().unwrap();
             
             if let Token::Label(name) = next.token {
-                Some(Label::new(self.interner.get_or_intern(name.as_str()).into()))
+                Some(Label::new(self.get_str_symbol(name.as_str())))
             } else { unreachable!() }
             
         } else { None };
@@ -744,26 +749,27 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         
         let body = self.parse_statement_list(ctx)?;
         
-        let function_def = Expr::FunctionDef(signature, body.into_boxed_slice());
+        let function_def = FunctionDef::new(signature, body);
         
         // SYNTACTIC SUGAR: fun name(..) => let name = fun(..)
         if let Some(lvalue) = name {
             let function_decl = Declaration {
                 decl: DeclType::Immutable,
                 lhs: lvalue,
-                init: function_def,
+                init: Expr::FunctionDef(function_def),
             };
             
             Ok(Expr::Declaration(Box::new(function_decl)))
         } else {
             
-            Ok(function_def)
+            Ok(Expr::FunctionDef(function_def))
         }
     }
     
     fn parse_function_param_list(&mut self, ctx: &mut ErrorContext) -> InternalResult<FunSignature> {
 
-        let mut params = Vec::new();
+        let mut required = Vec::new();
+        let mut default = Vec::new();
         let mut variadic = None;
 
         loop {
@@ -800,26 +806,52 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 if let Token::Identifier(name) = next.token { name }
                 else { return Err("invalid parameter".into()); };
             
-            let name = self.interner.get_or_intern(name.as_str()).into();
-            let param = FunParam { name, decl };
+            let name = self.get_str_symbol(name.as_str());
             
             // possibly variadic
             
             let next = self.peek()?;
-            match next.token {
-                // variadic parameter
-                Token::Ellipsis => {
+            let is_variadic = matches!(next.token, Token::Ellipsis);
+            if is_variadic {
+                ctx.set_end(&self.advance().unwrap());
+            }
+            
+            // possible default value
+            let next = self.peek()?;
+            let default_value =
+                if matches!(next.token, Token::OpAssign) {
                     ctx.set_end(&self.advance().unwrap());
                     
-                    variadic.replace(param);
-                    
-                    if !matches!(self.peek()?.token, Token::CloseParen) {
-                        return Err("a variadic parameter must be the last one in the parameter list".into());
-                    }
+                    Some(self.parse_expr_variant(ctx)?)
+                } else {
+                    None
+                };
+            
+            // expect either a comma "," or the closing ")"
+            let next = self.peek()?;
+            match next.token {
+                // variadic parameter
+                Token::Comma if is_variadic => {
+                    return Err("a variadic parameter must be the last one in the parameter list".into());
+                }
+                Token::CloseParen if is_variadic => {
+                    variadic.replace(FunParam::new(name, decl, default_value));
                 },
                 
                 // normal parameter
-                Token::Comma | Token::CloseParen => params.push(param),
+                Token::Comma | Token::CloseParen if !is_variadic => {
+                    let has_default = default_value.is_some();
+                    
+                    let param = FunParam::new(name, decl, default_value);
+                    if has_default {
+                        default.push(param);
+                    } else {
+                        if !default.is_empty() {
+                            return Err("cannot have a non-default parameter after a default parameter".into());
+                        }
+                        required.push(param);
+                    }
+                },
                 
                 _ => return Err("invalid parameter".into()),
             }
@@ -827,7 +859,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             ctx.pop_extend();
         }
         
-        Ok(FunSignature { params: params.into_boxed_slice(), variadic })
+        Ok(FunSignature::new(required, default, variadic))
     }
     
     /*
@@ -884,7 +916,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                     ctx.set_end(&next);
                     
                     if let Token::Identifier(name) = next.token {
-                        items.push(AccessItem::Attribute(self.interner.get_or_intern(name.as_str()).into()));
+                        items.push(AccessItem::Attribute(self.get_str_symbol(name.as_str())));
                     } else {
                         return Err("invalid Identifier".into());
                     }
@@ -969,7 +1001,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             let atom = match next.token {
                 // Identifiers
                 Token::Identifier(name) => {
-                    Atom::Identifier(self.interner.get_or_intern(name.as_str()).into())
+                    Atom::Identifier(self.get_str_symbol(name.as_str()))
                 },
                 
                 // Literals
@@ -980,7 +1012,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
                 Token::FloatLiteral(value)   => Atom::FloatLiteral(value),
                 Token::StringLiteral(value)   => {
-                    Atom::StringLiteral(self.interner.get_or_intern(value.as_str()).into())
+                    Atom::StringLiteral(self.get_str_symbol(value.as_str()))
                 },
                 
                 _ => { 

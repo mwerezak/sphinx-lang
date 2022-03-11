@@ -107,7 +107,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             
             Expr::Block(suite, label) => self.eval_block(suite, label),
             
-            Expr::FunctionDef(signature, body) => unimplemented!(),
+            Expr::FunctionDef(fundef) => unimplemented!(),
         }
     }
 

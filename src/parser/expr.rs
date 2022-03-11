@@ -2,6 +2,7 @@ use crate::debug::symbol::DebugSymbol;
 use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration};
+use crate::parser::fundef::FunctionDef;
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::stmt::{StmtMeta, Stmt, Label};
 
@@ -29,25 +30,9 @@ pub enum Expr {
     
     Block(Vec<StmtMeta>, Option<Label>), // TODO switch these
     
-    FunctionDef(FunSignature, Box<[StmtMeta]>),
+    FunctionDef(FunctionDef),
     
     // ClassDef
-}
-
-// Function Definitions
-use crate::runtime::strings::StringSymbol;
-use crate::parser::assign::DeclType;
-
-#[derive(Debug, Clone)]
-pub struct FunSignature {
-    pub params: Box<[FunParam]>,
-    pub variadic: Option<FunParam>,
-}
-
-#[derive(Debug, Clone)]
-pub struct FunParam {
-    pub name: StringSymbol,
-    pub decl: DeclType,
 }
 
 
