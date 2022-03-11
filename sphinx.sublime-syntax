@@ -1,8 +1,8 @@
 %YAML 1.2
 ---
-name: ReLox
+name: Sphinx
 file_extensions:
-  - [sphinx sph]
+  - sph
 scope: source.sphinx
 
 variables:
@@ -43,7 +43,7 @@ contexts:
     - include: parens
     - include: subscripts
     - include: if-expressions
-    - include: object-initializers
+    - include: object-constructors
 
     # tuple constructor
     - match: \,
@@ -409,14 +409,22 @@ contexts:
       scope: invalid
 
   class-variable-defs:
-    - match: \b(var)\b
+    - match: \b(var|let)\b
       scope: keyword.declaration.other
       push:
-        - meta_content_scope: variable.member
+        - meta_content_scope: variable.parameter
         - include: metamethod-names
+        - match: (?=\b(fun|var|let|init)\b)
+          pop: true
         - match: \=
           scope: keyword.operator.assignment
           pop: true
+        - match: \b(self)\b  # method descriptor syntax
+          scope: variable.language
+        - match: \.
+          scope: punctuation.accessor
+        - include: type_annotation
+
 
   method-defs:
     - match: \b(fun)\b
@@ -428,7 +436,7 @@ contexts:
           scope: punctuation.section.group.begin
           set: function-param-list
 
-  object-initializers:
+  object-constructors:
     - match: \{
       scope: punctuation.section.braces.begin
       push: object-initializer-lvalue
@@ -439,10 +447,10 @@ contexts:
       scope: punctuation.section.braces.end
       pop: true
     - match: '='
-      scope: punctuation.separator
+      scope: keyword.operator.assignment
       set: object-initializer-rvalue
     - match: '{{identifier}}'
-      scope: variable.parameter
+      scope: variable.member
     - include: subscripts
     - include: type_annotation
 

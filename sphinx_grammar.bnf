@@ -77,7 +77,7 @@ block-expression ::= ( label )? "begin" ( statement )* ( control-flow )? "end" ;
 (* right associative *)
 lvalue ::= identifier | primary index-access | primary member-access ;
 
-lvalue-expression ::= lvalue | lvalue-list | "(" lvalue ")" ;   (* basically just lvalues, and tuples of lvalues *)
+lvalue-expression ::= lvalue | lvalue-list | "(" lvalue-expression ")" ;   (* lvalues, tuples of lvalues, and grouped lvalues *)
 lvalue-list ::= lvalue-expression ( "," lvalue-expression )* ;
 
 lvalue-annotated ::= lvalue-expression ( ":" type-expression )? ; 

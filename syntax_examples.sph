@@ -391,7 +391,13 @@ something.field = 1
 something.method()
 
 class Breakfast
+  # declare class-level variables
   var classvar = 0
+  
+  # type annotate possible member variables
+  # unlike function parameters, mutability is the default for object members
+  var self.field          # member named "field" is mutable
+  let self.name: String   # member named "name" is immutable and has type "String"
 
   # functions whose first parameter is the "self" symbol
   # are automatically converted into builtin method descripter objects
@@ -407,10 +413,14 @@ class Breakfast
   var serve = fun(self, who)
     echo "Enjoy your breakfast, " + who + "."
   end
+  
+  # use classmethods to define constructor functions
+  fun new(name)
+    return Breakfast { field = 1, name = "Eggs and Bacon" }
+  end
 end
 
-# and even when created outside of a class body.
-# descripters are passed the owning class (and instance, if relevant) when the __get() metamethod is invoked
+# Maybe. TBD
 Breakfast.cook = fun(self)
   echo "Eggs a-fryin'!"
 end
