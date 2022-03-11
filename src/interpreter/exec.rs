@@ -1,8 +1,8 @@
 use crate::parser::stmt::{StmtMeta, Stmt};
-use crate::runtime::{Environment, Variant};
+use crate::runtime::Variant;
 use crate::runtime::errors::{ExecResult, RuntimeError};
 
-use crate::interpreter::{ControlFlow, EvalContext};
+use crate::interpreter::{ControlFlow, EvalContext, Environment};
 use crate::interpreter::eval::{try_value, EvalResult};
 
 

@@ -6,16 +6,17 @@ use log;
 
 use clap::{Command, Arg};
 
-
 use sphinx_lang::source::{ModuleSource, SourceType, ParseContext};
 use sphinx_lang::frontend::render_parser_error;
 use sphinx_lang::debug::symbol::DebugSymbolResolver;
+
 use sphinx_lang::language;
-use sphinx_lang::interpreter::{EvalContext, ExecContext};
 use sphinx_lang::lexer::LexerBuilder;
 use sphinx_lang::parser::stmt::{Stmt};
-use sphinx_lang::runtime::*;
+
 use sphinx_lang::runtime::string_table::StringTableGuard;
+use sphinx_lang::interpreter::*;
+use sphinx_lang::interpreter::{EvalContext, ExecContext};
 
 
 fn main() {
