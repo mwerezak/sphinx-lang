@@ -40,14 +40,14 @@ use crate::parser::assign::DeclType;
 
 #[derive(Debug, Clone)]
 pub struct FunSignature {
-    params: Box<[FunParam]>,
-    variadic: Option<FunParam>,
+    pub params: Box<[FunParam]>,
+    pub variadic: Option<FunParam>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FunParam {
-    name: StringSymbol,
-    decl: DeclType,
+    pub name: StringSymbol,
+    pub decl: DeclType,
 }
 
 

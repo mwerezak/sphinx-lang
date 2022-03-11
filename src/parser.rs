@@ -7,6 +7,7 @@ use crate::lexer::{TokenMeta, Token, TokenIndex, LexerError};
 use crate::runtime::string_table::StringTableInternal;
 
 use expr::{ExprMeta, Expr};
+use expr::{FunSignature, FunParam};
 use stmt::{StmtMeta, Stmt, Label};
 use primary::{Primary, Atom, AccessItem};
 use assign::{Assignment, LValue, Declaration, DeclType};
@@ -702,10 +703,10 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         let name = 
             if !matches!(next.token, Token::OpenParen) {
                 let primary = self.parse_primary(ctx)
-                    .map_err(|_| ErrorPrototype::from("invalid function name or function assignment target"))?;
+                    .map_err(|_| ErrorPrototype::from("cannot assign a function to this"))?;
                     
                 let lvalue = LValue::try_from(primary)
-                    .map_err(|_| ErrorPrototype::from("invalid function name or function assignment target"))?;
+                    .map_err(|_| ErrorPrototype::from("cannot assign a function to this"))?;
                 
                 Some(lvalue)
             
@@ -715,12 +716,107 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         let next = self.advance().unwrap();
         ctx.set_end(&next);
         
+        // function parameter list
+        
         if !matches!(next.token, Token::OpenParen) {
-            
+            return Err("missing opening '(' before parameter list".into());
         }
         
+        let signature = self.parse_function_param_list(ctx)?;
         
-        unimplemented!()
+        let next = self.advance()?;
+        if !matches!(next.token, Token::CloseParen) {
+            return Err("missing closing ')' after parameter list".into());
+        }
+        
+        // function body
+        
+        let body = self.parse_statement_list(ctx)?;
+        
+        let function_def = Expr::FunctionDef(signature, body.into_boxed_slice());
+        
+        // SYNTACTIC SUGAR: fun name(..) => let name = fun(..)
+        if let Some(lvalue) = name {
+            let function_decl = Declaration {
+                decl: DeclType::Immutable,
+                lhs: lvalue,
+                init: function_def,
+            };
+            
+            Ok(Expr::Declaration(Box::new(function_decl)))
+        } else {
+            
+            Ok(function_def)
+        }
+    }
+    
+    fn parse_function_param_list(&mut self, ctx: &mut ErrorContext) -> InternalResult<FunSignature> {
+
+        let mut params = Vec::new();
+        let mut variadic = None;
+
+        loop {
+            let next = self.peek()?;
+            
+            if matches!(next.token, Token::CloseParen) {
+                break;
+            }
+            
+            ctx.push(ContextTag::FunParam);
+            ctx.set_start(&next);
+            
+            // mutability modifier
+            
+            let decl = match next.token {
+                Token::Var => Some(DeclType::Mutable),
+                Token::Let => Some(DeclType::Immutable),
+                Token::Identifier(..) => None,
+                _ => return Err("invalid parameter".into()),
+            };
+            
+            if decl.is_some() {
+                ctx.set_end(&self.advance().unwrap());
+            }
+            
+            let decl = decl.unwrap_or(DeclType::Immutable);
+            
+            // name
+            
+            let next = self.advance()?;
+            ctx.set_end(&next);
+            
+            let name = 
+                if let Token::Identifier(name) = next.token { name }
+                else { return Err("invalid parameter".into()); };
+            
+            let name = self.interner.get_or_intern(name.as_str()).into();
+            let param = FunParam { name, decl };
+            
+            // possibly variadic
+            
+            let next = self.peek()?;
+            match next.token {
+                // variadic parameter
+                Token::Ellipsis => {
+                    ctx.set_end(&self.advance().unwrap());
+                    
+                    variadic.replace(param);
+                    
+                    if !matches!(self.peek()?.token, Token::CloseParen) {
+                        return Err("a variadic parameter must be the last one in the parameter list".into());
+                    }
+                },
+                
+                // normal parameter
+                Token::Comma | Token::CloseParen => params.push(param),
+                
+                _ => return Err("invalid parameter".into()),
+            }
+            
+            ctx.pop_extend();
+        }
+        
+        Ok(FunSignature { params: params.into_boxed_slice(), variadic })
     }
     
     /*
