@@ -654,7 +654,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
     fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
         let expr = match self.peek()?.token {
             Token::Class => unimplemented!(),
-            Token::Fun => unimplemented!(),
+            Token::Fun => self.parse_function_def(ctx)?,
             Token::If => unimplemented!(),
             Token::Begin | Token::Label(..) => self.parse_block_expr(ctx)?,
             
@@ -682,9 +682,20 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             return Err("block labels must be followed by either a block or a loop".into());
         }
         
-        let suite = self.parse_statement_list(ctx)?;
+        let mut suite = self.parse_statement_list(ctx)?;
         
-        // TODO syntatic sugar: if the last statement is an expression statement, it implicitly becomes a "break <expr>"
+        // SYNTACTIC SUGAR: convert expression statement at end of block into "break <expr>"
+        if let Some(Stmt::Expression(..)) = suite.last().map(|stmt| stmt.variant()) {
+            let (stmt, symbol) = suite.pop().unwrap().take();
+            
+            let expr = match stmt {
+                Stmt::Expression(expr) => expr,
+                _ => unreachable!(),
+            };
+            
+            let break_stmt = StmtMeta::new(Stmt::Break(None, Some(expr)), symbol);
+            suite.push(break_stmt);
+        }
         
         ctx.pop_extend();
         Ok(Expr::Block(suite, block_label))
