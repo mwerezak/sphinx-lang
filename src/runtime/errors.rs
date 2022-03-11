@@ -13,6 +13,8 @@ pub enum RuntimeErrorKind {
     OverflowError,
     NegativeShiftCount,
     NameNotDefined(String),
+    NameNotDefinedLocal(String),
+    CantAssignImmutable,
     UnhashableType,
     Other,
 }

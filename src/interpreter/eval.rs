@@ -4,7 +4,7 @@
 use crate::parser::expr::{ExprMeta, Expr};
 use crate::parser::stmt::{StmtMeta, Label};
 use crate::parser::primary::{Primary, Atom};
-use crate::parser::assign::{Declaration, Assignment, LValue};
+use crate::parser::assign::{Declaration, Assignment, LValue, DeclType};
 
 use crate::runtime::Variant;
 use crate::runtime::strings::StringValue;
@@ -12,7 +12,7 @@ use crate::runtime::ops::*;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
-use crate::interpreter::{ControlFlow, ExecContext, Environment};
+use crate::interpreter::{ControlFlow, ExecContext, Environment, Access};
 
 
 // evaluation can be interrupted by a control flow statement inside a block expression
@@ -69,22 +69,6 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
     
     pub fn eval(&self, expr: &ExprMeta) -> ExecResult<EvalResult> {
         self.eval_expr(expr.variant())
-    }
-    
-    fn find_value(&self, name: &StringValue) -> ExecResult<Variant> {
-        self.local_env.find_value(name)
-            .ok_or_else(|| {
-                let name = name.as_str(self.local_env.string_table()).to_string();
-                ErrorKind::NameNotDefined(name).into()
-            })
-    }
-    
-    fn find_env(&'a self, name: &StringValue) -> ExecResult<&'a Environment<'r, 's>> {
-        self.local_env.find_name(name)
-            .ok_or_else(|| {
-                let name = name.as_str(self.local_env.string_table()).to_string();
-                ErrorKind::NameNotDefined(name).into()
-            })
     }
     
     pub fn eval_expr(&self, expr: &Expr) -> ExecResult<EvalResult> {
@@ -162,7 +146,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             Atom::FloatLiteral(value) => Variant::Float(*value),
             Atom::StringLiteral(sym) => Variant::String((*sym).into()),
             
-            Atom::Identifier(name) => self.find_value(&StringValue::from(*name))?,
+            Atom::Identifier(name) => self.local_env.lookup(&StringValue::from(*name))?,
             
             Atom::Self_ => unimplemented!(),
             Atom::Super => unimplemented!(),
@@ -266,16 +250,17 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
     fn eval_assignment(&self, assignment: &Assignment) -> ExecResult<EvalResult> {
         if let LValue::Identifier(name) = assignment.lhs {
             let name = StringValue::from(name);
-            let store_env = self.find_env(&name)?;
             
-            let lhs_value = store_env.lookup_value(&name).unwrap();
+            // make sure we evaluate rhs *before* borrowing lhs
             let mut rhs_value = try_value!(self.eval_expr(&assignment.rhs)?);
+            let mut lhs_value = self.local_env.lookup_mut(&name)?;
             
             if let Some(op) = assignment.op {
                 rhs_value = self.eval_binary_op_values(op, &lhs_value, &rhs_value)?;
             }
             
-            store_env.insert_value(&name, &rhs_value);
+            *lhs_value = rhs_value.clone();
+            
             Ok(rhs_value.into())
         } else {
             unimplemented!()
@@ -286,8 +271,16 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         
         if let LValue::Identifier(name) = declaration.lhs {
             let name = StringValue::from(name);
+            
+            let access = match declaration.decl {
+                DeclType::Immutable => Access::ReadOnly,
+                DeclType::Mutable => Access::ReadWrite,
+            };
+
             let init_value = try_value!(self.eval_expr(&declaration.init)?);
-            self.local_env.insert_value(&name, &init_value);
+            
+            self.local_env.create(&name, access, init_value.clone())?;
+            
             Ok(init_value.into())
         } else {
             unimplemented!()
