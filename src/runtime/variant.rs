@@ -17,7 +17,7 @@ pub enum Variant {
     Integer(IntType),
     Float(FloatType),
     String(StringValue),
-    //Tuple(GCHandle),
+    //Tuple(Tuple),
     //Object(GCHandle),
 }
 
@@ -31,23 +31,24 @@ impl Variant {
     // Note, bit_value() and float_value() are defined based on what is needed for the language *implementation*
     // They do not reflect the semantics of the Sphinx language
     
-    pub fn bit_value(&self) -> IntType {
-        match self {
+    pub fn bit_value(&self) -> Option<IntType> {
+        let value = match self {
             Self::Integer(value) => *value,
             Self::BoolFalse => 0, // all 0s
             Self::BoolTrue => !0, // all 1s
-            _ => panic!("bit_value() valid only for integers and booleans"),
-        }
+            _ => return None,
+        };
+        Some(value)
     }
     
-    pub fn float_value(&self) -> FloatType {
-        match self {
+    pub fn float_value(&self) -> Option<FloatType> {
+        let value = match self {
             // it's okay if this is a lossy conversion
             Self::Integer(value) => (*value) as FloatType,
             Self::Float(value) => *value,
-            
-            _ => panic!("float_value() valid only for numeric primitives"),
-        }
+            _ => return None,
+        };
+        Some(value)
     }
     
     pub fn into_key<'s>(self, string_table: &'s StringTable) -> ExecResult<VariantKey<'s>> {

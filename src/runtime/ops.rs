@@ -83,7 +83,7 @@ pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> Option<bool> {
             => Some(*lhs_value == *rhs_value),
         
         (_, _) if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) 
-            => Some(lhs.float_value() == rhs.float_value()),
+            => Some(lhs.float_value().unwrap() == rhs.float_value().unwrap()),
         
 
         _ => None,
@@ -113,7 +113,9 @@ macro_rules! eval_binary_arithmetic {
         pub fn $name (lhs: &Variant, rhs: &Variant) -> ExecResult<Option<Variant>> {
             let value = match (lhs, rhs) {
                 (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => $int_name (*lhs_value, *rhs_value)?,
-                _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) => $float_name (lhs.float_value(), rhs.float_value())?,
+                _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) 
+                    => $float_name (lhs.float_value().unwrap(), rhs.float_value().unwrap())?,
+                
                 _ => return Ok(None),
             };
             Ok(Some(value))
@@ -160,7 +162,9 @@ macro_rules! eval_binary_comparison {
         pub fn $name (lhs: &Variant, rhs: &Variant) -> Option<bool> {
             let value = match (lhs, rhs) {
                 (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => $int_name (*lhs_value, *rhs_value),
-                _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) => $float_name (lhs.float_value(), rhs.float_value()),
+                _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) 
+                    => $float_name (lhs.float_value().unwrap(), rhs.float_value().unwrap()),
+                
                 _ => return None,
             };
             Some(value)
@@ -199,7 +203,9 @@ macro_rules! eval_binary_bitwise {
                 (Variant::BoolTrue, Variant::BoolFalse) => $bool_name (true, false),
                 (Variant::BoolFalse, Variant::BoolTrue) => $bool_name (false, true),
                 (Variant::BoolFalse, Variant::BoolFalse) => $bool_name (false, false),
-                _ if is_bitwise_primitive(lhs) && is_bitwise_primitive(rhs) => $int_name (lhs.bit_value(), rhs.bit_value()),
+                _ if is_bitwise_primitive(lhs) && is_bitwise_primitive(rhs) 
+                    => $int_name (lhs.bit_value().unwrap(), rhs.bit_value().unwrap()),
+                
                 _ => return None,
             };
             Some(value)
@@ -230,8 +236,8 @@ macro_rules! eval_binary_shift {
         #[inline]
         pub fn $name (lhs: &Variant, rhs: &Variant) -> ExecResult<Option<Variant>> {
             let value = match (lhs, rhs) {
-                (_, Variant::Integer(shift)) if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), *shift)?,
-                (_, Variant::BoolTrue)  if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value(), 1)?,
+                (_, Variant::Integer(shift)) if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value().unwrap(), *shift)?,
+                (_, Variant::BoolTrue)  if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value().unwrap(), 1)?,
                 (_, Variant::BoolFalse) if is_bitwise_primitive(lhs) => lhs.clone(), // no-op, just copy the value to output
                 _ => return Ok(None),
             };
