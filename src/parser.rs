@@ -62,12 +62,6 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
     /// for debugging
     fn current_index(&mut self) -> TokenIndex { self.peek().unwrap().span.index }
     
-    /// Helper for methods that can't eagerly return with an error but must collect them into a sequence to return later
-    fn append_errors(&mut self, errors: impl Iterator<Item=ErrorPrototype>) -> Option<ErrorPrototype> {
-        self.errors.extend(errors);
-        self.errors.pop_front()
-    }
-    
     fn get_str_symbol(&mut self, string: &str) -> StringSymbol {
         self.interner.get_or_intern(string)
     }
@@ -136,8 +130,10 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 debug!("parser: {:?}", stmt); 
                 Ok(stmt)
             },
-            Err(err) => {
-                let error = Self::process_error(ctx, err);
+            Err(error) => {
+                self.errors.push_back(error);
+                let error = self.errors.pop_front().unwrap();
+                let error = Self::process_error(ctx, error);
                 
                 self.synchronize_stmt(false);
                 
@@ -160,9 +156,20 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         error
     }
     
+    fn catch_error_and_sync<T>(&mut self, ctx: &ErrorContext, result: InternalResult<T>, inside_block: bool) -> Option<T> {
+        result.map_or_else(
+            |error| {
+                self.errors.push_back(error.with_symbol_from_ctx(&ctx));
+                self.synchronize_stmt(inside_block);
+                None
+            },
+            |value| Some(value)
+        )
+    }
+    
     // If we hit an error we need to synchronize back to a likely-valid state before we continue parsing again
     // To do this, just keep discarding tokens until we think we're at the start of a new statement
-    fn synchronize_stmt(&mut self, expect_end: bool) {
+    fn synchronize_stmt(&mut self, inside_block: bool) {
         // Check for either: a token that only appears at the start of a new statement
         // OR try to parse an expression. If we can do it without errors, assume we're in a good state. The expression can be discarded.
         debug!("sync to next stmt...");
@@ -188,7 +195,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 Token::Echo 
                     => break,
                 
-                Token::End if expect_end => break,
+                Token::End if inside_block => break,
                 
                 _ => if self.parse_expr_variant(&mut ctx).is_ok() {
                     break;
@@ -255,7 +262,6 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         ctx.push(ContextTag::StmtList);
         
         let mut suite = Vec::new();
-        let mut errors = Vec::new();
         
         debug!("enter stmt list at index {}...", self.current_index());
         
@@ -266,16 +272,10 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 break;
             }
             
-            let control_stmt = match self.try_parse_control_flow_stmt(ctx) {
-                Ok(stmt) => stmt,
-                // Err(error) if matches!(error.kind(), ErrorKind::EndofTokenStream) => {
-                //     break;
-                // }
-                Err(error) => {
-                    errors.push(error.with_symbol_from_ctx(&ctx));
-                    self.synchronize_stmt(true);
-                    continue;
-                }
+            let control_stmt = self.try_parse_control_flow_stmt(ctx);
+            let control_stmt = match self.catch_error_and_sync(ctx, control_stmt, true) {
+                Some(stmt) => stmt,
+                None => continue,
             };
             
             if let Some(control) = control_stmt {
@@ -296,7 +296,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                     let error = ErrorPrototype::from(ErrorKind::SyntaxError(message.into()))
                         .with_symbol_from_ctx(&ctx);
                     
-                    errors.push(error);
+                    self.errors.push_back(error);
                 
                 } else{
                     suite.push(control);
@@ -305,13 +305,10 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 break;
             }
             
-            let stmt = match self.parse_stmt(ctx) {
-                Ok(stmt) => stmt,
-                Err(error) => {
-                    errors.push(error.with_symbol_from_ctx(&ctx));
-                    self.synchronize_stmt(true);
-                    continue;
-                }
+            let stmt = self.parse_stmt(ctx);
+            let stmt = match self.catch_error_and_sync(ctx, stmt, true) {
+                Some(stmt) => stmt,
+                None => continue,
             };
             
             suite.push(stmt);
@@ -320,10 +317,6 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         ctx.set_end(&self.advance().unwrap());
         
         debug!("exit stmt list at {}...", self.current_index());
-        
-        if !errors.is_empty() {
-            return Err(self.append_errors(errors.into_iter()).unwrap());
-        }
         
         ctx.pop_extend();
         Ok(suite)

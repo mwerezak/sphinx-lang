@@ -21,7 +21,7 @@ pub enum Expr {
     Assignment(Box<Assignment>), // box the whole Assignment (instead of just lhs Expr) to keep size of ExprMeta down
     
     Declaration(Box<Declaration>),
-
+    
     Tuple(Box<[ExprMeta]>),
     
     ObjectCtor(Box<ObjectConstructor>),
