@@ -253,7 +253,25 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             
             // make sure we evaluate rhs *before* borrowing lhs
             let mut rhs_value = try_value!(self.eval_expr(&assignment.rhs)?);
-            let mut lhs_value = self.local_env.lookup_mut(&name)?;
+            
+            let mut lhs_value;
+            
+            if assignment.global {
+                lhs_value = self.local_env.lookup_mut(&name)?;
+                
+            } else {
+                let lookup_result = self.local_env.lookup_local_mut(&name);
+                
+                // produce a different error if the name isn't defined locally but *is* defined in some enclosing scope
+                match lookup_result {
+                    Err(error) if matches!(error.kind(), ErrorKind::NameNotDefinedLocal(..)) => {
+                        self.local_env.lookup(&name)?; // see if the name is defined at all
+                        return Err(ErrorKind::CantAssignNonLocal.into());
+                    }
+                    _ => lhs_value = lookup_result?,
+                }
+                
+            }
             
             if let Some(op) = assignment.op {
                 rhs_value = self.eval_binary_op_values(op, &lhs_value, &rhs_value)?;

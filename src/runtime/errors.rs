@@ -15,6 +15,7 @@ pub enum RuntimeErrorKind {
     NameNotDefined(String),
     NameNotDefinedLocal(String),
     CantAssignImmutable,
+    CantAssignNonLocal,  // can't assign to a non-local variable without the "global" keyword
     UnhashableType,
     Other,
 }
@@ -39,6 +40,8 @@ impl RuntimeError {
     pub fn caused_by(mut self, cause: impl Error + 'static) -> Self {
         self.cause = Some(Box::new(cause)); self
     }
+    
+    pub fn kind(&self) -> &RuntimeErrorKind { &self.kind }
 }
 
 impl Error for RuntimeError {

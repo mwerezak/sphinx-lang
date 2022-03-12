@@ -120,7 +120,7 @@ impl<'r, 's> Environment<'r, 's> {
             .ok_or_else(|| ErrorKind::NameNotDefinedLocal(name_key.to_string()).into())
     }
     
-    pub fn lookup_mut<'a>(&'a self, name: &StringValue) -> ExecResult<impl DerefMut<Target=Variant> + 'a> {
+    pub fn lookup_mut(&self, name: &StringValue) -> ExecResult<RefMut<Variant>> {
         let name_key = StringKey::new(name.clone(), self.string_table);
         
         let variable = self.find_mut(&name_key)
@@ -133,7 +133,7 @@ impl<'r, 's> Environment<'r, 's> {
         Ok(RefMut::map(variable, |var| &mut var.value))
     }
     
-    pub fn lookup_local_mut<'a>(&'a self, name: &StringValue) -> ExecResult<impl DerefMut<Target=Variant> + 'a> {
+    pub fn lookup_local_mut(&self, name: &StringValue) -> ExecResult<RefMut<Variant>> {
         let name_key = StringKey::new(name.clone(), self.string_table);
         
         let variable = self.get_mut(&name_key)
@@ -173,7 +173,7 @@ impl<'r, 's> Environment<'r, 's> {
             if value.is_some() {
                 return value;
             }
-            next_env = self.parent;
+            next_env = env.parent;
         }
         None
     }
@@ -185,7 +185,7 @@ impl<'r, 's> Environment<'r, 's> {
             if value.is_some() {
                 return value;
             }
-            next_env = self.parent;
+            next_env = env.parent;
         }
         None
     }
