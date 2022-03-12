@@ -1,202 +1,106 @@
 use std::fmt;
-use std::rc::Rc;
-use std::cell::Ref;
-use std::ops::Deref;
-use std::hash::{Hash, Hasher, BuildHasher};
+use std::cmp;
+use std::sync::RwLock;
+use string_interner::{self, DefaultBackend, DefaultSymbol};
+use string_interner::symbol::Symbol;
 
-mod inline;
-
-pub mod string_table;
-pub use string_table::StringSymbol;
-use string_table::StringTable;
+use crate::runtime::DefaultBuildHasher;
 
 
+// Interned Strings
+pub type InternSymbol = DefaultSymbol;
+pub type InternBackend = DefaultBackend<DefaultSymbol>;
+pub type StringInterner = string_interner::StringInterner<InternBackend, DefaultBuildHasher>;
 
-/// Provides support for `StringValue::as_str()` and `StringKey::as_str()`
-enum StrRef<'a> {
-    Slice(&'a str),
-    Ref(Ref<'a, str>),
-}
 
-impl Deref for StrRef<'_> {
-    type Target = str;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StringSymbol(InternSymbol);
+
+impl StringSymbol {
+    fn to_usize(&self) -> usize {
+        self.0.to_usize()
+    }
     
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Slice(string) => string,
-            Self::Ref(str_ref) => str_ref,
-        }
+    pub fn as_str(&self) -> &str {
+        // STRING_TABLE.read().unwrap().resolve(self).unwrap()
+        unimplemented!()
     }
 }
 
-
-/// Enum over the different string representations.
-/// `StringValue` is fairly opaque. That's because if we have an interned string, there aren't many operations
-/// we can actually do without having a reference to the `StringTable`. If you do have such a reference, you can
-/// either use `StringValue::as_ref()` or do a cheap conversion to `StringKey` which will get you the ability 
-/// to hash, compare, or even just check the length of the string.
-
-const INLINE_SIZE: usize = 22;
-pub type InlineStr = inline::InlineStr<INLINE_SIZE>;
-
-#[derive(Debug, Clone)]
-pub enum StringValue {
-    Intern(StringSymbol),
-    Inline(InlineStr),
-    CowRc(Rc<str>),
+impl From<StringSymbol> for InternSymbol {
+    fn from(intern: StringSymbol) -> Self {
+        intern.0
+    }
 }
 
-impl From<StringSymbol> for StringValue {
-    #[inline]
-    fn from(sym: StringSymbol) -> Self { Self::Intern(sym) }
+impl From<InternSymbol> for StringSymbol {
+    fn from(symbol: InternSymbol) -> Self {
+        Self(symbol)
+    }
 }
 
-impl From<InlineStr> for StringValue {
-    #[inline]
-    fn from(in_str: InlineStr) -> Self { Self::Inline(in_str) }
-}
-
-impl From<&str> for StringValue {
-    #[inline]
+impl From<&str> for StringSymbol {
     fn from(string: &str) -> Self {
-        // first, try inlining
-        InlineStr::try_new(string).map_or_else(
-            |string| StringValue::CowRc(Rc::from(string)),
-            |inline| StringValue::Inline(inline),
-        )
-    }
-}
-
-impl StringValue {
-    pub fn as_str<'a, 's>(&'a self, string_table: &'s StringTable) -> impl Deref<Target=str> + 'a where 's: 'a {
-        match self {
-            Self::Inline(in_str) => StrRef::Slice(in_str),
-            Self::CowRc(rc_str) => StrRef::Slice(rc_str),
-            Self::Intern(sym) => StrRef::Ref(string_table.resolve(*sym)),
-        }
-    }
-    
-    #[inline]
-    pub fn into_key<'s>(self, string_table: &'s StringTable) -> StringKey<'s> {
-        StringKey::new(self, string_table)
-    }
-    
-    // Performs a comparison if it is possible to do so without a string table
-    pub fn try_eq(&self, other: &StringValue) -> Option<bool> {
-        let value = match (self, other) {
-            (Self::Intern(sym_a), Self::Intern(sym_b)) => sym_a == sym_b,
-            
-            (Self::Inline(in_a), Self::Inline(in_b)) => in_a.deref() == in_b.deref(),
-            (Self::CowRc(rc_a), Self::CowRc(rc_b)) => **rc_a == **rc_b,
-            
-            (Self::CowRc(rc_str), Self::Inline(in_str)) 
-            | (Self::Inline(in_str), Self::CowRc(rc_str)) => **rc_str == *in_str.deref(),
-            
-            _ => return None,
-        };
-        Some(value)
-    }
-    
-}
-
-
-// For use with VariantKey
-
-#[derive(Debug, Clone)]
-pub enum StringKey<'s> {
-    Intern(StringSymbol, &'s StringTable),
-    Inline(InlineStr, u64),
-    CowRc(Rc<str>, u64),
-}
-
-
-impl<'s> StringKey<'s> {
-    
-    /// A reference to the string table is required because we need to compute a hash specifically
-    /// using it's hasher in order to produce hashes compatible with interned strings
-    #[inline]
-    pub fn new(value: StringValue, string_table: &'s StringTable) -> Self {
-        match value {
-            StringValue::Intern(sym) => Self::Intern(sym, string_table),
-            
-            // For hash consistency with interned strings, we need to cache a hash produced by the string table
-            StringValue::Inline(in_str) => {
-                let hash = string_table.make_hash(&in_str);
-                Self::Inline(in_str, hash)
-            },
-            StringValue::CowRc(rc_str) => {
-                let hash = string_table.make_hash(&rc_str);
-                Self::CowRc(rc_str, hash)
-            },
-        }
-    }
-    
-    pub fn as_str<'a>(&'a self) -> impl Deref<Target=str> + 'a where 's: 'a {
-        match self {
-            Self::Inline(in_str, _) => StrRef::Slice(in_str),
-            Self::CowRc(rc_str, _) => StrRef::Slice(rc_str),
-            Self::Intern(sym, string_table) => StrRef::Ref(string_table.resolve(*sym)),
+        match STRING_TABLE.read().unwrap().get(string) {
+            Some(sym) => sym,
+            None => STRING_TABLE.write().unwrap().get_or_intern(string),
         }
     }
 }
 
-impl Hash for StringKey<'_> {
-    fn hash<H>(&self, state: &mut H) where H: Hasher {
-        match self {
-            Self::Inline(_, hash) => hash.hash(state),
-            Self::CowRc(_, hash) => hash.hash(state),
-            
-            Self::Intern(sym, string_table) => {
-                let hash = string_table.resolve_hash(*sym).unwrap();
-                hash.hash(state);
-            },
-        }
+// Lexicographical ordering of strings
+impl PartialOrd for StringSymbol {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        <str as PartialOrd>::partial_cmp(self.as_str(), other.as_str())
     }
 }
 
-impl Eq for StringKey<'_> { }
-
-impl PartialEq for StringKey<'_> {
-    #[inline]
-    fn eq(&self, other: &StringKey<'_>) -> bool {
-        let self_str = &self.as_str() as &str;
-        let other_str = &other.as_str() as &str;
-        self_str == other_str
+impl Ord for StringSymbol {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        <str as Ord>::cmp(self.as_str(), other.as_str())
     }
 }
 
-// TODO impl PartialOrd, Ord for StringKey
-impl PartialOrd for StringKey<'_> {
-    fn partial_cmp(&self, other: &StringKey<'_>) -> Option<std::cmp::Ordering> {
-        let self_str = &self.as_str() as &str;
-        let other_str = &other.as_str() as &str;
-        <&str as PartialOrd>::partial_cmp(&self_str, &other_str)
-    }
-}
-
-impl Ord for StringKey<'_> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let self_str = &self.as_str() as &str;
-        let other_str = &other.as_str() as &str;
-        <&str as Ord>::cmp(&self_str, &other_str)
-    }
-}
-
-
-impl fmt::Display for StringKey<'_> {
+impl fmt::Display for StringSymbol {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.write_str(&self.as_str())
+        fmt.write_str(self.as_str())
     }
 }
 
-impl From<StringKey<'_>> for StringValue {
-    #[inline]
-    fn from(strkey: StringKey<'_>) -> Self {
-        match strkey {
-            StringKey::Intern(sym, _) => Self::Intern(sym),
-            StringKey::Inline(in_str, _) => Self::Inline(in_str),
-            StringKey::CowRc(rc_str, _) => Self::CowRc(rc_str),
+
+
+// Just use a global string table, the alternative (an explosion of pointless lifetime parameters
+// for something that is going to live for the entire duration of the program anyways) is much worse
+
+
+lazy_static! {
+    pub static ref STRING_TABLE: RwLock<StringTable> = RwLock::new(StringTable::new());
+}
+
+
+#[derive(Debug)]
+pub struct StringTable {
+    interner: StringInterner,
+}
+
+impl StringTable {
+    pub fn new() -> Self {
+        StringTable {
+            interner: StringInterner::new(),
         }
     }
+    
+    pub fn get(&self, string: &str) -> Option<StringSymbol> {
+        self.interner.get(string).map(|symbol| symbol.into())
+    }
+    
+    pub fn get_or_intern(&mut self, string: &str) -> StringSymbol {
+        self.interner.get_or_intern(string).into();
+    }
+    
+    pub fn resolve(&self, sym: impl Into<StringSymbol>) -> Option<&str> {
+        self.interner.resolve(sym.into())
+    }
 }
+

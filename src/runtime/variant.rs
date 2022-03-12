@@ -3,9 +3,8 @@ use std::rc::Rc;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::strings::{StringValue, StringKey};
-use crate::runtime::string_table::StringTable;
-use crate::runtime::errors::{ExecResult, RuntimeErrorKind as ErrorKind};
+use crate::runtime::strings::StringSymbol;
+use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
 // Fundamental data value type
@@ -17,7 +16,7 @@ pub enum Variant {
     BoolFalse,
     Integer(IntType),
     Float(FloatType),
-    String(StringValue),
+    String(StringSymbol),
     Tuple(Rc<[Variant]>),  // will use COW semantics, so if we need to send to another thread we can just clone the underlying data
     //Object(GCHandle),
 }
@@ -52,16 +51,18 @@ impl Variant {
         Some(value)
     }
     
-    pub fn into_key<'s>(self, string_table: &'s StringTable) -> ExecResult<VariantKey<'s>> {
-        VariantKey::new(self, string_table)
-    }
-    
-    pub fn as_display<'a, 's>(&'a self, string_table: &'s StringTable) -> impl fmt::Display + 'a where 's: 'a {
-        ReprDisplay(self, string_table)
-    }
-    
     pub fn make_tuple(items: Box<[Variant]>) -> Self {
         Self::Tuple(Rc::from(items))
+    }
+    
+    pub fn can_hash(&self) -> bool {
+        match self {
+            Self::Float(..) => false,
+            Self::Tuple(items) => items.iter().all(|item| item.can_hash()),
+            // TODO Objects - check metatabale for __hash
+            _ => true
+        }
+        
     }
 }
 
@@ -82,119 +83,82 @@ impl From<FloatType> for Variant {
     fn from(value: FloatType) -> Self { Variant::Float(value) }
 }
 
-impl From<StringValue> for Variant {
-    fn from(strval: StringValue) -> Self { Variant::String(strval) }
+impl From<StringSymbol> for Variant {
+    fn from(value: StringSymbol) -> Self { Variant::String(value) }
 }
 
 
-
-// Wrapper type for use as keys in VariantMap
+// Not all Variants are hashable, so there is a separate type to handle that
 
 #[derive(Debug, Clone)]
-pub enum VariantKey<'s> {
-    Nil,
-    EmptyTuple, // the empty tuple value
-    BoolTrue,
-    BoolFalse,
-    Integer(IntType),
-    String(StringKey<'s>),
-    Tuple(Rc<[VariantKey<'s>]>),
-    // Object(u64, GCHandle), // use user-defined hash and equality
+pub struct VariantKey<'a>(&'a Variant);
+
+impl TryFrom<Variant> for VariantKey<'_> {
+    type Error = RuntimeError;
+    fn try_from(value: Variant) -> ExecResult<Self> {
+        if !value.can_hash() {
+            return Err(ErrorKind::UnhashableType.into());
+        }
+        Ok(Self(&value))
+    }
 }
 
-impl<'s> VariantKey<'s> {
-    pub fn new(value: Variant, string_table: &'s StringTable) -> ExecResult<Self> {
-        let key = match value {
-            Variant::Nil => Self::Nil,
-            Variant::EmptyTuple => Self::EmptyTuple,
-            Variant::BoolTrue => Self::BoolTrue,
-            Variant::BoolFalse => Self::BoolFalse,
-            
-            Variant::Integer(value) => Self::Integer(value),
-            Variant::String(strval) => Self::String(StringKey::new(strval, string_table)),
-            
-            // floats are unhashable - maybe implement a special numeric hash like Python does in the future?
-            Variant::Float(..) => return Err(ErrorKind::UnhashableType.into()),
-            
-            Variant::Tuple(items) => {
-                let mut keys = Vec::with_capacity(items.len());
-                for item in items.iter() {
-                    keys.push(VariantKey::new(item.clone(), string_table)?);
-                }
-                Self::Tuple(Rc::from(keys.into_boxed_slice()))
-            }
-            
-            // Object - check if __hash is available
-        };
-        Ok(key)
-    }
+impl From<VariantKey<'_>> for Variant {
+    fn from(key: VariantKey) -> Self { *key.0 }
 }
 
 impl Hash for VariantKey<'_> {
     fn hash<H>(&self, state: &mut H) where H: Hasher {
+        debug_assert!(self.0.can_hash());
+        
         let discriminant = std::mem::discriminant(self);
         discriminant.hash(state);
         
-        match self {
-            Self::Integer(value) => value.hash(state),
-            Self::String(strkey) => strkey.hash(state),
+        match self.0 {
+            Variant::Integer(value) => value.hash(state),
+            Variant::String(strkey) => strkey.hash(state),
+            // TODO objects - get the result of __hash and hash it
             _ => { }
         }
     }
 }
 
-impl Eq for VariantKey<'_> { }
-
-impl<'s> PartialEq for VariantKey<'s> {
-    fn eq(&self, other: &VariantKey<'s>) -> bool {
-        match (self, other) {
-            (Self::Nil, Self::Nil) => true,
-            (Self::EmptyTuple, Self::EmptyTuple) => true,
-            (Self::BoolTrue, Self::BoolTrue) => true,
-            (Self::BoolFalse, Self::BoolFalse) => true,
+impl<'s> PartialEq for VariantKey<'_> {
+    fn eq(&self, other: &VariantKey) -> bool {
+        match (self.0, other.0) {
+            (Variant::Nil, Variant::Nil) => true,
+            (Variant::EmptyTuple, Variant::EmptyTuple) => true,
+            (Variant::BoolTrue, Variant::BoolTrue) => true,
+            (Variant::BoolFalse, Variant::BoolFalse) => true,
             
-            (Self::Integer(self_value), Self::Integer(other_value)) 
-                => self_value == other_value,
+            (Variant::Integer(a), Variant::Integer(b)) => a == b,
+            (Variant::String(a), Variant::String(b)) => a == b,
             
-            (Self::String(self_str), Self::String(other_str)) 
-                => self_str == other_str,
-                
+            (Variant::Tuple(a), Variant::Tuple(b)) if a.len() != b.len() => false,
+            (Variant::Tuple(a), Variant::Tuple(b)) => {
+                a.iter().zip(b.iter())
+                .all(|(a, b)| VariantKey(a) == VariantKey(b))
+            },
+            
+            // TODO objects, use __eq
+            
             _ => false,
         }
     }
 }
-
-impl From<VariantKey<'_>> for Variant {
-    fn from(key: VariantKey) -> Self {
-        match key {
-            VariantKey::Nil => Self::Nil,
-            VariantKey::EmptyTuple => Self::EmptyTuple,
-            VariantKey::BoolTrue => Self::BoolTrue,
-            VariantKey::BoolFalse => Self::BoolFalse,
-            VariantKey::Integer(value) => Self::Integer(value),
-            VariantKey::String(value) => Self::String(value.into()),
-            VariantKey::Tuple(keys) => {
-                let items = Vec::from_iter(keys.into_iter().map(|key| Self::from(key.clone())));
-                Self::Tuple(Rc::from(items.into_boxed_slice()))
-            }
-        }
-    }
-}
+impl Eq for VariantKey<'_> { }
 
 
-struct ReprDisplay<'a, 's>(&'a Variant, &'s StringTable);
-
-impl fmt::Display for ReprDisplay<'_, '_> {
+impl fmt::Display for Variant {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let ReprDisplay(value, string_table) = self;
-        match value {
-            Variant::Nil => fmt.write_str("nil"),
-            Variant::EmptyTuple => fmt.write_str("()"),
-            Variant::BoolTrue => fmt.write_str("true"),
-            Variant::BoolFalse => fmt.write_str("false"),
+        match self {
+            Self::Nil => fmt.write_str("nil"),
+            Self::EmptyTuple => fmt.write_str("()"),
+            Self::BoolTrue => fmt.write_str("true"),
+            Self::BoolFalse => fmt.write_str("false"),
             
-            Variant::Integer(value) => write!(fmt, "{}", *value),
-            Variant::Float(value) => {
+            Self::Integer(value) => write!(fmt, "{}", *value),
+            Self::Float(value) => {
                 if value.trunc() != *value {
                     write!(fmt, "{}", *value)
                 } else {
@@ -202,19 +166,18 @@ impl fmt::Display for ReprDisplay<'_, '_> {
                 }
             },
             
-            Variant::String(strval) => {
-                let s = &strval.as_str(string_table) as &str;
-                write!(fmt, "\"{}\"", s)
+            Self::String(value) => {
+                write!(fmt, "\"{}\"", value.as_str())
             },
             
-            Variant::Tuple(items) => {
+            Self::Tuple(items) => {
                 let (last, rest) = items.split_last().unwrap(); // will never be empty
                 
                 write!(fmt, "(")?;
                 for item in rest.iter() {
-                    write!(fmt, "{}, ", ReprDisplay(item, string_table))?;
+                    write!(fmt, "{}, ", item)?;
                 }
-                write!(fmt, "{})", ReprDisplay(last, string_table))
+                write!(fmt, "{})", last)
             }
         }
     }

@@ -2,11 +2,7 @@ use ahash::{self, AHasher};
 // use rustc_hash::FxHasher;
 
 mod variant;
-pub use variant::{Variant, VariantKey};
-
 pub mod strings;
-pub use strings::string_table;
-
 pub mod ops;
 pub mod types;
 pub mod errors;
@@ -14,8 +10,10 @@ pub mod errors;
 mod tests;
 
 
+pub use variant::{Variant, VariantKey};
+pub use strings::STRING_TABLE;
+
 // Default Hasher
 
 pub type DefaultHasher = AHasher;
 pub type DefaultBuildHasher = ahash::RandomState;
-
