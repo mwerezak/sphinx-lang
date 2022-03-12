@@ -156,15 +156,28 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         error
     }
     
-    fn catch_error_and_sync<T>(&mut self, ctx: &ErrorContext, result: InternalResult<T>, inside_block: bool) -> Option<T> {
-        result.map_or_else(
-            |error| {
+    fn catch_error_and_sync<T>(&mut self, ctx: &ErrorContext, result: InternalResult<T>, inside_block: bool) -> Option<InternalResult<T>> {
+        match result {
+            Ok(..) => Some(result),
+            Err(error) => {
+                if matches!(error.kind(), ErrorKind::EndofTokenStream) {
+                    return Some(Err(error));
+                }
+                
                 self.errors.push_back(error.with_symbol_from_ctx(&ctx));
                 self.synchronize_stmt(inside_block);
-                None
-            },
-            |value| Some(value)
-        )
+                
+                // if the next token is EOF there is no point catching an error
+                // since there is no more source code to examine anyways
+                // (same applies if we can't even peek without hitting an error)
+                match self.peek() {
+                    Err(..) | Ok(TokenMeta { token: Token::EOF, .. }) 
+                      => Some(Err(self.errors.pop_front().unwrap())),
+                    
+                    _ => None,
+                }
+            }
+        }
     }
     
     // If we hit an error we need to synchronize back to a likely-valid state before we continue parsing again
@@ -258,7 +271,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         Ok(stmt)
     }
     
-    fn parse_statement_list(&mut self, ctx: &mut ErrorContext) -> InternalResult<Vec<StmtMeta>> {
+    fn parse_stmt_list(&mut self, ctx: &mut ErrorContext) -> InternalResult<Vec<StmtMeta>> {
         ctx.push(ContextTag::StmtList);
         
         let mut suite = Vec::new();
@@ -272,9 +285,9 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 break;
             }
             
-            let control_stmt = self.try_parse_control_flow_stmt(ctx);
-            let control_stmt = match self.catch_error_and_sync(ctx, control_stmt, true) {
-                Some(stmt) => stmt,
+            let parse_result = self.try_parse_control_flow_stmt(ctx);
+            let control_stmt = match self.catch_error_and_sync(ctx, parse_result, true) {
+                Some(result) => result?,
                 None => continue,
             };
             
@@ -305,9 +318,9 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
                 break;
             }
             
-            let stmt = self.parse_stmt(ctx);
-            let stmt = match self.catch_error_and_sync(ctx, stmt, true) {
-                Some(stmt) => stmt,
+            let parse_result = self.parse_stmt(ctx);
+            let stmt = match self.catch_error_and_sync(ctx, parse_result, true) {
+                Some(result) => result?,
                 None => continue,
             };
             
@@ -695,7 +708,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             return Err("block labels must be followed by either a block or a loop".into());
         }
         
-        let mut suite = self.parse_statement_list(ctx)?;
+        let mut suite = self.parse_stmt_list(ctx)?;
         
         // SYNTACTIC SUGAR: convert expression statement at end of block into "break <expr>"
         if let Some(Stmt::Expression(..)) = suite.last().map(|stmt| stmt.variant()) {
@@ -748,7 +761,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         
         // function body
         
-        let body = self.parse_statement_list(ctx)?;
+        let body = self.parse_stmt_list(ctx)?;
         
         let function_def = FunctionDef::new(signature, body);
         
