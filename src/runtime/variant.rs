@@ -56,8 +56,8 @@ impl Variant {
         VariantKey::new(self, string_table)
     }
     
-    pub fn repr<'a, 's>(&'a self, string_table: &'s StringTable) -> impl fmt::Display + 'a where 's: 'a {
-        VariantRepr(self, string_table)
+    pub fn as_display<'a, 's>(&'a self, string_table: &'s StringTable) -> impl fmt::Display + 'a where 's: 'a {
+        ReprDisplay(self, string_table)
     }
     
     pub fn make_tuple(items: Box<[Variant]>) -> Self {
@@ -182,11 +182,11 @@ impl From<VariantKey<'_>> for Variant {
 }
 
 
-struct VariantRepr<'a, 's>(&'a Variant, &'s StringTable);
+struct ReprDisplay<'a, 's>(&'a Variant, &'s StringTable);
 
-impl fmt::Display for VariantRepr<'_, '_> {
+impl fmt::Display for ReprDisplay<'_, '_> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let VariantRepr(value, string_table) = self;
+        let ReprDisplay(value, string_table) = self;
         match value {
             Variant::Nil => fmt.write_str("nil"),
             Variant::EmptyTuple => fmt.write_str("()"),
@@ -212,9 +212,9 @@ impl fmt::Display for VariantRepr<'_, '_> {
                 
                 write!(fmt, "(")?;
                 for item in rest.iter() {
-                    write!(fmt, "{}, ", VariantRepr(item, string_table))?;
+                    write!(fmt, "{}, ", ReprDisplay(item, string_table))?;
                 }
-                write!(fmt, "{})", VariantRepr(last, string_table))
+                write!(fmt, "{})", ReprDisplay(last, string_table))
             }
         }
     }

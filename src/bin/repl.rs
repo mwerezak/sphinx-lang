@@ -219,7 +219,7 @@ impl<'r> Repl<'r> {
                         
                         match eval_result {
                             Ok(value) => {
-                                println!("{}", value.unwrap_value().repr(&self.string_table));
+                                println!("{}", value.unwrap_value().as_display(&self.string_table));
                             },
                             Err(error) => {
                                 println!("{:?}", error)

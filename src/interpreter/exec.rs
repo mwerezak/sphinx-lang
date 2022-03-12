@@ -25,7 +25,7 @@ impl<'a, 'r, 's> ExecContext<'a, 'r, 's> {
                 let eval_ctx = EvalContext::new(self.local_env);
                 let value = try_value!(eval_ctx.eval_expr(&expr)?);
                 
-                println!("{}", value.repr(self.local_env.string_table()));
+                println!("{}", value.as_display(self.local_env.string_table()));
                 
                 ControlFlow::None
             },
