@@ -86,7 +86,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             Expr::Assignment(assignment) => self.eval_assignment(assignment),
             Expr::Declaration(declaration) => self.eval_declaration(declaration),
             
-            Expr::Tuple(expr_list) => unimplemented!(),
+            Expr::Tuple(expr_list) => self.eval_tuple(expr_list),
             Expr::ObjectCtor(ctor) => unimplemented!(),
             
             Expr::Block(label, suite) => self.eval_block(label, suite.iter()),
@@ -154,6 +154,14 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             Atom::Group(expr) => return self.eval_expr(expr),
         };
         Ok(value.into())
+    }
+    
+    fn eval_tuple(&self, expr_list: &[ExprMeta]) -> ExecResult<EvalResult> {
+        let mut items = Vec::with_capacity(expr_list.len());
+        for expr in expr_list.iter() {
+            items.push(try_value!(self.eval_expr(expr.variant())?));
+        }
+        Ok(Variant::make_tuple(items.into_boxed_slice()).into())
     }
     
     fn eval_short_circuit_logic(&self, op: Logical, lhs: &Expr, rhs: &Expr) -> ExecResult<EvalResult> {
@@ -294,7 +302,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
                 DeclType::Immutable => Access::ReadOnly,
                 DeclType::Mutable => Access::ReadWrite,
             };
-
+            
             let init_value = try_value!(self.eval_expr(&declaration.init)?);
             
             self.local_env.create(&name, access, init_value.clone())?;

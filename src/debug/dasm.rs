@@ -91,6 +91,14 @@ impl fmt::Display for Variant {
             Self::Integer(value) => write!(fmt, "{}", value),
             Self::Float(value) => write!(fmt, "{:.6}", value),
             Self::String(strval) => write!(fmt, "{}", strval),
+            Self::Tuple(items) => {
+                let (last, rest) = items.split_last().unwrap();
+                fmt.write_str("(")?;
+                for item in rest.iter() {
+                    write!(fmt, "{}, ", item)?;
+                }
+                write!(fmt, "{})", last)
+            },
         }
     }
 }

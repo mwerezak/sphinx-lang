@@ -98,7 +98,7 @@ impl<'f, 's> ParseContext<'f, 's> {
     fn collect_parser_output<'m>(&mut self, source: SourceText<'m>) -> Vec<Result<StmtMeta, ParserError<'m>>> {
         match source {
             SourceText::String { module, text } => {
-                let mut chars = Vec::new();
+                let mut chars = Vec::with_capacity(text.len());
                 chars.extend(text.chars().map(Ok));
                 
                 let lexer = self.lexer_factory.build(chars.into_iter());
