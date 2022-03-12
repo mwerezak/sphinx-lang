@@ -268,6 +268,9 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             
             let control_stmt = match self.try_parse_control_flow_stmt(ctx) {
                 Ok(stmt) => stmt,
+                // Err(error) if matches!(error.kind(), ErrorKind::EndofTokenStream) => {
+                //     break;
+                // }
                 Err(error) => {
                     errors.push(error.with_symbol_from_ctx(&ctx));
                     self.synchronize_stmt(true);
@@ -536,7 +539,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
             Ok(expr)
         } else {
             ctx.pop_extend(); // pop the TupleCtor context frame
-            Ok(Expr::Tuple(tuple_exprs))
+            Ok(Expr::Tuple(tuple_exprs.into_boxed_slice()))
         }
     }
     
@@ -715,7 +718,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         }
         
         ctx.pop_extend();
-        Ok(Expr::Block(suite, block_label))
+        Ok(Expr::Block(block_label, suite.into_boxed_slice()))
     }
     
     fn parse_function_def(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {

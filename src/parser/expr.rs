@@ -22,13 +22,13 @@ pub enum Expr {
     
     Declaration(Box<Declaration>),
 
-    Tuple(Vec<ExprMeta>),
+    Tuple(Box<[ExprMeta]>),
     
     ObjectCtor(Box<ObjectConstructor>),
     
     // IfExpr
     
-    Block(Vec<StmtMeta>, Option<Label>), // TODO switch these
+    Block(Option<Label>, Box<[StmtMeta]>),
     
     FunctionDef(FunctionDef),
     

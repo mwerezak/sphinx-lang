@@ -89,18 +89,18 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             Expr::Tuple(expr_list) => unimplemented!(),
             Expr::ObjectCtor(ctor) => unimplemented!(),
             
-            Expr::Block(suite, label) => self.eval_block(suite, label),
+            Expr::Block(label, suite) => self.eval_block(label, suite.iter()),
             
             Expr::FunctionDef(fundef) => unimplemented!(),
         }
     }
 
-    fn eval_block(&self, suite: &Vec<StmtMeta>, block_label: &Option<Label>) -> ExecResult<EvalResult> {
+    fn eval_block<'b>(&self, block_label: &Option<Label>, suite: impl Iterator<Item=&'b StmtMeta>) -> ExecResult<EvalResult> {
         let new_env = self.local_env.new_local();
         let block_ctx = ExecContext::new(&new_env);
         
         let mut result = None;
-        for stmt in suite.iter() {
+        for stmt in suite {
             let control = block_ctx.exec(&stmt)?;
             match control {
                 // these aren't used by block expressions and so must relate to an enclosing item
@@ -285,8 +285,11 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
         } else {
             unimplemented!()
         }
-        
     }
+    
+    // fn eval_declaration_inner(&self, name: &StringSymbol, access: Access, init: &Expr) -> ExecResult<EvalResult> {
+        
+    // }
     
     // fn eval_lvalue(&mut self, lvalue: &LValue) -> ExecResult<()> {
         

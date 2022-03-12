@@ -100,7 +100,7 @@ impl TryFrom<Expr> for LValue {
             Expr::Tuple(expr_list) => {
                 let mut lvalue_list = Vec::<LValue>::new();
                 
-                for expr in expr_list.into_iter() {
+                for expr in expr_list.into_vec().into_iter() {
                     let lvalue = expr.take_variant().try_into()?;
                     lvalue_list.push(lvalue);
                 }
