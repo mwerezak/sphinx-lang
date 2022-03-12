@@ -95,6 +95,7 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(KeywordRule::new(Token::Nil,                "nil"))
     .add_rule(KeywordRule::new(Token::Let,                "let"))
     .add_rule(KeywordRule::new(Token::Var,                "var"))
+    .add_rule(KeywordRule::new(Token::Global,             "global"))
     .add_rule(KeywordRule::new(Token::Del,                "del"))
     .add_rule(KeywordRule::new(Token::Begin,              "begin"))
     .add_rule(KeywordRule::new(Token::If,                 "if"))

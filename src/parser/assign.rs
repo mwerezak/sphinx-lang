@@ -34,6 +34,7 @@ pub struct Assignment {
     pub lhs: LValue,
     pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     pub rhs: Expr,
+    pub global: bool,
 }
 
 // Declarations
