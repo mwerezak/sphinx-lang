@@ -2,7 +2,7 @@ use crate::debug::symbol::DebugSymbol;
 use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration};
-use crate::parser::fundef::FunctionDef;
+use crate::parser::fundefs::FunctionDef;
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::stmt::{StmtMeta, Stmt, Label};
 

@@ -11,7 +11,7 @@ use stmt::{StmtMeta, Stmt, Label};
 use primary::{Primary, Atom, AccessItem};
 use assign::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
-use fundef::{FunctionDef, FunSignature, FunParam};
+use fundefs::{FunctionDef, FunSignature, FunParam};
 use structs::{ObjectConstructor};
 use errors::{ErrorPrototype, ErrorKind, ErrorContext, ContextTag};
 
@@ -24,7 +24,7 @@ pub mod stmt;
 pub mod primary;
 pub mod assign;
 pub mod operator;
-pub mod fundef;
+pub mod fundefs;
 pub mod structs;
 
 pub use errors::{ParserError, ContextFrame};
