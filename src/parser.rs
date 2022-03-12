@@ -77,8 +77,8 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
         }
     }
     
-    // peek() will consume any errors it encounters
-    // this is so that we don't have to do complex map_err() every single time we call self.peek()
+    // peek() will consume any errors it encounters (i.e. peek() acts like advance() if the next token was a lexer error)
+    // this is so that we don't have to do a complex map_err() every single time we call self.peek()
     fn peek(&mut self) -> InternalResult<&TokenMeta> {
         if self.next.is_none() {
             self.next = self.tokens.next();
