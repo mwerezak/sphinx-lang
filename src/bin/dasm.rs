@@ -9,13 +9,18 @@ use sphinx_lang::codegen::CodeGenerator;
 use sphinx_lang::debug::symbol::DebugSymbolResolver;
 use sphinx_lang::debug::dasm::Disassembler;
 
-fn print_parse_errors<'m>(module: &'m ModuleSource, errors: Vec<ParserError<'m>>) {
-    let symbols = errors.iter().map(|err| err.debug_symbol());
+fn print_parse_errors(module: &ModuleSource, errors: Vec<ParserError>) {
+    let symbols = errors.iter().filter_map(|err| err.debug_symbol());
         
     let resolved_table = module.resolve_symbols(symbols).unwrap();
     
     for error in errors.iter() {
-        let resolved = resolved_table.get(&error.debug_symbol()).unwrap().as_ref();
+        let debug_symbol = error.debug_symbol();
+        if debug_symbol.is_none() {
+            continue;
+        }
+        
+        let resolved = resolved_table.get(&debug_symbol.unwrap()).unwrap().as_ref();
         
         match resolved {
             Ok(resolved) => println!("{}", frontend::render_parser_error(&error, resolved)),

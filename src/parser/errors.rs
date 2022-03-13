@@ -7,6 +7,7 @@ use crate::debug::symbol::{DebugSymbol, TokenIndex};
 
 
 pub type ErrorKind = ParserErrorKind;
+pub type ParseResult<T> = Result<T, ParserError>;
 
 // TODO change this to just using string messages instead
 #[derive(Debug)]
@@ -52,18 +53,71 @@ pub enum ContextTag {
 // Since ErrorContext can share references with the Parser, we need to use 
 // an error type that does not refer to the error context internally.
 // The error context is always available at the base of the recursive descent call stack and can be added later.
-#[derive(Debug)]
-pub struct ErrorPrototype {
-    kind: ErrorKind,
-    symbol: Option<DebugSymbol>,
-    lexer_error: Option<LexerError>,
+// #[derive(Debug)]
+// pub struct ErrorPrototype {
+//     kind: ErrorKind,
+//     symbol: Option<DebugSymbol>,
+//     lexer_error: Option<LexerError>,
+// }
+
+// impl ErrorPrototype {
+//     pub fn kind(&self) -> &ErrorKind { &self.kind }
+    
+//     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
+//         self.symbol.replace(symbol); self 
+//     }
+    
+//     pub fn with_symbol_from_ctx(mut self, ctx: &ErrorContext) -> Self {
+//         if let Some(symbol) = ctx.frame().as_debug_symbol() {
+//             self.symbol.replace(symbol);
+//         }
+//         self
+//     }
+// }
+
+impl From<ErrorKind> for ParserError {
+    fn from(kind: ErrorKind) -> Self {
+        Self { 
+            kind, context: None, symbol: None, cause: None,
+        }
+    }
 }
 
-impl ErrorPrototype {
-    pub fn kind(&self) -> &ErrorKind { &self.kind }
+impl From<&str> for ParserError {
+    fn from(message: &str) -> Self {
+        Self { 
+            kind: message.into(), 
+            context: None, symbol: None, cause: None,
+        }
+    }
+}
+
+impl From<LexerError> for ParserError {
+    fn from(error: LexerError) -> Self {
+        Self { 
+            kind: ErrorKind::LexerError, 
+            context: None,
+            symbol: Some((&error.span).into()),
+            cause: Some(Box::new(error)),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ParserError {
+    kind: ErrorKind,
+    context: Option<ContextTag>,
+    symbol: Option<DebugSymbol>,
+    cause: Option<Box<dyn Error>>,
+}
+
+impl ParserError {
+    pub fn with_context_tag(mut self, context: ContextTag) -> Self {
+        self.context.replace(context); self
+    }
     
     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
-        self.symbol.replace(symbol); self 
+        self.symbol.replace(symbol); self
     }
     
     pub fn with_symbol_from_ctx(mut self, ctx: &ErrorContext) -> Self {
@@ -72,78 +126,35 @@ impl ErrorPrototype {
         }
         self
     }
-}
-
-impl From<ParserErrorKind> for ErrorPrototype {
-    fn from(kind: ParserErrorKind) -> Self {
-        ErrorPrototype { kind, symbol: None, lexer_error: None }
+    
+    pub fn with_cause(mut self, error: impl Error + 'static) -> Self {
+        self.cause.replace(Box::new(error)); self
     }
-}
-
-impl From<&str> for ErrorPrototype {
-    fn from(message: &str) -> Self {
-        ErrorPrototype { kind: message.into(), symbol: None, lexer_error: None }
-    }
-}
-
-impl From<LexerError> for ErrorPrototype {
-    fn from(error: LexerError) -> Self {
-        ErrorPrototype { 
-            kind: ErrorKind::LexerError, 
-            symbol: None,
-            lexer_error: Some(error),
+    
+    // fill in fields from context if not already set
+    pub fn with_error_context(mut self, context: ErrorContext) -> Self {
+        if self.context.is_none() {
+            self.context.replace(context.frame().context());
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct ParserError<'m> {
-    kind: ErrorKind,
-    module: &'m ModuleSource, // TODO remove
-    context: ContextTag,
-    symbol: DebugSymbol,
-    cause: Option<Box<dyn Error>>,
-}
-
-impl<'m> ParserError<'m> {
-    pub fn from_prototype(proto: ErrorPrototype, context: ErrorContext<'m>) -> Self {
-        let module = context.module;
-        let context_tag = context.frame().context();
-        
-        let symbol;
-        let cause;
-        if let Some(error) = proto.lexer_error {
-            symbol = (&error.span).into();
-            cause = Some(Box::new(error) as Box<dyn Error>);
-        } else if let Some(symb) = proto.symbol {
-            symbol = symb;
-            cause = None;
-        } else {
-            symbol = context.take_debug_symbol();
-            cause = None;
+        if self.symbol.is_none() {
+            self.symbol.replace(context.take_debug_symbol());
         }
-        
-        ParserError {
-            module, cause, symbol,
-            kind: proto.kind,
-            context: context_tag,
-        }
+        self
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
-    pub fn module(&self) -> &ModuleSource { self.module }
-    pub fn context(&self) -> &ContextTag { &self.context }
-    pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
+    pub fn context(&self) -> Option<&ContextTag> { self.context.as_ref() }
+    pub fn debug_symbol(&self) -> Option<&DebugSymbol> { self.symbol.as_ref() }
 }
 
 
-impl Error for ParserError<'_> {
+impl Error for ParserError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.cause.as_ref().map(|o| o.as_ref())
     }
 }
 
-impl fmt::Display for ParserError<'_> {
+impl fmt::Display for ParserError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         
         let message = match self.kind() {
@@ -160,19 +171,16 @@ impl fmt::Display for ParserError<'_> {
 // Structures used by the parser for error handling and synchronization
 
 #[derive(Debug, Clone)]
-pub struct ErrorContext<'m> {
-    module: &'m ModuleSource,
+pub struct ErrorContext {
     stack: Vec<ContextFrame>,
 }
 
-impl<'m> ErrorContext<'m> {
-    pub fn new(module: &'m ModuleSource, base: ContextTag) -> Self {
+impl<'m> ErrorContext {
+    pub fn new(base: ContextTag) -> Self {
         ErrorContext {
-            module, stack: vec![ ContextFrame::new(base) ],
+            stack: vec![ ContextFrame::new(base) ],
         }
     }
-    
-    //pub fn module(&self) -> &'m str { self.module }
     
     pub fn frame(&self) -> &ContextFrame { self.stack.last().unwrap() }
     pub fn frame_mut(&mut self) -> &mut ContextFrame { self.stack.last_mut().unwrap() }

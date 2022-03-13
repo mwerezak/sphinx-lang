@@ -13,7 +13,7 @@ use assign::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use fundefs::{FunctionDef, FunSignature, FunParam};
 use structs::{ObjectConstructor};
-use errors::{ErrorPrototype, ErrorKind, ErrorContext, ContextTag};
+use errors::{ParseResult, ErrorKind, ErrorContext, ContextTag};
 
 
 mod errors;
@@ -36,15 +36,13 @@ pub struct Parser<'m, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     module: &'m ModuleSource,
     tokens: T,
     next: Option<Result<TokenMeta, LexerError>>,
-    errors: VecDeque<ErrorPrototype>,
+    errors: VecDeque<ParserError>,
 }
 
 impl<'m, T> Iterator for Parser<'m, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    type Item = Result<StmtMeta, ParserError<'m>>;
+    type Item = Result<StmtMeta, ParserError>;
     fn next(&mut self) -> Option<Self::Item> { self.next_stmt() }
 }
-
-type InternalResult<T> = Result<T, ErrorPrototype>;
 
 impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
@@ -60,7 +58,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     /// for debugging
     fn current_index(&mut self) -> TokenIndex { self.peek().unwrap().span.index }
     
-    fn advance(&mut self) -> InternalResult<TokenMeta> {
+    fn advance(&mut self) -> ParseResult<TokenMeta> {
         let next = self.next.take()
             .or_else(|| self.tokens.next());
         
@@ -73,7 +71,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     // peek() will consume any errors it encounters (i.e. peek() acts like advance() if the next token was a lexer error)
     // this is so that we don't have to do a complex map_err() every single time we call self.peek()
-    fn peek(&mut self) -> InternalResult<&TokenMeta> {
+    fn peek(&mut self) -> ParseResult<&TokenMeta> {
         if self.next.is_none() {
             self.next = self.tokens.next();
             if self.next.is_none() {
@@ -91,8 +89,8 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         }
     }
     
-    pub fn next_stmt(&mut self) -> Option<Result<StmtMeta, ParserError<'m>>> {
-        let mut ctx = ErrorContext::new(self.module, ContextTag::TopLevel);
+    pub fn next_stmt(&mut self) -> Option<Result<StmtMeta, ParserError>> {
+        let mut ctx = ErrorContext::new(ContextTag::TopLevel);
         
         if let Some(error) = self.errors.pop_front() {
             return Some(Err(Self::process_error(ctx, error)));
@@ -102,10 +100,8 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         loop {
             match self.peek() {
                 Err(error) if matches!(error.kind(), ErrorKind::EndofTokenStream) => return None,
-                Err(error) => return {
-                    let error = ParserError::from_prototype(error, ctx);
-                    Some(Err(error))
-                },
+                
+                Err(error) => return Some(Err(Self::process_error(ctx, error))),
                 
                 Ok(next) if matches!(next.token, Token::EOF) => return None,
                 
@@ -137,10 +133,10 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Some(result)
     }
     
-    fn process_error(ctx: ErrorContext<'m>, error: ErrorPrototype) -> ParserError<'m> {
+    fn process_error(ctx: ErrorContext, error: ParserError) -> ParserError {
         debug!("{:#?}", ctx);
         
-        let error = ParserError::from_prototype(error, ctx);
+        let error = error.with_error_context(ctx);
         
         debug!("parser error: {:?}\ncontext: {:?}\nsymbol: {:?}", 
             error.kind(), error.context(), 
@@ -150,7 +146,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         error
     }
     
-    fn catch_error_and_sync<T>(&mut self, ctx: &ErrorContext, result: InternalResult<T>, inside_block: bool) -> Option<InternalResult<T>> {
+    fn catch_error_and_sync<T>(&mut self, ctx: &ErrorContext, result: ParseResult<T>, inside_block: bool) -> Option<ParseResult<T>> {
         match result {
             Ok(..) => Some(result),
             Err(error) => {
@@ -181,7 +177,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         // OR try to parse an expression. If we can do it without errors, assume we're in a good state. The expression can be discarded.
         debug!("sync to next stmt...");
         
-        let mut ctx = ErrorContext::new(self.module, ContextTag::Sync);
+        let mut ctx = ErrorContext::new(ContextTag::Sync);
         
         loop {
 
@@ -216,7 +212,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     /*** Statement Parsing ***/
     
-    fn parse_stmt(&mut self, ctx: &mut ErrorContext) -> InternalResult<StmtMeta> {
+    fn parse_stmt(&mut self, ctx: &mut ErrorContext) -> ParseResult<StmtMeta> {
         // skip statement separators
         while let Token::Semicolon = self.peek()?.token {
             self.advance()?;
@@ -233,7 +229,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(StmtMeta::new(stmt, symbol))
     }
     
-    fn parse_toplevel_stmt(&mut self, ctx: &mut ErrorContext) -> InternalResult<Stmt> {
+    fn parse_toplevel_stmt(&mut self, ctx: &mut ErrorContext) -> ParseResult<Stmt> {
         let stmt = match  self.peek()?.token {
             Token::While => unimplemented!(),
             Token::Do => unimplemented!(),
@@ -265,7 +261,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(stmt)
     }
     
-    fn parse_stmt_list(&mut self, ctx: &mut ErrorContext) -> InternalResult<Vec<StmtMeta>> {
+    fn parse_stmt_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<Vec<StmtMeta>> {
         ctx.push(ContextTag::StmtList);
         
         let mut suite = Vec::new();
@@ -300,7 +296,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                     };
                     
                     let message = format!("\"{}\" must be the last statement in a block", name);
-                    let error = ErrorPrototype::from(ErrorKind::SyntaxError(message.into()))
+                    let error = ParserError::from(ErrorKind::SyntaxError(message.into()))
                         .with_symbol_from_ctx(&ctx);
                     
                     self.errors.push_back(error);
@@ -329,7 +325,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(suite)
     }
     
-    fn try_parse_label(&mut self, _ctx: &mut ErrorContext) -> InternalResult<Option<Label>> {
+    fn try_parse_label(&mut self, _ctx: &mut ErrorContext) -> ParseResult<Option<Label>> {
         let next = self.peek()?;
         
         let label = if let Token::Label(..) = next.token {
@@ -343,7 +339,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(label)
     }
     
-    fn try_parse_control_flow_stmt(&mut self, ctx: &mut ErrorContext) -> InternalResult<Option<StmtMeta>> {
+    fn try_parse_control_flow_stmt(&mut self, ctx: &mut ErrorContext) -> ParseResult<Option<StmtMeta>> {
         let next = self.peek()?;
         
         let stmt = match next.token {
@@ -393,7 +389,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     /*** Expression Parsing ***/
     
-    fn parse_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<ExprMeta> {
+    fn parse_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<ExprMeta> {
         ctx.push(ContextTag::ExprMeta);
         
         let variant = self.parse_expr_variant(ctx)?;
@@ -404,7 +400,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     }
     
     // the top of the recursive descent stack for expressions
-    fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         let next = self.peek()?;
         
         if let Token::Let | Token::Var = next.token {
@@ -428,7 +424,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         assignment-expression ::= lvalue-annotated assignment-op expression ;
     */
     
-    fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         
         let global_token = 
             if let Token::NonLocal = self.peek()?.token { Some(self.advance().unwrap()) }
@@ -447,7 +443,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             }
             
             // LHS of assignment has to be an lvalue
-            let lhs = LValue::try_from(expr).map_err(|_| ErrorPrototype::from("can't assign to this"))?;
+            let lhs = LValue::try_from(expr).map_err(|_| ParserError::from("can't assign to this"))?;
             let rhs = self.parse_expr_variant(ctx)?;
             
             ctx.pop_extend();
@@ -467,7 +463,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     /*
         declaration-expression ::= ( "let" | "var" ) assignment-expression ;
     */
-    fn parse_vardecl_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_vardecl_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         ctx.push(ContextTag::VarDeclExpr);
         
         let next = self.advance()?;
@@ -480,7 +476,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         };
         
         let expr = self.parse_tuple_expr(ctx)?;
-        let lhs = LValue::try_from(expr).map_err(|_| ErrorPrototype::from("can't assign to this"))?;
+        let lhs = LValue::try_from(expr).map_err(|_| ParserError::from("can't assign to this"))?;
         if !Self::is_lvalue_valid_for_decl(&lhs) {
             return Err("only identifiers can be used in a variable declaration".into());
         }
@@ -514,7 +510,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         }
     }
     
-    fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         
         // descend recursively into binops
         let mut first_expr = Some(self.parse_binop_expr(ctx)?); // might be taken into tuple later
@@ -561,11 +557,11 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         operand[1] ::= unary ;
         operand[N] ::= operand[N-1] ( OPERATOR[N] operand[N-1] )* ;
     */
-    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_binop_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         self.parse_binop_expr_levels(ctx, PRECEDENCE_START)
     }
     
-    fn parse_binop_expr_levels(&mut self, ctx: &mut ErrorContext, level: Precedence) -> InternalResult<Expr> {
+    fn parse_binop_expr_levels(&mut self, ctx: &mut ErrorContext, level: Precedence) -> ParseResult<Expr> {
         if level == PRECEDENCE_END {
             return self.parse_unary_expr(ctx);  // exit binop precedence recursion
         }
@@ -603,7 +599,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         unary-expression ::= ( "-" | "+" | "not" ) unary | primary ;
     */
-    fn parse_unary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_unary_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         let next = self.peek()?;
         if let Some(unary_op) = Self::which_unary_op(&next.token) {
             ctx.push(ContextTag::UnaryOpExpr);
@@ -683,7 +679,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Here we parse all the things that are tighter binding than either unary or binary operator expressions.
         We look for anything that can be immediately identified from the next token, or else fall back to a primary expression.
     */
-    fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         let expr = match self.peek()?.token {
             Token::Class => unimplemented!(),
             Token::Fun => self.parse_function_def(ctx)?,
@@ -700,7 +696,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     /*
         block-expression ::= ( label )? "begin" ( statement | control-flow | "break" ( label )? expression )* "end" ;  (* break can be supplied a value inside of begin-blocks *)
     */
-    fn parse_block_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_block_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         ctx.push(ContextTag::BlockExpr);
         ctx.set_start(self.peek()?);
         
@@ -733,7 +729,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(Expr::Block(block_label, suite.into_boxed_slice()))
     }
     
-    fn parse_function_def(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
+    fn parse_function_def(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         ctx.push(ContextTag::FunDefExpr);
         
         let next = self.advance()?;
@@ -786,7 +782,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         }
     }
     
-    fn parse_function_param_list(&mut self, ctx: &mut ErrorContext) -> InternalResult<FunSignature> {
+    fn parse_function_param_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<FunSignature> {
 
         let mut required = Vec::new();
         let mut default = Vec::new();
@@ -893,7 +889,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;
     
     */
-    fn parse_object_constructor(&mut self, ctx: &mut ErrorContext) -> InternalResult<ObjectConstructor> {
+    fn parse_object_constructor(&mut self, ctx: &mut ErrorContext) -> ParseResult<ObjectConstructor> {
         ctx.push(ContextTag::ObjectCtor);
         
         let next = self.advance().unwrap();
@@ -921,7 +917,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         invocation ::= "(" ... ")" ;  (* WIP *)
         object-constructor ::= "{" member-initializer ( "," member-initializer )* "}" ;
     */
-    fn parse_primary(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> { 
+    fn parse_primary(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> { 
         ctx.push(ContextTag::PrimaryExpr);
         
         let atom = self.parse_atom(ctx)?;
@@ -981,7 +977,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     }
     
     // similar to parse_primary(), except we only allow member access and index access, and convert to an LValue after
-    fn parse_function_assignment_target(&mut self, ctx: &mut ErrorContext) -> InternalResult<LValue> {
+    fn parse_function_assignment_target(&mut self, ctx: &mut ErrorContext) -> ParseResult<LValue> {
         ctx.push(ContextTag::PrimaryExpr);
         
         let atom = self.parse_atom(ctx)?;
@@ -1006,13 +1002,13 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let lvalue =
             if items.is_empty() { LValue::try_from(atom) } 
             else { LValue::try_from(Primary::new(atom, items)) }
-            .map_err(|_| ErrorPrototype::from("cannot assign a function to this"))?;
+            .map_err(|_| ParserError::from("cannot assign a function to this"))?;
         
         Ok(lvalue)
     }
     
     // access ::= "." IDENTIFIER ;
-    fn parse_member_access(&mut self, ctx: &mut ErrorContext) -> InternalResult<AccessItem> {
+    fn parse_member_access(&mut self, ctx: &mut ErrorContext) -> ParseResult<AccessItem> {
         ctx.push(ContextTag::MemberAccess);
         ctx.set_start(&self.advance().unwrap());
         
@@ -1031,7 +1027,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     }
     
     // subscript ::= "[" expression "]" ;
-    fn parse_index_access(&mut self, ctx: &mut ErrorContext) -> InternalResult<AccessItem> {
+    fn parse_index_access(&mut self, ctx: &mut ErrorContext) -> ParseResult<AccessItem> {
         ctx.push(ContextTag::IndexAccess);
         ctx.set_start(&self.advance().unwrap());
         
@@ -1052,7 +1048,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     }
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
-    fn parse_atom(&mut self, ctx: &mut ErrorContext) -> InternalResult<Atom> { 
+    fn parse_atom(&mut self, ctx: &mut ErrorContext) -> ParseResult<Atom> { 
         
         if let Token::OpenParen = self.peek()?.token {
             Ok(self.parse_group_expr(ctx)?)  // Groups
@@ -1090,7 +1086,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         }
     }
     
-    fn parse_group_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Atom> {
+    fn parse_group_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Atom> {
         ctx.push(ContextTag::Group);
         
         let next = self.advance().unwrap(); // consume the "("
