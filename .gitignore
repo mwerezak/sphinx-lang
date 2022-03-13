@@ -1,4 +1,5 @@
 /src/_runtime
+/src/interpreter*
 
 /target
 Cargo.lock
