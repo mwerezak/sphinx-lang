@@ -31,11 +31,11 @@ pub enum Token {
     True, False, Nil,
     Let, Var, NonLocal, Del,
     If, Then, Elif, Else,
-    Begin, For, While, Do,
+    Begin, For, In, While, Do,
     Continue, Break, Return,
     Fun, Class,
-    Self_, Super,
-    Echo,
+    // Self_, Super,
+    Echo, Assert,
     End,
     
     // Literals

@@ -63,7 +63,7 @@ contexts:
       scope: keyword.other
 
   misc-keywords:
-    - match: \b(del|echo)\b
+    - match: \b(del|echo|assert)\b
       scope: keyword.other
 
   control-flow-keywords:
