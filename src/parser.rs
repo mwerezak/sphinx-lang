@@ -60,10 +60,6 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     /// for debugging
     fn current_index(&mut self) -> TokenIndex { self.peek().unwrap().span.index }
     
-    fn get_str_symbol(&mut self, string: &str) -> StringSymbol {
-        STRING_TABLE.write().unwrap().get_or_intern(string)
-    }
-    
     fn advance(&mut self) -> InternalResult<TokenMeta> {
         let next = self.next.take()
             .or_else(|| self.tokens.next());
@@ -340,7 +336,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             let next = self.advance().unwrap();
             
             if let Token::Label(name) = next.token {
-                Some(Label::new(self.get_str_symbol(name.as_str())))
+                Some(Label::new(STRING_TABLE.get_or_intern(name.as_str())))
             } else { unreachable!() }
             
         } else { None };
@@ -830,7 +826,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 if let Token::Identifier(name) = next.token { name }
                 else { return Err("invalid parameter".into()); };
             
-            let name = self.get_str_symbol(name.as_str());
+            let name = STRING_TABLE.get_or_intern(name.as_str());
             
             // possibly variadic
             
@@ -1025,7 +1021,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         let item;
         if let Token::Identifier(name) = next.token {
-            item = AccessItem::Attribute(self.get_str_symbol(name.as_str()));
+            item = AccessItem::Attribute(STRING_TABLE.get_or_intern(name.as_str()));
         } else {
             return Err("invalid Identifier".into());
         }
@@ -1070,7 +1066,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             let atom = match next.token {
                 // Identifiers
                 Token::Identifier(name) => {
-                    Atom::Identifier(self.get_str_symbol(name.as_str()))
+                    Atom::Identifier(STRING_TABLE.get_or_intern(name.as_str()))
                 },
                 
                 // Literals
@@ -1081,7 +1077,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
                 Token::FloatLiteral(value)   => Atom::FloatLiteral(value),
                 Token::StringLiteral(value)   => {
-                    Atom::StringLiteral(self.get_str_symbol(value.as_str()))
+                    Atom::StringLiteral(STRING_TABLE.get_or_intern(value.as_str()))
                 },
                 
                 _ => { 

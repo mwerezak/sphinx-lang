@@ -9,11 +9,6 @@ use crate::runtime::DefaultBuildHasher;
 
 
 // Interned Strings
-pub type InternSymbol = DefaultSymbol;
-pub type InternBackend = DefaultBackend<DefaultSymbol>;
-pub type StringInterner = string_interner::StringInterner<InternBackend, DefaultBuildHasher>;
-
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StringSymbol(InternSymbol);
@@ -25,24 +20,8 @@ impl StringSymbol {
     
     /// Returns a Deref that reads the string referenced by this `StringSymbol` from the global string table.
     /// A lock on the string table is held until the value returned from this method is dropped.
-    pub fn as_read_str(&self) -> impl Deref<Target=str> {
-        ReadString {
-            symbol: *self,
-            read: STRING_TABLE.read().unwrap(),
-        }
-    }
-}
-
-// Helper for StringSymbol::as_read_str()
-struct ReadString<'s>{
-    symbol: StringSymbol,
-    read: RwLockReadGuard<'s, StringTable>
-}
-
-impl<'s> Deref for ReadString<'s> {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.read.resolve(self.symbol).unwrap()
+    pub fn as_str_ref(&self) -> impl Deref<Target=str> {
+        STRING_TABLE.resolve(self)
     }
 }
 
@@ -60,9 +39,9 @@ impl From<InternSymbol> for StringSymbol {
 
 impl From<&str> for StringSymbol {
     fn from(string: &str) -> Self {
-        match STRING_TABLE.read().unwrap().get(string) {
+        match STRING_TABLE.get(string) {
             Some(sym) => sym,
-            None => STRING_TABLE.write().unwrap().get_or_intern(string),
+            None => STRING_TABLE.get_or_intern(string),
         }
     }
 }
@@ -70,19 +49,19 @@ impl From<&str> for StringSymbol {
 // Lexicographical ordering of strings
 impl PartialOrd for StringSymbol {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        <str as PartialOrd>::partial_cmp(&self.as_read_str(), &other.as_read_str())
+        <str as PartialOrd>::partial_cmp(&self.as_str_ref(), &other.as_str_ref())
     }
 }
 
 impl Ord for StringSymbol {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        <str as Ord>::cmp(&self.as_read_str(), &other.as_read_str())
+        <str as Ord>::cmp(&self.as_str_ref(), &other.as_str_ref())
     }
 }
 
 impl fmt::Display for StringSymbol {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.write_str(&self.as_read_str())
+        fmt.write_str(&self.as_str_ref())
     }
 }
 
@@ -97,32 +76,52 @@ impl fmt::Display for StringSymbol {
 // footprint of StringSymbol is cut in half since we don't need to store a reference to the string table.
 
 lazy_static! {
-    pub static ref STRING_TABLE: RwLock<StringTable> = RwLock::new(StringTable::new());
+    pub static ref STRING_TABLE: StringTable = StringTable::new();
 }
 
 
+type InternSymbol = DefaultSymbol;
+type InternBackend = DefaultBackend<DefaultSymbol>;
+type StringInterner = string_interner::StringInterner<InternBackend, DefaultBuildHasher>;
+
 #[derive(Debug)]
 pub struct StringTable {
-    interner: StringInterner,
+    interner: RwLock<StringInterner>,
 }
 
 impl<'s> StringTable {
     pub fn new() -> Self {
         StringTable {
-            interner: StringInterner::new(),
+            interner: RwLock::new(StringInterner::new()),
         }
     }
     
     pub fn get(&self, string: &str) -> Option<StringSymbol> {
-        self.interner.get(string).map(|symbol| symbol.into())
+        self.interner.read().unwrap()
+            .get(string).map(|symbol| symbol.into())
     }
     
-    pub fn get_or_intern(&mut self, string: &str) -> StringSymbol {
-        self.interner.get_or_intern(string).into()
+    pub fn get_or_intern(&self, string: &str) -> StringSymbol {
+        self.interner.write().unwrap().get_or_intern(string).into()
     }
     
-    pub fn resolve(&'s self, sym: impl Into<InternSymbol>) -> Option<&'s str> {
-        self.interner.resolve(sym.into())
+    pub fn resolve(&'s self, symbol: &StringSymbol) -> StrRead<'s> {
+        StrRead { 
+            symbol: (*symbol).into(), 
+            read: self.interner.read().unwrap() 
+        }
     }
 }
 
+/// Deref for strings resolved by the string table. Holds a read lock on the table until dropped.
+pub struct StrRead<'s>{
+    symbol: InternSymbol,
+    read: RwLockReadGuard<'s, StringInterner>
+}
+
+impl<'s> Deref for StrRead<'s> {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.read.resolve(self.symbol).unwrap()
+    }
+}
