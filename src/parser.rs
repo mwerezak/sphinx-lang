@@ -435,7 +435,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> InternalResult<Expr> {
         
         let global_token = 
-            if let Token::Global = self.peek()?.token { Some(self.advance().unwrap()) }
+            if let Token::NonLocal = self.peek()?.token { Some(self.advance().unwrap()) }
             else { None };
         
         let expr = self.parse_tuple_expr(ctx)?;

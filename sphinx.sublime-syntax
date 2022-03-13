@@ -59,7 +59,7 @@ contexts:
   declaration-keywords:
     - match: \b(let|var)\b
       scope: keyword.declaration.other
-    - match: \b(global)\b
+    - match: \b(nonlocal)\b
       scope: keyword.other
 
   misc-keywords:

@@ -149,8 +149,6 @@ impl Environment {
                 Err(error) if matches!(error.kind(), ErrorKind::NameNotDefinedLocal(..)) => {
                     next_env = env.parent.as_ref();
                 },
-                // Err(error) => return Err(error),
-                // Ok(write) => return Ok(write),
                 result => return result,
             }
         }

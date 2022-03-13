@@ -82,7 +82,7 @@ lvalue_list ::= lvalue_expression ( "," lvalue_expression )* ;
 lvalue_annotated ::= lvalue_expression ( ":" type_expression )? ; 
 
 assignment_op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-assignment_expression ::= ( "global" )? lvalue_annotated assignment_op expression ;
+assignment_expression ::= ( "nonlocal" )? lvalue_annotated assignment_op expression ;
 
 (* 
     it isn't captured here, as that would require duplicating all of the above, 

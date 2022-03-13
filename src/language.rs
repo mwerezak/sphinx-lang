@@ -95,7 +95,7 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(KeywordRule::new(Token::Nil,                "nil"))
     .add_rule(KeywordRule::new(Token::Let,                "let"))
     .add_rule(KeywordRule::new(Token::Var,                "var"))
-    .add_rule(KeywordRule::new(Token::Global,             "global"))
+    .add_rule(KeywordRule::new(Token::NonLocal,             "nonlocal"))
     .add_rule(KeywordRule::new(Token::Del,                "del"))
     .add_rule(KeywordRule::new(Token::Begin,              "begin"))
     .add_rule(KeywordRule::new(Token::If,                 "if"))
@@ -123,5 +123,4 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(StringLiteralRule::new(ESCAPE_SEQUENCES.iter().map(|esc| esc.as_ref())))
     .add_rule(LabelRule::new("::"))
     
-
 }
