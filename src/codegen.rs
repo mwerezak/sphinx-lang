@@ -96,7 +96,7 @@ impl CodeGenerator {
         if cid <= u8::MAX.into() {
             self.emit_single(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap())
         } else {
-            self.emit_multi(symbol, OpCode::LoadConst16, cid.to_ne_bytes())
+            self.emit_multi(symbol, OpCode::LoadConst16, cid.to_le_bytes())
         }
     }
     

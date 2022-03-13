@@ -88,7 +88,7 @@ impl<'c, 's> Disassembler<'c, 's> {
                 self.write_value(&mut line, self.chunk.lookup_const(cid))?;
             },
             Some(OpCode::LoadConst16) => {
-                let cid =  ConstID::from_le_bytes(instr[1..3].try_into().unwrap());
+                let cid =  ConstID::from_le_bytes(instr[1..=2].try_into().unwrap());
                 self.write_opcode(&mut line, &opcode.unwrap())?;
                 write!(line, " {: >4} ", cid)?;
                 self.write_value(&mut line, self.chunk.lookup_const(cid))?;
