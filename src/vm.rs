@@ -2,6 +2,8 @@ use crate::runtime::errors::RuntimeError;
 
 pub mod chunk;
 pub mod opcodes;
+pub mod codegen;
+
 use chunk::Chunk;
 use opcodes::OpCode;
 

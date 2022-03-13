@@ -10,7 +10,7 @@ use crate::debug::symbol::DebugSymbol;
 
 pub struct Disassembler<'c> {
     chunk: &'c Chunk,
-    symbols: Option<ChunkDebugSymbols>,
+    symbols: Option<DebugSymbols>,
 }
 
 impl<'c> Disassembler<'c> {
@@ -18,7 +18,7 @@ impl<'c> Disassembler<'c> {
         Disassembler { chunk, symbols: None }
     }
     
-    pub fn with_symbols(mut self, symbols: ChunkDebugSymbols) -> Self {
+    pub fn with_symbols(mut self, symbols: DebugSymbols) -> Self {
         self.symbols = Some(symbols); self
     }
     
@@ -103,15 +103,14 @@ impl fmt::Display for DasmDisplay<'_> {
 // Should contain a DebugSymbol for each opcode in the 
 // associated Chunk, and in the same order.
 #[derive(Clone)]
-pub struct ChunkDebugSymbols {
-    source: ModuleSource,
+pub struct DebugSymbols {
     symbols: Vec<(DebugSymbol, u8)>,  // run length encoding
 }
 
-impl ChunkDebugSymbols {
-    pub fn new(source: ModuleSource) -> Self {
-        ChunkDebugSymbols {
-            source, symbols: Vec::new(),
+impl DebugSymbols {
+    pub fn new() -> Self {
+        DebugSymbols {
+            symbols: Vec::default(),
         }
     }
     
