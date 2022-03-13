@@ -20,10 +20,12 @@ impl StringSymbol {
     
     /// Returns a Deref that reads the string referenced by this `StringSymbol` from the global string table.
     /// A lock on the string table is held until the value returned from this method is dropped.
-    pub fn as_str_ref(&self) -> impl Deref<Target=str> {
+    pub fn resolve(&self) -> impl Deref<Target=str> {
         STRING_TABLE.resolve(self)
     }
 }
+
+// not implementing Deref for StringSymbol because I don't want to hide the cost of acquiring a read lock
 
 impl From<StringSymbol> for InternSymbol {
     fn from(intern: StringSymbol) -> Self {
@@ -49,19 +51,19 @@ impl From<&str> for StringSymbol {
 // Lexicographical ordering of strings
 impl PartialOrd for StringSymbol {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        <str as PartialOrd>::partial_cmp(&self.as_str_ref(), &other.as_str_ref())
+        <str as PartialOrd>::partial_cmp(&self.resolve(), &other.resolve())
     }
 }
 
 impl Ord for StringSymbol {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        <str as Ord>::cmp(&self.as_str_ref(), &other.as_str_ref())
+        <str as Ord>::cmp(&self.resolve(), &other.resolve())
     }
 }
 
 impl fmt::Display for StringSymbol {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.write_str(&self.as_str_ref())
+        fmt.write_str(&self.resolve())
     }
 }
 
@@ -86,6 +88,7 @@ type StringInterner = string_interner::StringInterner<InternBackend, DefaultBuil
 
 #[derive(Debug)]
 pub struct StringTable {
+    // I expect that writes should be much rarer than reads
     interner: RwLock<StringInterner>,
 }
 
