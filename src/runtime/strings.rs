@@ -88,9 +88,13 @@ impl fmt::Display for StringSymbol {
 
 
 
-// Just use a global string table, the alternative (an explosion of pointless lifetime parameters
-// for something that is going to live for the entire duration of the program anyways) is much worse
-
+// I've spent way too much time pondering whether or not making this global is a good idea, and I've
+// come to the conclusion that the answer is an overwhelming yes. The string table is unlike almost all 
+// other kinds of global data in that the actual associations that it stores don't actually matter, only 
+// the content does (you could say its data is content-addressed). Therefore, even two completely unrelated
+// programs could share a string table with no problems. The only consideration is thread-safety, which
+// is handled by RwLock. In return, we avoid a massive explosion of lifetime parameters and the memory
+// footprint of StringSymbol is cut in half since we don't need to store a reference to the string table.
 
 lazy_static! {
     pub static ref STRING_TABLE: RwLock<StringTable> = RwLock::new(StringTable::new());
