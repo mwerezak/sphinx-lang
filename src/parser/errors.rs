@@ -244,11 +244,11 @@ impl ContextFrame {
     pub fn end(&self) -> Option<&Span> { self.end.as_ref() }
     
     pub fn set_start(&mut self, token: &TokenMeta) { 
-        self.start.replace(token.span.clone()); 
+        self.start.replace(token.span); 
     }
     
     pub fn set_end(&mut self, token: &TokenMeta) { 
-        self.end.replace(token.span.clone()); 
+        self.end.replace(token.span); 
     }
     
     pub fn set_span(&mut self, start: Option<Span>, end: Option<Span>) {
@@ -275,7 +275,7 @@ impl ContextFrame {
     }
     
     pub fn as_debug_symbol(&self) -> Option<DebugSymbol> {
-        match (self.start.clone(), self.end.clone()) {
+        match (self.start, self.end) {
             
             (Some(start), Some(end)) => {
                 let start_index = start.index;

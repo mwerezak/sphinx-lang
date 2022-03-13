@@ -61,7 +61,7 @@ pub type TokenLength = u16;
 // include only mere character indexes in the output
 // if a lexeme needs to be rendered (e.g. for error messages), 
 // the relevant string can be extracted from the source at that point
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Span {
     pub index: TokenIndex,  // index of start of token in file
     pub length: TokenLength,

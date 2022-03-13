@@ -34,27 +34,29 @@ impl<'c> Disassembler<'c> {
     fn decode_instr(&self, fmt: &mut Formatter<'_>, offset: &usize, instr: &[u8]) -> Result<usize, fmt::Error> {
         write!(fmt, "{:04} ", offset)?;
         
-        let offset = match OpCode::from_byte(instr[0]) {
+        let opcode = OpCode::from_byte(instr[0]);
+        match opcode {
             Some(OpCode::LoadConst) => {
                 let cid = instr[1];
-                writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConst, cid, DasmDisplay(self.chunk.lookup_const(cid)))?;
-                offset + 2
+                // writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConst, cid, DasmDisplay(self.chunk.lookup_const(cid)))?;
             },
-            Some(OpCode::LoadConstWide) => {
+            Some(OpCode::LoadConst16) => {
                 let cid =  ConstID::from_le_bytes(instr[1..3].try_into().unwrap());
-                writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConstWide, cid, DasmDisplay(self.chunk.lookup_const(cid)))?;
-                offset + 3
+                // writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConst16, cid, DasmDisplay(self.chunk.lookup_const(cid)))?;
             },
             Some(opcode) => {
                 writeln!(fmt, "{}", opcode)?;
-                offset + 1
             },
             None => {
                 writeln!(fmt, "Unknown opcode {:#x}", instr[0])?;
-                offset + 1
             }
-        };
-        Ok(offset)
+        }
+        Ok(offset + opcode.map_or(1, |op| op.instr_len()))
+    }
+    
+    fn write_value(&self, write: &mut impl fmt::Write, value: &Variant) -> fmt::Result {
+        let string = format!("{}", value);
+        write!(write, "{}", utils::trim_str(string.as_str(), 16))
     }
 }
 
@@ -70,9 +72,20 @@ impl fmt::Display for Disassembler<'_> {
 impl fmt::Display for OpCode {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mnemonic = match *self {
-            Self::LoadConst => "OP_LDCONST",
-            Self::LoadConstWide => "OP_LDCONST_16",
             Self::Return => "OP_RETURN",
+            
+            Self::LoadConst => "OP_LDCONST",
+            Self::LoadConst16 => "OP_LDCONST_16",
+            
+            Self::Nil => "OP_NIL",
+            Self::Empty => "OP_EMPTY",
+            Self::True => "OP_TRUE",
+            Self::False => "OP_FALSE",
+            
+            Self::Neg => "OP_NEG",
+            Self::Pos => "OP_POS",
+            Self::Inv => "OP_INV",
+            Self::Not => "OP_NOT",
         };
         
         if let Some(width) = fmt.width() {
@@ -82,21 +95,6 @@ impl fmt::Display for OpCode {
         }
     }
 }
-
-struct DasmDisplay<'a>(&'a Variant);
-
-impl<'a> From<&'a Variant> for DasmDisplay<'a> {
-    fn from(value: &'a Variant) -> Self { Self(value) }
-}
-
-impl fmt::Display for DasmDisplay<'_> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let string = format!("{}", self.0);
-        write!(fmt, "{}", utils::trim_str(string.as_str(), 16))
-    }
-}
-
-
 
 
 // Container for debug symbols generated for bytecode
@@ -120,12 +118,12 @@ impl DebugSymbols {
         )
     }
     
-    pub fn push(&mut self, symbol: DebugSymbol) {
+    pub fn push(&mut self, symbol: &DebugSymbol) {
         match self.symbols.last_mut() {
-            Some((last, ref mut count)) if *last == symbol && *count < u8::MAX => { 
+            Some((last, ref mut count)) if last == symbol && *count < u8::MAX => { 
                 *count += 1 
             },
-            _ => { self.symbols.push((symbol, 1)) }
+            _ => { self.symbols.push((*symbol, 1)) }
         }
     }
 }

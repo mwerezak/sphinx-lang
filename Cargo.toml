@@ -11,8 +11,8 @@ categories = ["compilers", "development-tools", "parser-implementations"]
 [lib]
 crate-type = ["lib"]
 
-[[bin]]
-name = "repl"
+# [[bin]]
+# name = "repl"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/maniefrust.html
 

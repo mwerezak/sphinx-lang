@@ -16,7 +16,7 @@ use crate::source::{ModuleSource, SourceText};
 // will probably be attached to the statement level
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DebugSymbol {
     pub start: TokenIndex,
     pub end: TokenIndex,

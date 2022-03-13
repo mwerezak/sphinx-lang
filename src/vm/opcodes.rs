@@ -55,36 +55,70 @@ const OP_GT:            u8 = 0x5F;
 #[repr(u8)]
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum OpCode {
-    LoadConst  = OP_LDCONST,
-    LoadConstWide = OP_LDCONST_16,
     Return = OP_RETURN, 
+    
+    LoadConst  = OP_LDCONST,
+    LoadConst16 = OP_LDCONST_16,
+    
+    Nil = OP_NIL,
+    Empty = OP_EMPTY,
+    True = OP_TRUE,
+    False = OP_FALSE,
+    
+    Neg = OP_NEG,
+    Pos = OP_POS,
+    Inv = OP_INV,
+    Not = OP_NOT,
 }
 
 impl OpCode {
     pub fn from_byte(byte: u8) -> Option<OpCode> {
         let opcode = match byte {
-            OP_LDCONST => Self::LoadConst,
-            OP_LDCONST_16 => Self::LoadConstWide,
             OP_RETURN => Self::Return,
+            
+            OP_LDCONST => Self::LoadConst,
+            OP_LDCONST_16 => Self::LoadConst16,
+            
+            OP_NIL => Self::Nil,
+            OP_EMPTY => Self::Empty,
+            OP_TRUE => Self::True,
+            OP_FALSE => Self::False,
+            
+            OP_NEG => Self::Neg,
+            OP_POS => Self::Pos,
+            OP_INV => Self::Inv,
+            OP_NOT => Self::Not,
+            
             _ => return None,
         };
         Some(opcode)
     }
-}
-
-impl From<OpCode> for u8 {
-    fn from(opcode: OpCode) -> Self {
-        match opcode {
-            OpCode::LoadConst => OP_LDCONST,
-            OpCode::LoadConstWide => OP_LDCONST_16,
-            OpCode::Return => OP_RETURN,
+    
+    pub fn instr_len(&self) -> usize {
+        match self {
+            Self::Return => 1,
+            
+            Self::LoadConst => 2,
+            Self::LoadConst16 => 3,
+            
+            Self::Nil => 1,
+            Self::Empty => 1,
+            Self::True => 1,
+            Self::False => 1,
+            
+            Self::Neg => 1,
+            Self::Pos => 1,
+            Self::Inv => 1,
+            Self::Not => 1,
         }
     }
 }
 
+impl From<OpCode> for u8 {
+    fn from(opcode: OpCode) -> Self { opcode as u8 }
+}
+
 impl PartialEq<u8> for OpCode {
-    fn eq(&self, other: &u8) -> bool {
-        *other == (*self).into()
-    }
+    fn eq(&self, other: &u8) -> bool { *other == (*self).into() }
 }
 

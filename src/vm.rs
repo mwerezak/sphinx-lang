@@ -1,3 +1,4 @@
+use crate::runtime::Variant;
 use crate::runtime::errors::RuntimeError;
 
 pub mod chunk;
@@ -13,6 +14,7 @@ struct VirtualMachine<'c> {
     pc: usize, // program counter
     program: &'c Chunk,
     //globals: HashMap<StringSymbol, Variable>
+    immediate: Vec<Variant>,
 }
 
 impl VirtualMachine<'_> {
@@ -34,9 +36,19 @@ impl VirtualMachine<'_> {
                     
                 },
                 
-                OpCode::LoadConstWide => {
+                OpCode::LoadConst16 => {
                     
                 },
+                
+                OpCode::Nil => self.immediate.push(Variant::Nil),
+                OpCode::Empty => self.immediate.push(Variant::EmptyTuple),
+                OpCode::True => self.immediate.push(Variant::BoolTrue),
+                OpCode::False => self.immediate.push(Variant::BoolFalse),
+                
+                OpCode::Neg => unimplemented!(),
+                OpCode::Pos => unimplemented!(),
+                OpCode::Inv => unimplemented!(),
+                OpCode::Not => unimplemented!(),
             }
         }
     }
