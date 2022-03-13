@@ -270,13 +270,8 @@ impl std::fmt::Display for StringEscapeError {
         );
         
         match self.kind {
-            StringEscapeErrorKind::InvalidEscapeTag => write!(fmt, "unrecognized escape sequence '{}'", render_escape)?,
-            StringEscapeErrorKind::InvalidEscapeArg => write!(fmt, "invalid escape sequence '{}'", render_escape)?,
+            StringEscapeErrorKind::InvalidEscapeTag => write!(fmt, "unrecognized escape sequence '{}'", render_escape),
+            StringEscapeErrorKind::InvalidEscapeArg => write!(fmt, "invalid escape sequence '{}'", render_escape),
         }
-        
-        if let Some(ref raw) = self.raw {
-            write!(fmt, " in string literal \"{}\"", utils::trim_str(raw, 25))?;
-        }
-        Ok(())
     }
 }
