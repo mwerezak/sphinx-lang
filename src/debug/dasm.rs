@@ -1,68 +1,159 @@
 use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{Write, Formatter};
+use std::iter;
 use crate::utils;
 use crate::runtime::Variant;
 use crate::vm::chunk::{Chunk, ConstID};
 use crate::vm::opcodes::OpCode;
 use crate::source::ModuleSource;
-use crate::debug::symbol::DebugSymbol;
+use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, SymbolResolutionError};
 
 
-pub struct Disassembler<'c> {
+const PAD_WIDTH: usize = 48;
+
+pub struct Disassembler<'c, 's> {
     chunk: &'c Chunk,
-    symbols: Option<DebugSymbols>,
+    symbols: Option<&'s DebugSymbols>,
+    symbol_table: Option<&'s ResolvedSymbolTable<'s>>,
 }
 
-impl<'c> Disassembler<'c> {
+// helper for Disassembler::try_resolve_symbol()
+type ResolvedSymbolResult = Result<ResolvedSymbol, SymbolResolutionError>;
+enum Symbol<'s> {
+    // None means "repeat"
+    Unresolved(Option<&'s DebugSymbol>),
+    Resolved(Option<&'s ResolvedSymbolResult>),
+}
+
+impl<'c, 's> Disassembler<'c, 's> {
     pub fn new(chunk: &'c Chunk) -> Self {
-        Disassembler { chunk, symbols: None }
+        Self { chunk, symbols: None, symbol_table: None }
     }
     
-    pub fn with_symbols(mut self, symbols: DebugSymbols) -> Self {
-        self.symbols = Some(symbols); self
+    pub fn with_symbols(mut self, symbols: &'s DebugSymbols) -> Self {
+        self.symbols.replace(symbols); self
+    }
+    
+    pub fn with_symbol_table(mut self, symbol_table: &'s ResolvedSymbolTable<'s>) -> Self {
+        self.symbol_table.replace(symbol_table); self
     }
     
     fn decode_chunk(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        let mut symbols = self.symbols.map(|symbols| symbols.iter());
+        let mut last_symbol = None;
+        
         let mut offset = 0;
         while offset < self.chunk.bytes().len() {
             let (_, bytes) = self.chunk.bytes().split_at(offset);
-            offset = self.decode_instr(fmt, &offset, bytes)?;
+            
+            // get the next unresolved symbol if there are any
+            let unresolved = symbols.as_mut().map_or(None, |iter| iter.next());
+            let symbol = self.try_resolve_symbol(unresolved, last_symbol);
+            last_symbol = unresolved;
+            
+            offset = self.decode_instr(fmt, &offset, bytes, symbol)?;
         }
         Ok(())
     }
+    
+    // handles all the logic around whether we have a symbol table, if there was a symbol resolution error, repeats...
+    fn try_resolve_symbol<'a>(&self, unresolved: Option<&'a DebugSymbol>, last_symbol: Option<&DebugSymbol>) -> Option<Symbol<'a>> where 's: 'a {
+        let resolved = unresolved.and(self.symbol_table.map_or(
+            None,
+            |symbol_table| symbol_table.get(&unresolved.unwrap()))
+        );
+        
+        let is_repeat = last_symbol.and(unresolved).is_some() && last_symbol.unwrap() == unresolved.unwrap();
 
-    fn decode_instr(&self, fmt: &mut Formatter<'_>, offset: &usize, instr: &[u8]) -> Result<usize, fmt::Error> {
-        write!(fmt, "{:04} ", offset)?;
+        if resolved.is_some() {
+            if !is_repeat { Some(Symbol::Resolved(resolved)) }
+            else { Some(Symbol::Resolved(None)) }
+        } else if unresolved.is_some() {
+            if !is_repeat { Some(Symbol::Unresolved(unresolved)) }
+            else { Some(Symbol::Unresolved(None)) }
+        } else { None }
+    }
+
+    fn decode_instr(&self, fmt: &mut Formatter<'_>, offset: &usize, instr: &[u8], symbol: Option<Symbol>) -> Result<usize, fmt::Error> {
+        let mut line = String::new();
+        
+        write!(line, "{:04} ", offset)?;
         
         let opcode = OpCode::from_byte(instr[0]);
         match opcode {
             Some(OpCode::LoadConst) => {
                 let cid = instr[1];
-                // writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConst, cid, DasmDisplay(self.chunk.lookup_const(cid)))?;
+                self.write_opcode(&mut line, &opcode.unwrap())?;
+                write!(line, " {: >4} ", cid)?;
+                self.write_value(&mut line, self.chunk.lookup_const(cid))?;
             },
             Some(OpCode::LoadConst16) => {
                 let cid =  ConstID::from_le_bytes(instr[1..3].try_into().unwrap());
-                // writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConst16, cid, DasmDisplay(self.chunk.lookup_const(cid)))?;
+                self.write_opcode(&mut line, &opcode.unwrap())?;
+                write!(line, " {: >4} ", cid)?;
+                self.write_value(&mut line, self.chunk.lookup_const(cid))?;
             },
             Some(opcode) => {
-                writeln!(fmt, "{}", opcode)?;
+                self.write_opcode(&mut line, &opcode)?;
             },
             None => {
-                writeln!(fmt, "Unknown opcode {:#x}", instr[0])?;
+                write!(line, "Unknown! {:#x}", instr[0])?;
             }
         }
+        
+        if let Some(symbol) = symbol {
+            if line.len() < PAD_WIDTH {
+                line.extend(iter::repeat(' ').take(PAD_WIDTH - line.len()))
+            }
+            match symbol {
+                Symbol::Unresolved(symbol) => self.write_unresolved_symbol(&mut line, symbol)?,
+                Symbol::Resolved(symbol) => self.write_debug_symbol(&mut line, symbol)?,
+            }
+        }
+        
+        writeln!(fmt, "{}", line)?;
+        
         Ok(offset + opcode.map_or(1, |op| op.instr_len()))
     }
     
-    fn write_value(&self, write: &mut impl fmt::Write, value: &Variant) -> fmt::Result {
+    fn write_opcode(&self, fmt: &mut impl fmt::Write, opcode: &OpCode) -> fmt::Result {
+        write!(fmt, "{:16}", opcode)
+    }
+    
+    fn write_value(&self, fmt: &mut impl fmt::Write, value: &Variant) -> fmt::Result {
         let string = format!("{}", value);
-        write!(write, "{}", utils::trim_str(string.as_str(), 16))
+        write!(fmt, "'{}'", utils::trim_str(string.as_str(), 16))
+    }
+    
+    fn write_unresolved_symbol(&self, fmt: &mut impl fmt::Write, symbol: Option<&DebugSymbol>) -> fmt::Result {
+        match symbol {
+            Some(symbol) => write!(fmt, "| ${}:{}", symbol.start, symbol.end),
+            None => write!(fmt, "|"),  // repeats
+        }
+        
+    }
+    
+    fn write_debug_symbol(&self, fmt: &mut impl fmt::Write, symbol: Option<&ResolvedSymbolResult>) -> fmt::Result {
+        match symbol {
+            Some(Ok(symbol)) => {
+                write!(fmt, "{: >4}| ", symbol.lineno())?;
+                
+                let line = symbol.iter_lines().nth(0).unwrap_or("").trim_end();
+                if symbol.is_multiline() {
+                    write!(fmt, "{}...", line)
+                } else {
+                    fmt.write_str(line)
+                }
+            },
+            
+            Some(Err(error)) => write!(fmt, "   ERROR: {}", error),
+            
+            None => write!(fmt, "    |"),
+        }
     }
 }
 
-
-
-impl fmt::Display for Disassembler<'_> {
+impl fmt::Display for Disassembler<'_, '_> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         self.decode_chunk(fmt)
     }
@@ -112,7 +203,7 @@ impl DebugSymbols {
         }
     }
     
-    pub fn symbols(&self) -> impl Iterator<Item=&DebugSymbol> { 
+    pub fn iter(&self) -> impl Iterator<Item=&DebugSymbol> { 
         self.symbols.iter().flat_map(
             |(sym, count)| std::iter::repeat(sym).take(usize::from(*count))
         )

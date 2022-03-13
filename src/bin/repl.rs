@@ -43,7 +43,6 @@ fn main() {
     let args = app.get_matches();
     
     let mut module = None;
-    
     if let Some(s) = args.value_of("cmd") {
         let source = SourceType::String(s.to_string());
         module = Some(ModuleSource::new("<cmd>", source));
