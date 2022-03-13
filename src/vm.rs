@@ -10,6 +10,7 @@ use opcodes::OpCode;
 struct VirtualMachine<'c> {
     pc: usize, // program counter
     program: &'c Chunk,
+    //globals: HashMap<StringSymbol, Variable>
 }
 
 impl VirtualMachine<'_> {

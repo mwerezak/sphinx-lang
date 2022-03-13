@@ -65,29 +65,29 @@ pub fn eval_not(operand: &Variant) -> ExecResult<Variant> {
 
 #[inline]
 pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> Option<bool> {
-    match (lhs, rhs) {
+    let result = match (lhs, rhs) {
         // nil always compares false
-        (Variant::Nil, _) => Some(false),
-        (_, Variant::Nil) => Some(false),
+        (Variant::Nil, _) => false,
+        (_, Variant::Nil) => false,
         
         // empty tuple is only equal with itself
-        (Variant::EmptyTuple, Variant::EmptyTuple) => Some(true),
+        (Variant::EmptyTuple, Variant::EmptyTuple) => true,
         
-        (Variant::BoolTrue, Variant::BoolTrue) => Some(true),
-        (Variant::BoolFalse, Variant::BoolFalse) => Some(true),
+        (Variant::BoolTrue, Variant::BoolTrue) => true,
+        (Variant::BoolFalse, Variant::BoolFalse) => true,
         
-        (Variant::String(lhs_str), Variant::String(rhs_str)) => lhs_str.try_eq(rhs_str),
+        (Variant::String(a), Variant::String(b)) => a == b,
         
         // numeric equality
         (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) 
-            => Some(*lhs_value == *rhs_value),
+            => *lhs_value == *rhs_value,
         
         (_, _) if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) 
-            => Some(lhs.float_value().unwrap() == rhs.float_value().unwrap()),
-        
+            => lhs.float_value().unwrap() == rhs.float_value().unwrap(),
 
-        _ => None,
-    }
+        _ => return None,
+    };
+    Some(result)
 }
 
 #[inline(always)]

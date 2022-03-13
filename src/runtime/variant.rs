@@ -93,9 +93,9 @@ impl From<StringSymbol> for Variant {
 #[derive(Debug, Clone)]
 pub struct VariantKey<'a>(&'a Variant);
 
-impl TryFrom<Variant> for VariantKey<'_> {
+impl<'a> TryFrom<&'a Variant> for VariantKey<'a> {
     type Error = RuntimeError;
-    fn try_from(value: Variant) -> ExecResult<Self> {
+    fn try_from(value: &'a Variant) -> ExecResult<Self> {
         if !value.can_hash() {
             return Err(ErrorKind::UnhashableType.into());
         }
@@ -103,15 +103,11 @@ impl TryFrom<Variant> for VariantKey<'_> {
     }
 }
 
-impl From<VariantKey<'_>> for Variant {
-    fn from(key: VariantKey) -> Self { *key.0 }
-}
-
 impl Hash for VariantKey<'_> {
     fn hash<H>(&self, state: &mut H) where H: Hasher {
         debug_assert!(self.0.can_hash());
         
-        let discriminant = std::mem::discriminant(self);
+        let discriminant = std::mem::discriminant(self.0);
         discriminant.hash(state);
         
         match self.0 {
@@ -167,7 +163,7 @@ impl fmt::Display for Variant {
             },
             
             Self::String(value) => {
-                write!(fmt, "\"{}\"", value.as_str())
+                write!(fmt, "\"{}\"", value)
             },
             
             Self::Tuple(items) => {

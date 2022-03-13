@@ -1,6 +1,7 @@
 use std::io;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use log;
 
@@ -14,7 +15,6 @@ use sphinx_lang::language;
 use sphinx_lang::lexer::LexerBuilder;
 use sphinx_lang::parser::stmt::{Stmt};
 
-use sphinx_lang::runtime::string_table::StringTable;
 use sphinx_lang::interpreter::*;
 use sphinx_lang::interpreter::{EvalContext, ExecContext};
 
@@ -54,9 +54,8 @@ fn main() {
     
     if let Some(module) = module {
         let lexer_factory = language::create_default_lexer_rules();
-        let string_table = StringTable::new();
         
-        let mut parse_ctx = ParseContext::new(&lexer_factory, &string_table);
+        let mut parse_ctx = ParseContext::new(&lexer_factory);
         let source_text = module.source_text().expect("error reading source");
         let parse_result = parse_ctx.parse_ast(source_text);
         
@@ -88,8 +87,7 @@ fn main() {
         
     } else {
         println!("\nSphinx Interpreter {}\n", version);
-        let string_table = StringTable::new();
-        let repl = Repl::new(&string_table);
+        let repl = Repl::new();
         repl.run();
     }
 }
@@ -98,10 +96,9 @@ fn main() {
 const PROMT_START: &str = ">>> ";
 const PROMT_CONTINUE: &str = "... ";
 
-struct Repl<'r> {
-    string_table: &'r StringTable,
+struct Repl {
     lexer_factory: LexerBuilder,
-    root_env: Environment<'r, 'r>,
+    root_env: Arc<Environment>,
 }
 
 
@@ -112,12 +109,11 @@ enum ReadLine {
     Quit,
 }
 
-impl<'r> Repl<'r> {
-    pub fn new(string_table: &'r StringTable) -> Self {
+impl Repl {
+    pub fn new() -> Self {
         Repl { 
-            string_table,
             lexer_factory: language::create_default_lexer_rules(),
-            root_env: new_root_env(string_table),
+            root_env: Environment::new_root(),
         }
     }
     
@@ -147,7 +143,7 @@ impl<'r> Repl<'r> {
     
     fn is_input_complete(&self, input: &str) -> bool {
         // This is fairly hacky. If we can't parse the input without errors, then we assume we need to continue
-        let mut parse_ctx = ParseContext::new(&self.lexer_factory, &self.string_table);
+        let mut parse_ctx = ParseContext::new(&self.lexer_factory);
         let module = ModuleSource::new("<repl>", SourceType::String(input.to_string()));
         let source_text = module.source_text().expect("error reading source");
         let parse_result = parse_ctx.parse_ast(source_text);
@@ -187,7 +183,7 @@ impl<'r> Repl<'r> {
                 }
             }
             
-            let mut parse_ctx = ParseContext::new(&self.lexer_factory, &self.string_table);
+            let mut parse_ctx = ParseContext::new(&self.lexer_factory);
             let module = ModuleSource::new("<repl>", SourceType::String(input));
             let source_text = module.source_text().expect("error reading source");
             let parse_result = parse_ctx.parse_ast(source_text);
@@ -219,7 +215,7 @@ impl<'r> Repl<'r> {
                         
                         match eval_result {
                             Ok(value) => {
-                                println!("{}", value.unwrap_value().as_display(&self.string_table));
+                                println!("{}", value.unwrap_value());
                             },
                             Err(error) => {
                                 println!("{:?}", error)

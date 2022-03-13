@@ -1,13 +1,14 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 
+use std::sync::Arc;
+
 use crate::parser::expr::{ExprMeta, Expr};
 use crate::parser::stmt::{StmtMeta, Label};
 use crate::parser::primary::{Primary, Atom};
 use crate::parser::assign::{Declaration, Assignment, LValue, DeclType};
 
 use crate::runtime::Variant;
-use crate::runtime::strings::StringValue;
 use crate::runtime::ops::*;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::errors::{ExecResult, ErrorKind};
@@ -56,14 +57,14 @@ pub (crate) use try_value;
 
 
 // tracks the local scope and the innermost ExprMeta
-pub struct EvalContext<'a, 'r, 's> {
+pub struct EvalContext<'e> {
     // very important to keep 'a and 'r separate
     // otherwise EvalContext would be forced to live as long as 'r!
-    local_env: &'a Environment<'r, 's>,
+    local_env: &'e Arc<Environment>,
 }
 
-impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
-    pub fn new(local_env: &'a Environment<'r, 's>) -> Self {
+impl<'e> EvalContext<'e> {
+    pub fn new(local_env: &'e Arc<Environment>) -> Self {
         EvalContext { local_env }
     }
     
@@ -146,7 +147,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             Atom::FloatLiteral(value) => Variant::Float(*value),
             Atom::StringLiteral(sym) => Variant::String((*sym).into()),
             
-            Atom::Identifier(name) => self.local_env.lookup(&StringValue::from(*name))?,
+            Atom::Identifier(name) => self.local_env.lookup(name)?,
             
             Atom::Self_ => unimplemented!(),
             Atom::Super => unimplemented!(),
@@ -257,8 +258,6 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
     
     fn eval_assignment(&self, assignment: &Assignment) -> ExecResult<EvalResult> {
         if let LValue::Identifier(name) = assignment.lhs {
-            let name = StringValue::from(name);
-            
             // make sure we evaluate rhs *before* borrowing lhs
             let mut rhs_value = try_value!(self.eval_expr(&assignment.rhs)?);
             
@@ -296,8 +295,6 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
     fn eval_declaration(&self, declaration: &Declaration) -> ExecResult<EvalResult> {
         
         if let LValue::Identifier(name) = declaration.lhs {
-            let name = StringValue::from(name);
-            
             let access = match declaration.decl {
                 DeclType::Immutable => Access::ReadOnly,
                 DeclType::Mutable => Access::ReadWrite,
@@ -305,7 +302,7 @@ impl<'a, 'r, 's> EvalContext<'a, 'r, 's> {
             
             let init_value = try_value!(self.eval_expr(&declaration.init)?);
             
-            self.local_env.create(&name, access, init_value.clone())?;
+            self.local_env.create(name, access, init_value.clone())?;
             
             Ok(init_value.into())
         } else {

@@ -1,12 +1,10 @@
-use std::rc::Rc;
-use std::cell::{RefCell, Ref, RefMut};
-use std::ops::DerefMut;
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
+use std::ops::{Deref, DerefMut};
 use std::collections::HashMap;
 
 use crate::parser::stmt::Label;
 use crate::runtime::{Variant, VariantKey, DefaultBuildHasher};
-use crate::runtime::strings::{StringKey, StringValue};
-use crate::runtime::string_table::StringTable;
+use crate::runtime::strings::{StringSymbol};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 pub mod eval;
@@ -44,152 +42,138 @@ pub struct Variable {
     pub value: Variant,
 }
 
+pub type Namespace = HashMap<StringSymbol, Variable, DefaultBuildHasher>;
 
-pub type Namespace<'s> = HashMap<StringKey<'s>, Variable, DefaultBuildHasher>;
-
-
-pub fn new_root_env<'r, 's>(string_table: &'s StringTable) -> Environment<'r, 's> {
-    let namespace = Namespace::with_hasher(DefaultBuildHasher::default());
-    Environment {
-        parent: None,
-        namespace: RefCell::new(namespace),
-        string_table,
-    }
-}
 
 #[derive(Debug)]
-pub struct Environment<'r, 's> {
-    parent: Option<&'r Environment<'r, 's>>,
-    namespace: RefCell<Namespace<'s>>,  // if we switch to Arc, use a RwLock for this
-    string_table: &'s StringTable,
+pub struct Environment {
+    parent: Option<Arc<Environment>>,
+    namespace: RwLock<Namespace>,  // if we switch to Arc, use a RwLock for this
 }
 
-impl<'r, 's> Environment<'r, 's> {
-    /// Create a new local Environment with this one as it's parent.
-    pub fn new_local<'a>(&'a self) -> Environment<'a, 's> {
+impl Environment {
+    pub fn new_root() -> Arc<Self> {
         let namespace = Namespace::with_hasher(DefaultBuildHasher::default());
-        Environment {
-            parent: Some(self),
-            namespace: RefCell::new(namespace),
-            string_table: self.string_table,
-        }
-    }
-    
-    pub fn string_table(&self) -> &StringTable { self.string_table }
-    
-    #[inline]
-    fn namespace(&self) -> Ref<Namespace<'s>> { 
-        self.namespace.borrow() 
-    }
-    
-    #[inline]
-    fn namespace_mut(&self) -> RefMut<Namespace<'s>> {
-        self.namespace.borrow_mut() 
-    }
-    
-    // if the variable already exists, it is overwritten
-    pub fn create(&self, name: &StringValue, access: Access, value: Variant) -> ExecResult<()> {
-        let mut local_store = self.namespace_mut();
-        let name_key = StringKey::new(name.clone(), self.string_table);
-        let variable = Variable { access, value: value.clone() };
-        
-        local_store.insert(name_key, variable);
-        Ok(())
+        let root_env = Self {
+            parent: None,
+            namespace: RwLock::new(namespace),
+        };
+        Arc::new(root_env)
     }
 
-    pub fn delete(&self, name: &StringValue) -> ExecResult<()> {
-        let mut local_store = self.namespace_mut();
-        let name_key = StringKey::new(name.clone(), self.string_table);
-        if !local_store.contains_key(&name_key) {
-            return Err(ErrorKind::NameNotDefinedLocal(name_key.to_string()).into())
+    /// Create a new local Environment with this one as it's parent.
+    pub fn new_local(self: &Arc<Self>) -> Arc<Self> {
+        let namespace = Namespace::with_hasher(DefaultBuildHasher::default());
+        let local_env = Self {
+            parent: Some(self.clone()),
+            namespace: RwLock::new(namespace),
+        };
+        Arc::new(local_env)
+    }
+    
+    
+    // if the variable already exists, it is overwritten
+    pub fn create(&self, name: StringSymbol, access: Access, value: Variant) -> ExecResult<()> {
+        let mut local_store = self.namespace.write().unwrap();
+        let variable = Variable { access, value: value.clone() };
+        
+        local_store.insert(name, variable);
+        Ok(())
+    }
+    
+
+    pub fn delete(&self, name: &StringSymbol) -> ExecResult<()> {
+        let mut local_store = self.namespace.write().unwrap();
+        if !local_store.contains_key(&name) {
+            return Err(ErrorKind::NameNotDefinedLocal(name.to_string()).into())
         }
         
-        local_store.remove(&name_key);
+        local_store.remove(&name);
         Ok(())
     } 
     
-    pub fn lookup(&self, name: &StringValue) -> ExecResult<Variant> {
-        let name_key = StringKey::new(name.clone(), self.string_table);
-        self.find_value(&name_key)
-            .ok_or_else(|| ErrorKind::NameNotDefined(name_key.to_string()).into())
-    }
-    
-    pub fn lookup_local(&self, name: &StringValue) -> ExecResult<Variant> {
-        let name_key = StringKey::new(name.clone(), self.string_table);
-        self.get_value(&name_key)
-            .ok_or_else(|| ErrorKind::NameNotDefinedLocal(name_key.to_string()).into())
-    }
-    
-    pub fn lookup_mut(&self, name: &StringValue) -> ExecResult<RefMut<Variant>> {
-        let name_key = StringKey::new(name.clone(), self.string_table);
-        
-        let variable = self.find_mut(&name_key)
-            .ok_or_else(|| RuntimeError::from(ErrorKind::NameNotDefined(name_key.to_string())))?;
-        
-        if variable.access != Access::ReadWrite {
-            return Err(ErrorKind::CantAssignImmutable.into())
-        }
-        
-        Ok(RefMut::map(variable, |var| &mut var.value))
-    }
-    
-    pub fn lookup_local_mut(&self, name: &StringValue) -> ExecResult<RefMut<Variant>> {
-        let name_key = StringKey::new(name.clone(), self.string_table);
-        
-        let variable = self.get_mut(&name_key)
-                .ok_or_else(|| RuntimeError::from(ErrorKind::NameNotDefinedLocal(name_key.to_string())))?;
-        
-        if variable.access != Access::ReadWrite {
-            return Err(ErrorKind::CantAssignImmutable.into())
-        }
-        
-        Ok(RefMut::map(variable, |var| &mut var.value))
+    pub fn lookup_local(&self, name: &StringSymbol) -> ExecResult<Variant> {
+        self.get_value(&name)
+            .ok_or_else(|| ErrorKind::NameNotDefinedLocal(name.to_string()).into())
     }
     
     /// Lookup a value for the given name in this Environment
-    fn get_value(&self, name_key: &StringKey<'s>) -> Option<Variant> {
-        let local_store = self.namespace();
-        local_store.get(&name_key).map(|var| var.value.clone())
+    fn get_value(&self, name: &StringSymbol) -> Option<Variant> {
+        let local_store = self.namespace.read().unwrap();
+        local_store.get(&name).map(|var| var.value.clone())
     }
     
-    fn get_mut(&self, name_key: &StringKey<'s>) -> Option<RefMut<Variable>>{
-        let local_store = self.namespace_mut();
-        
-        if !local_store.contains_key(&name_key) {
-            return None;
-        }
-        
-        let ref_mut = RefMut::map(local_store,
-            |local_store| local_store.get_mut(&name_key).unwrap()
-        );
-        Some(ref_mut)
+    pub fn lookup(self: &Arc<Self>, name: &StringSymbol) -> ExecResult<Variant> {
+        self.find_value(&name)
+            .ok_or_else(|| ErrorKind::NameNotDefined(name.to_string()).into())
     }
     
     /// Lookup a value for the given name in the innermost Environment in which it can be found.
-    fn find_value(&self, name_key: &StringKey<'s>) -> Option<Variant> {
+    fn find_value(self: &Arc<Self>, name: &StringSymbol) -> Option<Variant> {
         let mut next_env = Some(self);
         while let Some(env) = next_env {
-            let value = env.get_value(name_key);
+            let value = env.get_value(name);
             if value.is_some() {
                 return value;
             }
-            next_env = env.parent;
+            next_env = env.parent.as_ref();
         }
         None
     }
     
-    fn find_mut(&self, name_key: &StringKey<'s>) -> Option<RefMut<Variable>> {
-        let mut next_env = Some(self);
-        while let Some(env) = next_env {
-            let value = env.get_mut(name_key);
-            if value.is_some() {
-                return value;
-            }
-            next_env = env.parent;
-        }
-        None
+    pub fn lookup_local_mut(&self, name: &StringSymbol) -> ExecResult<VariantWrite<'_>> {
+        self.get_write(name)
     }
     
+    fn get_write(&self, name: &StringSymbol) -> ExecResult<VariantWrite>{
+        let local_store = self.namespace.write().unwrap();
+        match local_store.get(&name) {
+            Some(variable) if variable.access != Access::ReadWrite
+                => Err(ErrorKind::CantAssignImmutable.into()),
+            
+            Some(..) => Ok(VariantWrite { name: *name, write: local_store }),
+                
+            None => Err(ErrorKind::NameNotDefinedLocal(name.to_string()).into()),
+        }
+    }
+    
+    pub fn lookup_mut<'a>(self: &'a Arc<Self>, name: &StringSymbol) -> ExecResult<VariantWrite<'a>> {
+        self.find_write(name)
+    }
+    
+    /// Return a write guard on the closest namespace that contains the name name
+    fn find_write<'a>(self: &'a Arc<Self>, name: &StringSymbol) -> ExecResult<VariantWrite<'a>> {
+        let mut next_env = Some(self);
+        while let Some(env) = next_env {
+            match env.get_write(name) {
+                Err(error) if matches!(error.kind(), ErrorKind::NameNotDefinedLocal(..)) => {
+                    next_env = env.parent.as_ref();
+                },
+                // Err(error) => return Err(error),
+                // Ok(write) => return Ok(write),
+                result => return result,
+            }
+        }
+        Err(ErrorKind::NameNotDefined(name.to_string()).into())
+    }
+}
 
+// Helper struct
+pub struct VariantWrite<'a> {
+    // name: StringSymbol,
+    name: StringSymbol,
+    write: RwLockWriteGuard<'a, Namespace>,
+}
 
+impl Deref for VariantWrite<'_> {
+    type Target = Variant;
+    fn deref(&self) -> &Self::Target { 
+        &self.write.get(&self.name).unwrap().value
+    }
+}
+
+impl DerefMut for VariantWrite<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target { 
+        &mut self.write.get_mut(&self.name).unwrap().value
+    }
 }

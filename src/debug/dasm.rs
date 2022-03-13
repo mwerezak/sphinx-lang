@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
+use crate::utils;
 use crate::runtime::Variant;
-use crate::runtime::strings::StringValue;
 use crate::vm::chunk::{Chunk, ConstID};
 use crate::vm::opcodes::OpCode;
 use crate::source::ModuleSource;
@@ -37,12 +37,12 @@ impl<'c> Disassembler<'c> {
         let offset = match OpCode::from_byte(instr[0]) {
             Some(OpCode::LoadConst) => {
                 let cid = instr[1];
-                writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConst, cid, self.chunk.lookup_const(cid))?;
+                writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConst, cid, DasmDisplay(self.chunk.lookup_const(cid)))?;
                 offset + 2
             },
             Some(OpCode::LoadConstWide) => {
                 let cid =  ConstID::from_le_bytes(instr[1..3].try_into().unwrap());
-                writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConstWide, cid, self.chunk.lookup_const(cid))?;
+                writeln!(fmt, "{:16} {: >4} '{}'", OpCode::LoadConstWide, cid, DasmDisplay(self.chunk.lookup_const(cid)))?;
                 offset + 3
             },
             Some(opcode) => {
@@ -57,6 +57,8 @@ impl<'c> Disassembler<'c> {
         Ok(offset)
     }
 }
+
+
 
 impl fmt::Display for Disassembler<'_> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
@@ -81,37 +83,20 @@ impl fmt::Display for OpCode {
     }
 }
 
-impl fmt::Display for Variant {
+struct DasmDisplay<'a>(&'a Variant);
+
+impl<'a> From<&'a Variant> for DasmDisplay<'a> {
+    fn from(value: &'a Variant) -> Self { Self(value) }
+}
+
+impl fmt::Display for DasmDisplay<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Nil => fmt.write_str("nil"),
-            Self::EmptyTuple => fmt.write_str("()"),
-            Self::BoolTrue => fmt.write_str("true"),
-            Self::BoolFalse => fmt.write_str("false"),
-            Self::Integer(value) => write!(fmt, "{}", value),
-            Self::Float(value) => write!(fmt, "{:.6}", value),
-            Self::String(strval) => write!(fmt, "{}", strval),
-            Self::Tuple(items) => {
-                let (last, rest) = items.split_last().unwrap();
-                fmt.write_str("(")?;
-                for item in rest.iter() {
-                    write!(fmt, "{}, ", item)?;
-                }
-                write!(fmt, "{})", last)
-            },
-        }
+        let string = format!("{}", self.0);
+        write!(fmt, "{}", utils::trim_str(string.as_str(), 16))
     }
 }
 
-impl fmt::Display for StringValue {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Intern(sym) => write!(fmt, "$({:?})", sym),
-            Self::Inline(in_str) => write!(fmt, "$\"{:?}\"", in_str),
-            Self::CowRc(rc_str) => write!(fmt, "*\"{:?}\"", rc_str),
-        }
-    }
-}
+
 
 
 // Container for debug symbols generated for bytecode

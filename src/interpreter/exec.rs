@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::parser::stmt::{StmtMeta, Stmt};
 use crate::runtime::Variant;
 use crate::runtime::errors::{ExecResult, RuntimeError};
@@ -6,12 +8,12 @@ use crate::interpreter::{ControlFlow, EvalContext, Environment};
 use crate::interpreter::eval::{try_value, EvalResult};
 
 
-pub struct ExecContext<'a, 'r, 's> {
-    local_env: &'a Environment<'r, 's>,
+pub struct ExecContext<'e> {
+    local_env: &'e Arc<Environment>,
 }
 
-impl<'a, 'r, 's> ExecContext<'a, 'r, 's> {
-    pub fn new(local_env: &'a Environment<'r, 's>) -> Self {
+impl<'e> ExecContext<'e> {
+    pub fn new(local_env: &'e Arc<Environment>) -> Self {
         ExecContext { local_env }
     }
     
@@ -25,7 +27,7 @@ impl<'a, 'r, 's> ExecContext<'a, 'r, 's> {
                 let eval_ctx = EvalContext::new(self.local_env);
                 let value = try_value!(eval_ctx.eval_expr(&expr)?);
                 
-                println!("{}", value.as_display(self.local_env.string_table()));
+                println!("{}", value);
                 
                 ControlFlow::None
             },

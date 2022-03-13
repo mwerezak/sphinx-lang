@@ -4,7 +4,7 @@ use log::debug;
 
 use crate::source::ModuleSource;
 use crate::lexer::{TokenMeta, Token, TokenIndex, LexerError};
-use crate::runtime::string_table::{StringSymbol, StringTableInternal};
+use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 
 use expr::{ExprMeta, Expr};
 use stmt::{StmtMeta, Stmt, Label};
@@ -32,27 +32,25 @@ pub use errors::{ParserError, ContextFrame};
 
 // Recursive descent parser
 
-pub struct Parser<'m, 'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+pub struct Parser<'m, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     module: &'m ModuleSource,
-    interner: &'h mut StringTableInternal,
     tokens: T,
     next: Option<Result<TokenMeta, LexerError>>,
     errors: VecDeque<ErrorPrototype>,
 }
 
-impl<'m, T> Iterator for Parser<'m, '_, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+impl<'m, T> Iterator for Parser<'m, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     type Item = Result<StmtMeta, ParserError<'m>>;
     fn next(&mut self) -> Option<Self::Item> { self.next_stmt() }
 }
 
 type InternalResult<T> = Result<T, ErrorPrototype>;
 
-impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
+impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
-    pub fn new(module: &'m ModuleSource, interner: &'h mut StringTableInternal, tokens: I) -> Self {
+    pub fn new(module: &'m ModuleSource, tokens: I) -> Self {
         Parser {
             module,
-            interner,
             tokens,
             next: None,
             errors: VecDeque::new(),
@@ -63,7 +61,7 @@ impl<'m, 'h, I> Parser<'m, 'h, I> where I: Iterator<Item=Result<TokenMeta, Lexer
     fn current_index(&mut self) -> TokenIndex { self.peek().unwrap().span.index }
     
     fn get_str_symbol(&mut self, string: &str) -> StringSymbol {
-        self.interner.get_or_intern(string)
+        STRING_TABLE.write().unwrap().get_or_intern(string)
     }
     
     fn advance(&mut self) -> InternalResult<TokenMeta> {
