@@ -235,8 +235,8 @@ impl<'e> EvalContext<'e> {
                 Comparison::LE     => eval_le(&lhs, &rhs),
                 Comparison::GE     => eval_ge(&lhs, &rhs),
                 
-                Comparison::EQ     => eval_eq(&lhs, &rhs),
-                Comparison::NE     => eval_ne(&lhs, &rhs),
+                Comparison::EQ     => Some(eval_eq(&lhs, &rhs)),
+                Comparison::NE     => Some(eval_ne(&lhs, &rhs)),
             
             }.map(Variant::from),
             

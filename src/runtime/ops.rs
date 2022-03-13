@@ -1,6 +1,9 @@
 //! Binary and unary operations with certain primitive types will *short-circuit*,
 //! meaning that the resulting value will be computed using the logic defined here
-//! instead of deferring to the type system
+//! instead of deferring to the type system.
+//!
+//! For most functions in this module, returning None means that the operation
+//! should be deferred to the metatables of the operands involved.
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
@@ -61,11 +64,15 @@ pub fn eval_not(operand: &Variant) -> ExecResult<Variant> {
 
 // Binary Operators
 
-// Equality is handled specially
-
+/// Equality is the most universally applicable of all the operands.
+///
+/// It's a bit different than all the other operations in that we can guarantee
+/// a result (no "invalid operand errors"). This is because it is defined for all primitive types,
+/// and for user objects that don't define __eq we can always fall back to reference equality.
+/// Note: This property is really helpful for implementing tuple equality here.
 #[inline]
-pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> Option<bool> {
-    let result = match (lhs, rhs) {
+pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> bool {
+    match (lhs, rhs) {
         // nil always compares false
         (Variant::Nil, _) => false,
         (_, Variant::Nil) => false,
@@ -76,23 +83,30 @@ pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> Option<bool> {
         (Variant::BoolTrue, Variant::BoolTrue) => true,
         (Variant::BoolFalse, Variant::BoolFalse) => true,
         
+        // string equality
         (Variant::String(a), Variant::String(b)) => a == b,
         
         // numeric equality
-        (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) 
-            => *lhs_value == *rhs_value,
+        (Variant::Integer(a), Variant::Integer(b)) => *a == *b,
         
-        (_, _) if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) 
-            => lhs.float_value().unwrap() == rhs.float_value().unwrap(),
+        (a, b) if is_arithmetic_primitive(a) && is_arithmetic_primitive(b) 
+            => a.float_value().unwrap() == b.float_value().unwrap(),
 
-        _ => return None,
-    };
-    Some(result)
+        // tuple equality
+        (Variant::Tuple(a), Variant::Tuple(b)) => {
+            a.iter().zip(b.iter())
+                .all(|(a, b)| eval_eq(a, b))
+        },
+
+        // TODO objects, defer to metatable or fall back to reference equality using GC handles
+
+        _ => false,
+    }
 }
 
 #[inline(always)]
-pub fn eval_ne(lhs: &Variant, rhs: &Variant) -> Option<bool> {
-    eval_eq(lhs, rhs).map(|result| !result)
+pub fn eval_ne(lhs: &Variant, rhs: &Variant) -> bool {
+    !eval_eq(lhs, rhs)
 }
 
 
