@@ -1,6 +1,24 @@
+use crate::language::{IntType, FloatType};
+use crate::runtime::Variant;
+// use crate::runtime::strings::{StringSymbol, StringInterner};
+use crate::codegen::errors::{CompileResult, ErrorKind};
+
+
+// Constants
+
+// #[derive(Debug, Clone)]
+// pub enum Constant {
+//     Nil,
+//     EmptyTuple,
+//     BoolTrue,
+//     BoolFalse,
+//     Integer(IntType),
+//     Float([u8; 8]),
+//     String(StringSymbol),
+// }
+
 // Chunks
 
-use crate::runtime::Variant;
 
 pub type ConstID = u16;
 
@@ -8,6 +26,8 @@ pub type ConstID = u16;
 pub struct Chunk {
     bytes: Vec<u8>,
     consts: Vec<Variant>,
+    // dedup: Hash
+    
 }
 
 impl Chunk {
@@ -35,11 +55,12 @@ impl Chunk {
         &self.consts[index.into()]
     }
     
-    pub fn push_const(&mut self, value: Variant) -> ConstID {
+    pub fn push_const(&mut self, value: Variant) -> CompileResult<ConstID> {
         let index = self.consts.len();
         self.consts.push(value);
         
-        ConstID::try_from(index).expect("constant pool limit reached")
+        ConstID::try_from(index)
+            .map_err(|_| ErrorKind::ConstPoolLimit.into())
     }
 }
 

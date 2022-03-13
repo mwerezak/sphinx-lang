@@ -3,8 +3,8 @@ use std::fmt::{Write, Formatter};
 use std::iter;
 use crate::utils;
 use crate::runtime::Variant;
-use crate::vm::chunk::{Chunk, ConstID};
-use crate::vm::opcodes::OpCode;
+use crate::codegen::OpCode;
+use crate::codegen::chunk::{Chunk, ConstID};
 use crate::source::ModuleSource;
 use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, SymbolResolutionError};
 
@@ -121,8 +121,12 @@ impl<'c, 's> Disassembler<'c, 's> {
     }
     
     fn write_value(&self, fmt: &mut impl fmt::Write, value: &Variant) -> fmt::Result {
-        let string = format!("{}", value);
-        write!(fmt, "'{}'", utils::trim_str(string.as_str(), 16))
+        if matches!(value, Variant::String(..)) {
+            let string = format!("{}", value);
+            write!(fmt, "{}", utils::trim_str(string.as_str(), 16))
+        } else {
+            write!(fmt, "'{}'", value)
+        }
     }
     
     fn write_unresolved_symbol(&self, fmt: &mut impl fmt::Write, symbol: Option<&DebugSymbol>) -> fmt::Result {
@@ -177,6 +181,23 @@ impl fmt::Display for OpCode {
             Self::Pos => "OP_POS",
             Self::Inv => "OP_INV",
             Self::Not => "OP_NOT",
+            
+            Self::And => "OP_AND",
+            Self::Xor => "OP_XOR",
+            Self::Or => "OP_OR",
+            Self::Shl => "OP_SHL",
+            Self::Shr => "OP_SHR",
+            Self::Add => "OP_ADD",
+            Self::Sub => "OP_SUB",
+            Self::Mul => "OP_MUL",
+            Self::Div => "OP_DIV",
+            Self::Mod => "OP_MOD",
+            Self::EQ => "OP_EQ",
+            Self::NE => "OP_NE",
+            Self::LT => "OP_LT",
+            Self::LE => "OP_LE",
+            Self::GE => "OP_GE",
+            Self::GT => "OP_GT",
         };
         
         if let Some(width) = fmt.width() {

@@ -1,13 +1,6 @@
+use crate::codegen::{Chunk, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::errors::RuntimeError;
-
-pub mod chunk;
-pub mod opcodes;
-pub mod codegen;
-
-use chunk::Chunk;
-use opcodes::OpCode;
-
 
 // Stack-based Virtual Machine
 struct VirtualMachine<'c> {
@@ -49,6 +42,23 @@ impl VirtualMachine<'_> {
                 OpCode::Pos => unimplemented!(),
                 OpCode::Inv => unimplemented!(),
                 OpCode::Not => unimplemented!(),
+                
+                OpCode::And => unimplemented!(),
+                OpCode::Xor => unimplemented!(),
+                OpCode::Or => unimplemented!(),
+                OpCode::Shl => unimplemented!(),
+                OpCode::Shr => unimplemented!(),
+                OpCode::Add => unimplemented!(),
+                OpCode::Sub => unimplemented!(),
+                OpCode::Mul => unimplemented!(),
+                OpCode::Div => unimplemented!(),
+                OpCode::Mod => unimplemented!(),
+                OpCode::EQ => unimplemented!(),
+                OpCode::NE => unimplemented!(),
+                OpCode::LT => unimplemented!(),
+                OpCode::LE => unimplemented!(),
+                OpCode::GE => unimplemented!(),
+                OpCode::GT => unimplemented!(),
             }
         }
     }

@@ -5,7 +5,7 @@ use sphinx_lang::frontend;
 use sphinx_lang::language;
 use sphinx_lang::source::{ModuleSource, SourceType, ParseContext};
 use sphinx_lang::parser::ParserError;
-use sphinx_lang::vm::codegen::CodeGenerator;
+use sphinx_lang::codegen::CodeGenerator;
 use sphinx_lang::debug::symbol::DebugSymbolResolver;
 use sphinx_lang::debug::dasm::Disassembler;
 

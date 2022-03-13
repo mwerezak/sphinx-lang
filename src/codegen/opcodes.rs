@@ -69,6 +69,23 @@ pub enum OpCode {
     Pos = OP_POS,
     Inv = OP_INV,
     Not = OP_NOT,
+    
+    And = OP_AND,
+    Xor = OP_XOR,
+    Or = OP_OR,
+    Shl = OP_SHL,
+    Shr = OP_SHR,
+    Add = OP_ADD,
+    Sub = OP_SUB,
+    Mul = OP_MUL,
+    Div = OP_DIV,
+    Mod = OP_MOD,
+    EQ = OP_EQ,
+    NE = OP_NE,
+    LT = OP_LT,
+    LE = OP_LE,
+    GE = OP_GE,
+    GT = OP_GT,
 }
 
 impl OpCode {
@@ -88,6 +105,23 @@ impl OpCode {
             OP_POS => Self::Pos,
             OP_INV => Self::Inv,
             OP_NOT => Self::Not,
+            
+            OP_AND => Self::And,
+            OP_XOR => Self::Xor,
+            OP_OR => Self::Or,
+            OP_SHL => Self::Shl,
+            OP_SHR => Self::Shr,
+            OP_ADD => Self::Add,
+            OP_SUB => Self::Sub,
+            OP_MUL => Self::Mul,
+            OP_DIV => Self::Div,
+            OP_MOD => Self::Mod,
+            OP_EQ => Self::EQ,
+            OP_NE => Self::NE,
+            OP_LT => Self::LT,
+            OP_LE => Self::LE,
+            OP_GE => Self::GE,
+            OP_GT => Self::GT,
             
             _ => return None,
         };
@@ -110,6 +144,23 @@ impl OpCode {
             Self::Pos => 1,
             Self::Inv => 1,
             Self::Not => 1,
+            
+            Self::And => 1,
+            Self::Xor => 1,
+            Self::Or => 1,
+            Self::Shl => 1,
+            Self::Shr => 1,
+            Self::Add => 1,
+            Self::Sub => 1,
+            Self::Mul => 1,
+            Self::Div => 1,
+            Self::Mod => 1,
+            Self::EQ => 1,
+            Self::NE => 1,
+            Self::LT => 1,
+            Self::LE => 1,
+            Self::GE => 1,
+            Self::GT => 1,
         }
     }
 }

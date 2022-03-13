@@ -1,4 +1,4 @@
-use crate::debug::symbol::DebugSymbol;
+use crate::debug::DebugSymbol;
 use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration};

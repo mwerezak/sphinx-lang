@@ -99,7 +99,7 @@ impl From<LexerError> for ErrorPrototype {
 #[derive(Debug)]
 pub struct ParserError<'m> {
     kind: ErrorKind,
-    module: &'m ModuleSource,
+    module: &'m ModuleSource, // TODO remove
     context: ContextTag,
     symbol: DebugSymbol,
     cause: Option<Box<dyn Error>>,

@@ -1,5 +1,5 @@
 use crate::runtime::strings::StringSymbol;
-use crate::debug::symbol::DebugSymbol;
+use crate::debug::DebugSymbol;
 use crate::parser::expr::Expr;
 
 

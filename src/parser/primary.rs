@@ -10,8 +10,8 @@ use crate::parser::structs::ObjectConstructor;
 pub enum Atom {
     Nil,
     EmptyTuple,
-    Self_,
-    Super,
+    // Self_,
+    // Super,
     Identifier(StringSymbol),
     BooleanLiteral(bool),
     IntegerLiteral(language::IntType),

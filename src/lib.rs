@@ -12,9 +12,9 @@ pub mod lexer;
 pub mod parser;
 
 pub mod language;
+// pub mod interpreter;
+pub mod codegen;
 pub mod runtime;
-pub mod interpreter;
-pub mod vm;
 
 pub mod frontend;
 pub mod debug;
