@@ -1,6 +1,8 @@
 use std::fmt;
 use std::fmt::{Write, Formatter};
 use std::iter;
+use string_interner::Symbol as _;
+
 use crate::utils;
 use crate::language::FloatType;
 use crate::runtime::Variant;
@@ -10,7 +12,7 @@ use crate::source::ModuleSource;
 use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, SymbolResolutionError};
 
 
-const PAD_WIDTH: usize = 48;
+const PAD_WIDTH: usize = 60;
 
 pub struct Disassembler<'c, 's> {
     chunk: &'c UnloadedChunk,
@@ -84,11 +86,13 @@ impl<'c, 's> Disassembler<'c, 's> {
         match opcode {
             Some(OpCode::LoadConst) => {
                 let cid = instr[1];
-                write!(line, "{:16} {: >4} {}", opcode.unwrap(), cid, self.chunk.lookup_const(cid))?;
+                write!(line, "{:16} {: >4}    ", opcode.unwrap(), cid)?;
+                self.write_const(&mut line, self.chunk.lookup_const(cid))?;
             },
             Some(OpCode::LoadConst16) => {
                 let cid =  ConstID::from_le_bytes(instr[1..=2].try_into().unwrap());
-                write!(line, "{:16} {: >4} {}", opcode.unwrap(), cid, self.chunk.lookup_const(cid))?;
+                write!(line, "{:16} {: >4}    ", opcode.unwrap(), cid)?;
+                self.write_const(&mut line, self.chunk.lookup_const(cid))?;
             },
             Some(opcode) => {
                 write!(line, "{:16}", opcode)?;
@@ -138,6 +142,19 @@ impl<'c, 's> Disassembler<'c, 's> {
             
             None => write!(fmt, "    |"),
         }
+    }
+    
+    fn write_const(&self, fmt: &mut impl fmt::Write, value: &Constant) -> fmt::Result {
+        if let Constant::String(symbol) = value {
+            if let Some(string) = self.chunk.strings().resolve(*symbol) {
+                if string.len() > 16 {
+                    return write!(fmt, "\"{}...\"", &string[..13]);
+                }
+                return write!(fmt, "\"{}\"", string);
+            }
+        }
+        
+        write!(fmt, "{}", value)
     }
 }
 
@@ -198,7 +215,7 @@ impl fmt::Display for Constant {
         match self {
             Self::Integer(value) => write!(fmt, "'{}'", value),
             Self::Float(bytes) => write!(fmt, "'{:.6}'", FloatType::from_le_bytes(*bytes)),
-            Self::String(_symbol) => unimplemented!(),
+            Self::String(symbol) => write!(fmt, "${}", symbol.to_usize() + 1),
         }
     }
 }

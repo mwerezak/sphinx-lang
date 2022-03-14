@@ -102,8 +102,8 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn emit_const(&mut self, symbol: &DebugSymbol, cvalue: Constant) -> CompileResult<()> {
-        let cid = self.chunk.push_const(cvalue)
+    fn emit_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<()> {
+        let cid = self.chunk.push_const(value)
             .map_err(|error| error.with_symbol(*symbol))?;
         
         if cid <= u8::MAX.into() {
@@ -155,7 +155,7 @@ impl CodeGenerator {
             Atom::BooleanLiteral(false) => self.emit_instr(symbol, OpCode::False),
             Atom::IntegerLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
             Atom::FloatLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
-            Atom::StringLiteral(value) => unimplemented!(),
+            Atom::StringLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
             
             Atom::Identifier(name) => unimplemented!(),
             

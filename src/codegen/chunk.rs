@@ -1,8 +1,9 @@
 use std::mem;
+use std::collections::HashMap;
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::strings::{InternSymbol, StringInterner, StringTable};
-use crate::codegen::errors::{CompileResult, ErrorKind};
+use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
 
 
 // Constants
@@ -33,9 +34,8 @@ pub type ConstID = u16;
 pub struct ChunkBuilder {
     bytes: Vec<u8>,
     consts: Vec<Constant>,
+    dedup: HashMap<Constant, ConstID>,
     strings: StringInterner,
-    // dedup: Hash
-    
 }
 
 impl ChunkBuilder {
@@ -44,6 +44,7 @@ impl ChunkBuilder {
             strings,
             bytes: Vec::new(),
             consts: Vec::new(),
+            dedup: HashMap::new(),
         }
     }
     
@@ -64,30 +65,33 @@ impl ChunkBuilder {
     
     // Constants
     
-    pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {
-        &self.consts[usize::from(index.into())]
+    pub fn push_const(&mut self, value: Constant) -> CompileResult<ConstID> {
+        if let Constant::String(symbol) = value {
+            debug_assert!(self.strings.resolve(symbol).is_some());
+        }
+        
+        if let Some(cid) = self.dedup.get(&value) {
+            Ok(*cid)
+        } else {
+            let cid = ConstID::try_from(self.consts.len())
+                .map_err(|_| CompileError::from(ErrorKind::ConstPoolLimit))?;
+            self.consts.push(value);
+            self.dedup.insert(value, cid);
+            Ok(cid)
+        }
     }
     
-    pub fn push_const(&mut self, cvalue: Constant) -> CompileResult<ConstID> {
-        // TODO dedup
-        
-        let index = self.consts.len();
-        self.consts.push(cvalue);
-        
-        ConstID::try_from(index)
-            .map_err(|_| ErrorKind::ConstPoolLimit.into())
+    pub fn push_str(&mut self, string: &str) -> CompileResult<ConstID> {
+        let symbol = self.strings.get_or_intern(string);
+        self.push_const(Constant::String(symbol))
     }
     
-    // pub fn strings(&self) -> &StringInterner { &self.strings }
-    
-    // pub fn lookup_str()
-    
-    // pub fn push_str()
-    
-    pub fn build(self) -> UnloadedChunk {
+    pub fn build(mut self) -> UnloadedChunk {
+        self.strings.shrink_to_fit();
+        
         UnloadedChunk {
-            bytes: self.bytes,
-            consts: self.consts,
+            bytes: self.bytes.into_boxed_slice(),
+            consts: self.consts.into_boxed_slice(),
             strings: self.strings,
         }
     }
@@ -98,30 +102,26 @@ impl ChunkBuilder {
 /// This represents code that has been loaded from a file but might be sent
 /// to another thread or otherwise not executed right away
 pub struct UnloadedChunk {
-    bytes: Vec<u8>,
-    consts: Vec<Constant>,
+    bytes: Box<[u8]>,
+    consts: Box<[Constant]>,
     strings: StringInterner,
 }
 
 impl UnloadedChunk {
-    pub fn bytes(&self) -> &[u8] {
-        self.bytes.as_slice()
-    }
+    pub fn bytes(&self) -> &[u8] { &*self.bytes }
+    
+    pub fn strings(&self) -> &StringInterner { &self.strings }
     
     pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {
         &self.consts[usize::from(index.into())]
     }
-    
-    // pub fn lookup_value(&self, index: impl Into<ConstID>) -> Variant {
-
-    // }
 }
 
 
 /// Unlike `UnloadedChunk`, this is not `Send` (mainly because `StringSymbol` is not Send)
 pub struct Chunk {
-    bytes: Vec<u8>,
-    consts: Vec<Variant>,
+    bytes: Box<[u8]>,
+    consts: Box<[Variant]>,
 }
 
 impl Chunk {
@@ -137,9 +137,7 @@ impl Chunk {
     //     }
     // }
     
-    pub fn bytes(&self) -> &[u8] {
-        self.bytes.as_slice()
-    }
+    pub fn bytes(&self) -> &[u8] { &*self.bytes }
     
     pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Variant {
         &self.consts[usize::from(index.into())]
