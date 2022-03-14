@@ -17,8 +17,10 @@ thread_local! {
 
 // Interned Strings
 
+type PhantomUnsend = PhantomData<*mut ()>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct StringSymbol(InternSymbol, PhantomData<std::rc::Rc<str>>);
+pub struct StringSymbol(InternSymbol, PhantomUnsend);
 
 // Not Send because we depend on the thread-local string table.
 // (We can Send strings with some extra work, just not StringSymbols)
