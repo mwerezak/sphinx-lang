@@ -5,14 +5,14 @@ use crate::lexer::rules::MatchResult;
 
 // Helper struct to match an exact string
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub enum MatchCase {
     Sensitive,
     AsciiInsensitive,
     // Insensitive,  // too complicated
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct StrMatcher<'a> {
     target: &'a str,
     match_case: MatchCase,

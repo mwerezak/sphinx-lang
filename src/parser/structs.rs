@@ -1,4 +1,4 @@
 // Data structures
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ObjectConstructor { }  // TODO

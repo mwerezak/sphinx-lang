@@ -27,7 +27,6 @@ use parser::ParserError;
 use codegen::{Program, CodeGenerator, CompileError};
 use runtime::strings::StringInterner;
 
-
 #[derive(Debug)]
 pub enum BuildErrors {
     // depending on which stage the build failed

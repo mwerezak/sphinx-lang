@@ -4,10 +4,8 @@ use std::error::Error;
 // TODO box error
 pub type ExecResult<T> = Result<T, RuntimeError>;
 
-pub type ErrorKind = RuntimeErrorKind;
-
 #[derive(Debug)]
-pub enum RuntimeErrorKind {
+pub enum ErrorKind {
     InvalidUnaryOperand,  // unsupported operand for type
     InvalidBinaryOperand,
     OverflowError,
@@ -20,28 +18,28 @@ pub enum RuntimeErrorKind {
     Other,
 }
 
-impl From<RuntimeErrorKind> for RuntimeError {
-    fn from(kind: RuntimeErrorKind) -> Self {
+impl From<ErrorKind> for RuntimeError {
+    fn from(kind: ErrorKind) -> Self {
         RuntimeError { kind, cause: None }
     }
 }
 
 #[derive(Debug)]
 pub struct RuntimeError {
-    kind: RuntimeErrorKind,
+    kind: ErrorKind,
     cause: Option<Box<dyn Error>>,
 }
 
 impl RuntimeError {
     pub fn new(error: impl Error + 'static) -> Self {
-        RuntimeError::from(RuntimeErrorKind::Other).caused_by(error)
+        RuntimeError::from(ErrorKind::Other).caused_by(error)
     }
     
     pub fn caused_by(mut self, cause: impl Error + 'static) -> Self {
         self.cause = Some(Box::new(cause)); self
     }
     
-    pub fn kind(&self) -> &RuntimeErrorKind { &self.kind }
+    pub fn kind(&self) -> &ErrorKind { &self.kind }
 }
 
 impl Error for RuntimeError {

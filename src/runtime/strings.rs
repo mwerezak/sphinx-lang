@@ -88,7 +88,7 @@ type InternBackend = DefaultBackend<DefaultSymbol>;
 // StringTable is used for string symbol lookups at runtime
 pub type StringInterner = string_interner::StringInterner<InternBackend, DefaultBuildHasher>;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct StringTable {
     interner: RefCell<StringInterner>,
 }

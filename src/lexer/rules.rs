@@ -40,7 +40,7 @@ impl WordChar for char {
 
 // Match Result
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub enum MatchResult {
     // has not consumed enough characters to produce a valid token, but could if given further correct input
     IncompleteMatch,

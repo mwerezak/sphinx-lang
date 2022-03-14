@@ -8,7 +8,6 @@ use crate::debug::symbol::{DebugSymbol, TokenIndex};
 
 pub type ParseResult<T> = Result<T, ParserError>;
 
-// TODO change this to just using string messages instead
 #[derive(Debug)]
 pub enum ErrorKind {
     LexerError,
@@ -48,31 +47,6 @@ pub enum ContextTag {
     Group,
     Label,
 }
-
-// Since ErrorContext can share references with the Parser, we need to use 
-// an error type that does not refer to the error context internally.
-// The error context is always available at the base of the recursive descent call stack and can be added later.
-// #[derive(Debug)]
-// pub struct ErrorPrototype {
-//     kind: ErrorKind,
-//     symbol: Option<DebugSymbol>,
-//     lexer_error: Option<LexerError>,
-// }
-
-// impl ErrorPrototype {
-//     pub fn kind(&self) -> &ErrorKind { &self.kind }
-    
-//     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
-//         self.symbol.replace(symbol); self 
-//     }
-    
-//     pub fn with_symbol_from_ctx(mut self, ctx: &ErrorContext) -> Self {
-//         if let Some(symbol) = ctx.frame().as_debug_symbol() {
-//             self.symbol.replace(symbol);
-//         }
-//         self
-//     }
-// }
 
 impl From<ErrorKind> for ParserError {
     fn from(kind: ErrorKind) -> Self {
@@ -172,7 +146,7 @@ impl fmt::Display for ParserError {
 
 // Structures used by the parser for error handling and synchronization
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ErrorContext {
     stack: Vec<ContextFrame>,
 }
@@ -231,7 +205,7 @@ impl<'m> ErrorContext {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ContextFrame {
     tag: ContextTag,
     start: Option<Span>,

@@ -142,7 +142,7 @@ impl CodeGenerator {
             Expr::Declaration(declaration) => unimplemented!(),
             
             Expr::Tuple(expr_list) => unimplemented!(),
-            Expr::ObjectCtor(ctor) => unimplemented!(),
+            // Expr::ObjectCtor(ctor) => unimplemented!(),
             
             Expr::Block(label, suite) => unimplemented!(),
             

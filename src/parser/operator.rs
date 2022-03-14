@@ -4,14 +4,14 @@ use crate::runtime::types::operator::{Arithmetic, Bitwise, Shift, Comparison, Lo
 
 // Unary Operators
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryOp {
     Neg, Pos, Inv, Not,
 }
 
 // Binary Operators
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BinaryOp {
     // precedence level 2
     Mul, Div, Mod,

@@ -5,7 +5,7 @@ use crate::lexer::rules::strmatcher::StrMatcher;
 
 // Single Character Rules
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SingleCharRule {
     target: char,
     state: MatchResult,
@@ -52,7 +52,7 @@ impl LexerRule for SingleCharRule {
 
 // Multi Character Rules
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MultiCharRule {
     result: Token,
     matcher: StrMatcher<'static>,

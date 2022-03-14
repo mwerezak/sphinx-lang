@@ -8,7 +8,7 @@ pub mod string;
 
 // Identifiers
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct IdentifierRule {
     buf: String,
 }
@@ -58,7 +58,7 @@ impl LexerRule for IdentifierRule {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LabelRule {
     buf: String,
     prefix: StrMatcher<'static>,
@@ -124,7 +124,7 @@ impl LexerRule for LabelRule {
 
 // Plain Integer Literals
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct IntegerLiteralRule {
     buf: String,
 }
@@ -176,7 +176,7 @@ impl LexerRule for IntegerLiteralRule {
     
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct HexIntegerLiteralRule {
     buf: String,
     prefix: StrMatcher<'static>,
@@ -239,7 +239,7 @@ impl LexerRule for HexIntegerLiteralRule {
 
 // Floating-Point Literals
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FloatLiteralRule {
     buf: String,
     point: bool,

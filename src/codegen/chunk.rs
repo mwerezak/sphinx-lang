@@ -100,6 +100,7 @@ impl ChunkBuilder {
 
 
 /// A chunk whose strings have not been yet been loaded into the thread-local string table
+
 #[derive(Debug)]
 pub struct UnloadedChunk {
     bytes: Box<[u8]>,
@@ -119,6 +120,7 @@ impl UnloadedChunk {
 
 
 /// Unlike `UnloadedChunk`, this is not `Send` (mainly because `StringSymbol` is not Send)
+
 #[derive(Debug)]
 pub struct Chunk {
     bytes: Box<[u8]>,

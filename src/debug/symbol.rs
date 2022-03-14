@@ -39,7 +39,7 @@ impl From<&Span> for DebugSymbol {
 
 // Resolved Symbols
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ResolvedSymbol {
     lines: Vec<Rc<String>>,
     lineno: usize,  // line number at the start of the symbol
@@ -245,11 +245,11 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
 }
 
 
-#[derive(Debug)]
+
 enum SortIndex { Start, End }
 
 // comparison based on start or end index
-#[derive(Debug)]
+
 struct IndexSort<'s>(&'s DebugSymbol, SortIndex);
 
 impl IndexSort<'_> {

@@ -26,7 +26,7 @@ pub enum AccessItem {
     Attribute(InternSymbol),
     Index(ExprMeta),
     Invoke(),       // TODO
-    Construct(ObjectConstructor),
+    // Construct(ObjectConstructor),
 }
 
 #[derive(Debug, Clone)]

@@ -24,7 +24,7 @@ pub enum Expr {
     
     Tuple(Box<[ExprMeta]>),
     
-    ObjectCtor(Box<ObjectConstructor>),
+    // ObjectCtor(Box<ObjectConstructor>),
     
     // IfExpr
     

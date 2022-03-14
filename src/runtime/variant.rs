@@ -8,7 +8,7 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
 // Fundamental data value type
-#[derive(Debug, Clone)] // add Copy?
+#[derive(Clone)] // add Copy?
 pub enum Variant {
     Nil,
     EmptyTuple, // the empty tuple value
@@ -90,7 +90,7 @@ impl From<StringSymbol> for Variant {
 
 // Not all Variants are hashable, so there is a separate type to handle that
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct VariantKey<'a>(&'a Variant);
 
 impl<'a> TryFrom<&'a Variant> for VariantKey<'a> {

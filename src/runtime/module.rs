@@ -10,7 +10,7 @@ use crate::runtime::Variant;
 
 type GlobalID = u16; 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Access {
     ReadOnly,
     ReadWrite,

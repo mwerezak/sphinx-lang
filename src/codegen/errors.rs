@@ -5,11 +5,10 @@ use crate::utils;
 use crate::debug::{DebugSymbol, SourceError};
 
 
-pub type ErrorKind = CompileErrorKind;
 pub type CompileResult<T> = Result<T, CompileError>;
 
 #[derive(Debug)]
-pub enum CompileErrorKind {
+pub enum ErrorKind {
     // undefined locals, etc
     ConstPoolLimit,
 }
