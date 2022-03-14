@@ -3,12 +3,9 @@ use std::fmt::{Write, Formatter};
 use std::iter;
 use string_interner::Symbol as _;
 
-use crate::utils;
 use crate::language::FloatType;
-use crate::runtime::Variant;
 use crate::codegen::OpCode;
 use crate::codegen::chunk::{UnloadedChunk, Constant, ConstID};
-use crate::source::ModuleSource;
 use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, SymbolResolutionError};
 
 
@@ -179,7 +176,7 @@ impl fmt::Display for Constant {
 // Container for debug symbols generated for bytecode
 // Should contain a DebugSymbol for each opcode in the 
 // associated Chunk, and in the same order.
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct DebugSymbols {
     symbols: Vec<(DebugSymbol, u8)>,  // run length encoding
 }

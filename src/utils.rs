@@ -39,6 +39,7 @@ pub fn title_case_string(s: &str) -> String {
 // This struct is born out of a desire to read a file into unicode characters 
 // without pulling the entire file into a buffer
 
+#[derive(Debug)]
 pub struct ReadChars<R> where R: BufRead {
     read: R,
     linebuf: String,

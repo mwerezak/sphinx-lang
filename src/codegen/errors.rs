@@ -2,7 +2,7 @@ use std::fmt;
 use std::error::Error;
 
 use crate::utils;
-use crate::debug::DebugSymbol;
+use crate::debug::{DebugSymbol, SourceError};
 
 
 pub type ErrorKind = CompileErrorKind;
@@ -39,6 +39,10 @@ impl Error for CompileError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.cause.as_ref().map(|o| o.as_ref())
     }
+}
+
+impl SourceError for CompileError {
+    fn debug_symbol(&self) -> Option<&DebugSymbol> { self.symbol.as_ref() }
 }
 
 impl fmt::Display for CompileError {

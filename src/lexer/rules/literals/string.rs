@@ -1,4 +1,3 @@
-use crate::utils;
 use crate::lexer::Token;
 use crate::lexer::rules::{MatchResult, LexerRule, TokenError};
 

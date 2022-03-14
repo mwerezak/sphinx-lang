@@ -1,26 +1,52 @@
 //! output/error reporting and formatting
 
-use std::fmt;
 use std::iter;
-use std::fmt::Formatter;
+use std::error::Error;
+use std::fmt::{self, Formatter};
+
 use crate::utils;
-use crate::parser::ParserError;
-use crate::debug::symbol::ResolvedSymbol;
+use crate::debug::SourceError;
+use crate::debug::symbol::{ResolvedSymbol, DebugSymbolResolver};
 
-
-pub fn render_parser_error<'a>(error: &'a ParserError, symbol: &'a ResolvedSymbol) -> impl fmt::Display + 'a {
-    utils::delegate_fmt(|fmt| fmt_parser_error(fmt, error, symbol))
+pub fn print_source_errors(resolver: &impl DebugSymbolResolver, errors: &[impl SourceError]) {
+    let symbols = errors.iter().filter_map(|err| err.debug_symbol());
+        
+    let resolved_table = resolver.resolve_symbols(symbols).unwrap();
+    
+    for error in errors.iter() {
+        let debug_symbol = error.debug_symbol();
+        if debug_symbol.is_none() {
+            continue;
+        }
+        
+        let resolved = resolved_table.get(&debug_symbol.unwrap()).unwrap().as_ref();
+        
+        match resolved {
+            Ok(resolved) => println!("{}", RenderError(error, resolved)),
+            Err(resolve_error) => {
+                println!("{}", error);
+                println!("Could not resolve symbol: {}", resolve_error);
+            }
+        }
+    }
 }
 
-pub fn fmt_parser_error(fmt: &mut Formatter<'_>, error: &ParserError, symbol: &ResolvedSymbol) -> fmt::Result {
-    //TODO figure out a good way to present multiline errors
-    
-    // Write error message
-    let message = utils::title_case_string(&error.to_string());
-    write!(fmt, "{}.\n\n", message)?;
-    
-    // Write source line
-    fmt_source_lines(fmt, symbol)
+
+pub struct RenderError<'e, 's, E>(pub &'e E, pub &'s ResolvedSymbol) where E: Error;
+
+impl<E> fmt::Display for RenderError<'_, '_, E> where E: Error {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let RenderError(error, source_lines) = self;
+        
+        let message = utils::title_case_string(&error.to_string());
+        write!(fmt, "{}.\n\n{}", message, source_lines)
+    }
+}
+
+impl fmt::Display for ResolvedSymbol {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt_source_lines(fmt, self)
+    }
 }
 
 fn fmt_source_lines(fmt: &mut Formatter<'_>, symbol: &ResolvedSymbol) -> fmt::Result {

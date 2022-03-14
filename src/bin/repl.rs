@@ -1,5 +1,149 @@
 fn main() {}
-/*use std::io;
+/*use std::path::PathBuf;
+use clap::{Command, Arg};
+
+use sphinx_lang::frontend;
+use sphinx_lang::language;
+use sphinx_lang::source::{ModuleSource, SourceType, ParseContext};
+use sphinx_lang::codegen::CodeGenerator;
+use sphinx_lang::runtime::strings::StringInterner;
+use sphinx_lang::debug::symbol::DebugSymbolResolver;
+use sphinx_lang::debug::dasm::Disassembler;
+
+
+fn main() {
+    env_logger::init();
+    
+    let app = Command::new("repl")
+        .version("0.0")
+        .author("M. Werezak <mwerezak@gmail.com>")
+        .about("Dynamic language interpreter")
+        .arg(
+            Arg::new("file")
+            .index(1)
+            .help("path to input script file")
+            .value_name("FILE")
+        )
+        .arg(
+            Arg::new("cmd")
+            .short('c')
+            .help("execute a snippet then exit")
+            .value_name("CMD")
+        );
+        
+    let version = app.get_version().unwrap();
+    let args = app.get_matches();
+    
+    let mut module = None;
+    if let Some(s) = args.value_of("cmd") {
+        let source = SourceType::String(s.to_string());
+        module = Some(ModuleSource::new("<cmd>", source));
+    } else if let Some(s) = args.value_of("file") {
+        let source = SourceType::File(PathBuf::from(s));
+        module = Some(ModuleSource::new(s, source));
+    }
+    
+    if module.is_none() {
+        // TODO drop into REPL instead
+        println!("No input.");
+        return;
+    }
+    
+    println!("\nSphinx Version {}\n", version);
+    
+    // compile source
+    let module = module.unwrap();
+    
+    // parsing
+    let mut interner = StringInterner::new();
+    let lexer_factory = language::create_default_lexer_rules();
+    
+    let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
+    let source_text = module.source_text().expect("error reading source");
+    let parse_result = parse_ctx.parse_ast(source_text);
+    
+    if parse_result.is_err() {
+        println!("Errors in file \"{}\":\n", module.name());
+        frontend::print_source_errors(&module, parse_result.unwrap_err());
+        return;
+    }
+    
+    let stmts = parse_result.unwrap();
+    let symbols = stmts.iter().map(|stmts| stmts.debug_symbol());
+    let symbol_table = module.resolve_symbols(symbols);
+    
+    // compilation
+    let codegen = CodeGenerator::with_strings(interner);
+    let compile_result = codegen.compile_program(stmts.iter());
+    if compile_result.is_err() {
+        unimplemented!();
+    }
+    
+    let program = compile_result.unwrap();
+    let dasm = {
+        let dasm = Disassembler::new(program.bytecode())
+            .with_symbols(program.symbols());
+        
+        if let Ok(ref symbol_table) = symbol_table {
+            dasm.with_symbol_table(&symbol_table)
+        } else {
+            dasm
+        }
+    };
+    
+    println!("== \"{}\" ==", module.name());
+    println!("{}", dasm);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;

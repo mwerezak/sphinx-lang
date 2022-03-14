@@ -16,6 +16,7 @@ pub enum SourceType {
     File(PathBuf),
 }
 
+#[derive(Debug)]
 pub enum SourceText {
     String(String),
     File(ReadFileChars),
@@ -55,9 +56,10 @@ impl ModuleSource {
     
 }
 
-// High-level Parsing Interface
 
-// Container for state required for parsing
+/// High-level Parsing Interface
+///
+/// Contains the state required for parsing, and deals with the separate code paths taken for different SourceTypes
 pub struct ParseContext<'f, 's> {
     lexer_factory: &'f LexerBuilder,
     interner: &'s mut StringInterner,

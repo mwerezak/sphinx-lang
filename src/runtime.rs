@@ -5,6 +5,8 @@ mod variant;
 pub mod strings;
 pub mod ops;
 pub mod types;
+pub mod vm;
+pub mod module;
 pub mod errors;
 
 mod tests;

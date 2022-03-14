@@ -97,16 +97,6 @@ impl ResolvedSymbol {
 
 }
 
-impl fmt::Display for ResolvedSymbol {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for line in self.iter_lines() {
-            fmt.write_str(line.trim_end())?;
-            fmt.write_str("\n")?;
-        }
-        Ok(())
-    }
-}
-
 
 // Resolved Symbol Formatting
 

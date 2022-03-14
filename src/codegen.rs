@@ -3,7 +3,6 @@
 use crate::parser::stmt::{StmtMeta, Stmt};
 use crate::parser::expr::{Expr};
 use crate::parser::primary::{Atom, Primary};
-use crate::runtime::Variant;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::strings::StringInterner;
 use crate::debug::dasm::DebugSymbols;
@@ -15,12 +14,13 @@ pub mod errors;
 
 pub use opcodes::OpCode;
 pub use chunk::{Chunk, ConstID};
+pub use errors::{CompileResult, CompileError};
 
 use opcodes::*;
 use chunk::{Constant, ChunkBuilder, UnloadedChunk};
-use errors::{CompileResult, CompileError};
 
 
+#[derive(Debug)]
 pub struct Program {
     bytecode: UnloadedChunk,
     symbols: DebugSymbols,

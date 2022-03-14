@@ -2,22 +2,10 @@ use std::collections::VecDeque;
 
 use log::debug;
 
-use crate::source::ModuleSource;
 use crate::lexer::{TokenMeta, Token, TokenIndex, LexerError};
 use crate::runtime::strings::{InternSymbol, StringInterner};
+use crate::debug::SourceError;
 
-use expr::{ExprMeta, Expr};
-use stmt::{StmtMeta, Stmt, Label};
-use primary::{Primary, Atom, AccessItem};
-use assign::{Assignment, LValue, Declaration, DeclType};
-use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
-use fundefs::{FunctionDef, FunSignature, FunParam};
-use structs::{ObjectConstructor};
-use errors::{ParseResult, ErrorKind, ErrorContext, ContextTag};
-
-
-mod errors;
-mod tests;
 
 pub mod expr;
 pub mod stmt;
@@ -26,8 +14,19 @@ pub mod assign;
 pub mod operator;
 pub mod fundefs;
 pub mod structs;
+pub mod errors;
+mod tests;
 
-pub use errors::{ParserError, ContextFrame};
+pub use errors::{ParserError, ParseResult};
+
+use expr::{ExprMeta, Expr};
+use stmt::{StmtMeta, Stmt, Label};
+use primary::{Primary, Atom, AccessItem};
+use assign::{Assignment, LValue, Declaration, DeclType};
+use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
+use fundefs::{FunctionDef, FunSignature, FunParam};
+use structs::{ObjectConstructor};
+use errors::{ErrorKind, ErrorContext, ContextTag};
 
 
 // Recursive descent parser

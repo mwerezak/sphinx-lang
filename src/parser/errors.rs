@@ -1,23 +1,22 @@
 use std::fmt;
 use std::error::Error;
 use crate::utils;
-use crate::source::ModuleSource;
 use crate::lexer::{Span, TokenMeta, LexerError};
+use crate::debug::SourceError;
 use crate::debug::symbol::{DebugSymbol, TokenIndex};
 
 
-pub type ErrorKind = ParserErrorKind;
 pub type ParseResult<T> = Result<T, ParserError>;
 
 // TODO change this to just using string messages instead
 #[derive(Debug)]
-pub enum ParserErrorKind {
+pub enum ErrorKind {
     LexerError,
     EndofTokenStream,
     SyntaxError(String),
 }
 
-impl<S> From<S> for ParserErrorKind where S: ToString {
+impl<S> From<S> for ErrorKind where S: ToString {
     fn from(message: S) -> Self {
         ErrorKind::SyntaxError(message.to_string())
     }
@@ -144,7 +143,6 @@ impl ParserError {
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
     pub fn context(&self) -> Option<&ContextTag> { self.context.as_ref() }
-    pub fn debug_symbol(&self) -> Option<&DebugSymbol> { self.symbol.as_ref() }
 }
 
 
@@ -152,6 +150,10 @@ impl Error for ParserError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         self.cause.as_ref().map(|o| o.as_ref())
     }
+}
+
+impl SourceError for ParserError {
+    fn debug_symbol(&self) -> Option<&DebugSymbol> { self.symbol.as_ref() }
 }
 
 impl fmt::Display for ParserError {

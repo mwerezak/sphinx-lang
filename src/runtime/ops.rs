@@ -7,7 +7,6 @@
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-use crate::runtime::types::operator::UnaryOp;
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 

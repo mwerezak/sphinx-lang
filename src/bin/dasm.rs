@@ -1,42 +1,16 @@
 use std::path::PathBuf;
 use clap::{Command, Arg};
 
+use sphinx_lang::{BuildErrors, build_module};
 use sphinx_lang::frontend;
-use sphinx_lang::language;
-use sphinx_lang::source::{ModuleSource, SourceType, ParseContext};
-use sphinx_lang::parser::ParserError;
-use sphinx_lang::codegen::CodeGenerator;
-use sphinx_lang::runtime::strings::StringInterner;
+use sphinx_lang::source::{ModuleSource, SourceType};
 use sphinx_lang::debug::symbol::DebugSymbolResolver;
 use sphinx_lang::debug::dasm::Disassembler;
-
-fn print_parse_errors(module: &ModuleSource, errors: Vec<ParserError>) {
-    let symbols = errors.iter().filter_map(|err| err.debug_symbol());
-        
-    let resolved_table = module.resolve_symbols(symbols).unwrap();
-    
-    for error in errors.iter() {
-        let debug_symbol = error.debug_symbol();
-        if debug_symbol.is_none() {
-            continue;
-        }
-        
-        let resolved = resolved_table.get(&debug_symbol.unwrap()).unwrap().as_ref();
-        
-        match resolved {
-            Ok(resolved) => println!("{}", frontend::render_parser_error(&error, resolved)),
-            Err(resolve_error) => {
-                println!("{}", error);
-                println!("Could not resolve symbol: {}", resolve_error);
-            }
-        }
-    }
-}
 
 fn main() {
     env_logger::init();
     
-    let app = Command::new("repl")
+    let app = Command::new("dasm")
         .version("0.0")
         .author("M. Werezak <mwerezak@gmail.com>")
         .about("Bytecode disassembler for the Sphinx programming language")
@@ -81,35 +55,32 @@ fn main() {
     
     println!("\nSphinx Version {}\n", version);
     
-    // compile source
+    // build module
     let module = module.unwrap();
-    
-    // parsing
-    let mut interner = StringInterner::new();
-    let lexer_factory = language::create_default_lexer_rules();
-    
-    let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
-    let source_text = module.source_text().expect("error reading source");
-    let parse_result = parse_ctx.parse_ast(source_text);
-    
-    if parse_result.is_err() {
-        println!("Errors in file \"{}\":\n", module.name());
-        print_parse_errors(&module, parse_result.unwrap_err());
+    let build_result = build_module(&module);
+    if build_result.is_err() {
+        match build_result.unwrap_err() {
+            BuildErrors::Source(error) => {
+                println!("Error reading source: {}.", error);
+            }
+            
+            BuildErrors::Syntax(errors) => {
+                println!("Errors in file \"{}\":\n", module.name());
+                frontend::print_source_errors(&module, &errors);
+            }
+            
+            BuildErrors::Compile(errors) => {
+                println!("Errors in file \"{}\":\n", module.name());
+                frontend::print_source_errors(&module, &errors);
+            }
+        }
         return;
     }
     
-    let stmts = parse_result.unwrap();
-    let symbols = stmts.iter().map(|stmts| stmts.debug_symbol());
-    let symbol_table = module.resolve_symbols(symbols);
     
-    // compilation
-    let codegen = CodeGenerator::with_strings(interner);
-    let compile_result = codegen.compile_program(stmts.iter());
-    if compile_result.is_err() {
-        unimplemented!();
-    }
+    let program = build_result.unwrap();
+    let symbol_table = module.resolve_symbols(program.symbols().iter());
     
-    let program = compile_result.unwrap();
     let dasm = {
         let dasm = Disassembler::new(program.bytecode())
             .with_symbols(program.symbols());
