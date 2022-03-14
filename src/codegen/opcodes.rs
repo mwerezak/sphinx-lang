@@ -6,12 +6,32 @@
 
 // 0x00         Control
 
-const OP_RETURN:        u8 = 0x00;  // return from current function
+                        // width set here so that the longest mnemonic is 16 chars
+const OP_RETURN:        u8 = 0x00;  // return from current function?
+const OP_EXIT:          u8 = 0x01;
 
-// 0x20-30        Immediate Values
+// 0x10-30        Immediate Values
 
-const OP_LDCONST:       u8 = 0x20;  // load a constant from the chunk's const pool
-const OP_LDCONST_16:    u8 = 0x21;  // ...using a 16-bit index
+const OP_POP:           u8 = 0x10;
+
+const OP_LD_CONST:      u8 = 0x21;  // load a constant from the chunk's const pool
+const OP_LD_CONST_16:   u8 = 0x22;  // ...using a 16-bit index
+
+const OP_CR_GLOBAL_IM:  u8 = 0x23;
+const OP_CR_GLOBAL_MUT: u8 = 0x24;
+const OP_ST_GLOBAL:     u8 = 0x25;
+const OP_ST_GLOBAL_16:  u8 = 0x26;
+const OP_LD_GLOBAL:     u8 = 0x27;
+const OP_LD_GLOBAL_16:  u8 = 0x28;
+
+const OP_CR_LOCAL:      u8 = 0x29;  // Note: local mutability tracking is done by the compiler
+const OP_ST_LOCAL:      u8 = 0x2A;
+const OP_ST_LOCAL_16:   u8 = 0x2B;
+const OP_LD_LOCAL:      u8 = 0x2C;
+const OP_LD_LOCAL_16:   u8 = 0x2D;
+
+const OP_LD_NAME:       u8 = 0x2E;
+const OP_LD_INDEX:      u8 = 0x2F;
 
 const OP_NIL:           u8 = 0x30;
 const OP_EMPTY:         u8 = 0x31;
@@ -51,14 +71,20 @@ const OP_GT:            u8 = 0x5F;
 // 0x70         Jumps
 
 
+// 0xF0         Debugging/Tracing/Misc
+
+const DBG_INSPECT:      u8 = 0xF0;
+const DBG_IMM_DMP:      u8 = 0xF1;  // dump the immediate stack
+
 
 #[repr(u8)]
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum OpCode {
     Return = OP_RETURN, 
     
-    LoadConst  = OP_LDCONST,
-    LoadConst16 = OP_LDCONST_16,
+    Pop = OP_POP,
+    LoadConst  = OP_LD_CONST,
+    LoadConst16 = OP_LD_CONST_16,
     
     Nil = OP_NIL,
     Empty = OP_EMPTY,
@@ -93,8 +119,9 @@ impl OpCode {
         let opcode = match byte {
             OP_RETURN => Self::Return,
             
-            OP_LDCONST => Self::LoadConst,
-            OP_LDCONST_16 => Self::LoadConst16,
+            OP_POP => Self::Pop,
+            OP_LD_CONST => Self::LoadConst,
+            OP_LD_CONST_16 => Self::LoadConst16,
             
             OP_NIL => Self::Nil,
             OP_EMPTY => Self::Empty,
@@ -132,6 +159,7 @@ impl OpCode {
         match self {
             Self::Return => 1,
             
+            Self::Pop => 1,
             Self::LoadConst => 2,
             Self::LoadConst16 => 3,
             
@@ -173,3 +201,48 @@ impl PartialEq<u8> for OpCode {
     fn eq(&self, other: &u8) -> bool { *other == (*self).into() }
 }
 
+// For disassembly/debugging
+impl std::fmt::Display for OpCode {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mnemonic = match *self {
+            Self::Return => "OP_RETURN",
+            
+            Self::Pop => "OP_POP",
+            Self::LoadConst => "OP_LD_CONST",
+            Self::LoadConst16 => "OP_LD_CONST_16",
+            
+            Self::Nil => "OP_NIL",
+            Self::Empty => "OP_EMPTY",
+            Self::True => "OP_TRUE",
+            Self::False => "OP_FALSE",
+            
+            Self::Neg => "OP_NEG",
+            Self::Pos => "OP_POS",
+            Self::Inv => "OP_INV",
+            Self::Not => "OP_NOT",
+            
+            Self::And => "OP_AND",
+            Self::Xor => "OP_XOR",
+            Self::Or => "OP_OR",
+            Self::Shl => "OP_SHL",
+            Self::Shr => "OP_SHR",
+            Self::Add => "OP_ADD",
+            Self::Sub => "OP_SUB",
+            Self::Mul => "OP_MUL",
+            Self::Div => "OP_DIV",
+            Self::Mod => "OP_MOD",
+            Self::EQ => "OP_EQ",
+            Self::NE => "OP_NE",
+            Self::LT => "OP_LT",
+            Self::LE => "OP_LE",
+            Self::GE => "OP_GE",
+            Self::GT => "OP_GT",
+        };
+        
+        if let Some(width) = fmt.width() {
+            write!(fmt, "{:1$}", mnemonic, width)
+        } else {
+            fmt.write_str(mnemonic)
+        }
+    }
+}

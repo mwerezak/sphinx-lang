@@ -14,7 +14,7 @@ pub mod opcodes;
 pub mod errors;
 
 pub use opcodes::OpCode;
-pub use chunk::Chunk;
+pub use chunk::{Chunk, ConstID};
 
 use opcodes::*;
 use chunk::{Constant, ChunkBuilder, UnloadedChunk};
@@ -86,7 +86,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn emit_single(&mut self, symbol: &DebugSymbol, opcode: OpCode, byte: u8) -> CompileResult<()> {
+    fn emit_instr_byte(&mut self, symbol: &DebugSymbol, opcode: OpCode, byte: u8) -> CompileResult<()> {
         debug_assert!(opcode.instr_len() == 2);
         self.symbols.push(symbol);
         self.chunk.push_byte(opcode);
@@ -94,7 +94,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn emit_multi<const N: usize>(&mut self, symbol: &DebugSymbol, opcode: OpCode, bytes: [u8; N]) -> CompileResult<()> {
+    fn emit_instr_data<const N: usize>(&mut self, symbol: &DebugSymbol, opcode: OpCode, bytes: [u8; N]) -> CompileResult<()> {
         debug_assert!(opcode.instr_len() == 1 + N);
         self.symbols.push(symbol);
         self.chunk.push_byte(opcode);
@@ -107,16 +107,19 @@ impl CodeGenerator {
             .map_err(|error| error.with_symbol(*symbol))?;
         
         if cid <= u8::MAX.into() {
-            self.emit_single(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap())
+            self.emit_instr_byte(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap())
         } else {
-            self.emit_multi(symbol, OpCode::LoadConst16, cid.to_le_bytes())
+            self.emit_instr_data(symbol, OpCode::LoadConst16, cid.to_le_bytes())
         }
     }
     
     fn compile_stmt(&mut self, symbol: &DebugSymbol, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
             Stmt::Echo(expr) => unimplemented!(),
-            Stmt::Expression(expr) => self.compile_expr(symbol, expr),
+            Stmt::Expression(expr) => {
+                self.compile_expr(symbol, expr)?;
+                self.emit_instr(symbol, OpCode::Pop)
+            },
             Stmt::Continue(label) => unimplemented!(),
             Stmt::Break(label, expr) => unimplemented!(),
             Stmt::Return(expr) => unimplemented!(),

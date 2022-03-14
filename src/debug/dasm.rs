@@ -165,51 +165,6 @@ impl fmt::Display for Disassembler<'_, '_> {
 }
 
 
-impl fmt::Display for OpCode {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mnemonic = match *self {
-            Self::Return => "OP_RETURN",
-            
-            Self::LoadConst => "OP_LDCONST",
-            Self::LoadConst16 => "OP_LDCONST_16",
-            
-            Self::Nil => "OP_NIL",
-            Self::Empty => "OP_EMPTY",
-            Self::True => "OP_TRUE",
-            Self::False => "OP_FALSE",
-            
-            Self::Neg => "OP_NEG",
-            Self::Pos => "OP_POS",
-            Self::Inv => "OP_INV",
-            Self::Not => "OP_NOT",
-            
-            Self::And => "OP_AND",
-            Self::Xor => "OP_XOR",
-            Self::Or => "OP_OR",
-            Self::Shl => "OP_SHL",
-            Self::Shr => "OP_SHR",
-            Self::Add => "OP_ADD",
-            Self::Sub => "OP_SUB",
-            Self::Mul => "OP_MUL",
-            Self::Div => "OP_DIV",
-            Self::Mod => "OP_MOD",
-            Self::EQ => "OP_EQ",
-            Self::NE => "OP_NE",
-            Self::LT => "OP_LT",
-            Self::LE => "OP_LE",
-            Self::GE => "OP_GE",
-            Self::GT => "OP_GT",
-        };
-        
-        if let Some(width) = fmt.width() {
-            write!(fmt, "{:1$}", mnemonic, width)
-        } else {
-            fmt.write_str(mnemonic)
-        }
-    }
-}
-
-
 impl fmt::Display for Constant {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         match self {
