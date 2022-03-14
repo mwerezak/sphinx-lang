@@ -1,8 +1,9 @@
 use std::mem;
 use std::collections::HashMap;
+use string_interner::Symbol as _;
 use crate::language::{IntType, FloatType};
-use crate::runtime::Variant;
-use crate::runtime::strings::{InternSymbol, StringInterner, StringTable};
+use crate::runtime::{Variant, STRING_TABLE};
+use crate::runtime::strings::{StringInterner, InternSymbol, StringSymbol};
 use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
 
 
@@ -98,9 +99,7 @@ impl ChunkBuilder {
 }
 
 
-/// A chunk whose strings have not been loaded into the string table
-/// This represents code that has been loaded from a file but might be sent
-/// to another thread or otherwise not executed right away
+/// A chunk whose strings have not been yet been loaded into the thread-local string table
 pub struct UnloadedChunk {
     bytes: Box<[u8]>,
     consts: Box<[Constant]>,
@@ -121,25 +120,61 @@ impl UnloadedChunk {
 /// Unlike `UnloadedChunk`, this is not `Send` (mainly because `StringSymbol` is not Send)
 pub struct Chunk {
     bytes: Box<[u8]>,
-    consts: Box<[Variant]>,
+    consts: Box<[Constant]>,
+    strings: Box<[StringSymbol]>,
 }
 
 impl Chunk {
-    pub fn load(chunk: UnloadedChunk) -> Self {
-        unimplemented!()
-    }
-    
-    // fn load_const(value: Constant, interner: &mut StringInterner) -> Variant {
-    //     match value {
-    //         Constant::Integer(value) => Variant::from(value),
-    //         Constant::Float(bytes) => FloatType::from_le_bytes(bytes).into(),
-    //         Constant::String(symbol) => 
-    //     }
-    // }
-    
     pub fn bytes(&self) -> &[u8] { &*self.bytes }
     
-    pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Variant {
-        &self.consts[usize::from(index.into())]
+    pub fn lookup_const(&self, index: impl Into<ConstID>) -> Variant {
+        let value = &self.consts[usize::from(index.into())];
+        match value {
+            Constant::Integer(value) => Variant::from(*value),
+            Constant::Float(bytes) => FloatType::from_le_bytes(*bytes).into(),
+            Constant::String(idx) => Variant::from(self.strings[idx.to_usize()]),
+        }
+    }
+    
+    pub fn load(chunk: UnloadedChunk) -> Self {
+        let strings = STRING_TABLE.with(|string_table| {
+            let mut interner = string_table.interner_mut();
+            
+            let mut strings = Vec::with_capacity(chunk.strings.len());
+            for (idx, string) in chunk.strings.into_iter() {
+                debug_assert!(idx.to_usize() == strings.len());
+                let symbol = StringSymbol::from(interner.get_or_intern(string));
+                strings.push(symbol);
+            }
+            
+            strings.into_boxed_slice()
+        });
+        
+        Self {
+            bytes: chunk.bytes,
+            consts: chunk.consts,
+            strings
+        }
+    }
+    
+    // prepares a Chunk for exporting to a file
+    pub fn unload(self) -> UnloadedChunk {
+        let strings = STRING_TABLE.with(|string_table| {
+            let interner = string_table.interner();
+            
+            let mut strings = StringInterner::with_capacity(self.strings.len());
+            for symbol in self.strings.into_iter() {
+                let string = interner.resolve((*symbol).into()).unwrap();
+                strings.get_or_intern(string);
+            }
+            strings.shrink_to_fit();
+            strings
+        });
+        
+        UnloadedChunk {
+            bytes: self.bytes,
+            consts: self.consts,
+            strings,
+        }
     }
 }

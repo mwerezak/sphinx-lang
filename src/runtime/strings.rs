@@ -86,7 +86,7 @@ type InternBackend = DefaultBackend<DefaultSymbol>;
 // StringTable is used for string symbol lookups at runtime
 pub type StringInterner = string_interner::StringInterner<InternBackend, DefaultBuildHasher>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StringTable {
     interner: RefCell<StringInterner>,
 }
@@ -98,16 +98,6 @@ impl StringTable {
         }
     }
     
-    // effectively consumes the string table, leaving it empty
-    pub fn take_interner(&self) -> StringInterner {
-        self.interner.take()
-    }
-    
-    // helpful for interning a bunch of strings without the overhead of repeatedly borrowing
-    // pub fn borrow_interner_mut(&self) -> impl DerefMut<Target=StringInterner> + '_ {
-    //     self.interner.borrow_mut()
-    // }
-    
     pub fn get_or_intern(&self, string: &str) -> StringSymbol {
         self.interner.borrow_mut().get_or_intern(string).into()
     }
@@ -115,6 +105,20 @@ impl StringTable {
     pub fn resolve(&self, symbol: &StringSymbol) -> impl Deref<Target=str> + '_ {
         let symbol = InternSymbol::from(*symbol);
         Ref::map(self.interner.borrow(), |interner| interner.resolve(symbol).unwrap())
+    }
+    
+    // effectively consumes the string table, leaving it empty
+    pub fn take_interner(&self) -> StringInterner {
+        self.interner.take()
+    }
+
+    pub fn interner(&self) -> impl Deref<Target=StringInterner> + '_ {
+        self.interner.borrow()
+    }
+    
+    // helpful for interning a bunch of strings without the overhead of repeatedly borrowing
+    pub fn interner_mut(&self) -> impl DerefMut<Target=StringInterner> + '_ {
+        self.interner.borrow_mut()
     }
 }
 
