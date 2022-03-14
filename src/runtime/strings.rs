@@ -1,27 +1,36 @@
 use std::fmt;
 use std::cmp;
-use std::sync::{RwLock, RwLockReadGuard};
+use std::cell::{RefCell, Ref};
 use std::ops::Deref;
+use std::marker::PhantomData;
 use string_interner::{self, DefaultBackend, DefaultSymbol};
 use string_interner::symbol::Symbol;
 
 use crate::runtime::DefaultBuildHasher;
 
+// TODO only intern new strings with length <= 40 chars
+
+thread_local! {
+    pub static STRING_TABLE: StringTable = StringTable::new();
+}
+
 
 // Interned Strings
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct StringSymbol(InternSymbol);
+pub struct StringSymbol(InternSymbol, PhantomData<std::rc::Rc<str>>);
+
+// Not Send because we depend on the thread-local string table.
+// (We can Send strings with some extra work, just not StringSymbols)
+// impl !Send for StringSymbol { }
 
 impl StringSymbol {
     fn to_usize(&self) -> usize {
         self.0.to_usize()
     }
     
-    /// Returns a Deref that reads the string referenced by this `StringSymbol` from the global string table.
-    /// A lock on the string table is held until the value returned from this method is dropped.
-    pub fn resolve(&self) -> impl Deref<Target=str> {
-        STRING_TABLE.resolve(self)
+    pub fn intern(string: &str) -> Self {
+        STRING_TABLE.with(|str_tbl| str_tbl.get_or_intern(string))
     }
 }
 
@@ -35,96 +44,80 @@ impl From<StringSymbol> for InternSymbol {
 
 impl From<InternSymbol> for StringSymbol {
     fn from(symbol: InternSymbol) -> Self {
-        Self(symbol)
-    }
-}
-
-impl From<&str> for StringSymbol {
-    fn from(string: &str) -> Self {
-        match STRING_TABLE.get(string) {
-            Some(sym) => sym,
-            None => STRING_TABLE.get_or_intern(string),
-        }
+        Self(symbol, PhantomData)
     }
 }
 
 // Lexicographical ordering of strings
 impl PartialOrd for StringSymbol {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        <str as PartialOrd>::partial_cmp(&self.resolve(), &other.resolve())
+        STRING_TABLE.with(|str_tbl| {
+            <str as PartialOrd>::partial_cmp(
+                &str_tbl.resolve(self),
+                &str_tbl.resolve(other),
+            )
+        })
+
     }
 }
 
 impl Ord for StringSymbol {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        <str as Ord>::cmp(&self.resolve(), &other.resolve())
+        STRING_TABLE.with(|str_tbl| {
+            <str as Ord>::cmp(
+                &str_tbl.resolve(self),
+                &str_tbl.resolve(other),
+            )
+        })
     }
 }
 
 impl fmt::Display for StringSymbol {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.write_str(&self.resolve())
+        STRING_TABLE.with(|str_tbl| fmt.write_str(&str_tbl.resolve(self)))
     }
-}
-
-
-
-// I've spent way too much time pondering whether or not making this global is a good idea, and I've
-// come to the conclusion that the answer is an overwhelming yes. The string table is unlike almost all 
-// other kinds of global data in that the actual associations that it stores don't actually matter, only 
-// the content does (you could say its data is content-addressed). Therefore, even two completely unrelated
-// programs could share a string table with no problems. The only consideration is thread-safety, which
-// is handled by RwLock. In return, we avoid a massive explosion of lifetime parameters and the memory
-// footprint of StringSymbol is cut in half since we don't need to store a reference to the string table.
-
-lazy_static! {
-    pub static ref STRING_TABLE: StringTable = StringTable::new();
 }
 
 
 type InternSymbol = DefaultSymbol;
 type InternBackend = DefaultBackend<DefaultSymbol>;
-type StringInterner = string_interner::StringInterner<InternBackend, DefaultBuildHasher>;
+
+// StringInterner is used for storage of strings in code units during compilation,
+// StringTable is used for string symbol lookups at runtime
+pub type StringInterner = string_interner::StringInterner<InternBackend, DefaultBuildHasher>;
 
 #[derive(Debug)]
 pub struct StringTable {
-    // I expect that writes should be much rarer than reads
-    interner: RwLock<StringInterner>,
+    interner: RefCell<StringInterner>,
 }
 
-impl<'s> StringTable {
+impl StringTable {
     pub fn new() -> Self {
         StringTable {
-            interner: RwLock::new(StringInterner::new()),
+            interner: RefCell::new(StringInterner::new()),
         }
     }
     
-    pub fn get(&self, string: &str) -> Option<StringSymbol> {
-        self.interner.read().unwrap()
-            .get(string).map(|symbol| symbol.into())
+    // effectively consumes the string table, leaving it empty
+    pub fn take_interner(&self) -> StringInterner {
+        self.interner.take()
     }
     
     pub fn get_or_intern(&self, string: &str) -> StringSymbol {
-        self.interner.write().unwrap().get_or_intern(string).into()
+        self.interner.borrow_mut().get_or_intern(string).into()
     }
     
-    pub fn resolve(&'s self, symbol: &StringSymbol) -> StrRead<'s> {
-        StrRead { 
-            symbol: (*symbol).into(), 
-            read: self.interner.read().unwrap() 
-        }
+    pub fn resolve<'s>(&'s self, symbol: &StringSymbol) -> impl Deref<Target=str> + 's {
+        let symbol = InternSymbol::from(*symbol);
+        Ref::map(self.interner.borrow(), |interner| interner.resolve(symbol).unwrap())
     }
 }
 
-/// Deref for strings resolved by the string table. Holds a read lock on the table until dropped.
-pub struct StrRead<'s>{
-    symbol: InternSymbol,
-    read: RwLockReadGuard<'s, StringInterner>
-}
-
-impl<'s> Deref for StrRead<'s> {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.read.resolve(self.symbol).unwrap()
+impl<'s> Extend<&'s str> for StringTable {
+    fn extend<T>(&mut self, iter: T) where T: IntoIterator<Item=&'s str> {
+        let mut interner = self.interner.borrow_mut();
+        for string in iter.into_iter() {
+            interner.get_or_intern(string);
+        }
     }
 }

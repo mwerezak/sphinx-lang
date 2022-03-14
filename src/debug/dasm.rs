@@ -212,7 +212,7 @@ impl fmt::Display for OpCode {
 // Container for debug symbols generated for bytecode
 // Should contain a DebugSymbol for each opcode in the 
 // associated Chunk, and in the same order.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DebugSymbols {
     symbols: Vec<(DebugSymbol, u8)>,  // run length encoding
 }

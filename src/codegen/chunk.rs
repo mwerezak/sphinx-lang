@@ -1,6 +1,6 @@
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-// use crate::runtime::strings::{StringSymbol, StringInterner};
+use crate::runtime::strings::{StringSymbol, StringInterner};
 use crate::codegen::errors::{CompileResult, ErrorKind};
 
 
@@ -26,17 +26,21 @@ pub type ConstID = u16;
 pub struct Chunk {
     bytes: Vec<u8>,
     consts: Vec<Variant>,
+    strings: StringInterner,
     // dedup: Hash
     
 }
 
 impl Chunk {
-    pub fn new() -> Self {
-        Chunk {
+    pub fn with_strings(strings: StringInterner) -> Self {
+        Self {
+            strings,
             bytes: Vec::new(),
             consts: Vec::new(),
         }
     }
+    
+    // Bytecode
     
     pub fn bytes(&self) -> &[u8] {
         self.bytes.as_slice()
@@ -51,6 +55,10 @@ impl Chunk {
         self.bytes.extend(bytes);
     }
     
+    // Constants
+    
+    pub fn strings(&self) -> &StringInterner { &self.strings }
+    
     pub fn lookup_const(&self, index: impl Into<usize>) -> &Variant {
         &self.consts[index.into()]
     }
@@ -62,6 +70,8 @@ impl Chunk {
         ConstID::try_from(index)
             .map_err(|_| ErrorKind::ConstPoolLimit.into())
     }
+    
+    // pub fn push_str()
 }
 
 

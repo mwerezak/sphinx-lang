@@ -6,6 +6,7 @@ use crate::utils::ReadChars;
 use crate::lexer::LexerBuilder;
 use crate::parser::{Parser, ParserError};
 use crate::parser::stmt::StmtMeta;
+use crate::runtime::strings::StringInterner;
 
 type ReadFileChars = ReadChars<io::BufReader<fs::File>>;
 
@@ -15,15 +16,9 @@ pub enum SourceType {
     File(PathBuf),
 }
 
-pub enum SourceText<'m> {
-    String {
-        module: &'m ModuleSource,
-        text: String,
-    },
-    File {
-        module: &'m ModuleSource,
-        text: ReadFileChars
-    },
+pub enum SourceText {
+    String(String),
+    File(ReadFileChars),
 }
 
 // Represents a "source" of source code, and provides the means to access the source text as a sequence of chars
@@ -47,14 +42,8 @@ impl ModuleSource {
     // Load the source text
     pub fn source_text(&self) -> io::Result<SourceText> {
         match &self.source {
-            SourceType::String(string) => Ok(SourceText::String {
-                module: self,
-                text: string.clone()
-            }),
-            SourceType::File(ref path) => Ok(SourceText::File{
-                module: self,
-                text: Self::read_source_file(path)?,
-            }),
+            SourceType::String(string) => Ok(SourceText::String(string.clone())),
+            SourceType::File(ref path) => Ok(SourceText::File(Self::read_source_file(path)?)),
         }
     }
     
@@ -69,19 +58,21 @@ impl ModuleSource {
 // High-level Parsing Interface
 
 // Container for state required for parsing
-pub struct ParseContext<'f> {
+pub struct ParseContext<'f, 's> {
     lexer_factory: &'f LexerBuilder,
+    interner: &'s mut StringInterner,
 }
 
-impl<'f> ParseContext<'f> {
-    pub fn new(lexer_factory: &'f LexerBuilder) -> Self {
+impl<'f, 's> ParseContext<'f, 's> {
+    pub fn new(lexer_factory: &'f LexerBuilder, interner: &'s mut StringInterner) -> Self {
         ParseContext {
             lexer_factory,
+            interner,
         }
     }
     
     // Returns a Vec of parsed Stmts (if no error occurred) or a Vec or errors
-    pub fn parse_ast<'m>(&mut self, source: SourceText<'m>) -> Result<Vec<StmtMeta>, Vec<ParserError>> {
+    pub fn parse_ast<'m>(&mut self, source: SourceText) -> Result<Vec<StmtMeta>, Vec<ParserError>> {
         
         let output = self.collect_parser_output(source);
         
@@ -93,19 +84,19 @@ impl<'f> ParseContext<'f> {
     }
 
     // Helper to deal with the separate branches for parsing SourceText
-    fn collect_parser_output<'m>(&mut self, source: SourceText<'m>) -> Vec<Result<StmtMeta, ParserError>> {
+    fn collect_parser_output<'m>(&mut self, source: SourceText) -> Vec<Result<StmtMeta, ParserError>> {
         match source {
-            SourceText::String { module, text } => {
+            SourceText::String(text) => {
                 let mut chars = Vec::with_capacity(text.len());
                 chars.extend(text.chars().map(Ok));
                 
                 let lexer = self.lexer_factory.build(chars.into_iter());
-                let parser = Parser::new(module, lexer);
+                let parser = Parser::new(self.interner, lexer);
                 parser.collect()
             }
-            SourceText::File { module, text } => {
+            SourceText::File(text) => {
                 let lexer = self.lexer_factory.build(text);
-                let parser = Parser::new(module, lexer);
+                let parser = Parser::new(self.interner, lexer);
                 parser.collect()
             },
         }

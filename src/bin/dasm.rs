@@ -6,6 +6,7 @@ use sphinx_lang::language;
 use sphinx_lang::source::{ModuleSource, SourceType, ParseContext};
 use sphinx_lang::parser::ParserError;
 use sphinx_lang::codegen::CodeGenerator;
+use sphinx_lang::runtime::strings::StringInterner;
 use sphinx_lang::debug::symbol::DebugSymbolResolver;
 use sphinx_lang::debug::dasm::Disassembler;
 
@@ -84,8 +85,10 @@ fn main() {
     let module = module.unwrap();
     
     // parsing
+    let mut interner = StringInterner::new();
     let lexer_factory = language::create_default_lexer_rules();
-    let mut parse_ctx = ParseContext::new(&lexer_factory);
+    
+    let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
     let source_text = module.source_text().expect("error reading source");
     let parse_result = parse_ctx.parse_ast(source_text);
     
@@ -100,7 +103,7 @@ fn main() {
     let symbol_table = module.resolve_symbols(symbols);
     
     // compilation
-    let codegen = CodeGenerator::new();
+    let codegen = CodeGenerator::with_strings(interner);
     let compile_result = codegen.compile_program(stmts.iter());
     if compile_result.is_err() {
         unimplemented!();
@@ -108,8 +111,8 @@ fn main() {
     
     let program = compile_result.unwrap();
     let dasm = {
-        let dasm = Disassembler::new(&program.bytecode)
-            .with_symbols(&program.symbols);
+        let dasm = Disassembler::new(program.bytecode())
+            .with_symbols(program.symbols());
         
         if let Ok(ref symbol_table) = symbol_table {
             dasm.with_symbol_table(&symbol_table)

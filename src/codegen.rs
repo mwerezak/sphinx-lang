@@ -5,6 +5,7 @@ use crate::parser::expr::{Expr};
 use crate::parser::primary::{Atom, Primary};
 use crate::runtime::Variant;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
+use crate::runtime::strings::StringInterner;
 use crate::debug::dasm::DebugSymbols;
 use crate::debug::DebugSymbol;
 
@@ -18,18 +19,15 @@ pub use chunk::Chunk;
 use opcodes::*;
 use errors::{CompileResult, CompileError};
 
+#[derive(Default)]
 pub struct Program {
-    pub bytecode: Chunk,
-    pub symbols: DebugSymbols,
+    bytecode: Chunk,
+    symbols: DebugSymbols,
 }
 
-impl Default for Program {
-    fn default() -> Self {
-        Program {
-            bytecode: Chunk::new(),
-            symbols: DebugSymbols::new(),
-        }
-    }
+impl Program {
+    pub fn bytecode(&self) -> &Chunk { &self.bytecode }
+    pub fn symbols(&self) -> &DebugSymbols { &self.symbols }
 }
 
 pub struct CodeGenerator {
@@ -41,6 +39,18 @@ impl CodeGenerator {
     pub fn new() -> Self {
         CodeGenerator {
             program: Program::default(),
+            errors: Vec::new(),
+        }
+    }
+    
+    pub fn with_strings(strings: StringInterner) -> Self {
+        let program = Program {
+            bytecode: Chunk::with_strings(strings),
+            symbols: DebugSymbols::default(),
+        };
+        
+        CodeGenerator {
+            program,
             errors: Vec::new(),
         }
     }

@@ -4,7 +4,7 @@ use log::debug;
 
 use crate::source::ModuleSource;
 use crate::lexer::{TokenMeta, Token, TokenIndex, LexerError};
-use crate::runtime::strings::{StringSymbol, STRING_TABLE};
+use crate::runtime::strings::{StringSymbol, StringInterner};
 
 use expr::{ExprMeta, Expr};
 use stmt::{StmtMeta, Stmt, Label};
@@ -32,24 +32,23 @@ pub use errors::{ParserError, ContextFrame};
 
 // Recursive descent parser
 
-pub struct Parser<'m, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
-    module: &'m ModuleSource,
+pub struct Parser<'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+    interner: &'h mut StringInterner,
     tokens: T,
     next: Option<Result<TokenMeta, LexerError>>,
     errors: VecDeque<ParserError>,
 }
 
-impl<'m, T> Iterator for Parser<'m, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+impl<'h, T> Iterator for Parser<'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     type Item = Result<StmtMeta, ParserError>;
     fn next(&mut self) -> Option<Self::Item> { self.next_stmt() }
 }
 
-impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
+impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
-    pub fn new(module: &'m ModuleSource, tokens: I) -> Self {
+    pub fn new(interner: &'h mut StringInterner, tokens: I) -> Self {
         Parser {
-            module,
-            tokens,
+            tokens, interner,
             next: None,
             errors: VecDeque::new(),
         }
@@ -87,6 +86,10 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         } else {
             Err(self.advance().unwrap_err())
         }
+    }
+    
+    fn intern_str(&mut self, string: impl AsRef<str>) -> StringSymbol {
+        self.interner.get_or_intern(string).into()
     }
     
     pub fn next_stmt(&mut self) -> Option<Result<StmtMeta, ParserError>> {
@@ -332,7 +335,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             let next = self.advance().unwrap();
             
             if let Token::Label(name) = next.token {
-                Some(Label::new(STRING_TABLE.get_or_intern(name.as_str())))
+                Some(Label::new(self.intern_str(name)))
             } else { unreachable!() }
             
         } else { None };
@@ -822,7 +825,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 if let Token::Identifier(name) = next.token { name }
                 else { return Err("invalid parameter".into()); };
             
-            let name = STRING_TABLE.get_or_intern(name.as_str());
+            let name = self.intern_str(name);
             
             // possibly variadic
             
@@ -1017,7 +1020,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         let item;
         if let Token::Identifier(name) = next.token {
-            item = AccessItem::Attribute(STRING_TABLE.get_or_intern(name.as_str()));
+            item = AccessItem::Attribute(self.intern_str(name));
         } else {
             return Err("invalid Identifier".into());
         }
@@ -1062,7 +1065,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             let atom = match next.token {
                 // Identifiers
                 Token::Identifier(name) => {
-                    Atom::Identifier(STRING_TABLE.get_or_intern(name.as_str()))
+                    Atom::Identifier(self.intern_str(name))
                 },
                 
                 // Literals
@@ -1073,7 +1076,7 @@ impl<'m, I> Parser<'m, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 Token::IntegerLiteral(value) => Atom::IntegerLiteral(value),
                 Token::FloatLiteral(value)   => Atom::FloatLiteral(value),
                 Token::StringLiteral(value)   => {
-                    Atom::StringLiteral(STRING_TABLE.get_or_intern(value.as_str()))
+                    Atom::StringLiteral(self.intern_str(value))
                 },
                 
                 _ => { 
