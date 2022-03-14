@@ -127,9 +127,12 @@ pub struct Chunk {
 impl Chunk {
     pub fn bytes(&self) -> &[u8] { &*self.bytes }
     
-    pub fn lookup_const(&self, index: impl Into<ConstID>) -> Variant {
-        let value = &self.consts[usize::from(index.into())];
-        match value {
+    pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {
+        &self.consts[usize::from(index.into())]
+    }
+    
+    pub fn lookup_value(&self, index: impl Into<ConstID>) -> Variant {
+        match self.lookup_const(index) {
             Constant::Integer(value) => Variant::from(*value),
             Constant::Float(bytes) => FloatType::from_le_bytes(*bytes).into(),
             Constant::String(idx) => Variant::from(self.strings[idx.to_usize()]),
