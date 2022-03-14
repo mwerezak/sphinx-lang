@@ -1,4 +1,4 @@
-use crate::runtime::strings::StringSymbol;
+use crate::runtime::strings::InternSymbol;
 use crate::parser::assign::DeclType;
 use crate::parser::expr::Expr;
 use crate::parser::stmt::StmtMeta;
@@ -50,13 +50,13 @@ impl FunSignature {
 
 #[derive(Debug, Clone)]
 pub struct FunParam {
-    name: StringSymbol,
+    name: InternSymbol,
     decl: DeclType,
     default: Option<Box<Expr>>,
 }
 
 impl FunParam {
-    pub fn new(name: StringSymbol, decl: DeclType, default: Option<Expr>) -> Self {
+    pub fn new(name: InternSymbol, decl: DeclType, default: Option<Expr>) -> Self {
         FunParam {
             name, decl,
             default: default.map(|expr| Box::new(expr)),

@@ -1,7 +1,7 @@
 use std::fmt;
 use std::cmp;
 use std::cell::{RefCell, Ref};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::marker::PhantomData;
 use string_interner::{self, DefaultBackend, DefaultSymbol};
 use string_interner::symbol::Symbol;
@@ -79,7 +79,7 @@ impl fmt::Display for StringSymbol {
 }
 
 
-type InternSymbol = DefaultSymbol;
+pub type InternSymbol = DefaultSymbol;
 type InternBackend = DefaultBackend<DefaultSymbol>;
 
 // StringInterner is used for storage of strings in code units during compilation,
@@ -103,11 +103,16 @@ impl StringTable {
         self.interner.take()
     }
     
+    // helpful for interning a bunch of strings without the overhead of repeatedly borrowing
+    // pub fn borrow_interner_mut(&self) -> impl DerefMut<Target=StringInterner> + '_ {
+    //     self.interner.borrow_mut()
+    // }
+    
     pub fn get_or_intern(&self, string: &str) -> StringSymbol {
         self.interner.borrow_mut().get_or_intern(string).into()
     }
     
-    pub fn resolve<'s>(&'s self, symbol: &StringSymbol) -> impl Deref<Target=str> + 's {
+    pub fn resolve(&self, symbol: &StringSymbol) -> impl Deref<Target=str> + '_ {
         let symbol = InternSymbol::from(*symbol);
         Ref::map(self.interner.borrow(), |interner| interner.resolve(symbol).unwrap())
     }

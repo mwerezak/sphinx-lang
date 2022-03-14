@@ -17,40 +17,39 @@ pub use opcodes::OpCode;
 pub use chunk::Chunk;
 
 use opcodes::*;
+use chunk::{Constant, ChunkBuilder, UnloadedChunk};
 use errors::{CompileResult, CompileError};
 
-#[derive(Default)]
+
 pub struct Program {
-    bytecode: Chunk,
+    bytecode: UnloadedChunk,
     symbols: DebugSymbols,
 }
 
 impl Program {
-    pub fn bytecode(&self) -> &Chunk { &self.bytecode }
+    pub fn bytecode(&self) -> &UnloadedChunk { &self.bytecode }
     pub fn symbols(&self) -> &DebugSymbols { &self.symbols }
 }
 
 pub struct CodeGenerator {
-    program: Program,
+    chunk: ChunkBuilder,
+    symbols: DebugSymbols,
     errors: Vec<CompileError>,
 }
 
 impl CodeGenerator {
     pub fn new() -> Self {
         CodeGenerator {
-            program: Program::default(),
+            chunk: ChunkBuilder::default(),
+            symbols: DebugSymbols::default(),
             errors: Vec::new(),
         }
     }
     
     pub fn with_strings(strings: StringInterner) -> Self {
-        let program = Program {
-            bytecode: Chunk::with_strings(strings),
-            symbols: DebugSymbols::default(),
-        };
-        
         CodeGenerator {
-            program,
+            chunk: ChunkBuilder::with_strings(strings),
+            symbols: DebugSymbols::default(),
             errors: Vec::new(),
         }
     }
@@ -64,7 +63,11 @@ impl CodeGenerator {
     
     pub fn finish(self) -> Result<Program, Vec<CompileError>> {
         if self.errors.is_empty() {
-            Ok(self.program)
+            let program = Program {
+                bytecode: self.chunk.build(),
+                symbols: self.symbols,
+            };
+            Ok(program)
         } else {
             Err(self.errors)
         }
@@ -78,29 +81,29 @@ impl CodeGenerator {
     
     fn emit_instr(&mut self, symbol: &DebugSymbol, opcode: OpCode) -> CompileResult<()> {
         debug_assert!(opcode.instr_len() == 1);
-        self.program.symbols.push(symbol);
-        self.program.bytecode.push_byte(opcode);
+        self.symbols.push(symbol);
+        self.chunk.push_byte(opcode);
         Ok(())
     }
     
     fn emit_single(&mut self, symbol: &DebugSymbol, opcode: OpCode, byte: u8) -> CompileResult<()> {
         debug_assert!(opcode.instr_len() == 2);
-        self.program.symbols.push(symbol);
-        self.program.bytecode.push_byte(opcode);
-        self.program.bytecode.push_byte(byte);
+        self.symbols.push(symbol);
+        self.chunk.push_byte(opcode);
+        self.chunk.push_byte(byte);
         Ok(())
     }
     
     fn emit_multi<const N: usize>(&mut self, symbol: &DebugSymbol, opcode: OpCode, bytes: [u8; N]) -> CompileResult<()> {
         debug_assert!(opcode.instr_len() == 1 + N);
-        self.program.symbols.push(symbol);
-        self.program.bytecode.push_byte(opcode);
-        self.program.bytecode.extend_bytes(&bytes);
+        self.symbols.push(symbol);
+        self.chunk.push_byte(opcode);
+        self.chunk.extend_bytes(&bytes);
         Ok(())
     }
     
-    fn emit_const(&mut self, symbol: &DebugSymbol, value: Variant) -> CompileResult<()> {
-        let cid = self.program.bytecode.push_const(value)
+    fn emit_const(&mut self, symbol: &DebugSymbol, cvalue: Constant) -> CompileResult<()> {
+        let cid = self.chunk.push_const(cvalue)
             .map_err(|error| error.with_symbol(*symbol))?;
         
         if cid <= u8::MAX.into() {
@@ -150,9 +153,9 @@ impl CodeGenerator {
             Atom::EmptyTuple => self.emit_instr(symbol, OpCode::Empty),
             Atom::BooleanLiteral(true) => self.emit_instr(symbol, OpCode::True),
             Atom::BooleanLiteral(false) => self.emit_instr(symbol, OpCode::False),
-            Atom::IntegerLiteral(value) => self.emit_const(symbol, Variant::Integer(*value)),
-            Atom::FloatLiteral(value) => self.emit_const(symbol, Variant::Float(*value)),
-            Atom::StringLiteral(value) => self.emit_const(symbol, Variant::String(*value)),
+            Atom::IntegerLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
+            Atom::FloatLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
+            Atom::StringLiteral(value) => unimplemented!(),
             
             Atom::Identifier(name) => unimplemented!(),
             

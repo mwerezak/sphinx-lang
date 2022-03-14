@@ -4,7 +4,7 @@ use log::debug;
 
 use crate::source::ModuleSource;
 use crate::lexer::{TokenMeta, Token, TokenIndex, LexerError};
-use crate::runtime::strings::{StringSymbol, StringInterner};
+use crate::runtime::strings::{InternSymbol, StringInterner};
 
 use expr::{ExprMeta, Expr};
 use stmt::{StmtMeta, Stmt, Label};
@@ -88,8 +88,8 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         }
     }
     
-    fn intern_str(&mut self, string: impl AsRef<str>) -> StringSymbol {
-        self.interner.get_or_intern(string).into()
+    fn intern_str(&mut self, string: impl AsRef<str>) -> InternSymbol {
+        self.interner.get_or_intern(string)
     }
     
     pub fn next_stmt(&mut self) -> Option<Result<StmtMeta, ParserError>> {

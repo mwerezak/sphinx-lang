@@ -2,9 +2,10 @@ use std::fmt;
 use std::fmt::{Write, Formatter};
 use std::iter;
 use crate::utils;
+use crate::language::FloatType;
 use crate::runtime::Variant;
 use crate::codegen::OpCode;
-use crate::codegen::chunk::{Chunk, ConstID};
+use crate::codegen::chunk::{UnloadedChunk, Constant, ConstID};
 use crate::source::ModuleSource;
 use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, SymbolResolutionError};
 
@@ -12,7 +13,7 @@ use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, Sym
 const PAD_WIDTH: usize = 48;
 
 pub struct Disassembler<'c, 's> {
-    chunk: &'c Chunk,
+    chunk: &'c UnloadedChunk,
     symbols: Option<&'s DebugSymbols>,
     symbol_table: Option<&'s ResolvedSymbolTable<'s>>,
 }
@@ -26,7 +27,7 @@ enum Symbol<'s> {
 }
 
 impl<'c, 's> Disassembler<'c, 's> {
-    pub fn new(chunk: &'c Chunk) -> Self {
+    pub fn new(chunk: &'c UnloadedChunk) -> Self {
         Self { chunk, symbols: None, symbol_table: None }
     }
     
@@ -83,18 +84,14 @@ impl<'c, 's> Disassembler<'c, 's> {
         match opcode {
             Some(OpCode::LoadConst) => {
                 let cid = instr[1];
-                self.write_opcode(&mut line, &opcode.unwrap())?;
-                write!(line, " {: >4} ", cid)?;
-                self.write_value(&mut line, self.chunk.lookup_const(cid))?;
+                write!(line, "{:16} {: >4} {}", opcode.unwrap(), cid, self.chunk.lookup_const(cid))?;
             },
             Some(OpCode::LoadConst16) => {
                 let cid =  ConstID::from_le_bytes(instr[1..=2].try_into().unwrap());
-                self.write_opcode(&mut line, &opcode.unwrap())?;
-                write!(line, " {: >4} ", cid)?;
-                self.write_value(&mut line, self.chunk.lookup_const(cid))?;
+                write!(line, "{:16} {: >4} {}", opcode.unwrap(), cid, self.chunk.lookup_const(cid))?;
             },
             Some(opcode) => {
-                self.write_opcode(&mut line, &opcode)?;
+                write!(line, "{:16}", opcode)?;
             },
             None => {
                 write!(line, "Unknown! {:#x}", instr[0])?;
@@ -114,19 +111,6 @@ impl<'c, 's> Disassembler<'c, 's> {
         writeln!(fmt, "{}", line)?;
         
         Ok(offset + opcode.map_or(1, |op| op.instr_len()))
-    }
-    
-    fn write_opcode(&self, fmt: &mut impl fmt::Write, opcode: &OpCode) -> fmt::Result {
-        write!(fmt, "{:16}", opcode)
-    }
-    
-    fn write_value(&self, fmt: &mut impl fmt::Write, value: &Variant) -> fmt::Result {
-        if matches!(value, Variant::String(..)) {
-            let string = format!("{}", value);
-            write!(fmt, "{}", utils::trim_str(string.as_str(), 16))
-        } else {
-            write!(fmt, "'{}'", value)
-        }
     }
     
     fn write_unresolved_symbol(&self, fmt: &mut impl fmt::Write, symbol: Option<&DebugSymbol>) -> fmt::Result {
@@ -204,6 +188,17 @@ impl fmt::Display for OpCode {
             write!(fmt, "{:1$}", mnemonic, width)
         } else {
             fmt.write_str(mnemonic)
+        }
+    }
+}
+
+
+impl fmt::Display for Constant {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Integer(value) => write!(fmt, "'{}'", value),
+            Self::Float(bytes) => write!(fmt, "'{:.6}'", FloatType::from_le_bytes(*bytes)),
+            Self::String(_symbol) => unimplemented!(),
         }
     }
 }

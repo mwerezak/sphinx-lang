@@ -1,14 +1,14 @@
-use crate::runtime::strings::StringSymbol;
+use crate::runtime::strings::InternSymbol;
 use crate::debug::DebugSymbol;
 use crate::parser::expr::Expr;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Label(StringSymbol);
+pub struct Label(InternSymbol);
 
 impl Label {
-    pub fn new(name: StringSymbol) -> Self { Label(name) }
-    pub fn name(&self) -> &StringSymbol { &self.0 }
+    pub fn new(name: InternSymbol) -> Self { Label(name) }
+    pub fn name(&self) -> &InternSymbol { &self.0 }
 }
 
 

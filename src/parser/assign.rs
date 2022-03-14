@@ -1,5 +1,5 @@
 
-use crate::runtime::strings::StringSymbol;
+use crate::runtime::strings::InternSymbol;
 use crate::parser::primary::{Primary, AccessItem, Atom};
 use crate::runtime::types::operator::BinaryOp;
 use crate::parser::expr::{Expr, ExprMeta};
@@ -9,7 +9,7 @@ use crate::parser::expr::{Expr, ExprMeta};
 
 #[derive(Debug, Clone)]
 pub enum LValue {
-    Identifier(StringSymbol),
+    Identifier(InternSymbol),
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
     Tuple(Box<[LValue]>),
@@ -18,7 +18,7 @@ pub enum LValue {
 #[derive(Debug, Clone)]
 pub struct AttributeTarget {
     pub receiver: Primary,
-    pub name: StringSymbol,
+    pub name: InternSymbol,
 }
 
 #[derive(Debug, Clone)]
