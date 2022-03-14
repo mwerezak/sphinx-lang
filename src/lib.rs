@@ -14,7 +14,6 @@ pub mod lexer;
 pub mod parser;
 
 pub mod language;
-// pub mod interpreter;
 pub mod codegen;
 pub mod runtime;
 
@@ -22,7 +21,7 @@ pub mod frontend;
 pub mod debug;
 
 
-use source::{ModuleSource, ParseContext};
+use source::{SourceText, ModuleSource, ParseContext};
 use parser::ParserError;
 use codegen::{Program, CodeGenerator, CompileError};
 use runtime::strings::StringInterner;
@@ -41,11 +40,14 @@ pub fn build_module(module: &ModuleSource) -> Result<Program, BuildErrors> {
         return Err(BuildErrors::Source(source_text.unwrap_err()));
     }
     
+    build_source(source_text.unwrap())
+}
+
+pub fn build_source(source_text: SourceText) -> Result<Program, BuildErrors> {
     // parsing
     let mut interner = StringInterner::new();
     let lexer_factory = language::create_default_lexer_rules();
     let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
-    let source_text = source_text.unwrap();
     let parse_result = parse_ctx.parse_ast(source_text);
     
     if parse_result.is_err() {
@@ -65,3 +67,4 @@ pub fn build_module(module: &ModuleSource) -> Result<Program, BuildErrors> {
     
     Ok(compile_result.unwrap())
 }
+

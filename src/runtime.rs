@@ -11,9 +11,9 @@ pub mod errors;
 
 mod tests;
 
-
-pub use variant::{Variant, VariantKey};
 pub use strings::STRING_TABLE;
+pub use variant::{Variant, VariantKey};
+pub use vm::VirtualMachine;
 
 // Default Hasher
 

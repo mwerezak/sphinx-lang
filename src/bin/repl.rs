@@ -1,15 +1,11 @@
-fn main() {}
-/*use std::path::PathBuf;
+use std::path::PathBuf;
 use clap::{Command, Arg};
 
 use sphinx_lang::frontend;
-use sphinx_lang::language;
-use sphinx_lang::source::{ModuleSource, SourceType, ParseContext};
-use sphinx_lang::codegen::CodeGenerator;
-use sphinx_lang::runtime::strings::StringInterner;
-use sphinx_lang::debug::symbol::DebugSymbolResolver;
-use sphinx_lang::debug::dasm::Disassembler;
-
+use sphinx_lang::{BuildErrors, build_module};
+use sphinx_lang::source::{ModuleSource, SourceType};
+use sphinx_lang::codegen::Chunk;
+use sphinx_lang::runtime::VirtualMachine;
 
 fn main() {
     env_logger::init();
@@ -45,199 +41,42 @@ fn main() {
     
     if module.is_none() {
         // TODO drop into REPL instead
+        //println!("\nSphinx Version {}\n", version);
         println!("No input.");
         return;
     }
     
-    println!("\nSphinx Version {}\n", version);
-    
-    // compile source
+    // build module
     let module = module.unwrap();
-    
-    // parsing
-    let mut interner = StringInterner::new();
-    let lexer_factory = language::create_default_lexer_rules();
-    
-    let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
-    let source_text = module.source_text().expect("error reading source");
-    let parse_result = parse_ctx.parse_ast(source_text);
-    
-    if parse_result.is_err() {
-        println!("Errors in file \"{}\":\n", module.name());
-        frontend::print_source_errors(&module, parse_result.unwrap_err());
+    let build_result = build_module(&module);
+    if build_result.is_err() {
+        match build_result.unwrap_err() {
+            BuildErrors::Source(error) => {
+                println!("Error reading source: {}.", error);
+            }
+            
+            BuildErrors::Syntax(errors) => {
+                println!("Errors in file \"{}\":\n", module.name());
+                frontend::print_source_errors(&module, &errors);
+            }
+            
+            BuildErrors::Compile(errors) => {
+                println!("Errors in file \"{}\":\n", module.name());
+                frontend::print_source_errors(&module, &errors);
+            }
+        }
         return;
     }
     
-    let stmts = parse_result.unwrap();
-    let symbols = stmts.iter().map(|stmts| stmts.debug_symbol());
-    let symbol_table = module.resolve_symbols(symbols);
+    let program = build_result.unwrap();
+    let chunk = Chunk::load(program.bytecode);
+    let mut vm = VirtualMachine::new(&chunk);
     
-    // compilation
-    let codegen = CodeGenerator::with_strings(interner);
-    let compile_result = codegen.compile_program(stmts.iter());
-    if compile_result.is_err() {
-        unimplemented!();
-    }
-    
-    let program = compile_result.unwrap();
-    let dasm = {
-        let dasm = Disassembler::new(program.bytecode())
-            .with_symbols(program.symbols());
-        
-        if let Ok(ref symbol_table) = symbol_table {
-            dasm.with_symbol_table(&symbol_table)
-        } else {
-            dasm
-        }
-    };
-    
-    println!("== \"{}\" ==", module.name());
-    println!("{}", dasm);
+    vm.run().expect("runtime error");
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-use std::io;
-use std::io::Write;
-use std::path::PathBuf;
-use std::sync::Arc;
-
-use log;
-
-use clap::{Command, Arg};
-
-use sphinx_lang::source::{ModuleSource, SourceType, ParseContext};
-use sphinx_lang::frontend::render_parser_error;
-use sphinx_lang::debug::symbol::DebugSymbolResolver;
-
-use sphinx_lang::language;
-use sphinx_lang::lexer::LexerBuilder;
-use sphinx_lang::parser::stmt::{Stmt};
-
-// use sphinx_lang::interpreter::*;
-// use sphinx_lang::interpreter::{EvalContext, ExecContext};
-
-
-fn main() {
-    env_logger::init();
-    
-    let app = Command::new("repl")
-        .version("0.0")
-        .author("M. Werezak <mwerezak@gmail.com>")
-        .about("Dynamic language interpreter")
-        .arg(
-            Arg::new("file")
-            .index(1)
-            .help("path to input script file")
-            .value_name("FILE")
-        )
-        .arg(
-            Arg::new("cmd")
-            .short('c')
-            .help("execute a snippet then exit")
-            .value_name("CMD")
-        );
-        
-    let version = app.get_version().unwrap();
-    let args = app.get_matches();
-    
-    let mut module = None;
-    if let Some(s) = args.value_of("cmd") {
-        let source = SourceType::String(s.to_string());
-        module = Some(ModuleSource::new("<cmd>", source));
-    } else if let Some(s) = args.value_of("file") {
-        let source = SourceType::File(PathBuf::from(s));
-        module = Some(ModuleSource::new(s, source));
-    }
-    
-    if let Some(module) = module {
-        let lexer_factory = language::create_default_lexer_rules();
-        
-        let mut parse_ctx = ParseContext::new(&lexer_factory);
-        let source_text = module.source_text().expect("error reading source");
-        let parse_result = parse_ctx.parse_ast(source_text);
-        
-        match parse_result {
-            Ok(stmts) => {
-                println!("{:#?}", stmts);
-            },
-            Err(errors) => { 
-                println!("Errors in file \"{}\":\n", module.name());
-            
-                let symbols = errors.iter()
-                    .map(|err| err.debug_symbol());
-                    
-                let resolved_table = module.resolve_symbols(symbols).unwrap();
-                
-                for error in errors.iter() {
-                    let resolved = resolved_table.get(&error.debug_symbol()).unwrap().as_ref();
-                    
-                    match resolved {
-                        Ok(resolved) => println!("{}", render_parser_error(&error, resolved)),
-                        Err(resolve_error) => {
-                            println!("{}", error);
-                            println!("Could not resolve symbol: {}", resolve_error);
-                        }
-                    }
-                }
-            },
-        }
-        
-    } else {
-        println!("\nSphinx Interpreter {}\n", version);
-        let repl = Repl::new();
-        repl.run();
-    }
-}
-
-
-const PROMT_START: &str = ">>> ";
+/*const PROMT_START: &str = ">>> ";
 const PROMT_CONTINUE: &str = "... ";
 
 struct Repl {

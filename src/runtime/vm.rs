@@ -11,6 +11,7 @@ enum Control {
 }
 
 // Stack-based Virtual Machine
+#[derive(Debug)]
 pub struct VirtualMachine<'c> {
     pc: usize, // program counter
     program: &'c Chunk,
@@ -18,20 +19,30 @@ pub struct VirtualMachine<'c> {
     immediate: Vec<Variant>,
 }
 
-impl VirtualMachine<'_> {
+impl<'c> VirtualMachine<'c> {
+    pub fn new(chunk: &'c Chunk) -> Self {
+        Self {
+            pc: 0,
+            program: chunk,
+            globals: Vec::new(),
+            immediate: Vec::new(),
+        }
+    }
+    
     pub fn run(&mut self) -> ExecResult<()> {
         let program_text = self.program.bytes();
         
         loop {
+            let op_byte = program_text.get(self.pc).expect("pc out of bounds");
             
-            let op_byte = program_text[self.pc];
-            let opcode = OpCode::from_byte(op_byte)
+            let opcode = OpCode::from_byte(*op_byte)
                 .unwrap_or_else(|| panic!("invalid instruction: {:x}", op_byte));
             
             let len = opcode.instr_len();
-            let data = &program_text[(self.pc+1)..(self.pc+len)];
-            self.pc += len;
+            let data_slice = (self.pc+1)..(self.pc+len);
+            let data = program_text.get(data_slice).expect("truncated instruction");
             
+            self.pc += len; // pc is always the next instruction
             match self.exec_instr(opcode, data)? {
                 Control::None => { }
                 Control::Return => return Ok(())
@@ -110,6 +121,9 @@ impl VirtualMachine<'_> {
             OpCode::LE => unimplemented!(),
             OpCode::GE => unimplemented!(),
             OpCode::GT => unimplemented!(),
+            
+            OpCode::Inspect => println!("{}", self.pop_stack()),
+            OpCode::Dump => println!("DBG_DUMP: {:?}", self),
         }
         
         Ok(Control::None)

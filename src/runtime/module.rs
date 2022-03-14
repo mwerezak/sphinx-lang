@@ -10,12 +10,13 @@ use crate::runtime::Variant;
 
 type GlobalID = u16; 
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Access {
     ReadOnly,
     ReadWrite,
 }
 
+#[derive(Debug)]
 pub struct Global {
     access: Access,
     value: Variant,

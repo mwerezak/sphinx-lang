@@ -22,13 +22,8 @@ use chunk::{Constant, ChunkBuilder, UnloadedChunk};
 
 #[derive(Debug)]
 pub struct Program {
-    bytecode: UnloadedChunk,
-    symbols: DebugSymbols,
-}
-
-impl Program {
-    pub fn bytecode(&self) -> &UnloadedChunk { &self.bytecode }
-    pub fn symbols(&self) -> &DebugSymbols { &self.symbols }
+    pub bytecode: UnloadedChunk,
+    pub symbols: DebugSymbols,
 }
 
 pub struct CodeGenerator {
@@ -63,8 +58,11 @@ impl CodeGenerator {
     
     pub fn finish(self) -> Result<Program, Vec<CompileError>> {
         if self.errors.is_empty() {
+            let mut chunk = self.chunk;
+            chunk.push_byte(OpCode::Return);
+            
             let program = Program {
-                bytecode: self.chunk.build(),
+                bytecode: chunk.build(),
                 symbols: self.symbols,
             };
             Ok(program)
@@ -115,7 +113,11 @@ impl CodeGenerator {
     
     fn compile_stmt(&mut self, symbol: &DebugSymbol, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
-            Stmt::Echo(expr) => unimplemented!(),
+            Stmt::Echo(expr) => {
+                self.compile_expr(symbol, expr)?;
+                self.emit_instr(symbol, OpCode::Inspect)
+            },
+            
             Stmt::Expression(expr) => {
                 self.compile_expr(symbol, expr)?;
                 self.emit_instr(symbol, OpCode::Pop)

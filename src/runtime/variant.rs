@@ -8,7 +8,7 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
 // Fundamental data value type
-#[derive(Clone)] // add Copy?
+#[derive(Debug, Clone)] // add Copy?
 pub enum Variant {
     Nil,
     EmptyTuple, // the empty tuple value

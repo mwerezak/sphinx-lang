@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use clap::{Command, Arg};
 
-use sphinx_lang::{BuildErrors, build_module};
 use sphinx_lang::frontend;
+use sphinx_lang::{BuildErrors, build_module};
 use sphinx_lang::source::{ModuleSource, SourceType};
 use sphinx_lang::debug::symbol::DebugSymbolResolver;
 use sphinx_lang::debug::dasm::Disassembler;
@@ -77,13 +77,12 @@ fn main() {
         return;
     }
     
-    
     let program = build_result.unwrap();
-    let symbol_table = module.resolve_symbols(program.symbols().iter());
+    let symbol_table = module.resolve_symbols(program.symbols.iter());
     
     let dasm = {
-        let dasm = Disassembler::new(program.bytecode())
-            .with_symbols(program.symbols());
+        let dasm = Disassembler::new(&program.bytecode)
+            .with_symbols(&program.symbols);
         
         if let Ok(ref symbol_table) = symbol_table {
             dasm.with_symbol_table(&symbol_table)

@@ -74,7 +74,7 @@ const OP_GT:            u8 = 0x5F;
 // 0xF0         Debugging/Tracing/Misc
 
 const DBG_INSPECT:      u8 = 0xF0;
-const DBG_IMM_DMP:      u8 = 0xF1;  // dump the immediate stack
+const DBG_DUMP:         u8 = 0xF1;
 
 
 #[repr(u8)]
@@ -112,6 +112,9 @@ pub enum OpCode {
     LE = OP_LE,
     GE = OP_GE,
     GT = OP_GT,
+    
+    Inspect = DBG_INSPECT,
+    Dump = DBG_DUMP,
 }
 
 impl OpCode {
@@ -149,6 +152,9 @@ impl OpCode {
             OP_LE => Self::LE,
             OP_GE => Self::GE,
             OP_GT => Self::GT,
+            
+            DBG_INSPECT => Self::Inspect,
+            DBG_DUMP => Self::Dump,
             
             _ => return None,
         };
@@ -189,6 +195,9 @@ impl OpCode {
             Self::LE => 1,
             Self::GE => 1,
             Self::GT => 1,
+            
+            Self::Inspect => 1,
+            Self::Dump => 1,
         }
     }
 }
@@ -237,6 +246,9 @@ impl std::fmt::Display for OpCode {
             Self::LE => "OP_LE",
             Self::GE => "OP_GE",
             Self::GT => "OP_GT",
+            
+            Self::Inspect => "DBG_INSPECT",
+            Self::Dump => "DBG_DUMP",
         };
         
         if let Some(width) = fmt.width() {
