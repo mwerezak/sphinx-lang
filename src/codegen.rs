@@ -177,14 +177,13 @@ impl CodeGenerator {
     }
     
     fn compile_decl_global_name(&mut self, symbol: &DebugSymbol, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
+        self.emit_const(symbol, Constant::from(name))?;
+        
         self.compile_expr(symbol, init)?;
         
-        let cid = self.make_const(symbol, Constant::from(name))?;
         match decl {
-            DeclType::Immutable if cid <= u8::MAX.into() => self.emit_instr_byte(symbol, OpCode::InsertGlobal, u8::try_from(cid).unwrap()),
-            DeclType::Immutable => self.emit_instr_data(symbol, OpCode::InsertGlobal16, cid.to_le_bytes()),
-            DeclType::Mutable if cid <= u8::MAX.into() => self.emit_instr_byte(symbol, OpCode::InsertGlobalMut, u8::try_from(cid).unwrap()),
-            DeclType::Mutable => self.emit_instr_data(symbol, OpCode::InsertGlobalMut16, cid.to_le_bytes()),
+            DeclType::Immutable => self.emit_instr(symbol, OpCode::InsertGlobal),
+            DeclType::Mutable => self.emit_instr(symbol, OpCode::InsertGlobalMut),
         }
     }
     

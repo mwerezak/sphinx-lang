@@ -28,7 +28,7 @@ pub struct CompileError {
 
 impl CompileError {
     pub fn new<S>(message: S) -> Self where S: ToString {
-        Self::from(ErrorKind::from(message))
+        ErrorKind::from(message).into()
     }
     
     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {

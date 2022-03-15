@@ -12,17 +12,15 @@ const OP_EXIT:          u8 = 0x01;
 
 // 0x10-30        Immediate Values
 
-const OP_POP:           u8 = 0x10;
+const OP_POP:           u8 = 0x10;  // [ _ ] => []
 
 const OP_LD_CONST:      u8 = 0x21;  // load a constant from the chunk's const pool
 const OP_LD_CONST_16:   u8 = 0x22;  // ...using a 16-bit index
 
-const OP_IN_GBL_IM:     u8 = 0x23;
-const OP_IN_GBL_IM_16:  u8 = 0x24;
-const OP_IN_GBL_MUT:    u8 = 0x25;
-const OP_IN_GBL_MUT_16: u8 = 0x26;
-const OP_ST_GBL:        u8 = 0x27;
-const OP_LD_GBL:        u8 = 0x28;
+const OP_IN_GLOBAL_IM:  u8 = 0x23;  // [ name value ] => []
+const OP_IN_GLOBAL_MUT: u8 = 0x24;  // [ name value ] => []
+const OP_ST_GLOBAL:     u8 = 0x26;  // [ name value ] => []
+const OP_LD_GLOBAL:     u8 = 0x27;  // [ name ] => [ value ]
 
 // const OP_IN_LOCAL:      u8 = 0x27;  // Note: local mutability tracking is done by the compiler
 // const OP_ST_LOCAL:      u8 = 0x28;
@@ -33,21 +31,25 @@ const OP_LD_GBL:        u8 = 0x28;
 // const OP_LD_NAME:       u8 = 0x2C;
 // const OP_LD_INDEX:      u8 = 0x2D;
 
-const OP_NIL:           u8 = 0x30;
-const OP_EMPTY:         u8 = 0x31;
-const OP_TRUE:          u8 = 0x32;
-const OP_FALSE:         u8 = 0x33;
+// Dynamic Insert/Store
+
+// const OP_IN_DYN         u8 = ...;  // [ target: tuple, value, mut: bool] => []
+
+const OP_NIL:           u8 = 0x30;  // _ => [ nil ]
+const OP_EMPTY:         u8 = 0x31;  // _ => [ () ]
+const OP_TRUE:          u8 = 0x32;  // _ => [ true ]
+const OP_FALSE:         u8 = 0x33;  // _ => [ false ]
 
 // 0x40         Unary Operations
 
-const OP_NEG:           u8 = 0x40;
+const OP_NEG:           u8 = 0x40;  // [ operand ] => [ result ]
 const OP_POS:           u8 = 0x41;
 const OP_INV:           u8 = 0x42;
 const OP_NOT:           u8 = 0x43;
 
 // 0x50-60      Binary Operations
 
-const OP_AND:           u8 = 0x50;
+const OP_AND:           u8 = 0x50;  // [ lhs rhs ] => [ result ]
 const OP_XOR:           u8 = 0x51;
 const OP_OR:            u8 = 0x52;
 
@@ -85,10 +87,8 @@ pub enum OpCode {
     Pop = OP_POP,
     LoadConst  = OP_LD_CONST,
     LoadConst16 = OP_LD_CONST_16,
-    InsertGlobal = OP_IN_GBL_IM,
-    InsertGlobal16 = OP_IN_GBL_IM_16,
-    InsertGlobalMut = OP_IN_GBL_MUT,
-    InsertGlobalMut16 = OP_IN_GBL_MUT_16,
+    InsertGlobal = OP_IN_GLOBAL_IM,
+    InsertGlobalMut = OP_IN_GLOBAL_MUT,
     
     Nil = OP_NIL,
     Empty = OP_EMPTY,
@@ -130,10 +130,8 @@ impl OpCode {
             OP_POP => Self::Pop,
             OP_LD_CONST => Self::LoadConst,
             OP_LD_CONST_16 => Self::LoadConst16,
-            OP_IN_GBL_IM => Self::InsertGlobal,
-            OP_IN_GBL_IM_16 => Self::InsertGlobal16,
-            OP_IN_GBL_MUT => Self::InsertGlobalMut,
-            OP_IN_GBL_MUT_16 => Self::InsertGlobalMut16,
+            OP_IN_GLOBAL_IM => Self::InsertGlobal,
+            OP_IN_GLOBAL_MUT => Self::InsertGlobalMut,
             
             OP_NIL => Self::Nil,
             OP_EMPTY => Self::Empty,
@@ -175,10 +173,6 @@ impl OpCode {
         match self {
             Self::LoadConst => 2,
             Self::LoadConst16 => 3,
-            Self::InsertGlobal => 2,
-            Self::InsertGlobal16 => 3,
-            Self::InsertGlobalMut => 2,
-            Self::InsertGlobalMut16 => 3,
             
             _ => 1,
         }
@@ -202,11 +196,8 @@ impl std::fmt::Display for OpCode {
             Self::Pop => "OP_POP",
             Self::LoadConst => "OP_LD_CONST",
             Self::LoadConst16 => "OP_LD_CONST_16",
-            Self::InsertGlobal => "OP_IN_GBL_IM",
-            Self::InsertGlobal16 => "OP_IN_GBL_IM_16",
-            Self::InsertGlobalMut => "OP_IN_GBL_MUT",
-            Self::InsertGlobalMut16 => "OP_IN_GBL_MUT_16",
-
+            Self::InsertGlobal => "OP_IN_GLOBAL_IM",
+            Self::InsertGlobalMut => "OP_IN_GLOBAL_MUT",
             
             Self::Nil => "OP_NIL",
             Self::Empty => "OP_EMPTY",

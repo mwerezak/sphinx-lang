@@ -82,13 +82,13 @@ impl<'c, 's> Disassembler<'c, 's> {
         let opcode = OpCode::from_byte(instr[0]);
         match opcode {
             Some(opcode) => match opcode {
-                OpCode::LoadConst | OpCode::InsertGlobal | OpCode::InsertGlobalMut => {
+                OpCode::LoadConst => {
                     let cid = instr[1];
                     write!(line, "{:16} {: >4}    ", opcode, cid)?;
                     self.write_const(&mut line, self.chunk.lookup_const(cid))?;
                 },
                 
-                OpCode::LoadConst16 | OpCode::InsertGlobal16 | OpCode::InsertGlobalMut16 => {
+                OpCode::LoadConst16 => {
                     let cid =  ConstID::from_le_bytes(instr[1..=2].try_into().unwrap());
                     write!(line, "{:16} {: >4}    ", opcode, cid)?;
                     self.write_const(&mut line, self.chunk.lookup_const(cid))?;

@@ -86,8 +86,8 @@ impl VirtualMachine {
     }
     
     #[inline(always)]
-    fn pop_many(&mut self, count: usize) -> Vec<Variant> {
-        self.immediate.split_off(self.immediate.len() - count)
+    fn discard_stack(&mut self, count: usize) {
+        self.immediate.truncate(self.immediate.len() - count)
     }
     
     #[inline(always)]
@@ -134,10 +134,21 @@ impl VirtualMachine {
                 self.push_stack(value);
             },
             
-            OpCode::InsertGlobal => unimplemented!(),
-            OpCode::InsertGlobal16 => unimplemented!(),
-            OpCode::InsertGlobalMut => unimplemented!(),
-            OpCode::InsertGlobalMut16 => unimplemented!(),
+            OpCode::InsertGlobal    |
+            OpCode::InsertGlobalMut => {
+                let access = 
+                    if opcode == OpCode::InsertGlobalMut { Access::ReadWrite }
+                    else { Access::ReadOnly };
+                
+                let value = self.pop_stack();
+                let name = self.pop_stack();
+                let symbol = match name {
+                    Variant::String(symbol) => symbol,
+                    _ => panic!("invalid operand type"),
+                };
+                
+                self.globals.create(symbol, access, value)?;
+            },
             
             OpCode::Nil => self.push_stack(Variant::Nil),
             OpCode::Empty => self.push_stack(Variant::EmptyTuple),
