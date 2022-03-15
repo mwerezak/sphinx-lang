@@ -128,11 +128,14 @@ impl<'c, 's> Disassembler<'c, 's> {
             Some(Ok(symbol)) => {
                 write!(fmt, "{: >4}| ", symbol.lineno())?;
                 
-                let line = symbol.iter_lines().nth(0).unwrap_or("").trim_end();
+                let line = symbol.iter_whole_lines().nth(0).unwrap_or("").trim_end();
                 if symbol.is_multiline() {
-                    write!(fmt, "{}...", line)
+                    let (before, sym_text) = line.split_at(symbol.start());
+                    write!(fmt, "{}`{}...", before, sym_text)
                 } else {
-                    fmt.write_str(line)
+                    let (before, rest) = line.split_at(symbol.start());
+                    let (sym_text, after) = rest.split_at(symbol.end() - symbol.start());
+                    write!(fmt, "{}`{}`{}", before, sym_text, after)
                 }
             },
             

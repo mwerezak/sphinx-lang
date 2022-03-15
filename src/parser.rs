@@ -475,7 +475,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         ctx.push(ContextTag::VarDeclExpr);
         
         let next = self.advance()?;
-        ctx.set_end(&next);
+        ctx.set_start(&next);
         
         let decl = match next.token {
             Token::Let => DeclType::Immutable,
