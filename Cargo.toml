@@ -1,6 +1,6 @@
 [package]
 name = "sphinx-lang"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "MIT"
 description = "An intepreter for a dynamic language inspired by Lua and Python, implemented in Rust"
@@ -11,8 +11,8 @@ categories = ["compilers", "development-tools", "parser-implementations"]
 [lib]
 crate-type = ["lib"]
 
-# [[bin]]
-# name = "repl"
+[[bin]]
+name = "repl"
 
 [[bin]]
 name = "dasm"
