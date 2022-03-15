@@ -97,7 +97,7 @@ impl<'a> TryFrom<&'a Variant> for VariantKey<'a> {
     type Error = RuntimeError;
     fn try_from(value: &'a Variant) -> ExecResult<Self> {
         if !value.can_hash() {
-            return Err(ErrorKind::UnhashableType.into());
+            return Err(ErrorKind::UnhashableType(value.clone()).into());
         }
         Ok(Self(&value))
     }
@@ -144,7 +144,7 @@ impl<'s> PartialEq for VariantKey<'_> {
 }
 impl Eq for VariantKey<'_> { }
 
-
+// TODO change this to debug, implement Display separately
 impl fmt::Display for Variant {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

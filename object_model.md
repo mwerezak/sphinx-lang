@@ -89,6 +89,7 @@ by default all objects are dictionaries like in Lua and support both attr access
 
 ### Context Managers
 
+- `__enter`
 - `__exit`
 
 ### Descriptors

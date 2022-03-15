@@ -1,20 +1,22 @@
 use std::fmt;
 use std::error::Error;
 
+use crate::runtime::Variant;
+
 // TODO box error
 pub type ExecResult<T> = Result<T, RuntimeError>;
 
 #[derive(Debug)]
 pub enum ErrorKind {
-    InvalidUnaryOperand,  // unsupported operand for type
-    InvalidBinaryOperand,
+    InvalidUnaryOperand(Variant),  // unsupported operand for type
+    InvalidBinaryOperand(Variant, Variant),
     OverflowError,
     NegativeShiftCount,
     NameNotDefined(String),
     NameNotDefinedLocal(String),
     CantAssignImmutable,
     CantAssignNonLocal,  // can't assign to a non-local variable without the "global" keyword
-    UnhashableType,
+    UnhashableType(Variant),
     Other,
 }
 
