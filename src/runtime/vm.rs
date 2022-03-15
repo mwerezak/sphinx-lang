@@ -1,7 +1,33 @@
 use crate::codegen::{Chunk, ConstID, OpCode};
 use crate::runtime::Variant;
+use crate::runtime::ops;
 use crate::runtime::module::{Access, Namespace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
+
+
+// Helper macros
+macro_rules! eval_binary_op {
+    ($self:expr, $eval_func:tt ) => {
+        {
+            // need to pop only after eval, to ensure operands stay rooted in GC
+            let operand = $self.peek_many(2);
+            let result = ops::$eval_func(&operand[0], &operand[1])?;
+            $self.pop_stack();
+            $self.replace_stack(result);
+        }
+    };
+}
+
+macro_rules! eval_cmp {
+    ($self:expr, $eval_func:tt ) => {
+        {
+            let operand = $self.peek_many(2);
+            let result = ops::$eval_func(&operand[0], &operand[1])?;
+            $self.pop_stack();
+            $self.replace_stack(Variant::from(result));
+        }
+    };
+}
 
 
 // Helper
@@ -29,12 +55,8 @@ impl VirtualMachine {
         }
     }
     
-    // Supports execution in REPL mode. Swaps out the the current program while leaving globals untouched.
-    // If the immediate stack is not empty then this will panic
-    pub fn reload_program(&mut self, chunk: Chunk) -> () {
-        if !self.immediate.is_empty() {
-            panic!("invalid state for program reload");
-        }
+    pub fn reload_program(&mut self, chunk: Chunk) {
+        self.immediate.clear();
         self.program = chunk;
         self.pc = 0;
     }
@@ -111,27 +133,40 @@ impl VirtualMachine {
             OpCode::True => self.push_stack(Variant::BoolTrue),
             OpCode::False => self.push_stack(Variant::BoolFalse),
             
-            OpCode::Neg => unimplemented!(),
-            OpCode::Pos => unimplemented!(),
-            OpCode::Inv => unimplemented!(),
-            OpCode::Not => unimplemented!(),
+            OpCode::Neg => {
+                let result = ops::eval_neg(self.peek_stack())?;
+                self.replace_stack(result);
+            },
+            OpCode::Pos => {
+                let result = ops::eval_pos(self.peek_stack())?;
+                self.replace_stack(result);
+            },
+            OpCode::Inv => {
+                let result = ops::eval_inv(self.peek_stack())?;
+                self.replace_stack(result);
+            },
+            OpCode::Not => {
+                let result = ops::eval_not(self.peek_stack())?;
+                self.replace_stack(result);
+            },
             
-            OpCode::And => unimplemented!(),
-            OpCode::Xor => unimplemented!(),
-            OpCode::Or => unimplemented!(),
-            OpCode::Shl => unimplemented!(),
-            OpCode::Shr => unimplemented!(),
-            OpCode::Add => unimplemented!(),
-            OpCode::Sub => unimplemented!(),
-            OpCode::Mul => unimplemented!(),
-            OpCode::Div => unimplemented!(),
-            OpCode::Mod => unimplemented!(),
-            OpCode::EQ => unimplemented!(),
-            OpCode::NE => unimplemented!(),
-            OpCode::LT => unimplemented!(),
-            OpCode::LE => unimplemented!(),
-            OpCode::GE => unimplemented!(),
-            OpCode::GT => unimplemented!(),
+            OpCode::And => eval_binary_op!(self, eval_and),
+            OpCode::Xor => eval_binary_op!(self, eval_xor),
+            OpCode::Or => eval_binary_op!(self, eval_or),
+            OpCode::Shl => eval_binary_op!(self, eval_shl),
+            OpCode::Shr => eval_binary_op!(self, eval_shr),
+            OpCode::Add => eval_binary_op!(self, eval_add),
+            OpCode::Sub => eval_binary_op!(self, eval_sub),
+            OpCode::Mul => eval_binary_op!(self, eval_mul),
+            OpCode::Div => eval_binary_op!(self, eval_div),
+            OpCode::Mod => eval_binary_op!(self, eval_mod),
+            
+            OpCode::EQ => eval_cmp!(self, eval_eq),
+            OpCode::NE => eval_cmp!(self, eval_ne),
+            OpCode::LT => eval_cmp!(self, eval_lt),
+            OpCode::LE => eval_cmp!(self, eval_le),
+            OpCode::GE => eval_cmp!(self, eval_ge),
+            OpCode::GT => eval_cmp!(self, eval_gt),
             
             OpCode::Inspect => println!("{:?}", self.pop_stack()),
             OpCode::Dump => println!("DBG_DUMP: {:?}", self),

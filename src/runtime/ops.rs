@@ -69,6 +69,8 @@ fn eval_meta_comparison(tag: CompareTag, lhs: &Variant, rhs: &Variant) -> ExecRe
     match result {
         Some(Err(error)) => Err(error),
         Some(Ok(Some(value))) => Ok(value),
+        _ if tag == CompareTag::EQ => Ok(false), // equality always succeeds
+        
         _ => Err(ErrorKind::InvalidBinaryOperand(lhs.clone(), rhs.clone()).into()),
     }
 }
@@ -125,31 +127,32 @@ pub fn eval_not(operand: &Variant) -> ExecResult<Variant> {
 #[inline]
 pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> ExecResult<bool> {
     let value = match (lhs, rhs) {
-        // nil always compares false
-        (Variant::Nil, _) => false,
-        (_, Variant::Nil) => false,
         
-        // empty tuple is only equal with itself
         (Variant::EmptyTuple, Variant::EmptyTuple) => true,
         
-        (Variant::BoolTrue, Variant::BoolTrue) => true,
+        (Variant::BoolTrue,  Variant::BoolTrue)  => true,
         (Variant::BoolFalse, Variant::BoolFalse) => true,
+        (Variant::BoolTrue,  Variant::BoolFalse) => false,
+        (Variant::BoolFalse, Variant::BoolTrue)  => false,
         
         // string equality
         (Variant::String(a), Variant::String(b)) => a == b,
         
         // numeric equality
         (Variant::Integer(a), Variant::Integer(b)) => *a == *b,
-        
         (a, b) if is_arithmetic_primitive(&a) && is_arithmetic_primitive(&b) 
             => a.float_value().unwrap() == b.float_value().unwrap(),
 
         // tuple equality
         (Variant::Tuple(a), Variant::Tuple(b)) if a.len() == b.len() => {
-            // let a_items = a.into_vec().into_iter();
-            // let b_items = b.into_vec().into_iter();
-            // a_items.zip(b_items).all(|(a, b)| eval_eq(a, b))
-            unimplemented!()
+            let a_items = a.iter();
+            let b_items = b.iter();
+            for (a, b) in a_items.zip(b_items) {
+                if !eval_eq(a, b)? {
+                    return Ok(false);
+                }
+            }
+            true
         },
         (Variant::Tuple(..), Variant::Tuple(..)) => false,
 

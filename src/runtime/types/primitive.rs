@@ -13,7 +13,6 @@ lazy_static! {
     };
 }
 
-
 // Strings
 
 // fn string_add(lhs: &Variant, rhs: &Variant) -> ExecResult<Option<Variant>> {

@@ -198,7 +198,9 @@ impl Repl {
                 None => { self.vm.replace(VirtualMachine::new(chunk)); },
             }
             
-            self.vm.as_mut().unwrap().run().expect("runtime error");
+            if let Err(error) = self.vm.as_mut().unwrap().run() {
+                println!("Runtime error: {:?}", error);
+            }
             
             // for stmt in stmts.iter() {
             //     match stmt.variant() {

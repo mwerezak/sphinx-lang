@@ -33,9 +33,10 @@ itself should result in an error.
 using object initializer syntax (`Class { ... }`). By default it just sets the new instance's metatable
 to the object produced by the `__meta` metamethod.
 
-`__meta` - an object (or a callable that creates an object) that will be set as the metatable for
+`__newmeta` - an object (or a callable that creates an object) that will be set as the metatable for
 any new instances created using `__new`. If not present then the default object metatable will be used.
 
+<!-- 
 `__getattr` - a callable that is invoked when `.` access fails on an object. 
 By default it looks for the item on the class obj before looking at parent classes
 following a Python-like mro. If not present then `__getindex` will be called on the object instead.
@@ -43,7 +44,8 @@ following a Python-like mro. If not present then `__getindex` will be called on 
 `__getindex` - a callable that is invoked when indexing fails on an object.
 Unlike `__getattr`, the default object metatable does not contain an entry for `__getindex`.
 This means that by default indexing is local to an instance, it does not attempt to look up keys
-in the class object unless overridden.
+in the class object unless overridden. 
+-->
 
 `__class` - used by the default implementation of `__getattr` obtain the class object.
 
@@ -68,13 +70,21 @@ is invoked to give the descriptor the opportunity to initialize using the newly 
 
 ### General
 
+- `__attr`
+- `__newattr`
+
+- `__index`
+- `__newindex`
+
+<!-- 
 - `__getattr`
 - `__setattr`
 - `__delattr`
 
 - `__getindex` 
 - `__setindex` 
-- `__delindex` 
+- `__delindex`  
+-->
 
 Note: while there are separate metamethods for attr and index access, 
 by default all objects are dictionaries like in Lua and support both attr access and indexing.
@@ -83,7 +93,7 @@ by default all objects are dictionaries like in Lua and support both attr access
 - `__tostring`
 
 - `__new`
-- `__meta`
+- `__newmeta`
 - `__class`
 - `__mro`
 
