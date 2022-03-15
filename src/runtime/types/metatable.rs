@@ -73,155 +73,147 @@ pub enum CompareTag{
     LT, LE, EQ,
 }
 
-// Slot Selector Helpers
-
-macro_rules! select_unary {
-    ($self:expr, ref $tag:expr ) => {
-        match $tag {
-            UnaryTag::Pos => $self.op_pos.as_ref(),
-            UnaryTag::Neg => $self.op_neg.as_ref(),
-            UnaryTag::Inv => $self.op_inv.as_ref(),
-        }
-    };
-    ($self:expr, mut $tag:expr ) => {
-        &mut match $tag {
-            UnaryTag::Pos => $self.op_pos,
-            UnaryTag::Neg => $self.op_neg,
-            UnaryTag::Inv => $self.op_inv,
-        }
-    };
-}
-
-macro_rules! select_binary {
-    ( $self:expr, ref $tag:expr ) => {
-        match $tag {
-            BinaryTag::Add => $self.op_add.as_ref(),
-            BinaryTag::Sub => $self.op_sub.as_ref(),
-            BinaryTag::Mul => $self.op_mul.as_ref(),
-            BinaryTag::Div => $self.op_div.as_ref(),
-            BinaryTag::Mod => $self.op_mod.as_ref(),
-            BinaryTag::And => $self.op_and.as_ref(),
-            BinaryTag::Xor => $self.op_xor.as_ref(),
-            BinaryTag::Or  => $self.op_or.as_ref(),
-            BinaryTag::Shl => $self.op_shl.as_ref(),
-            BinaryTag::Shr => $self.op_shr.as_ref(),
-        }
-    };
-    ( $self:expr, mut $tag:expr ) => {
-        &mut match $tag {
-            BinaryTag::Add => $self.op_add,
-            BinaryTag::Sub => $self.op_sub,
-            BinaryTag::Mul => $self.op_mul,
-            BinaryTag::Div => $self.op_div,
-            BinaryTag::Mod => $self.op_mod,
-            BinaryTag::And => $self.op_and,
-            BinaryTag::Xor => $self.op_xor,
-            BinaryTag::Or  => $self.op_or,
-            BinaryTag::Shl => $self.op_shl,
-            BinaryTag::Shr => $self.op_shr,
-        }
-    };
-}
-
-macro_rules! select_binary_reflected {
-    ( $self:expr, ref $tag:expr ) => {
-        match $tag {
-            BinaryTag::Add => $self.op_radd.as_ref(),
-            BinaryTag::Sub => $self.op_rsub.as_ref(),
-            BinaryTag::Mul => $self.op_rmul.as_ref(),
-            BinaryTag::Div => $self.op_rdiv.as_ref(),
-            BinaryTag::Mod => $self.op_rmod.as_ref(),
-            BinaryTag::And => $self.op_rand.as_ref(),
-            BinaryTag::Xor => $self.op_rxor.as_ref(),
-            BinaryTag::Or  => $self.op_ror.as_ref(),
-            BinaryTag::Shl => $self.op_rshl.as_ref(),
-            BinaryTag::Shr => $self.op_rshr.as_ref(),
-        }
-    };
-    ( $self:expr, mut $tag:expr ) => {
-        &mut match $tag {
-            BinaryTag::Add => $self.op_radd,
-            BinaryTag::Sub => $self.op_rsub,
-            BinaryTag::Mul => $self.op_rmul,
-            BinaryTag::Div => $self.op_rdiv,
-            BinaryTag::Mod => $self.op_rmod,
-            BinaryTag::And => $self.op_rand,
-            BinaryTag::Xor => $self.op_rxor,
-            BinaryTag::Or  => $self.op_ror,
-            BinaryTag::Shl => $self.op_rshl,
-            BinaryTag::Shr => $self.op_rshr,
-        }
-    };
-}
-
-macro_rules! select_comparison {
-    ( $self:expr, ref $tag:expr ) => {
-        match $tag {
-            CompareTag::LT => $self.cmp_lt.as_ref(),
-            CompareTag::LE => $self.cmp_le.as_ref(),
-            CompareTag::EQ => $self.cmp_eq.as_ref(),
-        }
-    };
-    ( $self:expr, mut $tag:expr ) => {
-        &mut match $tag {
-            CompareTag::LT => $self.cmp_lt,
-            CompareTag::LE => $self.cmp_le,
-            CompareTag::EQ => $self.cmp_eq,
-        }
-    };
-}
-
 impl Metatable {
     #[inline]
     pub fn op_unary(&self, tag: UnaryTag) -> Option<&MethodUnary> {
-        select_unary!(self, ref tag)
+        match tag {
+            UnaryTag::Pos => self.op_pos.as_ref(),
+            UnaryTag::Neg => self.op_neg.as_ref(),
+            UnaryTag::Inv => self.op_inv.as_ref(),
+        }
     }
     
     pub fn set_unary(&mut self, tag: UnaryTag, method: MethodUnary) -> Option<MethodUnary> {
-        select_unary!(self, mut tag).replace(method)
+        match tag {
+            UnaryTag::Pos => self.op_pos.replace(method),
+            UnaryTag::Neg => self.op_neg.replace(method),
+            UnaryTag::Inv => self.op_inv.replace(method),
+        }
     }
     
     pub fn take_unary(&mut self, tag: UnaryTag) -> Option<MethodUnary> {
-        select_unary!(self, mut tag).take()
+        match tag {
+            UnaryTag::Pos => self.op_pos.take(),
+            UnaryTag::Neg => self.op_neg.take(),
+            UnaryTag::Inv => self.op_inv.take(),
+        }
     }
     
     #[inline]
     pub fn op_binary(&self, tag: BinaryTag) -> Option<&MethodBinary> {
-        select_binary!(self, ref tag)
+        match tag {
+            BinaryTag::Add => self.op_add.as_ref(),
+            BinaryTag::Sub => self.op_sub.as_ref(),
+            BinaryTag::Mul => self.op_mul.as_ref(),
+            BinaryTag::Div => self.op_div.as_ref(),
+            BinaryTag::Mod => self.op_mod.as_ref(),
+            BinaryTag::And => self.op_and.as_ref(),
+            BinaryTag::Xor => self.op_xor.as_ref(),
+            BinaryTag::Or  => self.op_or.as_ref(),
+            BinaryTag::Shl => self.op_shl.as_ref(),
+            BinaryTag::Shr => self.op_shr.as_ref(),
+        }
     }
     
     pub fn set_binary(&mut self, tag: BinaryTag, method: MethodBinary) -> Option<MethodBinary> {
-        select_binary!(self, mut tag).replace(method)
+        match tag {
+            BinaryTag::Add => self.op_add.replace(method),
+            BinaryTag::Sub => self.op_sub.replace(method),
+            BinaryTag::Mul => self.op_mul.replace(method),
+            BinaryTag::Div => self.op_div.replace(method),
+            BinaryTag::Mod => self.op_mod.replace(method),
+            BinaryTag::And => self.op_and.replace(method),
+            BinaryTag::Xor => self.op_xor.replace(method),
+            BinaryTag::Or  => self.op_or.replace(method),
+            BinaryTag::Shl => self.op_shl.replace(method),
+            BinaryTag::Shr => self.op_shr.replace(method),
+        }
     }
     
     pub fn take_binary(&mut self, tag: BinaryTag) -> Option<MethodBinary> {
-        select_binary!(self, mut tag).take()
+        match tag {
+            BinaryTag::Add => self.op_add.take(),
+            BinaryTag::Sub => self.op_sub.take(),
+            BinaryTag::Mul => self.op_mul.take(),
+            BinaryTag::Div => self.op_div.take(),
+            BinaryTag::Mod => self.op_mod.take(),
+            BinaryTag::And => self.op_and.take(),
+            BinaryTag::Xor => self.op_xor.take(),
+            BinaryTag::Or  => self.op_or.take(),
+            BinaryTag::Shl => self.op_shl.take(),
+            BinaryTag::Shr => self.op_shr.take(),
+        }
     }
     
     #[inline]
     pub fn op_binary_reflected(&self, tag: BinaryTag) -> Option<&MethodBinaryReflected> {
-        select_binary_reflected!(self, ref tag)
+        match tag {
+            BinaryTag::Add => self.op_radd.as_ref(),
+            BinaryTag::Sub => self.op_rsub.as_ref(),
+            BinaryTag::Mul => self.op_rmul.as_ref(),
+            BinaryTag::Div => self.op_rdiv.as_ref(),
+            BinaryTag::Mod => self.op_rmod.as_ref(),
+            BinaryTag::And => self.op_rand.as_ref(),
+            BinaryTag::Xor => self.op_rxor.as_ref(),
+            BinaryTag::Or  => self.op_ror.as_ref(),
+            BinaryTag::Shl => self.op_rshl.as_ref(),
+            BinaryTag::Shr => self.op_rshr.as_ref(),
+        }
     }
     
     pub fn set_binary_reflected(&mut self, tag: BinaryTag, method: MethodBinaryReflected) -> Option<MethodBinaryReflected> {
-        select_binary_reflected!(self, mut tag).replace(method)
+        match tag {
+            BinaryTag::Add => self.op_radd.replace(method),
+            BinaryTag::Sub => self.op_rsub.replace(method),
+            BinaryTag::Mul => self.op_rmul.replace(method),
+            BinaryTag::Div => self.op_rdiv.replace(method),
+            BinaryTag::Mod => self.op_rmod.replace(method),
+            BinaryTag::And => self.op_rand.replace(method),
+            BinaryTag::Xor => self.op_rxor.replace(method),
+            BinaryTag::Or  => self.op_ror.replace(method),
+            BinaryTag::Shl => self.op_rshl.replace(method),
+            BinaryTag::Shr => self.op_rshr.replace(method),
+        }
     }
     
     pub fn take_binary_reflected(&mut self, tag: BinaryTag) -> Option<MethodBinaryReflected> {
-        select_binary_reflected!(self, mut tag).take()
+        match tag {
+            BinaryTag::Add => self.op_radd.take(),
+            BinaryTag::Sub => self.op_rsub.take(),
+            BinaryTag::Mul => self.op_rmul.take(),
+            BinaryTag::Div => self.op_rdiv.take(),
+            BinaryTag::Mod => self.op_rmod.take(),
+            BinaryTag::And => self.op_rand.take(),
+            BinaryTag::Xor => self.op_rxor.take(),
+            BinaryTag::Or  => self.op_ror.take(),
+            BinaryTag::Shl => self.op_rshl.take(),
+            BinaryTag::Shr => self.op_rshr.take(),
+        }
     }
     
     #[inline]
     pub fn op_compare(&self, tag: CompareTag) -> Option<&MethodCompare> {
-        select_comparison!(self, ref tag)
+        match tag {
+            CompareTag::LT => self.cmp_lt.as_ref(),
+            CompareTag::LE => self.cmp_le.as_ref(),
+            CompareTag::EQ => self.cmp_eq.as_ref(),
+        }
     }
     
     pub fn set_compare(&mut self, tag: CompareTag, method: MethodCompare) -> Option<MethodCompare> {
-        select_comparison!(self, mut tag).replace(method)
+        match tag {
+            CompareTag::LT => self.cmp_lt.replace(method),
+            CompareTag::LE => self.cmp_le.replace(method),
+            CompareTag::EQ => self.cmp_eq.replace(method),
+        }
     }
     
     pub fn take_compare(&mut self, tag: CompareTag) -> Option<MethodCompare> {
-        select_comparison!(self, mut tag).take()
+        match tag {
+            CompareTag::LT => self.cmp_lt.take(),
+            CompareTag::LE => self.cmp_le.take(),
+            CompareTag::EQ => self.cmp_eq.take(),
+        }
     }
 }
 

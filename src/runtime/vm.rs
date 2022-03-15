@@ -80,26 +80,32 @@ impl VirtualMachine {
     // Note: when moving values off the stack, make sure to copy *before* popping
     // This ensures that the GC sees the values as rooted
     
+    #[inline(always)]
     fn pop_stack(&mut self) -> Variant {
         self.immediate.pop().expect("empty stack")
     }
     
+    #[inline(always)]
     fn pop_many(&mut self, count: usize) -> Vec<Variant> {
         self.immediate.split_off(self.immediate.len() - count)
     }
     
+    #[inline(always)]
     fn push_stack(&mut self, value: Variant) {
         self.immediate.push(value)
     }
     
+    #[inline(always)]
     fn replace_stack(&mut self, value: Variant) {
         *self.immediate.last_mut().expect("empty stack") = value;
     }
     
+    #[inline(always)]
     fn peek_stack(&self) -> &Variant {
         self.immediate.last().expect("empty stack")
     }
     
+    #[inline(always)]
     fn peek_many(&self, count: usize) -> &[Variant] {
         let (_, peek) = self.immediate.as_slice().split_at(self.immediate.len()-count);
         peek

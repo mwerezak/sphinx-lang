@@ -9,6 +9,18 @@ use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
+// Temporary until a proper type system is implemented?
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TypeTag {
+    Nil,
+    Tuple,
+    Bool,
+    Integer,
+    Float,
+    String,
+    Object,
+}
+
 // Fundamental data value type
 #[derive(Clone)] // add Copy?
 pub enum Variant {
@@ -25,9 +37,23 @@ pub enum Variant {
 }
 
 impl Variant {
+    //TODO type system
+    pub fn type_tag(&self) -> TypeTag {
+        match self {
+            Self::Nil => TypeTag::Nil,
+            Self::BoolTrue | Self::BoolFalse => TypeTag::Bool,
+            Self::Integer(..) => TypeTag::Integer,
+            Self::Float(..) => TypeTag::Float,
+            Self::String(..) => TypeTag::String,
+            Self::EmptyTuple | Self::Tuple(..) => TypeTag::Tuple,
+        }
+    }
     
     pub fn metatable(&self) -> &Metatable {
-        &METATABLE_DEFAULT
+        match self {
+            Self::String(..) => &METATABLE_STRING,
+            _ => &METATABLE_DEFAULT,
+        }
     }
     
     // Only "nil" and "false" have a truth value of false.
@@ -94,13 +120,21 @@ impl From<StringSymbol> for Variant {
     fn from(value: StringSymbol) -> Self { Variant::String(value) }
 }
 
+
+const AUTO_INTERN_MAX: usize = 40;
+
 impl From<&str> for Variant {
     fn from(value: &str) -> Self {
-        STRING_TABLE.with(|string_table| string_table.get(value))
-            .map_or_else(
-                || unimplemented!(),  // TODO create string object
-                |symbol| symbol.into()
-            )
+        if value.len() <= AUTO_INTERN_MAX {
+            return STRING_TABLE.with(|string_table| string_table.get_or_intern(value)).into();
+        }
+        
+        if let Some(symbol) = STRING_TABLE.with(|string_table| string_table.get(value)) {
+            return symbol.into();
+        }
+        
+        // long strings
+        unimplemented!()
     }
 }
 

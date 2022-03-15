@@ -8,7 +8,6 @@ use string_interner::symbol::Symbol;
 
 use crate::runtime::DefaultBuildHasher;
 
-// TODO only intern new strings with length <= 40 chars
 
 thread_local! {
     pub static STRING_TABLE: StringTable = StringTable::new();
