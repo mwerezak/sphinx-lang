@@ -98,9 +98,8 @@ impl ResolvedSymbol {
 }
 
 
-// Resolved Symbol Formatting
-
 // Symbol Resolution
+// TODO move to sub-module
 
 pub type ResolvedSymbolTable<'s> = HashMap<&'s DebugSymbol, Result<ResolvedSymbol, SymbolResolutionError>>;
 
@@ -116,6 +115,48 @@ impl DebugSymbolResolver for ModuleSource {
         }
     }
 }
+
+pub struct BufferedResolver {
+    buffer: String,
+}
+
+impl BufferedResolver {
+    pub fn new(string: impl ToString) -> Self {
+        Self { buffer: string.to_string() }
+    }
+}
+
+impl DebugSymbolResolver for BufferedResolver {
+    fn resolve_symbols<'s, S>(&self, symbols: S) -> io::Result<ResolvedSymbolTable<'s>> where S: Iterator<Item=&'s DebugSymbol> {
+        Ok(resolve_debug_symbols(self.buffer.chars().map(Ok), symbols))
+    }
+}
+
+// use std::fs;
+// use std::path::PathBuf;
+// use crate::utils::ReadChars;
+
+// /// Resolves 
+// pub struct FileSymbolResolver {
+//     path: PathBuf,
+// }
+
+// impl FileSymbolResolver {
+//     pub fn new(path: impl Into<PathBuf>) -> Self { 
+//         Self { path: path.into() } 
+//     }
+// }
+
+// impl DebugSymbolResolver for FileSymbolResolver {
+//     fn resolve_symbols<'s, S>(&self, symbols: S) -> io::Result<ResolvedSymbolTable<'s>> where S: Iterator<Item=&'s DebugSymbol> {
+//         let file = fs::File::open(self.path)?;
+//         let reader = io::BufReader::new(file);
+//         let reader = ReadChars::new(reader);
+//         Ok(resolve_debug_symbols(reader, symbols))
+//     }
+// }
+
+// resolution procedure
 
 fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbols: impl Iterator<Item=&'s DebugSymbol>) -> ResolvedSymbolTable<'s> {
     // put all the symbols into a priority queue based on first occurrence in the source text

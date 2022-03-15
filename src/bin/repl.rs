@@ -1,11 +1,15 @@
+use std::io::{self, Write};
 use std::path::PathBuf;
 use clap::{Command, Arg};
 
+use sphinx_lang;
 use sphinx_lang::frontend;
-use sphinx_lang::{BuildErrors, build_module};
-use sphinx_lang::source::{ModuleSource, SourceType};
+use sphinx_lang::BuildErrors;
+use sphinx_lang::source::{ModuleSource, SourceType, SourceText};
 use sphinx_lang::codegen::Chunk;
 use sphinx_lang::runtime::VirtualMachine;
+use sphinx_lang::runtime::strings::StringInterner;
+use sphinx_lang::debug::symbol::BufferedResolver;
 
 fn main() {
     env_logger::init();
@@ -26,7 +30,7 @@ fn main() {
             .help("execute a snippet then exit")
             .value_name("CMD")
         );
-        
+    
     let version = app.get_version().unwrap();
     let args = app.get_matches();
     
@@ -40,15 +44,15 @@ fn main() {
     }
     
     if module.is_none() {
-        // TODO drop into REPL instead
-        //println!("\nSphinx Version {}\n", version);
-        println!("No input.");
+        // Drop into REPL
+        println!("\nSphinx Version {}\n", version);
+        Repl::new().run();
         return;
     }
     
     // build module
     let module = module.unwrap();
-    let build_result = build_module(&module);
+    let build_result = sphinx_lang::build_module(&module);
     if build_result.is_err() {
         match build_result.unwrap_err() {
             BuildErrors::Source(error) => {
@@ -70,20 +74,18 @@ fn main() {
     
     let program = build_result.unwrap();
     let chunk = Chunk::load(program.bytecode);
-    let mut vm = VirtualMachine::new(&chunk);
+    let mut vm = VirtualMachine::new(chunk);
     
     vm.run().expect("runtime error");
 }
 
 
-/*const PROMT_START: &str = ">>> ";
+const PROMT_START: &str = ">>> ";
 const PROMT_CONTINUE: &str = "... ";
 
 struct Repl {
-    lexer_factory: LexerBuilder,
-    root_env: Arc<Environment>,
+    vm: Option<VirtualMachine>,
 }
-
 
 enum ReadLine {
     Ok(String),
@@ -94,9 +96,8 @@ enum ReadLine {
 
 impl Repl {
     pub fn new() -> Self {
-        Repl { 
-            lexer_factory: language::create_default_lexer_rules(),
-            root_env: Environment::new_root(),
+        Self {
+            vm: None,
         }
     }
     
@@ -117,31 +118,26 @@ impl Repl {
             return ReadLine::Empty;
         }
         
-        if input.chars().last().unwrap() == '\x04' || input == "quit" {
+        if input == "quit" || input.chars().find(|c| *c == '\x04').is_some() {
             return ReadLine::Quit;
         }
         
         ReadLine::Ok(input)
     }
     
-    fn is_input_complete(&self, input: &str) -> bool {
-        // This is fairly hacky. If we can't parse the input without errors, then we assume we need to continue
-        let mut parse_ctx = ParseContext::new(&self.lexer_factory);
-        let module = ModuleSource::new("<repl>", SourceType::String(input.to_string()));
-        let source_text = module.source_text().expect("error reading source");
-        let parse_result = parse_ctx.parse_ast(source_text);
-        parse_result.is_ok()
-    }
-    
-    pub fn run(&self) {
+    pub fn run(&mut self) {
         
         loop {
+            let mut interner;
             let mut input = String::new();
+            let mut parse_result = None;
             
             loop {
                 let prompt =
                     if input.is_empty() { PROMT_START }
                     else { PROMT_CONTINUE };
+                
+                interner = StringInterner::new();
                 
                 match self.read_line(prompt) {
                     ReadLine::Quit => return,
@@ -157,7 +153,10 @@ impl Repl {
                             break
                         }
                         
-                        if self.is_input_complete(input.as_str()) {
+                        // If we can't parse the input without errors, then we assume we need to continue
+                        let source_text = SourceText::from(input.clone());
+                        if let Ok(ast) = sphinx_lang::parse_source(&mut interner, source_text) {
+                            parse_result.replace(ast);
                             break
                         }
                         
@@ -166,55 +165,65 @@ impl Repl {
                 }
             }
             
-            let mut parse_ctx = ParseContext::new(&self.lexer_factory);
-            let module = ModuleSource::new("<repl>", SourceType::String(input));
-            let source_text = module.source_text().expect("error reading source");
-            let parse_result = parse_ctx.parse_ast(source_text);
+            let parse_result =
+                if let Some(ast) = parse_result { Ok(ast) }
+                else { 
+                    let source_text = SourceText::from(input.clone());
+                    sphinx_lang::parse_source(&mut interner, source_text) 
+                };
             
-            let stmts = match parse_result {
-                Ok(stmts) => stmts,
+            let ast = match parse_result {
+                Ok(ast) => ast,
                 
-                Err(errors) => { 
-                    let symbols = errors.iter()
-                        .map(|err| err.debug_symbol());
-                        
-                    let resolved_table = module.resolve_symbols(symbols).unwrap();
-                    
-                    for error in errors.iter() {
-                        let resolved = resolved_table.get(&error.debug_symbol()).unwrap().as_ref();
-                        println!("{}", render_parser_error(&error, resolved.unwrap()));
-                    }
-                    
+                Err(errors) => {
+                    let resolver = BufferedResolver::new(input);
+                    frontend::print_source_errors(&resolver, &errors);
                     continue;
                 },
             };
             
-            for stmt in stmts.iter() {
-                match stmt.variant() {
-                    Stmt::Expression(expr) => {
-                        let eval_ctx = EvalContext::new(&self.root_env);
-                        let eval_result = eval_ctx.eval_expr(&expr);
-                        log::debug!("{:?}", eval_result);
-                        
-                        match eval_result {
-                            Ok(value) => {
-                                println!("{}", value.unwrap_value());
-                            },
-                            Err(error) => {
-                                println!("{:?}", error)
-                            },
-                        }
-                    },
-                    _ => {
-                        let exec_ctx = ExecContext::new(&self.root_env);
-                        let exec_result = exec_ctx.exec(&stmt);
-                        log::debug!("{:?}", exec_result);
-                    },
+            let program = match sphinx_lang::compile_ast(interner, ast) {
+                Ok(program) => program,
+                
+                Err(errors) => {
+                    let resolver = BufferedResolver::new(input);
+                    frontend::print_source_errors(&resolver, &errors);
+                    continue;
                 }
+            };
+            
+            let chunk = Chunk::load(program.bytecode);
+            match self.vm {
+                Some(ref mut vm) => vm.reload_program(chunk),
+                None => { self.vm.replace(VirtualMachine::new(chunk)); },
             }
+            
+            self.vm.as_mut().unwrap().run().expect("runtime error");
+            
+            // for stmt in stmts.iter() {
+            //     match stmt.variant() {
+            //         Stmt::Expression(expr) => {
+            //             let eval_ctx = EvalContext::new(&self.root_env);
+            //             let eval_result = eval_ctx.eval_expr(&expr);
+            //             log::debug!("{:?}", eval_result);
+            //             match eval_result {
+            //                 Ok(value) => {
+            //                     println!("{}", value.unwrap_value());
+            //                 },
+            //                 Err(error) => {
+            //                     println!("{:?}", error)
+            //                 },
+            //             }
+            //         },
+            //         _ => {
+            //             let exec_ctx = ExecContext::new(&self.root_env);
+            //             let exec_result = exec_ctx.exec(&stmt);
+            //             log::debug!("{:?}", exec_result);
+            //         },
+            //     }
+            // }
             
         }
         
     }
 }
-*/

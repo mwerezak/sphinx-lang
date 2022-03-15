@@ -33,15 +33,7 @@ pub struct CodeGenerator {
 }
 
 impl CodeGenerator {
-    pub fn new() -> Self {
-        CodeGenerator {
-            chunk: ChunkBuilder::default(),
-            symbols: DebugSymbols::default(),
-            errors: Vec::new(),
-        }
-    }
-    
-    pub fn with_strings(strings: StringInterner) -> Self {
+    pub fn new(strings: StringInterner) -> Self {
         CodeGenerator {
             chunk: ChunkBuilder::with_strings(strings),
             symbols: DebugSymbols::default(),

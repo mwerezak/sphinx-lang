@@ -21,6 +21,10 @@ pub enum SourceText {
     File(ReadFileChars),
 }
 
+impl<S> From<S> for SourceText where S: ToString {
+    fn from(text: S) -> Self { SourceText::String(text.to_string()) }
+}
+
 // Represents a "source" of source code, and provides the means to access the source text as a sequence of chars
 pub struct ModuleSource {
     name: String,

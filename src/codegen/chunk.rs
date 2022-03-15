@@ -129,6 +129,7 @@ pub struct Chunk {
 }
 
 impl Chunk {
+    #[inline(always)]
     pub fn bytes(&self) -> &[u8] { &*self.bytes }
     
     pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {

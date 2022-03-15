@@ -20,18 +20,16 @@ const OP_LD_CONST_16:   u8 = 0x22;  // ...using a 16-bit index
 const OP_CR_GLOBAL_IM:  u8 = 0x23;
 const OP_CR_GLOBAL_MUT: u8 = 0x24;
 const OP_ST_GLOBAL:     u8 = 0x25;
-const OP_ST_GLOBAL_16:  u8 = 0x26;
-const OP_LD_GLOBAL:     u8 = 0x27;
-const OP_LD_GLOBAL_16:  u8 = 0x28;
+const OP_LD_GLOBAL:     u8 = 0x26;
 
-const OP_CR_LOCAL:      u8 = 0x29;  // Note: local mutability tracking is done by the compiler
-const OP_ST_LOCAL:      u8 = 0x2A;
-const OP_ST_LOCAL_16:   u8 = 0x2B;
-const OP_LD_LOCAL:      u8 = 0x2C;
-const OP_LD_LOCAL_16:   u8 = 0x2D;
+const OP_CR_LOCAL:      u8 = 0x27;  // Note: local mutability tracking is done by the compiler
+const OP_ST_LOCAL:      u8 = 0x28;
+const OP_ST_LOCAL_16:   u8 = 0x29;
+const OP_LD_LOCAL:      u8 = 0x2A;
+const OP_LD_LOCAL_16:   u8 = 0x2B;
 
-const OP_LD_NAME:       u8 = 0x2E;
-const OP_LD_INDEX:      u8 = 0x2F;
+const OP_LD_NAME:       u8 = 0x2C;
+const OP_LD_INDEX:      u8 = 0x2D;
 
 const OP_NIL:           u8 = 0x30;
 const OP_EMPTY:         u8 = 0x31;
@@ -118,6 +116,7 @@ pub enum OpCode {
 }
 
 impl OpCode {
+    #[inline]
     pub fn from_byte(byte: u8) -> Option<OpCode> {
         let opcode = match byte {
             OP_RETURN => Self::Return,
@@ -161,6 +160,7 @@ impl OpCode {
         Some(opcode)
     }
     
+    #[inline]
     pub fn instr_len(&self) -> usize {
         match self {
             Self::Return => 1,

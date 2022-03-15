@@ -1,6 +1,6 @@
 use crate::codegen::{Chunk, ConstID, OpCode};
 use crate::runtime::Variant;
-use crate::runtime::module::{Access, Global};
+use crate::runtime::module::{Access, Namespace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -12,38 +12,43 @@ enum Control {
 
 // Stack-based Virtual Machine
 #[derive(Debug)]
-pub struct VirtualMachine<'c> {
+pub struct VirtualMachine {
     pc: usize, // program counter
-    program: &'c Chunk,
-    globals: Vec<Global>,
+    program: Chunk,
+    globals: Namespace,
     immediate: Vec<Variant>,
 }
 
-impl<'c> VirtualMachine<'c> {
-    pub fn new(chunk: &'c Chunk) -> Self {
+impl VirtualMachine {
+    pub fn new(chunk: Chunk) -> Self {
         Self {
             pc: 0,
             program: chunk,
-            globals: Vec::new(),
+            globals: Namespace::new(),
             immediate: Vec::new(),
         }
     }
     
+    // Supports execution in REPL mode. Swaps out the the current program while leaving globals untouched.
+    // If the immediate stack is not empty then this will panic
+    pub fn reload_program(&mut self, chunk: Chunk) -> () {
+        if !self.immediate.is_empty() {
+            panic!("invalid state for program reload");
+        }
+        self.program = chunk;
+        self.pc = 0;
+    }
+    
+    pub fn take_chunk(self) -> Chunk { self.program }
+    
     pub fn run(&mut self) -> ExecResult<()> {
-        let program_text = self.program.bytes();
-        
         loop {
-            let op_byte = program_text.get(self.pc).expect("pc out of bounds");
+            let op_byte = self.program.bytes().get(self.pc).expect("pc out of bounds");
             
             let opcode = OpCode::from_byte(*op_byte)
                 .unwrap_or_else(|| panic!("invalid instruction: {:x}", op_byte));
             
-            let len = opcode.instr_len();
-            let data_slice = (self.pc+1)..(self.pc+len);
-            let data = program_text.get(data_slice).expect("truncated instruction");
-            
-            self.pc += len; // pc is always the next instruction
-            match self.exec_instr(opcode, data)? {
+            match self.exec_instr(opcode)? {
                 Control::None => { }
                 Control::Return => return Ok(())
             }
@@ -78,7 +83,13 @@ impl<'c> VirtualMachine<'c> {
         peek
     }
     
-    fn exec_instr(&mut self, opcode: OpCode, data: &[u8]) -> ExecResult<Control> {
+    fn exec_instr(&mut self, opcode: OpCode) -> ExecResult<Control> {
+        let len = opcode.instr_len();
+        let data_slice = (self.pc+1)..(self.pc+len);
+        let data = self.program.bytes().get(data_slice).expect("truncated instruction");
+        
+        self.pc += opcode.instr_len(); // pc points to next instruction
+        
         match opcode {
             OpCode::Return => return Ok(Control::Return),
             
@@ -129,5 +140,3 @@ impl<'c> VirtualMachine<'c> {
         Ok(Control::None)
     }
 }
-
-

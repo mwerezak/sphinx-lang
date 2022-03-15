@@ -23,6 +23,7 @@ pub mod debug;
 
 use source::{SourceText, ModuleSource, ParseContext};
 use parser::ParserError;
+use parser::stmt::StmtMeta;
 use codegen::{Program, CodeGenerator, CompileError};
 use runtime::strings::StringInterner;
 
@@ -44,21 +45,17 @@ pub fn build_module(module: &ModuleSource) -> Result<Program, BuildErrors> {
 }
 
 pub fn build_source(source_text: SourceText) -> Result<Program, BuildErrors> {
-    // parsing
     let mut interner = StringInterner::new();
-    let lexer_factory = language::create_default_lexer_rules();
-    let mut parse_ctx = ParseContext::new(&lexer_factory, &mut interner);
-    let parse_result = parse_ctx.parse_ast(source_text);
     
+    // parsing
+    let parse_result = parse_source(&mut interner, source_text);
     if parse_result.is_err() {
         let errors = parse_result.unwrap_err().into_boxed_slice();
         return Err(BuildErrors::Syntax(errors));
     }
     
     // compilation
-    let stmts = parse_result.unwrap();
-    let codegen = CodeGenerator::with_strings(interner);
-    let compile_result = codegen.compile_program(stmts.iter());
+    let compile_result = compile_ast(interner, parse_result.unwrap());
     
     if compile_result.is_err() {
         let errors = compile_result.unwrap_err().into_boxed_slice();
@@ -68,3 +65,16 @@ pub fn build_source(source_text: SourceText) -> Result<Program, BuildErrors> {
     Ok(compile_result.unwrap())
 }
 
+/// Produce AST from SourceText
+pub fn parse_source(interner: &mut StringInterner, source_text: SourceText) -> Result<Vec<StmtMeta>, Vec<ParserError>> {
+    let lexer_factory = language::create_default_lexer_rules();
+    let mut parse_ctx = ParseContext::new(&lexer_factory, interner);
+    
+    parse_ctx.parse_ast(source_text)
+}
+
+/// Produce bytecode from AST
+pub fn compile_ast(interner: StringInterner, ast: Vec<StmtMeta>) -> Result<Program, Vec<CompileError>> {
+    let codegen = CodeGenerator::new(interner);
+    codegen.compile_program(ast.iter())
+}

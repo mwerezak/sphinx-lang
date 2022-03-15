@@ -3,7 +3,7 @@ use std::error::Error;
 pub mod symbol;
 pub mod dasm;
 
-pub use symbol::DebugSymbol;
+pub use symbol::{DebugSymbol, DebugSymbolResolver};
 
 mod tests;
 
