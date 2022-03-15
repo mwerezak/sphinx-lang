@@ -14,8 +14,8 @@ const OP_EXIT:          u8 = 0x01;
 
 const OP_POP:           u8 = 0x10;  // [ _ ] => []
 
-const OP_LD_CONST:      u8 = 0x21;  // load a constant from the chunk's const pool
-const OP_LD_CONST_16:   u8 = 0x22;  // ...using a 16-bit index
+const OP_LD_CONST:      u8 = 0x21;  // (u8); _ => [ value ]
+const OP_LD_CONST_16:   u8 = 0x22;  // (u16); _ => [ value ]
 
 const OP_IN_GLOBAL_IM:  u8 = 0x23;  // [ name value ] => []
 const OP_IN_GLOBAL_MUT: u8 = 0x24;  // [ name value ] => []
@@ -36,9 +36,10 @@ const OP_LD_GLOBAL:     u8 = 0x27;  // [ name ] => [ value ]
 // const OP_IN_DYN         u8 = ...;  // [ target: tuple, value, mut: bool] => []
 
 const OP_NIL:           u8 = 0x30;  // _ => [ nil ]
-const OP_EMPTY:         u8 = 0x31;  // _ => [ () ]
+const OP_FALSE:         u8 = 0x31;  // _ => [ false ]
 const OP_TRUE:          u8 = 0x32;  // _ => [ true ]
-const OP_FALSE:         u8 = 0x33;  // _ => [ false ]
+const OP_EMPTY:         u8 = 0x33;  // _ => [ () ]
+const OP_TUPLE:         u8 = 0x34;  // (u8); [ ... ] => [ tuple ]
 
 // 0x40         Unary Operations
 
@@ -91,9 +92,10 @@ pub enum OpCode {
     InsertGlobalMut = OP_IN_GLOBAL_MUT,
     
     Nil = OP_NIL,
-    Empty = OP_EMPTY,
     True = OP_TRUE,
     False = OP_FALSE,
+    Empty = OP_EMPTY,
+    Tuple = OP_TUPLE,
     
     Neg = OP_NEG,
     Pos = OP_POS,
@@ -134,9 +136,10 @@ impl OpCode {
             OP_IN_GLOBAL_MUT => Self::InsertGlobalMut,
             
             OP_NIL => Self::Nil,
-            OP_EMPTY => Self::Empty,
             OP_TRUE => Self::True,
             OP_FALSE => Self::False,
+            OP_EMPTY => Self::Empty,
+            OP_TUPLE => Self::Tuple,
             
             OP_NEG => Self::Neg,
             OP_POS => Self::Pos,
@@ -173,7 +176,7 @@ impl OpCode {
         match self {
             Self::LoadConst => 2,
             Self::LoadConst16 => 3,
-            
+            Self::Tuple => 2,
             _ => 1,
         }
     }
@@ -200,9 +203,10 @@ impl std::fmt::Display for OpCode {
             Self::InsertGlobalMut => "OP_IN_GLOBAL_MUT",
             
             Self::Nil => "OP_NIL",
-            Self::Empty => "OP_EMPTY",
             Self::True => "OP_TRUE",
             Self::False => "OP_FALSE",
+            Self::Empty => "OP_EMPTY",
+            Self::Tuple => "OP_TUPLE",
             
             Self::Neg => "OP_NEG",
             Self::Pos => "OP_POS",

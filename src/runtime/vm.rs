@@ -81,6 +81,11 @@ impl VirtualMachine {
     // This ensures that the GC sees the values as rooted
     
     #[inline(always)]
+    fn stack_len(&self) -> usize {
+        self.immediate.len()
+    }
+    
+    #[inline(always)]
     fn pop_stack(&mut self) -> Variant {
         self.immediate.pop().expect("empty stack")
     }
@@ -151,9 +156,15 @@ impl VirtualMachine {
             },
             
             OpCode::Nil => self.push_stack(Variant::Nil),
-            OpCode::Empty => self.push_stack(Variant::EmptyTuple),
             OpCode::True => self.push_stack(Variant::BoolTrue),
             OpCode::False => self.push_stack(Variant::BoolFalse),
+            OpCode::Empty => self.push_stack(Variant::EmptyTuple),
+            
+            OpCode::Tuple => {
+                let tuple_len = data[0];
+                let items = self.immediate.split_off(self.stack_len()).into_boxed_slice();
+                self.push_stack(Variant::make_tuple(items));
+            },
             
             OpCode::Neg => {
                 let result = ops::eval_neg(self.peek_stack())?;

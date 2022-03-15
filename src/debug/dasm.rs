@@ -76,7 +76,7 @@ impl<'c, 's> Disassembler<'c, 's> {
 
     fn decode_instr(&self, fmt: &mut Formatter<'_>, offset: &usize, instr: &[u8], symbol: Option<Symbol>) -> Result<usize, fmt::Error> {        let mut line = String::new();
         
-        write!(line, "{:04} ", offset)?;
+        write!(line, "{:04X} ", offset)?;
         
         
         let opcode = OpCode::from_byte(instr[0]);
@@ -93,6 +93,11 @@ impl<'c, 's> Disassembler<'c, 's> {
                     write!(line, "{:16} {: >4}    ", opcode, cid)?;
                     self.write_const(&mut line, self.chunk.lookup_const(cid))?;
                 },
+                
+                OpCode::Tuple => {
+                    let len = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, len)?;
+                }
                 
                 opcode => write!(line, "{:16}", opcode)?,
             },

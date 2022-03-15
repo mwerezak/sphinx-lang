@@ -10,6 +10,7 @@ pub type CompileResult<T> = Result<T, CompileError>;
 #[derive(Debug)]
 pub enum ErrorKind {
     ConstPoolLimit,
+    TupleLengthLimit,
     Other(String),
 }
 
@@ -59,6 +60,7 @@ impl fmt::Display for CompileError {
         
         let message = match self.kind() {
             ErrorKind::ConstPoolLimit => "constant pool limit reached",
+            ErrorKind::TupleLengthLimit => "tuple length limit exceeded",
             ErrorKind::Other(message) => message,
         };
         

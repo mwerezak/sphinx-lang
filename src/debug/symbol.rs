@@ -284,7 +284,7 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
         resolved_symbols.insert(symbol, Ok(resolved));
     }
     
-    debug_assert!(symbol_count == resolved_symbols.len());
+    // debug_assert!(symbol_count == resolved_symbols.len());
     
     resolved_symbols
 }

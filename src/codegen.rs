@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 
 use crate::parser::stmt::{StmtMeta, Stmt};
-use crate::parser::expr::{Expr};
+use crate::parser::expr::{Expr, ExprMeta};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration, LValue, DeclType};
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
@@ -140,8 +140,7 @@ impl CodeGenerator {
             Expr::Declaration(decl) => self.compile_declaration(symbol, decl.decl, &decl.lhs, &decl.init),
             Expr::Assignment(assign) => self.compile_assignment(symbol, assign.op, &assign.lhs, &assign.rhs),
             
-            Expr::Tuple(expr_list) => unimplemented!(),
-            // Expr::ObjectCtor(ctor) => unimplemented!(),
+            Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list),
             
             Expr::Block(label, suite) => unimplemented!(),
             
@@ -221,6 +220,18 @@ impl CodeGenerator {
     
     fn compile_assign_global_name(&mut self, symbol: &DebugSymbol, op: Option<BinaryOp>, name: InternSymbol, rhs: &Expr) -> CompileResult<()> {
         unimplemented!();
+    }
+    
+    fn compile_tuple(&mut self, symbol: &DebugSymbol, expr_list: &Box<[ExprMeta]>) -> CompileResult<()> {
+        let len = u8::try_from(expr_list.len())
+            .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
+        
+        for expr in expr_list.iter() {
+            let inner_symbol = expr.debug_symbol();
+            self.compile_expr(inner_symbol, expr.variant())?;
+        }
+        
+        self.emit_instr_byte(symbol, OpCode::Tuple, len)
     }
     
     fn compile_atom(&mut self, symbol: &DebugSymbol, atom: &Atom) -> CompileResult<()> {
