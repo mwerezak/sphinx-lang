@@ -39,7 +39,7 @@ impl From<&Span> for DebugSymbol {
 
 // Resolved Symbols
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ResolvedSymbol {
     lines: Vec<Rc<String>>,
     lineno: usize,  // line number at the start of the symbol
@@ -159,9 +159,13 @@ impl DebugSymbolResolver for BufferedResolver {
 // resolution procedure
 
 fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbols: impl Iterator<Item=&'s DebugSymbol>) -> ResolvedSymbolTable<'s> {
+    // deduplicate symbols
+    let mut dedup_symbols = symbols.collect::<Vec<&DebugSymbol>>();
+    dedup_symbols.dedup();
+    
     // put all the symbols into a priority queue based on first occurrence in the source text
     let mut next_symbols = BinaryHeap::new();
-    next_symbols.extend(symbols.map(|sym| IndexSort(sym, SortIndex::Start)).map(cmp::Reverse));
+    next_symbols.extend(dedup_symbols.into_iter().map(|sym| IndexSort(sym, SortIndex::Start)).map(cmp::Reverse));
     let symbol_count = next_symbols.len();
     
     let mut open_symbols = BinaryHeap::new();
@@ -286,11 +290,12 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
 }
 
 
-
+#[derive(Debug)]
 enum SortIndex { Start, End }
 
 // comparison based on start or end index
 
+#[derive(Debug)]
 struct IndexSort<'s>(&'s DebugSymbol, SortIndex);
 
 impl IndexSort<'_> {

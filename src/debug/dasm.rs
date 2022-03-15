@@ -58,10 +58,10 @@ impl<'c, 's> Disassembler<'c, 's> {
     
     // handles all the logic around whether we have a symbol table, if there was a symbol resolution error, repeats...
     fn try_resolve_symbol<'a>(&self, unresolved: Option<&'a DebugSymbol>, last_symbol: Option<&DebugSymbol>) -> Option<Symbol<'a>> where 's: 'a {
-        let resolved = unresolved.and(self.symbol_table.map_or(
+        let resolved = unresolved.and_then(|symbol| self.symbol_table.map_or(
             None,
-            |symbol_table| symbol_table.get(&unresolved.unwrap()))
-        );
+            |symbol_table| symbol_table.get(&symbol)
+        ));
         
         let is_repeat = last_symbol.and(unresolved).is_some() && last_symbol.unwrap() == unresolved.unwrap();
 
