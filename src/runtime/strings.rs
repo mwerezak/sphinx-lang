@@ -100,6 +100,10 @@ impl StringTable {
         }
     }
     
+    pub fn get(&self, string: &str) -> Option<StringSymbol> {
+        self.interner.borrow_mut().get(string).map(|symbol| symbol.into())
+    }
+    
     pub fn get_or_intern(&self, string: &str) -> StringSymbol {
         self.interner.borrow_mut().get_or_intern(string).into()
     }

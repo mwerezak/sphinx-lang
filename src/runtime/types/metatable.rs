@@ -5,8 +5,12 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 type Method0<R> = fn(&Variant) -> ExecResult<R>;
 type Method1<R> = fn(&Variant, &Variant) -> ExecResult<R>;
+// type Method2<R> = fn(&Variant, &Variant, &Variant) -> ExecResult<R>;
 
-pub type MethodSelf = Method0<Variant>;
+// pub type MethodSelf = Method0<Variant>;
+// pub type MethodArg1 = Method1<Variant>;
+// pub type MethodArg2 = Method2<Variant>;
+
 pub type MethodUnary = Method0<Variant>;
 pub type MethodBinary = Method1<Option<Variant>>; // a None result will cause the reflected version to be called
 pub type MethodBinaryReflected = Method1<Variant>;
@@ -14,8 +18,6 @@ pub type MethodCompare = Method1<Option<bool>>;
 
 #[derive(Default)]
 pub struct Metatable {
-    tostring: Option<MethodSelf>,
-    
     // Operator Overloads
     op_pos: Option<MethodUnary>,
     op_neg: Option<MethodUnary>,
@@ -50,10 +52,7 @@ pub struct Metatable {
 
 
 // Metamethod Tags
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MethodTag {
-    ToString,
-}
+
 
 // Operator Overloads
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -75,19 +74,6 @@ pub enum CompareTag{
 }
 
 // Slot Selector Helpers
-
-macro_rules! select_method {
-    ($self:expr, ref $tag:expr ) => {
-        match $tag {
-            MethodTag::ToString => $self.tostring.as_ref(),
-        }
-    };
-    ($self:expr, mut $tag:expr ) => {
-        &mut match $tag {
-            MethodTag::ToString => $self.tostring,
-        } 
-    };
-}
 
 macro_rules! select_unary {
     ($self:expr, ref $tag:expr ) => {
@@ -187,67 +173,54 @@ macro_rules! select_comparison {
 
 impl Metatable {
     #[inline]
-    pub fn method(&self, tag: &MethodTag) -> Option<&MethodSelf> {
-        select_method!(&self, ref tag)
-    }
-    
-    pub fn set_method(&mut self, tag: &MethodTag, method: MethodSelf) -> Option<MethodSelf> {
-        select_method!(self, mut tag).replace(method)
-    }
-    
-    pub fn take_method(&mut self, tag: &MethodTag) -> Option<MethodSelf> {
-        select_method!(self, mut tag).take()
-    }
-    
-    #[inline]
-    pub fn op_unary(&self, tag: &UnaryTag) -> Option<&MethodUnary> {
+    pub fn op_unary(&self, tag: UnaryTag) -> Option<&MethodUnary> {
         select_unary!(self, ref tag)
     }
     
-    pub fn set_unary(&mut self, tag: &UnaryTag, method: MethodUnary) -> Option<MethodUnary> {
+    pub fn set_unary(&mut self, tag: UnaryTag, method: MethodUnary) -> Option<MethodUnary> {
         select_unary!(self, mut tag).replace(method)
     }
     
-    pub fn take_unary(&mut self, tag: &UnaryTag) -> Option<MethodUnary> {
+    pub fn take_unary(&mut self, tag: UnaryTag) -> Option<MethodUnary> {
         select_unary!(self, mut tag).take()
     }
     
     #[inline]
-    pub fn op_binary(&self, tag: &BinaryTag) -> Option<&MethodBinary> {
+    pub fn op_binary(&self, tag: BinaryTag) -> Option<&MethodBinary> {
         select_binary!(self, ref tag)
     }
     
-    pub fn set_binary(&mut self, tag: &BinaryTag, method: MethodBinary) -> Option<MethodBinary> {
+    pub fn set_binary(&mut self, tag: BinaryTag, method: MethodBinary) -> Option<MethodBinary> {
         select_binary!(self, mut tag).replace(method)
     }
     
-    pub fn take_binary(&mut self, tag: &BinaryTag) -> Option<MethodBinary> {
+    pub fn take_binary(&mut self, tag: BinaryTag) -> Option<MethodBinary> {
         select_binary!(self, mut tag).take()
     }
     
     #[inline]
-    pub fn op_binary_reflected(&self, tag: &BinaryTag) -> Option<&MethodBinaryReflected> {
+    pub fn op_binary_reflected(&self, tag: BinaryTag) -> Option<&MethodBinaryReflected> {
         select_binary_reflected!(self, ref tag)
     }
     
-    pub fn set_binary_reflected(&mut self, tag: &BinaryTag, method: MethodBinaryReflected) -> Option<MethodBinaryReflected> {
+    pub fn set_binary_reflected(&mut self, tag: BinaryTag, method: MethodBinaryReflected) -> Option<MethodBinaryReflected> {
         select_binary_reflected!(self, mut tag).replace(method)
     }
     
-    pub fn take_binary_reflected(&mut self, tag: &BinaryTag) -> Option<MethodBinaryReflected> {
+    pub fn take_binary_reflected(&mut self, tag: BinaryTag) -> Option<MethodBinaryReflected> {
         select_binary_reflected!(self, mut tag).take()
     }
     
     #[inline]
-    pub fn op_compare(&self, tag: &CompareTag) -> Option<&MethodCompare> {
+    pub fn op_compare(&self, tag: CompareTag) -> Option<&MethodCompare> {
         select_comparison!(self, ref tag)
     }
     
-    pub fn set_compare(&mut self, tag: &CompareTag, method: MethodCompare) -> Option<MethodCompare> {
+    pub fn set_compare(&mut self, tag: CompareTag, method: MethodCompare) -> Option<MethodCompare> {
         select_comparison!(self, mut tag).replace(method)
     }
     
-    pub fn take_compare(&mut self, tag: &CompareTag) -> Option<MethodCompare> {
+    pub fn take_compare(&mut self, tag: CompareTag) -> Option<MethodCompare> {
         select_comparison!(self, mut tag).take()
     }
 }

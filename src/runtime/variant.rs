@@ -3,7 +3,9 @@ use std::rc::Rc;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::strings::StringSymbol;
+use crate::runtime::types::Metatable;
+use crate::runtime::types::primitive::*;
+use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -17,11 +19,16 @@ pub enum Variant {
     Integer(IntType),
     Float(FloatType),
     String(StringSymbol),
-    Tuple(Rc<[Variant]>),  // will use COW semantics, so if we need to send to another thread we can just clone the underlying data
+    // TODO just GC tuples
+    Tuple(Rc<[Variant]>),  //  will use COW semantics, so if we need to send to another thread we can just clone the underlying data
     //Object(GCHandle),
 }
 
 impl Variant {
+    
+    pub fn metatable(&self) -> &Metatable {
+        &METATABLE_DEFAULT
+    }
     
     // Only "nil" and "false" have a truth value of false.
     pub fn truth_value(&self) -> bool {
@@ -85,6 +92,16 @@ impl From<FloatType> for Variant {
 
 impl From<StringSymbol> for Variant {
     fn from(value: StringSymbol) -> Self { Variant::String(value) }
+}
+
+impl From<&str> for Variant {
+    fn from(value: &str) -> Self {
+        STRING_TABLE.with(|string_table| string_table.get(value))
+            .map_or_else(
+                || unimplemented!(),  // TODO create string object
+                |symbol| symbol.into()
+            )
+    }
 }
 
 
