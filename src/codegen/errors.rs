@@ -10,7 +10,7 @@ pub type CompileResult<T> = Result<T, CompileError>;
 #[derive(Debug)]
 pub enum ErrorKind {
     ConstPoolLimit,
-    LValueListLength,
+    AssignTupleLength,
 }
 
 #[derive(Debug)]
@@ -49,7 +49,7 @@ impl fmt::Display for CompileError {
         
         let message = match self.kind() {
             ErrorKind::ConstPoolLimit => "constant pool limit reached",
-            ErrorKind::LValueListLength => "can't assign a tuple of the wrong length",
+            ErrorKind::AssignTupleLength => "can't assign tuples of different lengths",
         };
         
         utils::format_error(fmt, "compile error", Some(message), self.source())

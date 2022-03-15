@@ -159,7 +159,7 @@ impl CodeGenerator {
                 
                 Expr::Tuple(init_list) => {
                     if target_list.len() != init_list.len() {
-                        return Err(ErrorKind::LValueListLength.into())
+                        return Err(CompileError::from(ErrorKind::AssignTupleLength).with_symbol(*symbol))
                     }
                     
                     for (inner_lvalue, inner_expr) in target_list.iter().zip(init_list.iter()) {
@@ -199,7 +199,7 @@ impl CodeGenerator {
 
                 Expr::Tuple(rhs_list) => {
                     if target_list.len() != rhs_list.len() {
-                        return Err(ErrorKind::LValueListLength.into())
+                        return Err(CompileError::from(ErrorKind::AssignTupleLength).with_symbol(*symbol))
                     }
                     
                     for (inner_lvalue, inner_expr) in target_list.iter().zip(rhs_list.iter()) {

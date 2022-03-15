@@ -16,13 +16,14 @@ pub fn print_source_errors(resolver: &impl DebugSymbolResolver, errors: &[impl S
     for error in errors.iter() {
         let debug_symbol = error.debug_symbol();
         if debug_symbol.is_none() {
+            println!("{}", RenderError(error, None));
             continue;
         }
         
         let resolved = resolved_table.get(&debug_symbol.unwrap()).unwrap().as_ref();
         
         match resolved {
-            Ok(resolved) => println!("{}", RenderError(error, resolved)),
+            Ok(resolved) => println!("{}", RenderError(error, Some(resolved))),
             Err(resolve_error) => {
                 println!("{}", error);
                 println!("Could not resolve symbol: {}", resolve_error);
@@ -32,14 +33,18 @@ pub fn print_source_errors(resolver: &impl DebugSymbolResolver, errors: &[impl S
 }
 
 
-pub struct RenderError<'e, 's, E>(pub &'e E, pub &'s ResolvedSymbol) where E: Error;
+pub struct RenderError<'e, 's, E>(pub &'e E, pub Option<&'s ResolvedSymbol>) where E: Error;
 
 impl<E> fmt::Display for RenderError<'_, '_, E> where E: Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let RenderError(error, source_lines) = self;
         
         let message = utils::title_case_string(&error.to_string());
-        write!(fmt, "{}.\n\n{}", message, source_lines)
+        if let Some(source_lines) = source_lines {
+            write!(fmt, "{}.\n\n{}", message, source_lines)
+        } else {
+            write!(fmt, "{}.", message)
+        }
     }
 }
 
