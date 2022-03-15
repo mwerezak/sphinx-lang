@@ -133,7 +133,7 @@ impl VirtualMachine {
             OpCode::GE => unimplemented!(),
             OpCode::GT => unimplemented!(),
             
-            OpCode::Inspect => println!("{}", self.pop_stack()),
+            OpCode::Inspect => println!("{:?}", self.pop_stack()),
             OpCode::Dump => println!("DBG_DUMP: {:?}", self),
         }
         

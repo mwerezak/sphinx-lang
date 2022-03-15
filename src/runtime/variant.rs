@@ -8,7 +8,7 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
 // Fundamental data value type
-#[derive(Debug, Clone)] // add Copy?
+#[derive(Clone)] // add Copy?
 pub enum Variant {
     Nil,
     EmptyTuple, // the empty tuple value
@@ -144,8 +144,7 @@ impl<'s> PartialEq for VariantKey<'_> {
 }
 impl Eq for VariantKey<'_> { }
 
-// TODO change this to debug, implement Display separately
-impl fmt::Display for Variant {
+impl fmt::Debug for Variant {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Nil => fmt.write_str("nil"),
@@ -162,9 +161,25 @@ impl fmt::Display for Variant {
                 }
             },
             
-            Self::String(value) => {
-                write!(fmt, "\"{}\"", value)
-            },
+            Self::String(value) => write!(fmt, "\"{}\"", value),
+            
+            Self::Tuple(items) => {
+                let (last, rest) = items.split_last().unwrap(); // will never be empty
+                
+                write!(fmt, "(")?;
+                for item in rest.iter() {
+                    write!(fmt, "{:?}, ", item)?;
+                }
+                write!(fmt, "{:?})", last)
+            }
+        }
+    }
+}
+
+impl fmt::Display for Variant {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::String(value) => write!(fmt, "{}", value),
             
             Self::Tuple(items) => {
                 let (last, rest) = items.split_last().unwrap(); // will never be empty
@@ -175,6 +190,8 @@ impl fmt::Display for Variant {
                 }
                 write!(fmt, "{})", last)
             }
+            
+            _ => write!(fmt, "{}", self)
         }
     }
 }
