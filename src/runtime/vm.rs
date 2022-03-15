@@ -134,6 +134,11 @@ impl VirtualMachine {
                 self.push_stack(value);
             },
             
+            OpCode::InsertGlobal => unimplemented!(),
+            OpCode::InsertGlobal16 => unimplemented!(),
+            OpCode::InsertGlobalMut => unimplemented!(),
+            OpCode::InsertGlobalMut16 => unimplemented!(),
+            
             OpCode::Nil => self.push_stack(Variant::Nil),
             OpCode::Empty => self.push_stack(Variant::EmptyTuple),
             OpCode::True => self.push_stack(Variant::BoolTrue),

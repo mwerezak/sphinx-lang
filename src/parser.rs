@@ -406,7 +406,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let next = self.peek()?;
         
         if let Token::Let | Token::Var = next.token {
-            self.parse_vardecl_expr(ctx)
+            self.parse_declaration_expr(ctx)
         } else {
             self.parse_assignment_expr(ctx)
         }
@@ -446,6 +446,12 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             // LHS of assignment has to be an lvalue
             let lhs = LValue::try_from(expr).map_err(|_| ParserError::from("can't assign to this"))?;
+            
+            // update-assignment not allowed with tuples
+            if op.is_some() && matches!(lhs, LValue::Tuple(..)) {
+                return Err("can't combine tuple-assignment with update-assignment".into());
+            }
+            
             let rhs = self.parse_expr_variant(ctx)?;
             
             ctx.pop_extend();
@@ -465,7 +471,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     /*
         declaration-expression ::= ( "let" | "var" ) assignment-expression ;
     */
-    fn parse_vardecl_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
+    fn parse_declaration_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         ctx.push(ContextTag::VarDeclExpr);
         
         let next = self.advance()?;
@@ -474,25 +480,24 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let decl = match next.token {
             Token::Let => DeclType::Immutable,
             Token::Var => DeclType::Mutable,
-            _ => panic!("parse_vardecl_expr() called but next token was neither let nor var"),
+            _ => panic!("parse_declaration_expr() called but next token was neither let nor var"),
         };
         
         let expr = self.parse_tuple_expr(ctx)?;
         let lhs = LValue::try_from(expr).map_err(|_| ParserError::from("can't assign to this"))?;
         if !Self::is_lvalue_valid_for_decl(&lhs) {
-            return Err("only identifiers can be used in a variable declaration".into());
+            return Err("only names can be declared as variables".into());
         }
         
         // check for and consume "="
         let next = self.advance()?;
         ctx.set_end(&next);
         
-        if let Some(op) = Self::which_assignment_op(&next.token) {
-            if op.is_some() {
+        match Self::which_assignment_op(&next.token) {
+            None => return Err("missing \"=\" in variable declaration".into()),
+            Some(op) => if op.is_some() {
                 return Err("update-assignment is not allowed in a variable declaration".into());
             }
-        } else {
-            return Err("missing \"=\" in variable declaration".into());
         }
         
         let init = self.parse_expr_variant(ctx)?;

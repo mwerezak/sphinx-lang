@@ -17,10 +17,12 @@ const OP_POP:           u8 = 0x10;
 const OP_LD_CONST:      u8 = 0x21;  // load a constant from the chunk's const pool
 const OP_LD_CONST_16:   u8 = 0x22;  // ...using a 16-bit index
 
-const OP_IN_GLOBAL_IM:  u8 = 0x23;
-const OP_IN_GLOBAL_MUT: u8 = 0x24;
-const OP_ST_GLOBAL:     u8 = 0x25;
-const OP_LD_GLOBAL:     u8 = 0x26;
+const OP_IN_GBL_IM:     u8 = 0x23;
+const OP_IN_GBL_IM_16:  u8 = 0x24;
+const OP_IN_GBL_MUT:    u8 = 0x25;
+const OP_IN_GBL_MUT_16: u8 = 0x26;
+const OP_ST_GBL:        u8 = 0x27;
+const OP_LD_GBL:        u8 = 0x28;
 
 // const OP_IN_LOCAL:      u8 = 0x27;  // Note: local mutability tracking is done by the compiler
 // const OP_ST_LOCAL:      u8 = 0x28;
@@ -83,6 +85,10 @@ pub enum OpCode {
     Pop = OP_POP,
     LoadConst  = OP_LD_CONST,
     LoadConst16 = OP_LD_CONST_16,
+    InsertGlobal = OP_IN_GBL_IM,
+    InsertGlobal16 = OP_IN_GBL_IM_16,
+    InsertGlobalMut = OP_IN_GBL_MUT,
+    InsertGlobalMut16 = OP_IN_GBL_MUT_16,
     
     Nil = OP_NIL,
     Empty = OP_EMPTY,
@@ -124,6 +130,10 @@ impl OpCode {
             OP_POP => Self::Pop,
             OP_LD_CONST => Self::LoadConst,
             OP_LD_CONST_16 => Self::LoadConst16,
+            OP_IN_GBL_IM => Self::InsertGlobal,
+            OP_IN_GBL_IM_16 => Self::InsertGlobal16,
+            OP_IN_GBL_MUT => Self::InsertGlobalMut,
+            OP_IN_GBL_MUT_16 => Self::InsertGlobalMut16,
             
             OP_NIL => Self::Nil,
             OP_EMPTY => Self::Empty,
@@ -163,41 +173,14 @@ impl OpCode {
     #[inline]
     pub fn instr_len(&self) -> usize {
         match self {
-            Self::Return => 1,
-            
-            Self::Pop => 1,
             Self::LoadConst => 2,
             Self::LoadConst16 => 3,
+            Self::InsertGlobal => 2,
+            Self::InsertGlobal16 => 3,
+            Self::InsertGlobalMut => 2,
+            Self::InsertGlobalMut16 => 3,
             
-            Self::Nil => 1,
-            Self::Empty => 1,
-            Self::True => 1,
-            Self::False => 1,
-            
-            Self::Neg => 1,
-            Self::Pos => 1,
-            Self::Inv => 1,
-            Self::Not => 1,
-            
-            Self::And => 1,
-            Self::Xor => 1,
-            Self::Or => 1,
-            Self::Shl => 1,
-            Self::Shr => 1,
-            Self::Add => 1,
-            Self::Sub => 1,
-            Self::Mul => 1,
-            Self::Div => 1,
-            Self::Mod => 1,
-            Self::EQ => 1,
-            Self::NE => 1,
-            Self::LT => 1,
-            Self::LE => 1,
-            Self::GE => 1,
-            Self::GT => 1,
-            
-            Self::Inspect => 1,
-            Self::Dump => 1,
+            _ => 1,
         }
     }
 }
@@ -219,6 +202,11 @@ impl std::fmt::Display for OpCode {
             Self::Pop => "OP_POP",
             Self::LoadConst => "OP_LD_CONST",
             Self::LoadConst16 => "OP_LD_CONST_16",
+            Self::InsertGlobal => "OP_IN_GBL_IM",
+            Self::InsertGlobal16 => "OP_IN_GBL_IM_16",
+            Self::InsertGlobalMut => "OP_IN_GBL_MUT",
+            Self::InsertGlobalMut16 => "OP_IN_GBL_MUT_16",
+
             
             Self::Nil => "OP_NIL",
             Self::Empty => "OP_EMPTY",

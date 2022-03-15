@@ -79,10 +79,12 @@ lvalue ::= IDENTIFIER | primary index_access | primary member_access ;
 lvalue_expression ::= lvalue | lvalue_list | "(" lvalue_expression ")" ;   (* lvalues, tuples of lvalues, and grouped lvalues *)
 lvalue_list ::= lvalue_expression ( "," lvalue_expression )* ;
 
-lvalue_annotated ::= lvalue_expression ( ":" type_expression )? ; 
+lvalue_annotated ::= lvalue ( ":" type_expression )? ;
+lvalue_expr_annotated ::= lvalue_expression ( ":" type_expression )? ; 
+
 
 assignment_op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-assignment_expression ::= ( "nonlocal" )? lvalue_annotated assignment_op expression ;
+assignment_expression ::= ( "nonlocal" )? ( lvalue_annotated assignment_op | lvalue_expr_annotated "=" ) expression ;
 
 (* 
     it isn't captured here, as that would require duplicating all of the above, 

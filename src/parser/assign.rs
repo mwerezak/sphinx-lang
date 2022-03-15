@@ -39,7 +39,7 @@ pub struct Assignment {
 
 // Declarations
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DeclType {
     Immutable,
     Mutable,

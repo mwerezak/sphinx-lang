@@ -3,8 +3,9 @@
 use crate::parser::stmt::{StmtMeta, Stmt};
 use crate::parser::expr::{Expr};
 use crate::parser::primary::{Atom, Primary};
+use crate::parser::assign::{Assignment, Declaration, LValue, DeclType};
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
-use crate::runtime::strings::StringInterner;
+use crate::runtime::strings::{StringInterner, InternSymbol};
 use crate::debug::dasm::DebugSymbols;
 use crate::debug::DebugSymbol;
 
@@ -14,7 +15,7 @@ pub mod errors;
 
 pub use opcodes::OpCode;
 pub use chunk::{Chunk, ConstID};
-pub use errors::{CompileResult, CompileError};
+pub use errors::{CompileResult, CompileError, ErrorKind};
 
 use opcodes::*;
 use chunk::{Constant, ChunkBuilder, UnloadedChunk};
@@ -92,9 +93,13 @@ impl CodeGenerator {
         Ok(())
     }
     
+    fn make_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<ConstID> {
+        self.chunk.push_const(value)
+            .map_err(|error| error.with_symbol(*symbol))
+    }
+    
     fn emit_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<()> {
-        let cid = self.chunk.push_const(value)
-            .map_err(|error| error.with_symbol(*symbol))?;
+        let cid = self.make_const(symbol, value)?;
         
         if cid <= u8::MAX.into() {
             self.emit_instr_byte(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap())
@@ -132,8 +137,8 @@ impl CodeGenerator {
                 self.compile_binary_op(symbol, op, lhs, rhs)
             },
             
-            Expr::Assignment(assignment) => unimplemented!(),
-            Expr::Declaration(declaration) => unimplemented!(),
+            Expr::Declaration(decl) => self.compile_declaration(symbol, decl.decl, &decl.lhs, &decl.init),
+            Expr::Assignment(assign) => self.compile_assignment(symbol, assign.op, &assign.lhs, &assign.rhs),
             
             Expr::Tuple(expr_list) => unimplemented!(),
             // Expr::ObjectCtor(ctor) => unimplemented!(),
@@ -142,6 +147,78 @@ impl CodeGenerator {
             
             Expr::FunctionDef(fundef) => unimplemented!(),
         }
+    }
+    
+    fn compile_declaration(&mut self, symbol: &DebugSymbol, decl: DeclType, lvalue: &LValue, init: &Expr) -> CompileResult<()> {
+        match lvalue {
+            // TODO global/local name case
+            LValue::Identifier(name) => self.compile_decl_global_name(symbol, decl, *name, &init),
+            LValue::Attribute(target) => unimplemented!(),
+            LValue::Index(target) => unimplemented!(),
+            LValue::Tuple(target_list) => match init {
+                
+                Expr::Tuple(init_list) => {
+                    if target_list.len() != init_list.len() {
+                        return Err(ErrorKind::LValueListLength.into())
+                    }
+                    
+                    for (inner_lvalue, inner_expr) in target_list.iter().zip(init_list.iter()) {
+                        let inner_symbol = inner_expr.debug_symbol();
+                        let inner_init = inner_expr.variant();
+                        self.compile_declaration(inner_symbol, decl, inner_lvalue, inner_init)?;
+                    }
+                    
+                    Ok(())
+                },
+                
+                _ => unimplemented!(), // dynamic declaration
+            },
+        }
+    }
+    
+    fn compile_decl_global_name(&mut self, symbol: &DebugSymbol, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
+        self.compile_expr(symbol, init)?;
+        
+        let cid = self.make_const(symbol, Constant::from(name))?;
+        match decl {
+            DeclType::Immutable if cid <= u8::MAX.into() => self.emit_instr_byte(symbol, OpCode::InsertGlobal, u8::try_from(cid).unwrap()),
+            DeclType::Immutable => self.emit_instr_data(symbol, OpCode::InsertGlobal16, cid.to_le_bytes()),
+            DeclType::Mutable if cid <= u8::MAX.into() => self.emit_instr_byte(symbol, OpCode::InsertGlobalMut, u8::try_from(cid).unwrap()),
+            DeclType::Mutable => self.emit_instr_data(symbol, OpCode::InsertGlobalMut16, cid.to_le_bytes()),
+        }
+    }
+    
+    fn compile_assignment(&mut self, symbol: &DebugSymbol, op: Option<BinaryOp>, lvalue: &LValue, rhs: &Expr) -> CompileResult<()> {
+        match lvalue {
+            // TODO global/local name case
+            LValue::Identifier(name) => self.compile_assign_global_name(symbol, op, *name, &rhs),
+            LValue::Attribute(target) => unimplemented!(),
+            LValue::Index(target) => unimplemented!(),
+            LValue::Tuple(..) if op.is_some() => panic!("update-assignment with a tuple should be a syntax error"),
+            LValue::Tuple(target_list) => match rhs {
+
+                Expr::Tuple(rhs_list) => {
+                    if target_list.len() != rhs_list.len() {
+                        return Err(ErrorKind::LValueListLength.into())
+                    }
+                    
+                    for (inner_lvalue, inner_expr) in target_list.iter().zip(rhs_list.iter()) {
+                        let inner_symbol = inner_expr.debug_symbol();
+                        let inner_rhs = inner_expr.variant();
+                        self.compile_assignment(inner_symbol, None, inner_lvalue, inner_rhs)?;
+                    }
+                    
+                    Ok(())
+                },
+                
+                _ => unimplemented!(), // dynamic declaration
+
+            },
+        }
+    }
+    
+    fn compile_assign_global_name(&mut self, symbol: &DebugSymbol, op: Option<BinaryOp>, name: InternSymbol, rhs: &Expr) -> CompileResult<()> {
+        unimplemented!();
     }
     
     fn compile_atom(&mut self, symbol: &DebugSymbol, atom: &Atom) -> CompileResult<()> {
