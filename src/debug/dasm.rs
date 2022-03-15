@@ -74,29 +74,30 @@ impl<'c, 's> Disassembler<'c, 's> {
         } else { None }
     }
 
-    fn decode_instr(&self, fmt: &mut Formatter<'_>, offset: &usize, instr: &[u8], symbol: Option<Symbol>) -> Result<usize, fmt::Error> {
-        let mut line = String::new();
+    fn decode_instr(&self, fmt: &mut Formatter<'_>, offset: &usize, instr: &[u8], symbol: Option<Symbol>) -> Result<usize, fmt::Error> {        let mut line = String::new();
         
         write!(line, "{:04} ", offset)?;
         
+        
         let opcode = OpCode::from_byte(instr[0]);
         match opcode {
-            Some(OpCode::LoadConst) => {
-                let cid = instr[1];
-                write!(line, "{:16} {: >4}    ", opcode.unwrap(), cid)?;
-                self.write_const(&mut line, self.chunk.lookup_const(cid))?;
+            Some(opcode) => match opcode {
+                OpCode::LoadConst | OpCode::InsertGlobal | OpCode::InsertGlobalMut => {
+                    let cid = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, cid)?;
+                    self.write_const(&mut line, self.chunk.lookup_const(cid))?;
+                },
+                
+                OpCode::LoadConst16 | OpCode::InsertGlobal16 | OpCode::InsertGlobalMut16 => {
+                    let cid =  ConstID::from_le_bytes(instr[1..=2].try_into().unwrap());
+                    write!(line, "{:16} {: >4}    ", opcode, cid)?;
+                    self.write_const(&mut line, self.chunk.lookup_const(cid))?;
+                },
+                
+                opcode => write!(line, "{:16}", opcode)?,
             },
-            Some(OpCode::LoadConst16) => {
-                let cid =  ConstID::from_le_bytes(instr[1..=2].try_into().unwrap());
-                write!(line, "{:16} {: >4}    ", opcode.unwrap(), cid)?;
-                self.write_const(&mut line, self.chunk.lookup_const(cid))?;
-            },
-            Some(opcode) => {
-                write!(line, "{:16}", opcode)?;
-            },
-            None => {
-                write!(line, "Unknown! {:#x}", instr[0])?;
-            }
+            
+            None => write!(line, "Unknown! {:#x}", instr[0])?,
         }
         
         if let Some(symbol) = symbol {
