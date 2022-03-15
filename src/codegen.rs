@@ -159,7 +159,7 @@ impl CodeGenerator {
                 
                 Expr::Tuple(init_list) => {
                     if target_list.len() != init_list.len() {
-                        return Err(CompileError::from(ErrorKind::AssignTupleLength).with_symbol(*symbol))
+                        return Err(CompileError::new("can't assign tuples of different lengths").with_symbol(*symbol))
                     }
                     
                     for (inner_lvalue, inner_expr) in target_list.iter().zip(init_list.iter()) {
@@ -194,12 +194,15 @@ impl CodeGenerator {
             LValue::Identifier(name) => self.compile_assign_global_name(symbol, op, *name, &rhs),
             LValue::Attribute(target) => unimplemented!(),
             LValue::Index(target) => unimplemented!(),
-            LValue::Tuple(..) if op.is_some() => panic!("update-assignment with a tuple should be a syntax error"),
+            LValue::Tuple(..) if op.is_some() => {
+                return Err(CompileError::new("can't use update-assigment when assigning to a tuple").with_symbol(*symbol))
+            },
+            
             LValue::Tuple(target_list) => match rhs {
 
                 Expr::Tuple(rhs_list) => {
                     if target_list.len() != rhs_list.len() {
-                        return Err(CompileError::from(ErrorKind::AssignTupleLength).with_symbol(*symbol))
+                        return Err(CompileError::new("can't assign tuples of different lengths").with_symbol(*symbol))
                     }
                     
                     for (inner_lvalue, inner_expr) in target_list.iter().zip(rhs_list.iter()) {

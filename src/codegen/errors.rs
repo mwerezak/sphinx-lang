@@ -10,7 +10,13 @@ pub type CompileResult<T> = Result<T, CompileError>;
 #[derive(Debug)]
 pub enum ErrorKind {
     ConstPoolLimit,
-    AssignTupleLength,
+    Other(String),
+}
+
+impl<S> From<S> for ErrorKind where S: ToString {
+    fn from(message: S) -> Self {
+        ErrorKind::Other(message.to_string())
+    }
 }
 
 #[derive(Debug)]
@@ -21,6 +27,10 @@ pub struct CompileError {
 }
 
 impl CompileError {
+    pub fn new<S>(message: S) -> Self where S: ToString {
+        Self::from(ErrorKind::from(message))
+    }
+    
     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
         self.symbol.replace(symbol); self 
     }
@@ -49,7 +59,7 @@ impl fmt::Display for CompileError {
         
         let message = match self.kind() {
             ErrorKind::ConstPoolLimit => "constant pool limit reached",
-            ErrorKind::AssignTupleLength => "can't assign tuples of different lengths",
+            ErrorKind::Other(message) => message,
         };
         
         utils::format_error(fmt, "compile error", Some(message), self.source())
