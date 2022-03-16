@@ -195,18 +195,18 @@ macro_rules! eval_binary_arithmetic {
 macro_rules! checked_int_math {
     ( $method:tt, $lhs:expr, $rhs:expr ) => {
         match $lhs.$method($rhs) {
-            (value, false) => Ok(Variant::Integer(value)),
-            (_, true) => Err(ErrorKind::OverflowError.into()),
+            Some(value) => Ok(Variant::Integer(value)),
+            None => Err(ErrorKind::OverflowError.into()),
         }
     };
 }
 
 eval_binary_arithmetic!(eval_mul, int_mul, float_mul, BinaryTag::Mul);
-#[inline(always)] fn int_mul(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(overflowing_mul, lhs, rhs) }
+#[inline(always)] fn int_mul(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(checked_mul, lhs, rhs) }
 #[inline(always)] fn float_mul(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs * rhs)) }
 
 eval_binary_arithmetic!(eval_div, int_div, float_div, BinaryTag::Div);
-#[inline(always)] fn int_div(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(overflowing_div, lhs, rhs) }
+#[inline(always)] fn int_div(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(checked_div, lhs, rhs) }
 #[inline(always)] fn float_div(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs / rhs)) }
 
 eval_binary_arithmetic!(eval_mod, int_mod, float_mod, BinaryTag::Mod);
@@ -214,11 +214,11 @@ eval_binary_arithmetic!(eval_mod, int_mod, float_mod, BinaryTag::Mod);
 #[inline(always)] fn float_mod(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs % rhs)) }
 
 eval_binary_arithmetic!(eval_add, int_add, float_add, BinaryTag::Add);
-#[inline(always)] fn int_add(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(overflowing_add, lhs, rhs) }
+#[inline(always)] fn int_add(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(checked_add, lhs, rhs) }
 #[inline(always)] fn float_add(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs + rhs)) }
 
 eval_binary_arithmetic!(eval_sub, int_sub, float_sub, BinaryTag::Sub);
-#[inline(always)] fn int_sub(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(overflowing_sub, lhs, rhs) }
+#[inline(always)] fn int_sub(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(checked_sub, lhs, rhs) }
 #[inline(always)] fn float_sub(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs - rhs)) }
 
 // Comparison - uses similar coercion rules as Arithmetic, may only produce boolean results
@@ -320,7 +320,7 @@ fn int_shl(lhs: IntType, rhs: IntType) -> ExecResult<Variant> {
     if rhs < 0 { 
         return Err(ErrorKind::NegativeShiftCount.into()); 
     }
-    checked_int_math!(overflowing_shl, lhs, rhs.try_into().unwrap()) 
+    checked_int_math!(checked_shl, lhs, rhs.try_into().unwrap()) 
 }
 
 eval_binary_shift!(eval_shr, int_shr, BinaryTag::Shr);
@@ -329,5 +329,5 @@ fn int_shr(lhs: IntType, rhs: IntType) -> ExecResult<Variant> {
     if rhs < 0 { 
         return Err(ErrorKind::NegativeShiftCount.into()); 
     }
-    checked_int_math!(overflowing_shr, lhs, rhs.try_into().unwrap()) 
+    checked_int_math!(checked_shr, lhs, rhs.try_into().unwrap()) 
 }
