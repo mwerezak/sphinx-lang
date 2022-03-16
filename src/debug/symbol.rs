@@ -183,11 +183,14 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
         let c = match char_result {
             Ok(c) => c,
             
-            Err(..) => {
+            Err(ioerror) => {
+                let ioerror = Rc::new(ioerror);
+                
                 // drop all open symbols and close all closing symbols
                 active_symbols.clear();
                 for cmp::Reverse(IndexSort(symbol,..)) in open_symbols.drain() {
-                    resolved_symbols.insert(symbol, Err(ErrorKind::IOError.into()));
+                    let error = SymbolResolutionError::caused_by(ErrorKind::IOError, *symbol, ioerror.clone());
+                    resolved_symbols.insert(symbol, Err(error));
                 }
                 
                 // we've already have the required text for all closing symbols, so we don't need to drop them
@@ -273,7 +276,8 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
     
     // process any active or closing symbols left after we hit EOF
     for cmp::Reverse(IndexSort(symbol,..)) in open_symbols.drain() {
-        resolved_symbols.insert(symbol, Err(ErrorKind::EOFReached.into()));
+        let error = SymbolResolutionError::new(ErrorKind::EOFReached, *symbol);
+        resolved_symbols.insert(symbol, Err(error));
     }
     
     let line_rc = Rc::new(current_line.clone());
@@ -330,10 +334,8 @@ impl Ord for IndexSort<'_> {
 
 use std::error::Error;
 
-pub type ErrorKind = SymbolResolutionErrorKind;
-
 #[derive(Debug)]
-pub enum SymbolResolutionErrorKind {
+pub enum ErrorKind {
     IOError,    // hit an io::Error while grabbing the symbol text
     EOFReached, // hit EOF before reaching the indicated end of symbol
 }
@@ -341,29 +343,24 @@ pub enum SymbolResolutionErrorKind {
 #[derive(Debug)]
 pub struct SymbolResolutionError {
     kind: ErrorKind,
-    cause: Option<Box<dyn std::error::Error>>,
+    symbol: DebugSymbol,
+    cause: Option<Rc<dyn std::error::Error>>,
 }
 
 impl SymbolResolutionError {
-    pub fn new(kind: ErrorKind) -> Self {
-        SymbolResolutionError {
-            kind, cause: None,
+    pub fn new(kind: ErrorKind, symbol: DebugSymbol) -> Self {
+        Self {
+            kind, symbol, cause: None,
         }
     }
     
-    pub fn caused_by(kind: ErrorKind, error: impl std::error::Error + 'static) -> Self {
-        SymbolResolutionError {
-            kind, cause: Some(Box::new(error)),
+    pub fn caused_by(kind: ErrorKind, symbol: DebugSymbol, error: Rc<dyn std::error::Error>) -> Self {
+        Self {
+            kind, symbol, cause: Some(error),
         }
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
-}
-
-impl From<ErrorKind> for SymbolResolutionError {
-    fn from(kind: ErrorKind) -> Self {
-        Self::new(kind)
-    }
 }
 
 impl Error for SymbolResolutionError {
@@ -375,11 +372,12 @@ impl Error for SymbolResolutionError {
 impl fmt::Display for SymbolResolutionError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         
-        let message = match self.kind() {
-            SymbolResolutionErrorKind::IOError => "I/O error while extracting symbol",
-            SymbolResolutionErrorKind::EOFReached => "EOF reached while extracting symbol",
+        let inner_message = match self.kind() {
+            ErrorKind::IOError => "I/O error while extracting symbol",
+            ErrorKind::EOFReached => "EOF reached while extracting symbol",
         };
         
-        utils::format_error(fmt, "could not resolve symbol", Some(message), self.source())
+        let message = format!("could not resolve symbol ${}:{}", self.symbol.start, self.symbol.end);
+        utils::format_error(fmt, message.as_str(), Some(inner_message), self.source())
     }
 }

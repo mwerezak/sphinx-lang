@@ -170,7 +170,7 @@ impl<'c, 's> Disassembler<'c, 's> {
                 let line = symbol.iter_whole_lines().nth(0).unwrap_or("").trim_end();
                 if symbol.is_multiline() {
                     let (before, sym_text) = line.split_at(symbol.start());
-                    write!(fmt, "{}`{}...", before, sym_text)
+                    write!(fmt, "{}`{}...`", before, sym_text)
                 } else {
                     let (before, rest) = line.split_at(symbol.start());
                     let (sym_text, after) = rest.split_at(symbol.end() - symbol.start());

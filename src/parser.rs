@@ -237,11 +237,11 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             Token::Do => unimplemented!(),
             Token::For => unimplemented!(),
             Token::Echo => {
-                ctx.set_end(&self.advance().unwrap());
+                ctx.set_start(&self.advance().unwrap());
                 Stmt::Echo(self.parse_expr_variant(ctx)?)
             },
             Token::Assert => {
-                ctx.set_end(&self.advance().unwrap());
+                ctx.set_start(&self.advance().unwrap());
                 Stmt::Assert(self.parse_expr_variant(ctx)?)
             }
             
@@ -438,7 +438,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let next = self.peek()?;
         if let Some(op) = Self::which_assignment_op(&next.token) {
             // consume assign_op token
-            ctx.push_continuation(ContextTag::AssignmentExpr);
+            ctx.push_continuation(ContextTag::AssignmentExpr, None);
             ctx.set_end(&self.advance().unwrap());
             
             if let Some(ref token) = optional_token {
@@ -525,6 +525,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         
+        // if this inner expression ends up being captured as the first
+        // element of a tuple, we will want to get its debug symbol.
+        ctx.push(ContextTag::ExprMeta);
+        
         // descend recursively into binops
         let mut first_expr = Some(self.parse_binop_expr(ctx)?); // might be taken into tuple later
         
@@ -537,13 +541,12 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             }
             
             if let Some(first_expr) = first_expr.take() {
-                ctx.push_continuation(ContextTag::ExprMeta);  // retroactivly get debug symbol
-                let symbol = ctx.frame().as_debug_symbol().unwrap();
-                ctx.pop_extend();
-                
+                // retroactivly get debug symbol
+                let frame = ctx.pop();
+                let symbol = frame.as_debug_symbol().unwrap();
                 tuple_exprs.push(ExprMeta::new(first_expr, symbol));
                 
-                ctx.push_continuation(ContextTag::TupleCtor); // enter the tuple context
+                ctx.push_continuation(ContextTag::TupleCtor, Some(frame)); // enter the tuple context
             }
             
             ctx.set_end(&self.advance().unwrap()); // consume comma
@@ -556,10 +559,11 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             tuple_exprs.push(ExprMeta::new(next_expr, symbol));
         }
         
+        ctx.pop_extend();
+        
         if let Some(expr) = first_expr {
             Ok(expr)
         } else {
-            ctx.pop_extend(); // pop the TupleCtor context frame
             Ok(Expr::Tuple(tuple_exprs.into_boxed_slice()))
         }
     }
@@ -581,6 +585,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         let mut expr = self.parse_binop_expr_levels(ctx, level - 1)?;
         
+        let mut push_ctx = false;
         loop {
             let next = self.peek()?;
             let binary_op = Self::which_binary_op(&next.token);
@@ -594,13 +599,16 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 break;
             }
             
-            ctx.push_continuation(ContextTag::BinaryOpExpr);
+            push_ctx = true;
+            ctx.push_continuation(ContextTag::BinaryOpExpr, None);
             ctx.set_end(&self.advance().unwrap()); // consume binary_op token
             
             let rhs_expr = self.parse_binop_expr_levels(ctx, level - 1)?;
             
             expr = Expr::BinaryOp(binary_op.into(), Box::new((expr, rhs_expr)));
-            
+        }
+        
+        if push_ctx {
             ctx.pop_extend();
         }
         

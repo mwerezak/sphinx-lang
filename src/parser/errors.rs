@@ -1,3 +1,4 @@
+use log;
 use std::fmt;
 use std::error::Error;
 use crate::utils;
@@ -159,18 +160,29 @@ impl<'m> ErrorContext {
         }
     }
     
-    pub fn frame(&self) -> &ContextFrame { self.stack.last().unwrap() }
-    pub fn frame_mut(&mut self) -> &mut ContextFrame { self.stack.last_mut().unwrap() }
+    pub fn frame(&self) -> &ContextFrame { 
+        self.stack.last().unwrap() 
+    }
     
-    pub fn push(&mut self, tag: ContextTag) { self.stack.push(ContextFrame::new(tag)) }
+    pub fn frame_mut(&mut self) -> &mut ContextFrame { 
+        self.stack.last_mut().unwrap() 
+    }
     
-    pub fn push_continuation(&mut self, tag: ContextTag) {
-        let start = self.frame().start().map(|o| o.to_owned());
+    pub fn push(&mut self, tag: ContextTag) { 
+        log::debug!("Push frame: {:0>3} {:?}", self.stack.len()+1, tag);
+        self.stack.push(ContextFrame::new(tag)) 
+    }
+    
+    // treat the prev top frame as if it was *above* the new top frame
+    pub fn push_continuation(&mut self, tag: ContextTag, frame: Option<ContextFrame>) {
+        // log::debug!("Set frame:  {:0>3} {:?} -> {:?}", self.stack.len(), self.frame().context(), tag);
+        let frame = frame.unwrap_or_else(|| self.frame().clone());
         self.push(tag);
-        self.frame_mut().set_span(start, None);
+        self.frame_mut().extend(frame);
     }
     
     pub fn pop(&mut self) -> ContextFrame { 
+        log::debug!("Pop frame:  {:0>3} {:?}", self.stack.len(), self.frame().context());
         assert!(self.stack.len() > 1);
         self.stack.pop().unwrap()
     }
@@ -206,7 +218,7 @@ impl<'m> ErrorContext {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContextFrame {
     tag: ContextTag,
     start: Option<Span>,
@@ -242,21 +254,15 @@ impl ContextFrame {
     }
     
     pub fn extend(&mut self, other: ContextFrame) {
-        if self.start.as_ref().and(other.start.as_ref()).is_some() {
-            if span_lt(other.start.as_ref().unwrap(), self.start.as_ref().unwrap()) {
-                self.start = other.start;
-            }
-        } else if other.start.is_some() {
-            self.start = other.start;
-        }
+        let spans = [self.start, other.start, self.end, other.end];
+        let start = spans.iter().filter_map(|s| s.as_ref())
+            .min_by(|a, b| a.start_index().cmp(&b.start_index()));
         
-        if self.end.as_ref().and(other.end.as_ref()).is_some() {
-            if span_lt(self.end.as_ref().unwrap(), other.end.as_ref().unwrap()) {
-                self.end = other.end;
-            }
-        } else if other.end.is_some() {
-            self.end = other.end;
-        }
+        let end = spans.iter().filter_map(|s| s.as_ref())
+            .max_by(|a, b| a.end_index().cmp(&b.end_index()));
+        
+        self.start = start.map(|s| s.clone());
+        self.end = end.map(|s| s.clone());
     }
     
     pub fn as_debug_symbol(&self) -> Option<DebugSymbol> {
@@ -265,6 +271,12 @@ impl ContextFrame {
             (Some(start), Some(end)) => {
                 let start_index = start.index;
                 let end_index = end.index + TokenIndex::from(end.length);
+                println!(
+                    "$$$ {}/{} <-> {}/{} -> {}:{}", 
+                    start.index, start.length,
+                    end.index, end.length,
+                    start_index, end_index,
+                );
                 Some((start_index, end_index).into())
             },
             
