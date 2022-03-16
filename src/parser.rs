@@ -241,6 +241,9 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 Stmt::Echo(self.parse_expr_variant(ctx)?)
             },
             
+            Token::Var | Token::Let => self.parse_declaration_stmt(ctx)?,
+            Token::Fun => self.parse_function_decl_stmt(ctx)?,
+            
             Token::Continue | Token::Break | Token::Return => {
                 ctx.push(ContextTag::ControlFlow);
                 
@@ -403,13 +406,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     // the top of the recursive descent stack for expressions
     fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
-        let next = self.peek()?;
-        
-        if let Token::Let | Token::Var = next.token {
-            self.parse_declaration_expr(ctx)
-        } else {
-            self.parse_assignment_expr(ctx)
-        }
+        self.parse_assignment_expr(ctx)
     }
     
     /*
@@ -469,10 +466,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     }
     
     /*
-        declaration-expression ::= ( "let" | "var" ) assignment-expression ;
+        declaration ::= ( "let" | "var" ) lvalue_expr_annotated "=" expression ;
     */
-    fn parse_declaration_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
-        ctx.push(ContextTag::VarDeclExpr);
+    fn parse_declaration_stmt(&mut self, ctx: &mut ErrorContext) -> ParseResult<Stmt> {
+        ctx.push(ContextTag::DeclaraionStmt);
         
         let next = self.advance()?;
         ctx.set_start(&next);
@@ -480,7 +477,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let decl = match next.token {
             Token::Let => DeclType::Immutable,
             Token::Var => DeclType::Mutable,
-            _ => panic!("parse_declaration_expr() called but next token was neither let nor var"),
+            _ => panic!("invalid decl token"),
         };
         
         let expr = self.parse_tuple_expr(ctx)?;
@@ -505,7 +502,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         ctx.pop_extend();
         
         let decl = Box::new(Declaration { decl, lhs, init });
-        return Ok(Expr::Declaration(decl));
+        return Ok(Stmt::Declaration(decl));
     }
     
     fn is_lvalue_valid_for_decl(lvalue: &LValue) -> bool {
@@ -689,7 +686,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     fn parse_primary_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         let expr = match self.peek()?.token {
             Token::Class => unimplemented!(),
-            Token::Fun => self.parse_function_def(ctx)?,
+            Token::Fun => self.parse_anonymous_function(ctx)?,
             Token::If => unimplemented!(),
             Token::Begin | Token::Label(..) => self.parse_block_expr(ctx)?,
             
@@ -736,21 +733,42 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(Expr::Block(block_label, suite.into_boxed_slice()))
     }
     
-    fn parse_function_def(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
+    fn parse_function_decl_stmt(&mut self, ctx: &mut ErrorContext) -> ParseResult<Stmt> {
         ctx.push(ContextTag::FunDefExpr);
         
         let next = self.advance()?;
         ctx.set_start(&next);
         debug_assert!(matches!(next.token, Token::Fun));
         
-        // if the next token isn't an open paren, it must be a function name
-        let next = self.peek()?;
+        // expect a function name next
+        let lvalue = self.parse_function_assignment_target(ctx)?;
         
-        let name = 
-            if !matches!(next.token, Token::OpenParen) {
-                Some(self.parse_function_assignment_target(ctx)?)
-            } else { None };
+        let function_def = self.parse_function_def(ctx)?;
         
+        // SYNTACTIC SUGAR: fun name(..) => let name = fun(..)
+        let function_decl = Declaration {
+            decl: DeclType::Immutable,
+            lhs: lvalue,
+            init: Expr::FunctionDef(function_def),
+        };
+        
+        Ok(Stmt::Declaration(Box::new(function_decl)))
+    }
+    
+    fn parse_anonymous_function(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
+        ctx.push(ContextTag::FunDefExpr);
+        
+        let next = self.advance()?;
+        ctx.set_start(&next);
+        debug_assert!(matches!(next.token, Token::Fun));
+        
+        let func_def = self.parse_function_def(ctx)?;
+        
+        ctx.pop_extend();
+        Ok(Expr::FunctionDef(func_def))
+    }
+        
+    fn parse_function_def(&mut self, ctx: &mut ErrorContext) -> ParseResult<FunctionDef> {
         // expect open paren now
         let next = self.advance().unwrap();
         ctx.set_end(&next);
@@ -772,21 +790,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         let body = self.parse_stmt_list(ctx)?;
         
-        let function_def = FunctionDef::new(signature, body);
-        
-        // SYNTACTIC SUGAR: fun name(..) => let name = fun(..)
-        if let Some(lvalue) = name {
-            let function_decl = Declaration {
-                decl: DeclType::Immutable,
-                lhs: lvalue,
-                init: Expr::FunctionDef(function_def),
-            };
-            
-            Ok(Expr::Declaration(Box::new(function_decl)))
-        } else {
-            
-            Ok(Expr::FunctionDef(function_def))
-        }
+        Ok(FunctionDef::new(signature, body))
     }
     
     fn parse_function_param_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<FunSignature> {

@@ -11,23 +11,6 @@
 type_expression ::= (* TODO *) ;
 
 
-(*** Statements ***)
-
-statement ::= ";"
-            | while_loop
-            | do_while_loop
-            | for_loop 
-            | expression ;
-
-statement_list ::= ( statement )* ( control_flow )? ;  (* control flow only allowed at end of block, much like Lua *)
-control_flow ::= "continue" ( label )? | "break" ( label )? ( expression )? | "return" ( expression )? ;
-
-while_loop ::=  ( label )? "while" expression "do" statement_list "end" ;
-do_while_loop ::= ( label )? "do" statement_list "while" expression "end" ;
-
-for_loop ::= ( label )? "for" lvalue_list "in" expression "end" ;
-
-label ::= "::" LABELNAME ;
 
 (*** Expressions ***)
 
@@ -35,14 +18,12 @@ label ::= "::" LABELNAME ;
     This expression production is left_recursive, and as such, the actual recursive descent parser implementation differs somewhat (see the bottom of this file)
 *)
 expression ::= primary
-             | class_def
-             | function_def
+             | anon_function
              | if_expression
              | block_expression
              | UNARY_OP expression
              | expression BINARY_OP expression
              | assignment_expression
-             | declaration_expression
              | object_constructor
              | tuple_constructor ;
 
@@ -86,13 +67,6 @@ lvalue_expr_annotated ::= lvalue_expression ( ":" type_expression )? ;
 assignment_op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
 assignment_expression ::= ( "nonlocal" )? ( lvalue_annotated assignment_op | lvalue_expr_annotated "=" ) expression ;
 
-(* 
-    it isn't captured here, as that would require duplicating all of the above, 
-    but the only lvalue allowed in a declaration are identifiers
-*)
-declaration_expression ::= ( "let" | "var" ) assignment_expression ;
-
-
 
 (*** Function/Method Calls ***)
 
@@ -114,13 +88,38 @@ member_initializer ::= ( IDENTIFIER | "[" primary "]" ) ( ":" type_expression )?
 (* syntax for tuple_constructor has special casing for single_element tuples and the empty tuple *)
 tuple_constructor ::= expression_list | "(" expression "," ")" | "(" ")" ;
 
+
+
+(*** Statements ***)
+
+statement ::= ";"
+            | while_loop
+            | do_while_loop
+            | for_loop 
+            | declaration
+            | function_def
+            | class_def
+            | expression ;
+
+statement_list ::= ( statement )* ( control_flow )? ;  (* control flow only allowed at end of block, much like Lua *)
+control_flow ::= "continue" ( label )? | "break" ( label )? ( expression )? | "return" ( expression )? ;
+
+while_loop ::=  ( label )? "while" expression "do" statement_list "end" ;
+do_while_loop ::= ( label )? "do" statement_list "while" expression "end" ;
+
+for_loop ::= ( label )? "for" lvalue_list "in" expression "end" ;
+
+label ::= "::" LABELNAME ;
+
+declaration ::= ( "let" | "var" ) lvalue_expr_annotated "=" expression ;
+
+
 (*** Function Defs ***)
 
-function_def ::= "fun" ( lvalue )?  parameter_list ( "->" type_expression ":" )?  statement_list "end" ;
+function_def ::= "fun" lvalue parameter_list ( "->" type_expression ":" )?  statement_list "end" ;
+anon_function ::= "fun" parameter_list ( "->" type_expression ":" )?  statement_list "end" ;
 
 parameter_list ::= "(" ")" ;
-
-
 
 parameter_list ::= "(" ")" 
                  | "(" variadic_parameter ")"
@@ -140,6 +139,8 @@ default_variadic ::= default_parameter ( "=" expression ) ;
 (*** Class Defs ***)
 
 class_def ::= (* TODO *) ;
+
+
 
 
 (***** Non left_recursive version of `expression` for implementation *****)

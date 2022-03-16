@@ -1,6 +1,7 @@
 use crate::runtime::strings::InternSymbol;
 use crate::debug::DebugSymbol;
 use crate::parser::expr::Expr;
+use crate::parser::assign::Declaration;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,6 +17,7 @@ impl Label {
 pub enum Stmt {
     
     Expression(Expr),
+    Declaration(Box<Declaration>),
     
     // WhileLoop
     // DoWhileLoop

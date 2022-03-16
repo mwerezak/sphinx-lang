@@ -119,6 +119,9 @@ impl CodeGenerator {
                 self.compile_expr(symbol, expr)?;
                 self.emit_instr(symbol, OpCode::Pop)
             },
+            
+            Stmt::Declaration(decl) => self.compile_declaration(symbol, decl.decl, &decl.lhs, &decl.init),
+            
             Stmt::Continue(label) => unimplemented!(),
             Stmt::Break(label, expr) => unimplemented!(),
             Stmt::Return(expr) => unimplemented!(),
@@ -143,7 +146,6 @@ impl CodeGenerator {
                 self.emit_binary_op(symbol, op)
             },
             
-            Expr::Declaration(decl) => self.compile_declaration(symbol, decl.decl, &decl.lhs, &decl.init),
             Expr::Assignment(assign) => self.compile_assignment(symbol, assign.op, &assign.lhs, &assign.rhs),
             
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list),
