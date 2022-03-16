@@ -238,15 +238,15 @@ impl VirtualMachine {
                 let items = self.immediate.split_off(self.stack_len() - tuple_len).into_boxed_slice();
                 self.push_stack(Variant::make_tuple(items));
             },
-            OpCode::UInt => {
+            OpCode::UInt8 => {
                 let value = IntType::from(data[0]);
                 self.push_stack(Variant::Integer(value))
             },
-            OpCode::Int => {
+            OpCode::Int8 => {
                 let value = i8::from_le_bytes([data[0]]);
                 self.push_stack(Variant::Integer(IntType::from(value)))
             }
-            OpCode::Float => {
+            OpCode::Float8 => {
                 let value = i8::from_le_bytes([data[0]]);
                 self.push_stack(Variant::Float(FloatType::from(value)))
             }

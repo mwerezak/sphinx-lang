@@ -114,19 +114,19 @@ impl<'c, 's> Disassembler<'c, 's> {
                     write!(line, "{:16} {: >4}    ", opcode, len)?;
                 }
                 
-                OpCode::UInt => {
+                OpCode::UInt8 => {
                     let value = Constant::Integer(instr[1].into());
                     write!(line, "{:16}         ", opcode)?;
                     self.write_const(&mut line, &value)?;
                 }
                 
-                OpCode::Int => {
+                OpCode::Int8 => {
                     let value = Constant::Integer(i8::from_le_bytes([instr[1]]).into());
                     write!(line, "{:16}         ", opcode)?;
                     self.write_const(&mut line, &value)?;
                 }
                 
-                OpCode::Float => {
+                OpCode::Float8 => {
                     let value = FloatType::from(i8::from_le_bytes([instr[1]]));
                     let value = Constant::Float(value.to_le_bytes());
                     write!(line, "{:16}         ", opcode)?;

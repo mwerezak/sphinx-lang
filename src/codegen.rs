@@ -515,10 +515,10 @@ impl CodeGenerator {
             Atom::BooleanLiteral(false) => self.emit_instr(symbol, OpCode::False),
             
             Atom::IntegerLiteral(value) => {
-                if let Ok(uint) = u8::try_from(*value) {
-                    self.emit_instr_byte(symbol, OpCode::UInt, uint)
-                } else if let Ok(int) = i8::try_from(*value) {
-                    self.emit_instr_byte(symbol, OpCode::Int, int.to_le_bytes()[0])
+                if let Ok(value) = u8::try_from(*value) {
+                    self.emit_instr_byte(symbol, OpCode::UInt8, value)
+                } else if let Ok(value) = i8::try_from(*value) {
+                    self.emit_instr_byte(symbol, OpCode::Int8, value.to_le_bytes()[0])
                 } else {
                     self.emit_const(symbol, Constant::from(*value))
                 }
@@ -527,7 +527,7 @@ impl CodeGenerator {
             Atom::FloatLiteral(value) => {
                 if FloatType::from(i8::MIN) <= *value && *value <= FloatType::from(i8::MAX) {
                     let value = *value as i8;
-                    self.emit_instr_byte(symbol, OpCode::Float, value.to_le_bytes()[0])
+                    self.emit_instr_byte(symbol, OpCode::Float8, value.to_le_bytes()[0])
                 } else {
                     self.emit_const(symbol, Constant::from(*value))
                 }
