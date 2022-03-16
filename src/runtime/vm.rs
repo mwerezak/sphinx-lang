@@ -1,6 +1,7 @@
 use crate::codegen::{Chunk, ConstID, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::ops;
+use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Access, Namespace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
@@ -116,6 +117,13 @@ impl VirtualMachine {
         peek
     }
     
+    fn into_name(value: &Variant) -> StringSymbol {
+        match value {
+            Variant::String(symbol) => *symbol,
+            _ => panic!("invalid operand type"),
+        }
+    }
+    
     fn exec_instr(&mut self, opcode: OpCode) -> ExecResult<Control> {
         let len = opcode.instr_len();
         let data_slice = (self.pc+1)..(self.pc+len);
@@ -145,14 +153,25 @@ impl VirtualMachine {
                     if opcode == OpCode::InsertGlobalMut { Access::ReadWrite }
                     else { Access::ReadOnly };
                 
-                let value = self.pop_stack();
-                let name = self.pop_stack();
-                let symbol = match name {
-                    Variant::String(symbol) => symbol,
-                    _ => panic!("invalid operand type"),
-                };
+                let name = Self::into_name(&self.pop_stack());
+                let value = self.peek_stack().clone();
                 
-                self.globals.create(symbol, access, value)?;
+                self.globals.create(name, access, value)?;
+            },
+            
+            OpCode::StoreGlobal => {
+                let name = Self::into_name(&self.pop_stack());
+                let value = self.peek_stack().clone();
+                let store = self.globals.lookup_mut(&name)?;
+                *store = value;
+            },
+            
+            OpCode::LoadGlobal => {
+                let value = {
+                    let name = Self::into_name(self.peek_stack());
+                    self.globals.lookup(&name)?.clone()
+                };
+                self.replace_stack(value);
             },
             
             OpCode::Nil => self.push_stack(Variant::Nil),
@@ -161,8 +180,8 @@ impl VirtualMachine {
             OpCode::Empty => self.push_stack(Variant::EmptyTuple),
             
             OpCode::Tuple => {
-                let tuple_len = data[0];
-                let items = self.immediate.split_off(self.stack_len()).into_boxed_slice();
+                let tuple_len = usize::from(data[0]);
+                let items = self.immediate.split_off(self.stack_len() - tuple_len).into_boxed_slice();
                 self.push_stack(Variant::make_tuple(items));
             },
             

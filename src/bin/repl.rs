@@ -6,6 +6,7 @@ use sphinx_lang;
 use sphinx_lang::frontend;
 use sphinx_lang::BuildErrors;
 use sphinx_lang::source::{ModuleSource, SourceType, SourceText};
+use sphinx_lang::parser::stmt::{Stmt, StmtMeta};
 use sphinx_lang::codegen::Chunk;
 use sphinx_lang::runtime::VirtualMachine;
 use sphinx_lang::runtime::strings::StringInterner;
@@ -172,7 +173,7 @@ impl Repl {
                     sphinx_lang::parse_source(&mut interner, source_text) 
                 };
             
-            let ast = match parse_result {
+            let mut ast = match parse_result {
                 Ok(ast) => ast,
                 
                 Err(errors) => {
@@ -181,6 +182,15 @@ impl Repl {
                     continue;
                 },
             };
+            
+            // if the last stmt is an expression statement, convert it into an inspect
+            if let Some(stmt) = ast.pop() {
+                let (mut stmt, symbol) = stmt.take();
+                if let Stmt::Expression(expr) = stmt {
+                    stmt = Stmt::Echo(expr);
+                }
+                ast.push(StmtMeta::new(stmt, symbol))
+            }
             
             let program = match sphinx_lang::compile_ast(interner, ast) {
                 Ok(program) => program,

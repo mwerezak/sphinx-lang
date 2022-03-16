@@ -17,9 +17,9 @@ const OP_POP:           u8 = 0x10;  // [ _ ] => []
 const OP_LD_CONST:      u8 = 0x21;  // (u8); _ => [ value ]
 const OP_LD_CONST_16:   u8 = 0x22;  // (u16); _ => [ value ]
 
-const OP_IN_GLOBAL_IM:  u8 = 0x23;  // [ name value ] => []
-const OP_IN_GLOBAL_MUT: u8 = 0x24;  // [ name value ] => []
-const OP_ST_GLOBAL:     u8 = 0x26;  // [ name value ] => []
+const OP_IN_GLOBAL_IM:  u8 = 0x23;  // [ value name ] => [ value ]
+const OP_IN_GLOBAL_MUT: u8 = 0x24;  // [ value name ] => [ value ]
+const OP_ST_GLOBAL:     u8 = 0x26;  // [ value name ] => [ value ]
 const OP_LD_GLOBAL:     u8 = 0x27;  // [ name ] => [ value ]
 
 // const OP_IN_LOCAL:      u8 = 0x27;  // Note: local mutability tracking is done by the compiler
@@ -90,6 +90,8 @@ pub enum OpCode {
     LoadConst16 = OP_LD_CONST_16,
     InsertGlobal = OP_IN_GLOBAL_IM,
     InsertGlobalMut = OP_IN_GLOBAL_MUT,
+    StoreGlobal = OP_ST_GLOBAL,
+    LoadGlobal = OP_LD_GLOBAL,
     
     Nil = OP_NIL,
     True = OP_TRUE,
@@ -134,6 +136,8 @@ impl OpCode {
             OP_LD_CONST_16 => Self::LoadConst16,
             OP_IN_GLOBAL_IM => Self::InsertGlobal,
             OP_IN_GLOBAL_MUT => Self::InsertGlobalMut,
+            OP_ST_GLOBAL => Self::StoreGlobal,
+            OP_LD_GLOBAL => Self::LoadGlobal,
             
             OP_NIL => Self::Nil,
             OP_TRUE => Self::True,
@@ -201,6 +205,8 @@ impl std::fmt::Display for OpCode {
             Self::LoadConst16 => "OP_LD_CONST_16",
             Self::InsertGlobal => "OP_IN_GLOBAL_IM",
             Self::InsertGlobalMut => "OP_IN_GLOBAL_MUT",
+            Self::StoreGlobal => "OP_ST_GLOBAL",
+            Self::LoadGlobal => "OP_LD_GLOBAL",
             
             Self::Nil => "OP_NIL",
             Self::True => "OP_TRUE",

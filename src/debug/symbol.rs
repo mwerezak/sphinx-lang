@@ -166,7 +166,7 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
     // put all the symbols into a priority queue based on first occurrence in the source text
     let mut next_symbols = BinaryHeap::new();
     next_symbols.extend(dedup_symbols.into_iter().map(|sym| IndexSort(sym, SortIndex::Start)).map(cmp::Reverse));
-    let symbol_count = next_symbols.len();
+    // let symbol_count = next_symbols.len();
     
     let mut open_symbols = BinaryHeap::new();
     let mut active_symbols = HashMap::<&DebugSymbol, (Vec<Rc<String>>, usize, usize)>::new(); // values are (buffer, line number, start index)

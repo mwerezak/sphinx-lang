@@ -131,10 +131,16 @@ impl CodeGenerator {
             
             Expr::Primary(primary) => unimplemented!(),
             
-            Expr::UnaryOp(op, expr) => self.compile_unary_op(symbol, op, expr),
+            Expr::UnaryOp(op, expr) => {
+                self.compile_expr(symbol, expr)?;
+                self.emit_unary_op(symbol, op)
+            },
+            
             Expr::BinaryOp(op, exprs) => {
                 let (ref lhs, ref rhs) = **exprs;
-                self.compile_binary_op(symbol, op, lhs, rhs)
+                self.compile_expr(symbol, lhs)?;
+                self.compile_expr(symbol, rhs)?;
+                self.emit_binary_op(symbol, op)
             },
             
             Expr::Declaration(decl) => self.compile_declaration(symbol, decl.decl, &decl.lhs, &decl.init),
@@ -176,9 +182,9 @@ impl CodeGenerator {
     }
     
     fn compile_decl_global_name(&mut self, symbol: &DebugSymbol, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
-        self.emit_const(symbol, Constant::from(name))?;
         
         self.compile_expr(symbol, init)?;
+        self.emit_const(symbol, Constant::from(name))?;
         
         match decl {
             DeclType::Immutable => self.emit_instr(symbol, OpCode::InsertGlobal),
@@ -219,7 +225,22 @@ impl CodeGenerator {
     }
     
     fn compile_assign_global_name(&mut self, symbol: &DebugSymbol, op: Option<BinaryOp>, name: InternSymbol, rhs: &Expr) -> CompileResult<()> {
-        unimplemented!();
+        
+        if let Some(op) = op {
+            // load current value
+            self.emit_const(symbol, Constant::from(name))?;
+            self.emit_instr(symbol, OpCode::LoadGlobal)?;
+            
+            // apply binary op
+            self.compile_expr(symbol, rhs)?;
+            self.emit_binary_op(symbol, &op)?;
+            
+        } else {
+            self.compile_expr(symbol, rhs)?;
+        }
+        
+        self.emit_const(symbol, Constant::from(name))?;
+        self.emit_instr(symbol, OpCode::StoreGlobal)
     }
     
     fn compile_tuple(&mut self, symbol: &DebugSymbol, expr_list: &Box<[ExprMeta]>) -> CompileResult<()> {
@@ -244,7 +265,11 @@ impl CodeGenerator {
             Atom::FloatLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
             Atom::StringLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
             
-            Atom::Identifier(name) => unimplemented!(),
+            Atom::Identifier(name) => {
+                // TODO local/global name case
+                self.emit_const(symbol, Constant::from(*name))?;
+                self.emit_instr(symbol, OpCode::LoadGlobal)
+            },
             
             // Atom::Self_ => unimplemented!(),
             // Atom::Super => unimplemented!(),
@@ -257,9 +282,7 @@ impl CodeGenerator {
         unimplemented!()
     }
     
-    fn compile_unary_op(&mut self, symbol: &DebugSymbol, op: &UnaryOp, expr: &Expr) -> CompileResult<()> {
-        self.compile_expr(symbol, expr)?;
-        
+    fn emit_unary_op(&mut self, symbol: &DebugSymbol, op: &UnaryOp) -> CompileResult<()> {
         match op {
             UnaryOp::Neg => self.emit_instr(symbol, OpCode::Neg),
             UnaryOp::Pos => self.emit_instr(symbol, OpCode::Pos),
@@ -268,10 +291,7 @@ impl CodeGenerator {
         }
     }
     
-    fn compile_binary_op(&mut self, symbol: &DebugSymbol, op: &BinaryOp, lhs: &Expr,  rhs: &Expr) -> CompileResult<()> {
-        self.compile_expr(symbol, lhs)?;
-        self.compile_expr(symbol, rhs)?;
-        
+    fn emit_binary_op(&mut self, symbol: &DebugSymbol, op: &BinaryOp) -> CompileResult<()> {
         match op {
             BinaryOp::Logical(logic) => unimplemented!(),
             
