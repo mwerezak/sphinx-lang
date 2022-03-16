@@ -221,7 +221,6 @@ impl VirtualMachine {
             OpCode::GT => eval_cmp!(self, eval_gt),
             
             OpCode::Inspect => println!("{:?}", self.pop_stack()),
-            OpCode::Dump => println!("DBG_DUMP: {:?}", self),
         }
         
         Ok(Control::None)
