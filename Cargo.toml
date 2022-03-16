@@ -12,10 +12,10 @@ categories = ["compilers", "development-tools", "parser-implementations"]
 crate-type = ["lib"]
 
 [[bin]]
-name = "repl"
+name = "sphinx"
 
 [[bin]]
-name = "dasm"
+name = "sph-dasm"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/maniefrust.html
 

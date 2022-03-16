@@ -10,20 +10,20 @@ use sphinx_lang::debug::dasm::Disassembler;
 fn main() {
     env_logger::init();
     
-    let app = Command::new("dasm")
+    let app = Command::new("sph-dasm")
         .version("0.0")
         .author("M. Werezak <mwerezak@gmail.com>")
         .about("Bytecode disassembler for the Sphinx programming language")
         .arg(
-            Arg::new("file")
+            Arg::new("source")
             .index(1)
-            .help("path to input file")
+            .help("path to a source file to disassemble")
             .value_name("FILE")
         )
         .arg(
-            Arg::new("source")
-            .short('s')
-            .help("disassemble a snippet then exit")
+            Arg::new("bytecode")
+            .short('d')
+            .help("disassemble compiled bytecode (not implemented yet)")
             .value_name("CMD")
         )
         .arg(
@@ -43,7 +43,7 @@ fn main() {
     } else if let Some(s) = args.value_of("source") {
         let source = SourceType::File(PathBuf::from(s));
         module = Some(ModuleSource::new(s, source));
-    } else if let Some(_s) = args.value_of("file") {
+    } else if let Some(_s) = args.value_of("bytecode") {
         // TODO read compiled bytecode and go directly to disassembly
         unimplemented!()
     }

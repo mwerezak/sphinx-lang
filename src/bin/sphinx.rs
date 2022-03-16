@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 use std::path::PathBuf;
-use clap::{Command, Arg};
+use clap::{Command, Arg, ArgMatches};
 
 use sphinx_lang;
 use sphinx_lang::frontend;
@@ -15,10 +15,10 @@ use sphinx_lang::debug::symbol::BufferedResolver;
 fn main() {
     env_logger::init();
     
-    let app = Command::new("repl")
+    let app = Command::new("sphinx")
         .version("0.0")
         .author("M. Werezak <mwerezak@gmail.com>")
-        .about("Dynamic language interpreter")
+        .about("An interpreter for the Sphinx programming language")
         .arg(
             Arg::new("file")
             .index(1)
@@ -30,10 +30,17 @@ fn main() {
             .short('c')
             .help("execute a snippet then exit")
             .value_name("CMD")
+        )
+        .arg(
+            Arg::new("parse_only")
+            .short('P')
+            .help("parse and print AST instead of executing")
         );
     
     let version = app.get_version().unwrap();
     let args = app.get_matches();
+    
+    let parse_only = args.is_present("parse_only");
     
     let mut module = None;
     if let Some(s) = args.value_of("cmd") {
@@ -51,8 +58,16 @@ fn main() {
         return;
     }
     
+    if parse_only {
+        parse_and_print_ast(args, module.unwrap());
+    } else {
+        build_and_execute(args, module.unwrap());
+    }
+
+}
+
+fn build_and_execute(_args: ArgMatches, module: ModuleSource) {
     // build module
-    let module = module.unwrap();
     let build_result = sphinx_lang::build_module(&module);
     if build_result.is_err() {
         match build_result.unwrap_err() {
@@ -79,6 +94,32 @@ fn main() {
     
     vm.run().expect("runtime error");
 }
+
+
+fn parse_and_print_ast(_args: ArgMatches, module: ModuleSource) {
+    let source_text = match module.source_text() {
+        Ok(source_text) => source_text,
+        
+        Err(error) => {
+            println!("Error reading source: {}.", error);
+            return;
+        },
+    };
+    
+    let mut interner = StringInterner::new();
+    let parse_result = sphinx_lang::parse_source(&mut interner, source_text);
+    
+    match parse_result {
+        Err(errors) => {
+            println!("Errors in file \"{}\":\n", module.name());
+            frontend::print_source_errors(&module, &errors);
+        },
+        Ok(ast) => println!("{:#?}", ast),
+    }
+}
+
+
+//////// REPL ////////
 
 
 const PROMT_START: &str = ">>> ";
