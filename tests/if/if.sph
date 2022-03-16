@@ -1,0 +1,14 @@
+# Evaluate the 'then' expression if the condition is true.
+if true then echo "good" end  # expect: good
+if false then echo "bad" end
+
+# Assignment in if condition.
+let a = false
+
+if a = true then 
+    echo a      # expect: true
+    assert a 
+end 
+
+# Declaration in if condition.
+if let b = true then echo b end # expect: true
