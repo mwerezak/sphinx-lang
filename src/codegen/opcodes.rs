@@ -4,88 +4,86 @@
 // So if we want to convert between them and integer constants easily, 
 // we need to explictly define each value as a const
 
-// 0x00         Control
+// 0x00-07        Control
 
                         // width set here so that the longest mnemonic is 16 chars
 const OP_RETURN:        u8 = 0x00;  // return from current function?
 const OP_EXIT:          u8 = 0x01;
 
-// 0x10-30        Immediate Values
+// 0x08-40        Immediate Values
 
-const OP_POP:           u8 = 0x10;  // [ _ ] => []
-const OP_DROP:          u8 = 0x11;  // (u8); [ ... ] => []
-const OP_CLONE:         u8 = 0x12;  // [ value ] => [ value value ]
+const OP_POP:           u8 = 0x08;  // [ _ ] => []
+const OP_DROP:          u8 = 0x09;  // (u8); [ ... ] => []
+const OP_CLONE:         u8 = 0x0A;  // [ value ] => [ value value ]
 
-const OP_LD_CONST:      u8 = 0x21;  // (u8); _ => [ value ]
-const OP_LD_CONST_16:   u8 = 0x22;  // (u16); _ => [ value ]
-// const OP_LD_CONST_32:   u8 = 0x23;  // (u32); _ => [ value ]
+const OP_LD_CONST:      u8 = 0x10;  // (u8); _ => [ value ]
+const OP_LD_CONST_16:   u8 = 0x11;  // (u16); _ => [ value ]
+// const OP_LD_CONST_32:   u8 = 0x12;  // (u32); _ => [ value ]
 
-const OP_IN_GLOBAL_IM:  u8 = 0x24;  // [ value name ] => [ value ]
-const OP_IN_GLOBAL_MUT: u8 = 0x25;  // [ value name ] => [ value ]
-const OP_ST_GLOBAL:     u8 = 0x26;  // [ value name ] => [ value ]
-const OP_LD_GLOBAL:     u8 = 0x27;  // [ name ] => [ value ]
-const OP_DP_GLOBAL:     u8 = 0x28;  // [ name ] => []
+const OP_IN_GLOBAL_IM:  u8 = 0x18;  // [ value name ] => [ value ]
+const OP_IN_GLOBAL_MUT: u8 = 0x19;  // [ value name ] => [ value ]
+const OP_ST_GLOBAL:     u8 = 0x1A;  // [ value name ] => [ value ]
+const OP_LD_GLOBAL:     u8 = 0x1B;  // [ name ] => [ value ]
+const OP_DP_GLOBAL:     u8 = 0x1C;  // [ name ] => []
 
-const OP_IN_LOCAL:      u8 = 0x29;  // [ value ] => [ value ... value ]; vm.locals += 1
-const OP_ST_LOCAL:      u8 = 0x2A;  // (u8);  [ value ] => [ value ]
-const OP_ST_LOCAL_16:   u8 = 0x2B;  // (u16); [ value ] => [ value ]
-// const OP_LD_LOCAL_32:   u8 = 0x2C;  // (u32); _ => [ value ]
-const OP_LD_LOCAL:      u8 = 0x2D;  // (u8);  _ => [ value ]
-const OP_LD_LOCAL_16:   u8 = 0x2E;  // (u16); _ => [ value ]
-const OP_DP_LOCALS:     u8 = 0x2F;  // (u8); [ ... ] => [] -- panics if there are any immediate values
-// const OP_LD_LOCAL_32:   u8 = 0x2F;  // (u32); _ => [ value ]
+const OP_IN_LOCAL:      u8 = 0x20;  // [ value ] => [ value ... value ]; vm.locals += 1
+const OP_ST_LOCAL:      u8 = 0x21;  // (u8);  [ value ] => [ value ]
+const OP_ST_LOCAL_16:   u8 = 0x22;  // (u16); [ value ] => [ value ]
+// const OP_LD_LOCAL_32:   u8 = 0x23;  // (u32); _ => [ value ]
+const OP_LD_LOCAL:      u8 = 0x24;  // (u8);  _ => [ value ]
+const OP_LD_LOCAL_16:   u8 = 0x25;  // (u16); _ => [ value ]
+const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ ... ] => [] -- panics if there are any immediate values
+// const OP_LD_LOCAL_32:   u8 = 0x27;  // (u32); _ => [ value ]
 
-// const OP_LD_NAME:       u8 = ...;
-// const OP_LD_INDEX:      u8 = ...;
+// const OP_LD_NAME:       u8 = 0x28;
+// const OP_LD_INDEX:      u8 = 0x29;
 
 
 // Dynamic Insert/Store
 
-// const OP_IN_DYN         u8 = ...;  // [ value dyn_target bool ] => []
-// const OP_ST_DYN         u8 = ...;  // [ value dyn_target ] => []
+// const OP_IN_DYN         u8 = 0x30;  // [ value dyn_target bool ] => []
+// const OP_ST_DYN         u8 = 0x31;  // [ value dyn_target ] => []
 
-const OP_NIL:           u8 = 0x30;  // _ => [ nil ]
-const OP_FALSE:         u8 = 0x31;  // _ => [ false ]
-const OP_TRUE:          u8 = 0x32;  // _ => [ true ]
-const OP_EMPTY:         u8 = 0x33;  // _ => [ () ]
-const OP_TUPLE:         u8 = 0x34;  // (u8); [ ... ] => [ tuple ]
+const OP_NIL:           u8 = 0x38;  // _ => [ nil ]
+const OP_FALSE:         u8 = 0x39;  // _ => [ false ]
+const OP_TRUE:          u8 = 0x3A;  // _ => [ true ]
+const OP_EMPTY:         u8 = 0x3B;  // _ => [ () ]
+const OP_TUPLE:         u8 = 0x3C;  // (u8); [ ... ] => [ tuple ]
 
 // small numbers
-const OP_U8:            u8 = 0x35;  // (u8); _ => [ value ]
-const OP_I8:            u8 = 0x36;  // (i8); _ => [ value ]
-const OP_F8:            u8 = 0x37;  // (i8); _ => [ value ]
+const OP_U8:            u8 = 0x3D;  // (u8); _ => [ value ]
+const OP_I8:            u8 = 0x3E;  // (i8); _ => [ value ]
+const OP_F8:            u8 = 0x3F;  // (i8); _ => [ value ]
 
-const OP_DYN_TARGET:    u8 = 0x39;  // (u8); [ ... ] => [ dyn_target ]
+const OP_DYN_TARGET:    u8 = 0x48;  // (u8); [ ... ] => [ dyn_target ]
 
-// 0x40         Unary Operations
+// 0x50-57      Unary Operations
 
-const OP_NEG:           u8 = 0x40;  // [ operand ] => [ result ]
-const OP_POS:           u8 = 0x41;
-const OP_INV:           u8 = 0x42;
-const OP_NOT:           u8 = 0x43;
+const OP_NEG:           u8 = 0x50;  // [ operand ] => [ result ]
+const OP_POS:           u8 = 0x51;
+const OP_INV:           u8 = 0x52;
+const OP_NOT:           u8 = 0x53;
 
-// 0x50-60      Binary Operations
+// 0x58-60      Binary Operations
 
-const OP_AND:           u8 = 0x50;  // [ lhs rhs ] => [ result ]
-const OP_XOR:           u8 = 0x51;
-const OP_OR:            u8 = 0x52;
+const OP_AND:           u8 = 0x58;  // [ lhs rhs ] => [ result ]
+const OP_XOR:           u8 = 0x59;
+const OP_OR:            u8 = 0x5A;
+const OP_SHL:           u8 = 0x5B;
+const OP_SHR:           u8 = 0x5C;
 
-const OP_SHL:           u8 = 0x53;
-const OP_SHR:           u8 = 0x54;
+const OP_ADD:           u8 = 0x60;
+const OP_SUB:           u8 = 0x61;
+const OP_MUL:           u8 = 0x62;
+const OP_DIV:           u8 = 0x63;
+const OP_MOD:           u8 = 0x64;
 
-const OP_ADD:           u8 = 0x55;
-const OP_SUB:           u8 = 0x56;
-const OP_MUL:           u8 = 0x57;
-const OP_DIV:           u8 = 0x58;
-const OP_MOD:           u8 = 0x59;
-
-const OP_EQ:            u8 = 0x5A;
-const OP_NE:            u8 = 0x5B;
-
-const OP_LT:            u8 = 0x5C;
-const OP_LE:            u8 = 0x5D;
-const OP_GE:            u8 = 0x5E;
-const OP_GT:            u8 = 0x5F;
+const OP_EQ:            u8 = 0x68;
+const OP_NE:            u8 = 0x69;
+const OP_LT:            u8 = 0x6A;
+const OP_LE:            u8 = 0x6B;
+const OP_GE:            u8 = 0x6C;
+const OP_GT:            u8 = 0x6D;
 
 // 0x70         Jumps
 
