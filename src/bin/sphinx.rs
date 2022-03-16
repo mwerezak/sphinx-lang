@@ -22,25 +22,33 @@ fn main() {
         .arg(
             Arg::new("file")
             .index(1)
-            .help("path to input script file")
+            .help("Path to input script file")
             .value_name("FILE")
         )
         .arg(
             Arg::new("cmd")
             .short('c')
-            .help("execute a snippet then exit")
+            .help("Execute a snippet then exit")
             .value_name("CMD")
+        )
+        .arg(
+            Arg::new("interactive")
+            .short('i')
+            .help("Drop into an interactive REPL after executing")
         )
         .arg(
             Arg::new("parse_only")
             .short('P')
-            .help("parse and print AST instead of executing")
+            .help("Parse and print AST instead of executing")
+        )
+        .arg(
+            Arg::new("compile_only")
+            .short('d')
+            .help("Produce compiled bytecode instead of executing (not implemented)")
         );
     
     let version = app.get_version().unwrap();
     let args = app.get_matches();
-    
-    let parse_only = args.is_present("parse_only");
     
     let mut module = None;
     if let Some(s) = args.value_of("cmd") {
@@ -52,21 +60,43 @@ fn main() {
     }
     
     if module.is_none() {
-        // Drop into REPL
-        println!("\nSphinx Version {}\n", version);
-        Repl::new().run();
+        start_repl(&args, version, None);
         return;
     }
     
-    if parse_only {
-        parse_and_print_ast(args, module.unwrap());
-    } else {
-        build_and_execute(args, module.unwrap());
+    let module = module.unwrap();
+    
+    if args.is_present("parse_only") {
+        parse_and_print_ast(&args, module);
     }
-
+    else if args.is_present("compile_only") {
+        unimplemented!()
+    }
+    else {
+        let exec_result = build_and_execute(&args, module);
+        
+        if let Ok(vm) = exec_result {
+            if args.is_present("interactive") {
+                start_repl(&args, version, Some(vm));
+            }
+        }
+    }
 }
 
-fn build_and_execute(_args: ArgMatches, module: ModuleSource) {
+fn start_repl(_args: &ArgMatches, version: &str, vm: Option<VirtualMachine>) {
+    println!("\nSphinx Version {}\n", version);
+    
+    let mut repl;
+    if let Some(vm) = vm {
+        repl = Repl::with_vm(vm);
+    } else {
+        repl = Repl::new();
+    }
+    
+    repl.run();
+}
+
+fn build_and_execute(_args: &ArgMatches, module: ModuleSource) -> Result<VirtualMachine, ()> {
     // build module
     let build_result = sphinx_lang::build_module(&module);
     if build_result.is_err() {
@@ -85,7 +115,7 @@ fn build_and_execute(_args: ArgMatches, module: ModuleSource) {
                 frontend::print_source_errors(&module, &errors);
             }
         }
-        return;
+        return Err(());
     }
     
     let program = build_result.unwrap();
@@ -93,10 +123,12 @@ fn build_and_execute(_args: ArgMatches, module: ModuleSource) {
     let mut vm = VirtualMachine::new(chunk);
     
     vm.run().expect("runtime error");
+    
+    Ok(vm)
 }
 
 
-fn parse_and_print_ast(_args: ArgMatches, module: ModuleSource) {
+fn parse_and_print_ast(_args: &ArgMatches, module: ModuleSource) {
     let source_text = match module.source_text() {
         Ok(source_text) => source_text,
         
@@ -138,9 +170,11 @@ enum ReadLine {
 
 impl Repl {
     pub fn new() -> Self {
-        Self {
-            vm: None,
-        }
+        Self { vm: None }
+    }
+    
+    pub fn with_vm(vm: VirtualMachine) -> Self {
+        Self { vm: Some(vm) }
     }
     
     fn read_line(&self, prompt: &'static str) -> ReadLine {

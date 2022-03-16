@@ -272,12 +272,6 @@ impl ContextFrame {
             (Some(start), Some(end)) => {
                 let start_index = start.index;
                 let end_index = end.index + TokenIndex::from(end.length);
-                println!(
-                    "$$$ {}/{} <-> {}/{} -> {}:{}", 
-                    start.index, start.length,
-                    end.index, end.length,
-                    start_index, end_index,
-                );
                 Some((start_index, end_index).into())
             },
             
