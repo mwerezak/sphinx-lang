@@ -148,7 +148,7 @@ impl<'a> TryFrom<&'a Variant> for VariantKey<'a> {
     type Error = RuntimeError;
     fn try_from(value: &'a Variant) -> ExecResult<Self> {
         if !value.can_hash() {
-            return Err(ErrorKind::UnhashableType(value.clone()).into());
+            return Err(ErrorKind::UnhashableValue(value.clone()).into());
         }
         Ok(Self(&value))
     }

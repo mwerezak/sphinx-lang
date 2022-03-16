@@ -26,7 +26,7 @@ pub enum Stmt {
     Return(Option<Expr>),
     
     Echo(Expr),
-    
+    Assert(Expr),
 }
 
 impl Stmt { }

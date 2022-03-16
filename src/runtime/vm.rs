@@ -287,6 +287,11 @@ impl VirtualMachine {
             OpCode::GT => eval_cmp!(self, eval_gt),
             
             OpCode::Inspect => println!("{:?}", self.pop_stack()),
+            OpCode::Assert => {
+                if !self.pop_stack().truth_value() {
+                    return Err(ErrorKind::AssertFailed.into());
+                }
+            }
         }
         
         Ok(Control::None)

@@ -281,6 +281,10 @@ impl CodeGenerator {
                 self.compile_expr(symbol, expr)?;
                 self.emit_instr(symbol, OpCode::Inspect)
             },
+            Stmt::Assert(expr) => {
+                self.compile_expr(symbol, expr)?;
+                self.emit_instr(symbol, OpCode::Assert)
+            }
             
             Stmt::Expression(expr) => {
                 self.compile_expr(symbol, expr)?;

@@ -1,6 +1,7 @@
 use std::fmt;
 use std::error::Error;
 
+use crate::utils;
 use crate::runtime::Variant;
 
 // TODO box error
@@ -13,9 +14,9 @@ pub enum ErrorKind {
     OverflowError,
     NegativeShiftCount,
     NameNotDefined(String),
-    NameNotDefinedLocal(String),
     CantAssignImmutable,  // can't assign to immutable global variable
-    UnhashableType(Variant),
+    UnhashableValue(Variant),
+    AssertFailed,
     Other,
 }
 
@@ -50,8 +51,20 @@ impl Error for RuntimeError {
 }
 
 impl fmt::Display for RuntimeError {
-    fn fmt(&self, _fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        unimplemented!()
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let message = match self.kind() {
+            ErrorKind::InvalidUnaryOperand(..) => format!("unsupported operand for type '...'"),
+            ErrorKind::InvalidBinaryOperand(..) => format!("unsupported operand for type '...' and '...'"),
+            ErrorKind::OverflowError => format!("integer arithmetic overflow"),
+            ErrorKind::NegativeShiftCount => format!("negative bitshift count"),
+            ErrorKind::NameNotDefined(name) => format!("undefined variable \"{}\"", name),
+            ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
+            ErrorKind::UnhashableValue(..) => format!("unhashable value"),
+            ErrorKind::AssertFailed => format!("assertion failed"),
+            ErrorKind::Other => String::new(),
+        };
+        
+        utils::format_error(fmt, "runtime error", Some(message.as_str()), self.source())
     }
 }
 

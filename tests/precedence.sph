@@ -1,0 +1,32 @@
+# * has higher precedence than +.
+assert 2 + 3 * 4 == 14; # expect: 14
+
+# * has higher precedence than -.
+assert 20 - 3 * 4 == 8; # expect: 8
+
+# / has higher precedence than +.
+assert 2 + 6 / 3 == 4; # expect: 4
+
+# / has higher precedence than -.
+assert 2 - 6 / 3 == 0; # expect: 0
+
+# < has higher precedence than ==.
+assert false == 2 < 1; # expect: true
+
+# > has higher precedence than ==.
+assert false == 1 > 2; # expect: true
+
+# <= has higher precedence than ==.
+assert false == 2 <= 1; # expect: true
+
+# >= has higher precedence than ==.
+assert false == 1 >= 2; # expect: true
+
+# 1 - 1 is not space-sensitive.
+assert 1 - 1  == 0; # expect: 0
+assert 1 -1   == 0;  # expect: 0
+assert 1- 1   == 0;  # expect: 0
+assert 1-1    == 0;   # expect: 0
+
+# Using () for grouping.
+assert (2 * (6 - (2 + 2))) == 4; # expect: 4

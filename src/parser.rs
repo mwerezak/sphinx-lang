@@ -240,6 +240,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 ctx.set_end(&self.advance().unwrap());
                 Stmt::Echo(self.parse_expr_variant(ctx)?)
             },
+            Token::Assert => {
+                ctx.set_end(&self.advance().unwrap());
+                Stmt::Assert(self.parse_expr_variant(ctx)?)
+            }
             
             Token::Continue | Token::Break | Token::Return => {
                 ctx.push(ContextTag::ControlFlow);
