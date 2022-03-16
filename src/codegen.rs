@@ -81,8 +81,17 @@ struct Local {
     offset: Offset,
 }
 
+enum ScopeTag {
+    Block,
+    Loop,
+    Branch,
+    Function,
+    Class,
+}
+
 #[derive(Debug)]
 struct Scope {
+    tag: ScopeTag,
     depth: usize,
     offset: Option<Offset>,
     locals: Vec<Local>,
@@ -90,10 +99,6 @@ struct Scope {
 }
 
 impl Scope {
-    fn new(symbol: DebugSymbol, depth: usize, offset: Option<Offset>) -> Self {
-        Self { symbol, depth, offset, locals: Vec::new() }
-    }
-    
     fn last_offset(&self) -> Option<Offset> {
         self.locals.last().map_or(self.offset, |local| Some(local.offset))
     }
@@ -143,9 +148,16 @@ impl CompilerState {
         self.scopes.last_mut()
     }
     
-    fn push_scope(&mut self, symbol: DebugSymbol) {
+    fn push_scope(&mut self, tag: ScopeTag, symbol: DebugSymbol) {
         let offset = self.local_scope().and_then(|scope| scope.last_offset());
-        self.scopes.push(Scope::new(symbol, self.scopes.len(), offset));
+        
+        let scope = Scope {
+            tag, symbol,
+            depth: self.scopes.len(),
+            offset,
+            locals: Vec::new(),
+        };
+        self.scopes.push(scope);
     }
     
     fn pop_scope(&mut self) -> Scope {
@@ -255,8 +267,8 @@ impl CodeGenerator {
         }
     }
     
-    fn emit_begin_scope(&mut self, symbol: &DebugSymbol) -> CompileResult<()> {
-        self.state.push_scope(*symbol);
+    fn emit_begin_scope(&mut self, tag: ScopeTag, symbol: &DebugSymbol) -> CompileResult<()> {
+        self.state.push_scope(tag, *symbol);
         Ok(())
     }
     
@@ -327,7 +339,7 @@ impl CodeGenerator {
     }
     
     fn compile_block(&mut self, symbol: &DebugSymbol, label: Option<&Label>, suite: &[StmtMeta]) -> CompileResult<()> {
-        self.emit_begin_scope(symbol)?;
+        self.emit_begin_scope(ScopeTag::Block, symbol)?;
         
         // TODO control flow
         for stmt in suite.iter() {
