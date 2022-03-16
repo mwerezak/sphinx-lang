@@ -17,7 +17,7 @@ pub enum Token {
     Ellipsis,
     
     // Operator Symbols
-    OpAdd, OpSub, OpMul, OpDiv, OpMod,
+    OpAdd, OpSub, OpMul, OpDiv, OpMod, OpExp,
     OpInv, OpAnd, OpOr, OpXor, OpLShift, OpRShift,
     
     OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,

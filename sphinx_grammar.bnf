@@ -162,17 +162,18 @@ unary_expression ::= UNARY_OP unary_expression | primary_expression ;
     Operator precendence in order from strong to weak binding
     (left associative unless otherwise specified)
      
-     0:  (unary -) (unary +) not          (right associative)
-     1:  * / %
-     2:  + - 
-     3:  << >>
-     4:  & 
-     5:  ^ 
-     6:  | 
-     7:  < > <= >=
-     8:  == !=
-     9:  and 
-    10:  or
+     1:  (unary -) (unary +) (unary ~) not          (right associative)
+     2:  ^
+     3:  * / %
+     4:  + - 
+     5:  << >>
+     6:  & 
+     7:  ~ 
+     8:  | 
+     9:  < > <= >=
+    10:  == !=
+    11:  and 
+    12:  or
 
 *)
 
