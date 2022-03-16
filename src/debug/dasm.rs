@@ -82,6 +82,12 @@ impl<'c, 's> Disassembler<'c, 's> {
         let opcode = OpCode::from_byte(instr[0]);
         match opcode {
             Some(opcode) => match opcode {
+                
+                OpCode::PopMany => {
+                    let len = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, len)?;
+                }
+                
                 OpCode::LoadConst => {
                     let cid = instr[1];
                     write!(line, "{:16} {: >4}    ", opcode, cid)?;
@@ -92,6 +98,15 @@ impl<'c, 's> Disassembler<'c, 's> {
                     let cid =  ConstID::from_le_bytes(instr[1..=2].try_into().unwrap());
                     write!(line, "{:16} {: >4}    ", opcode, cid)?;
                     self.write_const(&mut line, self.chunk.lookup_const(cid))?;
+                },
+                
+                OpCode::StoreLocal | OpCode::LoadLocal => {
+                    let offset = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, offset)?;
+                },
+                OpCode::StoreLocal16 | OpCode::LoadLocal16 => {
+                    let offset =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
+                    write!(line, "{:16} {: >4}    ", opcode, offset)?;
                 },
                 
                 OpCode::Tuple => {

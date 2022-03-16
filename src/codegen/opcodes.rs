@@ -13,33 +13,44 @@ const OP_EXIT:          u8 = 0x01;
 // 0x10-30        Immediate Values
 
 const OP_POP:           u8 = 0x10;  // [ _ ] => []
+const OP_POPN:          u8 = 0x11;  // (u8); [ ... ] => []
+const OP_CLONE:         u8 = 0x12;  // [ value ] => [ value value ]
 
 const OP_LD_CONST:      u8 = 0x21;  // (u8); _ => [ value ]
 const OP_LD_CONST_16:   u8 = 0x22;  // (u16); _ => [ value ]
+// const OP_LD_CONST_32:   u8 = 0x23;  // (u32); _ => [ value ]
 
-const OP_IN_GLOBAL_IM:  u8 = 0x23;  // [ value name ] => [ value ]
-const OP_IN_GLOBAL_MUT: u8 = 0x24;  // [ value name ] => [ value ]
-const OP_ST_GLOBAL:     u8 = 0x26;  // [ value name ] => [ value ]
+const OP_IN_GLOBAL_IM:  u8 = 0x24;  // [ value name ] => [ ]
+const OP_IN_GLOBAL_MUT: u8 = 0x25;  // [ value name ] => [ ]
+const OP_ST_GLOBAL:     u8 = 0x26;  // [ value name ] => [ value ] -- assignment is an expression
 const OP_LD_GLOBAL:     u8 = 0x27;  // [ name ] => [ value ]
 
-// const OP_IN_LOCAL:      u8 = 0x27;  // Note: local mutability tracking is done by the compiler
-// const OP_ST_LOCAL:      u8 = 0x28;
-// const OP_ST_LOCAL_16:   u8 = 0x29;
-// const OP_LD_LOCAL:      u8 = 0x2A;
-// const OP_LD_LOCAL_16:   u8 = 0x2B;
+const OP_ST_LOCAL:      u8 = 0x28;  // (u8);  [ value ] => [ value ]
+const OP_ST_LOCAL_16:   u8 = 0x29;  // (u16); [ value ] => [ value ]
+// const OP_ST_LOCAL_32:   u8 = 0x2A;
+const OP_LD_LOCAL:      u8 = 0x2B;  // (u8);  _ => [ value ]
+const OP_LD_LOCAL_16:   u8 = 0x2C;  // (u16); _ => [ value ]
+// const OP_LD_LOCAL_32:   u8 = 0x2D;  // (u32); _ => [ value ]
 
 // const OP_LD_NAME:       u8 = 0x2C;
 // const OP_LD_INDEX:      u8 = 0x2D;
 
 // Dynamic Insert/Store
 
-// const OP_IN_DYN         u8 = ...;  // [ target: tuple, value, mut: bool] => []
+// const OP_IN_DYN         u8 = ...;  // [ value dyn_target bool ] => []
+// const OP_ST_DYN         u8 = ...;  // [ value dyn_target ] => []
 
 const OP_NIL:           u8 = 0x30;  // _ => [ nil ]
 const OP_FALSE:         u8 = 0x31;  // _ => [ false ]
 const OP_TRUE:          u8 = 0x32;  // _ => [ true ]
 const OP_EMPTY:         u8 = 0x33;  // _ => [ () ]
 const OP_TUPLE:         u8 = 0x34;  // (u8); [ ... ] => [ tuple ]
+const OP_UINT8:         u8 = 0x35;  // (u8); _ => [ value ]
+const OP_INT8:          u8 = 0x36;  // (i8); _ => [ value ]
+const OP_FLOAT0:        u8 = 0x37;  // _ => [ 0.0 ]
+const OP_FLOAT1:        u8 = 0x38;  // _ => [ 1.0 ]
+
+const OP_DYN_TARGET:    u8 = 0x39;  // (u8); [ ... ] => [ dyn_target ]
 
 // 0x40         Unary Operations
 
@@ -88,12 +99,20 @@ pub enum OpCode {
     Return = OP_RETURN, 
     
     Pop = OP_POP,
+    PopMany = OP_POPN,
+    Clone = OP_CLONE,
+    
     LoadConst  = OP_LD_CONST,
     LoadConst16 = OP_LD_CONST_16,
     InsertGlobal = OP_IN_GLOBAL_IM,
     InsertGlobalMut = OP_IN_GLOBAL_MUT,
     StoreGlobal = OP_ST_GLOBAL,
     LoadGlobal = OP_LD_GLOBAL,
+    
+    StoreLocal = OP_ST_LOCAL,
+    StoreLocal16 = OP_ST_LOCAL_16,
+    LoadLocal = OP_LD_LOCAL,
+    LoadLocal16 = OP_LD_LOCAL_16,
     
     Nil = OP_NIL,
     True = OP_TRUE,
@@ -133,12 +152,21 @@ impl OpCode {
             OP_RETURN => Self::Return,
             
             OP_POP => Self::Pop,
+            OP_POPN => Self::PopMany,
+            OP_CLONE => Self::Clone,
+            
             OP_LD_CONST => Self::LoadConst,
             OP_LD_CONST_16 => Self::LoadConst16,
+            
             OP_IN_GLOBAL_IM => Self::InsertGlobal,
             OP_IN_GLOBAL_MUT => Self::InsertGlobalMut,
             OP_ST_GLOBAL => Self::StoreGlobal,
             OP_LD_GLOBAL => Self::LoadGlobal,
+            
+            OP_ST_LOCAL => Self::StoreLocal,
+            OP_ST_LOCAL_16 => Self::StoreLocal16,
+            OP_LD_LOCAL => Self::LoadLocal,
+            OP_LD_LOCAL_16 => Self::LoadLocal16,
             
             OP_NIL => Self::Nil,
             OP_TRUE => Self::True,
@@ -178,8 +206,16 @@ impl OpCode {
     #[inline]
     pub fn instr_len(&self) -> usize {
         match self {
+            Self::PopMany => 2,
+            
             Self::LoadConst => 2,
             Self::LoadConst16 => 3,
+            
+            Self::StoreLocal => 2,
+            Self::StoreLocal16 => 3,
+            Self::LoadLocal => 2,
+            Self::LoadLocal16 => 3,
+            
             Self::Tuple => 2,
             _ => 1,
         }
@@ -201,12 +237,21 @@ impl std::fmt::Display for OpCode {
             Self::Return => "OP_RETURN",
             
             Self::Pop => "OP_POP",
+            Self::PopMany => "OP_POPN",
+            Self::Clone => "OP_CLONE",
+            
             Self::LoadConst => "OP_LD_CONST",
             Self::LoadConst16 => "OP_LD_CONST_16",
+            
             Self::InsertGlobal => "OP_IN_GLOBAL_IM",
             Self::InsertGlobalMut => "OP_IN_GLOBAL_MUT",
             Self::StoreGlobal => "OP_ST_GLOBAL",
             Self::LoadGlobal => "OP_LD_GLOBAL",
+            
+            Self::StoreLocal => "OP_ST_LOCAL",
+            Self::StoreLocal16 => "OP_ST_LOCAL_16",
+            Self::LoadLocal => "OP_LD_LOCAL",
+            Self::LoadLocal16 => "OP_LD_LOCAL_16",
             
             Self::Nil => "OP_NIL",
             Self::True => "OP_TRUE",

@@ -112,6 +112,20 @@ impl VirtualMachine {
     }
     
     #[inline(always)]
+    fn peek_offset(&self, offset: usize) -> &Variant {
+        self.immediate.get(offset)
+            .expect("stack offset out of bounds")
+    }
+    
+    #[inline(always)]
+    fn replace_offset(&mut self, offset: usize, value: Variant) {
+        let item = self.immediate.get_mut(offset)
+            .expect("stack offset out of bounds");
+        
+        *item = value;
+    }
+    
+    #[inline(always)]
     fn peek_many(&self, count: usize) -> &[Variant] {
         let (_, peek) = self.immediate.as_slice().split_at(self.immediate.len()-count);
         peek
@@ -135,43 +149,65 @@ impl VirtualMachine {
             OpCode::Return => return Ok(Control::Return),
             
             OpCode::Pop => { self.pop_stack(); },
+            OpCode::PopMany => { 
+                let count = data[0].into();
+                self.discard_stack(count); 
+            }
+            OpCode::Clone => {
+                self.push_stack(self.peek_stack().clone());
+            }
             
             OpCode::LoadConst => {
                 let value = self.program.lookup_value(data[0]);
                 self.push_stack(value);
             },
-            
             OpCode::LoadConst16 => {
                 let cid = ConstID::from_le_bytes([data[0], data[1]]);
                 let value = self.program.lookup_value(cid);
                 self.push_stack(value);
             },
             
-            OpCode::InsertGlobal    |
-            OpCode::InsertGlobalMut => {
-                let access = 
-                    if opcode == OpCode::InsertGlobalMut { Access::ReadWrite }
-                    else { Access::ReadOnly };
-                
+            OpCode::InsertGlobal => {
                 let name = Self::into_name(&self.pop_stack());
-                let value = self.peek_stack().clone();
-                
-                self.globals.create(name, access, value)?;
+                let value = self.pop_stack();
+                self.globals.create(name, Access::ReadOnly, value)?;
             },
-            
+            OpCode::InsertGlobalMut => {
+                let name = Self::into_name(&self.pop_stack());
+                let value = self.pop_stack();
+                self.globals.create(name, Access::ReadWrite, value)?;
+            },
             OpCode::StoreGlobal => {
                 let name = Self::into_name(&self.pop_stack());
                 let value = self.peek_stack().clone();
                 let store = self.globals.lookup_mut(&name)?;
                 *store = value;
             },
-            
             OpCode::LoadGlobal => {
                 let value = {
                     let name = Self::into_name(self.peek_stack());
                     self.globals.lookup(&name)?.clone()
                 };
                 self.replace_stack(value);
+            },
+            
+            OpCode::StoreLocal => {
+                let offset = usize::from(data[0]);
+                self.replace_offset(offset, self.peek_stack().clone());
+            },
+            OpCode::StoreLocal16 => {
+                let offset = u16::from_le_bytes([data[0], data[1]]);
+                let offset = usize::from(offset);
+                self.replace_offset(offset, self.peek_stack().clone());
+            },
+            OpCode::LoadLocal => {
+                let offset = usize::from(data[0]);
+                self.push_stack(self.peek_offset(offset).clone());
+            },
+            OpCode::LoadLocal16 => {
+                let offset = u16::from_le_bytes([data[0], data[1]]);
+                let offset = usize::from(offset);
+                self.push_stack(self.peek_offset(offset).clone());
             },
             
             OpCode::Nil => self.push_stack(Variant::Nil),

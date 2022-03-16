@@ -11,6 +11,9 @@ pub type CompileResult<T> = Result<T, CompileError>;
 pub enum ErrorKind {
     ConstPoolLimit,
     TupleLengthLimit,
+    LocalVariableLimit,
+    CantAssignImmutable,
+    CantAssignNonLocal,
     Other(String),
 }
 
@@ -61,6 +64,9 @@ impl fmt::Display for CompileError {
         let message = match self.kind() {
             ErrorKind::ConstPoolLimit => "constant pool limit reached",
             ErrorKind::TupleLengthLimit => "tuple length limit exceeded",
+            ErrorKind::LocalVariableLimit => "local variable limit reached",
+            ErrorKind::CantAssignImmutable => "can't assign to immutable local variable",
+            ErrorKind::CantAssignNonLocal => "can't assign to a non-local variable without the \"nonlocal\" keyword",
             ErrorKind::Other(message) => message,
         };
         

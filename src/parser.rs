@@ -425,7 +425,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     
     fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         
-        let global_token = 
+        let optional_token = 
             if let Token::NonLocal = self.peek()?.token { Some(self.advance().unwrap()) }
             else { None };
         
@@ -437,7 +437,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.push_continuation(ContextTag::AssignmentExpr);
             ctx.set_end(&self.advance().unwrap());
             
-            if let Some(ref token) = global_token {
+            if let Some(ref token) = optional_token {
                 ctx.set_start(token);
             }
             
@@ -454,12 +454,17 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.pop_extend();
             
             let op = op.map(|op| op.into());
-            let global = global_token.is_some();
-            let assign = Box::new(Assignment { lhs, op, rhs, global });
+            
+            let nonlocal = match optional_token.map(|tok| tok.token) {
+                Some(Token::NonLocal) => true,
+                _ => false,
+            };
+            
+            let assign = Box::new(Assignment { lhs, op, rhs, nonlocal });
             return Ok(Expr::Assignment(assign));
             
-        } else if global_token.is_some() {
-            return Err("expected an assignment expression after \"global\"".into())
+        } else if optional_token.is_some() {
+            return Err("expected an assignment expression after \"nonlocal\"".into())
         }
         
         Ok(expr)

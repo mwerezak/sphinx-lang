@@ -14,8 +14,7 @@ pub enum ErrorKind {
     NegativeShiftCount,
     NameNotDefined(String),
     NameNotDefinedLocal(String),
-    CantAssignImmutable,
-    CantAssignNonLocal,  // can't assign to a non-local variable without the "global" keyword
+    CantAssignImmutable,  // can't assign to immutable global variable
     UnhashableType(Variant),
     Other,
 }
