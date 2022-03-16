@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 // Opcodes
 
 // Rust enums are not like C enums! They're more like unions.
@@ -7,8 +9,9 @@
 // 0x00-07        Control
 
                         // width set here so that the longest mnemonic is 16 chars
-const OP_RETURN:        u8 = 0x00;  // return from current function?
-const OP_EXIT:          u8 = 0x01;
+const OP_NOP:           u8 = 0x00;
+const OP_RETURN:        u8 = 0x01;  // return from current function?
+const OP_EXIT:          u8 = 0x02;
 
 // 0x08-40        Immediate Values
 
@@ -87,6 +90,8 @@ const OP_GT:            u8 = 0x6D;
 
 // 0x70         Jumps
 
+const OP_JMP_FALSE:     u8 = 0x70;  // (i16);
+
 
 // 0xF0         Debugging/Tracing/Misc
 
@@ -100,6 +105,7 @@ const DBG_DUMP_STRINGS: u8 = 0xF4;
 #[repr(u8)]
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum OpCode {
+    Nop = OP_NOP,
     Return = OP_RETURN, 
     
     Pop = OP_POP,
@@ -159,6 +165,7 @@ impl OpCode {
     #[inline]
     pub fn from_byte(byte: u8) -> Option<OpCode> {
         let opcode = match byte {
+            OP_NOP => Self::Nop,
             OP_RETURN => Self::Return,
             
             OP_POP => Self::Pop,
@@ -222,21 +229,23 @@ impl OpCode {
     #[inline]
     pub fn instr_len(&self) -> usize {
         match self {
-            Self::Drop => 2,
+            // don't really need size_of() for most of these, but it's a nice little bit of self-documentation
             
-            Self::LoadConst => 2,
-            Self::LoadConst16 => 3,
+            Self::Drop         => 1 + size_of::<u8>(),
             
-            Self::StoreLocal => 2,
-            Self::StoreLocal16 => 3,
-            Self::LoadLocal => 2,
-            Self::LoadLocal16 => 3,
-            Self::DropLocals => 2,
+            Self::LoadConst    => 1 + size_of::<u8>(),
+            Self::LoadConst16  => 1 + size_of::<u16>(),
             
-            Self::Tuple => 2,
-            Self::UInt8 => 2,
-            Self::Int8 => 2,
-            Self::Float8 => 2,
+            Self::StoreLocal   => 1 + size_of::<u8>(),
+            Self::StoreLocal16 => 1 + size_of::<u16>(),
+            Self::LoadLocal    => 1 + size_of::<u8>(),
+            Self::LoadLocal16  => 1 + size_of::<u16>(),
+            Self::DropLocals   => 1 + size_of::<u8>(),
+            
+            Self::Tuple        => 1 + size_of::<u8>(),
+            Self::UInt8        => 1 + size_of::<u8>(),
+            Self::Int8         => 1 + size_of::<i8>(),
+            Self::Float8       => 1 + size_of::<i8>(),
             
             _ => 1,
         }
@@ -255,6 +264,7 @@ impl PartialEq<u8> for OpCode {
 impl std::fmt::Display for OpCode {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mnemonic = match *self {
+            Self::Nop => "OP_NOP",
             Self::Return => "OP_RETURN",
             
             Self::Pop => "OP_POP",

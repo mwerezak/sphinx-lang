@@ -26,7 +26,7 @@ pub enum Expr {
     
     // ObjectCtor(Box<ObjectConstructor>),
     
-    IfExpr(IfExpr),
+    IfExpr(Conditional),
     
     Block(Option<Label>, Box<[StmtMeta]>),
     
@@ -36,7 +36,7 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone)]
-pub struct IfExpr {
+pub struct Conditional {
     pub branches: Box<[CondBranch]>,
     pub else_branch: Option<Box<[StmtMeta]>>,
 }

@@ -64,6 +64,11 @@ impl ChunkBuilder {
         self.bytes.extend(bytes);
     }
     
+    pub fn patch_bytes(&mut self, offset: usize, patch: &[u8]) {
+        let target = &mut self.bytes[offset..(offset + patch.len())];
+        target.copy_from_slice(patch);
+    }
+    
     // Constants
     
     pub fn push_const(&mut self, value: Constant) -> CompileResult<ConstID> {

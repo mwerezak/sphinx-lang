@@ -151,6 +151,8 @@ impl VirtualMachine {
         self.pc += opcode.instr_len(); // pc points to next instruction
         
         match opcode {
+            OpCode::Nop => { },
+            
             OpCode::Return => return Ok(Control::Return),
             
             OpCode::Pop => { 

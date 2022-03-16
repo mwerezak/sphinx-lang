@@ -19,7 +19,7 @@ mod tests;
 
 pub use errors::{ParserError, ParseResult};
 
-use expr::{ExprMeta, Expr, IfExpr, CondBranch};
+use expr::{ExprMeta, Expr, Conditional, CondBranch};
 use stmt::{StmtMeta, Stmt, Label};
 use primary::{Primary, Atom, AccessItem};
 use assign::{Assignment, LValue, Declaration, DeclType};
@@ -800,7 +800,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
         }
         
-        let if_expr = IfExpr {
+        let if_expr = Conditional {
             branches: branches.into_boxed_slice(),
             else_branch,
         };

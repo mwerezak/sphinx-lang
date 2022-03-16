@@ -2,7 +2,7 @@
 
 use crate::language::FloatType;
 use crate::parser::stmt::{StmtMeta, Stmt, Label};
-use crate::parser::expr::{Expr, ExprMeta};
+use crate::parser::expr::{Expr, ExprMeta, Conditional};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration, LValue, DeclType};
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
@@ -352,6 +352,10 @@ impl CodeGenerator {
         self.emit_end_scope()?;
         
         self.emit_instr(symbol, OpCode::Nil) // implicit nil if we don't break out of block
+    }
+    
+    fn compile_if_expr(&mut self, symbol: &DebugSymbol, cond_expr: &Conditional) -> CompileResult<()> {
+        unimplemented!()
     }
     
     fn compile_declaration(&mut self, symbol: &DebugSymbol, decl: DeclarationRef) -> CompileResult<()> {
