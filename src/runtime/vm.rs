@@ -1,3 +1,4 @@
+use crate::language::{IntType, FloatType};
 use crate::codegen::{Chunk, ConstID, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::ops;
@@ -231,12 +232,24 @@ impl VirtualMachine {
             OpCode::True => self.push_stack(Variant::BoolTrue),
             OpCode::False => self.push_stack(Variant::BoolFalse),
             OpCode::Empty => self.push_stack(Variant::EmptyTuple),
-            
+
             OpCode::Tuple => {
                 let tuple_len = usize::from(data[0]);
                 let items = self.immediate.split_off(self.stack_len() - tuple_len).into_boxed_slice();
                 self.push_stack(Variant::make_tuple(items));
             },
+            OpCode::UInt => {
+                let value = IntType::from(data[0]);
+                self.push_stack(Variant::Integer(value))
+            },
+            OpCode::Int => {
+                let value = i8::from_le_bytes([data[0]]);
+                self.push_stack(Variant::Integer(IntType::from(value)))
+            }
+            OpCode::Float => {
+                let value = i8::from_le_bytes([data[0]]);
+                self.push_stack(Variant::Float(FloatType::from(value)))
+            }
             
             OpCode::Neg => {
                 let result = ops::eval_neg(self.peek_stack())?;
@@ -257,7 +270,7 @@ impl VirtualMachine {
             
             OpCode::And => eval_binary_op!(self, eval_and),
             OpCode::Xor => eval_binary_op!(self, eval_xor),
-            OpCode::Or => eval_binary_op!(self, eval_or),
+            OpCode::Or  => eval_binary_op!(self, eval_or),
             OpCode::Shl => eval_binary_op!(self, eval_shl),
             OpCode::Shr => eval_binary_op!(self, eval_shr),
             OpCode::Add => eval_binary_op!(self, eval_add),

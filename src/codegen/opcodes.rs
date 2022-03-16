@@ -49,10 +49,11 @@ const OP_FALSE:         u8 = 0x31;  // _ => [ false ]
 const OP_TRUE:          u8 = 0x32;  // _ => [ true ]
 const OP_EMPTY:         u8 = 0x33;  // _ => [ () ]
 const OP_TUPLE:         u8 = 0x34;  // (u8); [ ... ] => [ tuple ]
-const OP_UINT8:         u8 = 0x35;  // (u8); _ => [ value ]
-const OP_INT8:          u8 = 0x36;  // (i8); _ => [ value ]
-const OP_FLOAT0:        u8 = 0x37;  // _ => [ 0.0 ]
-const OP_FLOAT1:        u8 = 0x38;  // _ => [ 1.0 ]
+
+// small numbers
+const OP_UINT:          u8 = 0x35;  // (u8); _ => [ value ]
+const OP_INT:           u8 = 0x36;  // (i8); _ => [ value ]
+const OP_FLOAT:         u8 = 0x37;  // (i8); _ => [ value ]
 
 const OP_DYN_TARGET:    u8 = 0x39;  // (u8); [ ... ] => [ dyn_target ]
 
@@ -125,6 +126,9 @@ pub enum OpCode {
     False = OP_FALSE,
     Empty = OP_EMPTY,
     Tuple = OP_TUPLE,
+    UInt = OP_UINT,
+    Int = OP_INT,
+    Float = OP_FLOAT,
     
     Neg = OP_NEG,
     Pos = OP_POS,
@@ -181,6 +185,9 @@ impl OpCode {
             OP_FALSE => Self::False,
             OP_EMPTY => Self::Empty,
             OP_TUPLE => Self::Tuple,
+            OP_UINT => Self::UInt,
+            OP_INT => Self::Int,
+            OP_FLOAT => Self::Float,
             
             OP_NEG => Self::Neg,
             OP_POS => Self::Pos,
@@ -226,6 +233,10 @@ impl OpCode {
             Self::DropLocals => 2,
             
             Self::Tuple => 2,
+            Self::UInt => 2,
+            Self::Int => 2,
+            Self::Float => 2,
+            
             _ => 1,
         }
     }
@@ -269,6 +280,9 @@ impl std::fmt::Display for OpCode {
             Self::False => "OP_FALSE",
             Self::Empty => "OP_EMPTY",
             Self::Tuple => "OP_TUPLE",
+            Self::UInt => "OP_UINT",
+            Self::Int => "OP_INT",
+            Self::Float => "OP_FLOAT",
             
             Self::Neg => "OP_NEG",
             Self::Pos => "OP_POS",

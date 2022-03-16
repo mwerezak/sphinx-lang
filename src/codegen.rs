@@ -1,5 +1,6 @@
 #![allow(unused_variables)]
 
+use crate::language::FloatType;
 use crate::parser::stmt::{StmtMeta, Stmt, Label};
 use crate::parser::expr::{Expr, ExprMeta};
 use crate::parser::primary::{Atom, Primary};
@@ -508,8 +509,25 @@ impl CodeGenerator {
             Atom::EmptyTuple => self.emit_instr(symbol, OpCode::Empty),
             Atom::BooleanLiteral(true) => self.emit_instr(symbol, OpCode::True),
             Atom::BooleanLiteral(false) => self.emit_instr(symbol, OpCode::False),
-            Atom::IntegerLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
-            Atom::FloatLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
+            
+            Atom::IntegerLiteral(value) => {
+                if let Ok(uint) = u8::try_from(*value) {
+                    self.emit_instr_byte(symbol, OpCode::UInt, uint)
+                } else if let Ok(int) = i8::try_from(*value) {
+                    self.emit_instr_byte(symbol, OpCode::Int, int.to_le_bytes()[0])
+                } else {
+                    self.emit_const(symbol, Constant::from(*value))
+                }
+            },
+            
+            Atom::FloatLiteral(value) => {
+                if FloatType::from(i8::MIN) <= *value && *value <= FloatType::from(i8::MAX) {
+                    let value = *value as i8;
+                    self.emit_instr_byte(symbol, OpCode::Float, value.to_le_bytes()[0])
+                } else {
+                    self.emit_const(symbol, Constant::from(*value))
+                }
+            },
             Atom::StringLiteral(value) => self.emit_const(symbol, Constant::from(*value)),
             
             Atom::Identifier(name) => self.compile_name_lookup(symbol, name),
