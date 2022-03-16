@@ -26,13 +26,25 @@ pub enum Expr {
     
     // ObjectCtor(Box<ObjectConstructor>),
     
-    // IfExpr
+    IfExpr(IfExpr),
     
     Block(Option<Label>, Box<[StmtMeta]>),
     
     FunctionDef(FunctionDef),
     
     // ClassDef
+}
+
+#[derive(Debug, Clone)]
+pub struct IfExpr {
+    pub branches: Box<[CondBranch]>,
+    pub else_branch: Option<Box<[StmtMeta]>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CondBranch {
+    pub cond: Expr,
+    pub suite: Box<[StmtMeta]>,
 }
 
 

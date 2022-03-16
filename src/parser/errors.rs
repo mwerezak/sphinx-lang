@@ -33,6 +33,7 @@ pub enum ContextTag {
     ControlFlow,
     ExprMeta,
     BlockExpr,
+    IfExpr,
     FunDefStmt,
     FunDefExpr,
     FunParam,

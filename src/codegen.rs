@@ -81,6 +81,7 @@ struct Local {
     offset: Offset,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ScopeTag {
     Block,
     Loop,
@@ -333,6 +334,7 @@ impl CodeGenerator {
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list),
             
             Expr::Block(label, suite) => self.compile_block(symbol, label.as_ref(), suite),
+            Expr::IfExpr(if_expr) => unimplemented!(),
             
             Expr::FunctionDef(fundef) => unimplemented!(),
         }
