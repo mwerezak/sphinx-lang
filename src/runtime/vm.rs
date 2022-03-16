@@ -37,12 +37,15 @@ enum Control {
     Return,
 }
 
+pub type LocalIndex = u16;
+
 // Stack-based Virtual Machine
 #[derive(Debug)]
 pub struct VirtualMachine {
     pc: usize, // program counter
     program: Chunk,
     globals: Namespace,
+    locals: LocalIndex,
     immediate: Vec<Variant>,
 }
 
@@ -52,6 +55,7 @@ impl VirtualMachine {
             pc: 0,
             program: chunk,
             globals: Namespace::new(),
+            locals: 0,
             immediate: Vec::new(),
         }
     }
@@ -148,8 +152,10 @@ impl VirtualMachine {
         match opcode {
             OpCode::Return => return Ok(Control::Return),
             
-            OpCode::Pop => { self.pop_stack(); },
-            OpCode::PopMany => { 
+            OpCode::Pop => { 
+                self.pop_stack(); 
+            },
+            OpCode::Drop => { 
                 let count = data[0].into();
                 self.discard_stack(count); 
             }
@@ -169,12 +175,12 @@ impl VirtualMachine {
             
             OpCode::InsertGlobal => {
                 let name = Self::into_name(&self.pop_stack());
-                let value = self.pop_stack();
+                let value = self.peek_stack().clone();
                 self.globals.create(name, Access::ReadOnly, value)?;
             },
             OpCode::InsertGlobalMut => {
                 let name = Self::into_name(&self.pop_stack());
-                let value = self.pop_stack();
+                let value = self.peek_stack().clone();
                 self.globals.create(name, Access::ReadWrite, value)?;
             },
             OpCode::StoreGlobal => {
@@ -191,6 +197,11 @@ impl VirtualMachine {
                 self.replace_stack(value);
             },
             
+            OpCode::InsertLocal => {
+                let value = self.peek_stack().clone();
+                self.immediate.insert(self.locals.into(), value);
+                self.locals += 1;
+            },
             OpCode::StoreLocal => {
                 let offset = usize::from(data[0]);
                 self.replace_offset(offset, self.peek_stack().clone());
@@ -208,6 +219,12 @@ impl VirtualMachine {
                 let offset = u16::from_le_bytes([data[0], data[1]]);
                 let offset = usize::from(offset);
                 self.push_stack(self.peek_offset(offset).clone());
+            },
+            OpCode::DropLocals => {
+                debug_assert!(usize::from(self.locals) == self.stack_len(), "drop with immediate values on stack");
+                let count = data[0];
+                self.discard_stack(count.into());
+                self.locals -= LocalIndex::from(count);
             },
             
             OpCode::Nil => self.push_stack(Variant::Nil),

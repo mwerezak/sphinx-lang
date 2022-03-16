@@ -6,6 +6,7 @@ use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration, LValue, DeclType};
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::strings::{StringInterner, InternSymbol};
+use crate::runtime::vm::LocalIndex;
 use crate::debug::dasm::DebugSymbols;
 use crate::debug::DebugSymbol;
 
@@ -70,7 +71,7 @@ impl<'a> From<&'a Declaration> for DeclarationRef<'a> {
 
 // Scope Tracking
 
-type Offset = u16;
+type Offset = LocalIndex;
 
 #[derive(Debug)]
 struct Local {
@@ -82,18 +83,18 @@ struct Local {
 #[derive(Debug)]
 struct Scope {
     depth: usize,
-    offset: Offset,
+    offset: Option<Offset>,
     locals: Vec<Local>,
     symbol: DebugSymbol,
 }
 
 impl Scope {
-    fn new(symbol: DebugSymbol, depth: usize, offset: Offset) -> Self {
+    fn new(symbol: DebugSymbol, depth: usize, offset: Option<Offset>) -> Self {
         Self { symbol, depth, offset, locals: Vec::new() }
     }
     
-    fn last_offset(&self) -> Offset {
-        self.locals.last().map_or(self.offset, |local| local.offset)
+    fn last_offset(&self) -> Option<Offset> {
+        self.locals.last().map_or(self.offset, |local| Some(local.offset))
     }
     
     fn find_local(&self, name: &InternSymbol) -> Option<&Local> {
@@ -105,8 +106,11 @@ impl Scope {
     }
     
     fn push_local(&mut self, decl: DeclType, name: InternSymbol) -> CompileResult<&Local> {
-        let offset = Offset::try_from(usize::from(self.offset) + self.locals.len())
-            .map_err(|_| CompileError::from(ErrorKind::LocalVariableLimit))?;
+        let offset = self.last_offset().map_or(
+            Ok(0),
+            |offset| offset.checked_add(1)
+                .ok_or_else(|| CompileError::from(ErrorKind::LocalVariableLimit))
+        )?;
         
         let local = Local {
             decl, name, offset,
@@ -118,33 +122,33 @@ impl Scope {
 
 #[derive(Debug)]
 struct CompilerState {
-    scope: Vec<Scope>,
+    scopes: Vec<Scope>,
 }
 
 impl CompilerState {
     fn new() -> Self {
-        Self { scope: Vec::new() }
+        Self { scopes: Vec::new() }
     }
     
     fn is_global_scope(&self) -> bool {
-        self.scope.is_empty()
+        self.scopes.is_empty()
     }
     
     fn local_scope(&self) -> Option<&Scope> {
-        self.scope.last()
+        self.scopes.last()
     }
     
     fn local_scope_mut(&mut self) -> Option<&mut Scope> {
-        self.scope.last_mut()
+        self.scopes.last_mut()
     }
     
     fn push_scope(&mut self, symbol: DebugSymbol) {
-        let offset = self.local_scope().map_or(0, |scope| scope.last_offset() + 1);
-        self.scope.push(Scope::new(symbol, self.scope.len(), offset));
+        let offset = self.local_scope().and_then(|scope| scope.last_offset());
+        self.scopes.push(Scope::new(symbol, self.scopes.len(), offset));
     }
     
     fn pop_scope(&mut self) -> Scope {
-        self.scope.pop().expect("pop global scope")
+        self.scopes.pop().expect("pop global scope")
     }
     
     fn insert_local(&mut self, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
@@ -160,7 +164,7 @@ impl CompilerState {
     }
     
     fn resolve_local(&mut self, name: &InternSymbol) -> Option<&Local> {
-        self.scope.iter().rev().find_map(|scope| scope.find_local(name))
+        self.scopes.iter().rev().find_map(|scope| scope.find_local(name))
     }
 }
 
@@ -262,15 +266,11 @@ impl CodeGenerator {
         // discard all the locals from the stack
         let mut discard = scope.locals.len();
         while discard > u8::MAX.into() {
-            self.emit_instr_byte(&symbol, OpCode::PopMany, u8::MAX)?;
+            self.emit_instr_byte(&symbol, OpCode::DropLocals, u8::MAX)?;
             discard -= usize::from(u8::MAX);
         }
         
-        if discard > 1 {
-            self.emit_instr_byte(&symbol, OpCode::PopMany, u8::try_from(discard).unwrap())?;
-        } else if discard == 1 {
-            self.emit_instr(&symbol, OpCode::Pop)?;
-        }
+        self.emit_instr_byte(&symbol, OpCode::DropLocals, u8::try_from(discard).unwrap())?;
         Ok(())
     }
     
@@ -285,8 +285,6 @@ impl CodeGenerator {
                 self.compile_expr(symbol, expr)?;
                 self.emit_instr(symbol, OpCode::Pop)
             },
-            
-            Stmt::Declaration(decl) => self.compile_declaration(symbol, (&**decl).into()),
             
             Stmt::Continue(label) => unimplemented!(),
             Stmt::Break(label, expr) => unimplemented!(),
@@ -312,6 +310,7 @@ impl CodeGenerator {
                 self.emit_binary_op(symbol, op)
             },
             
+            Expr::Declaration(decl) => self.compile_declaration(symbol, (&**decl).into()),
             Expr::Assignment(assign) => self.compile_assignment(symbol, (&**assign).into()),
             
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list),
@@ -338,14 +337,11 @@ impl CodeGenerator {
     
     fn compile_declaration(&mut self, symbol: &DebugSymbol, decl: DeclarationRef) -> CompileResult<()> {
         match &decl.lhs {
-            LValue::Identifier(name) if self.state.is_global_scope() => self.compile_decl_global_name(symbol, decl.decl, *name, &decl.init),
-            
-            LValue::Identifier(name) => {
-                // have to evaluate initializer first in order for shadowing to work
-                self.compile_expr(symbol, &decl.init)?;
-                
-                self.state.insert_local(decl.decl, *name).map_err(|err| err.with_symbol(*symbol))
-            }
+            LValue::Identifier(name) => if self.state.is_global_scope() {
+                self.compile_decl_global_name(symbol, decl.decl, *name, &decl.init)
+            } else {
+                self.compile_decl_local_name(symbol, decl.decl, *name, &decl.init)
+            },
             
             LValue::Attribute(target) => unimplemented!(),
             LValue::Index(target) => unimplemented!(),
@@ -378,11 +374,19 @@ impl CodeGenerator {
         }
     }
     
+    fn compile_decl_local_name(&mut self, symbol: &DebugSymbol, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
+        
+        self.compile_expr(symbol, init)?;  // make sure to evaluate initializer first in order for shadowing to work
+        
+        self.state.insert_local(decl, name).map_err(|err| err.with_symbol(*symbol))?;
+        self.emit_instr(symbol, OpCode::InsertLocal)
+    }
+    
     fn compile_decl_global_name(&mut self, symbol: &DebugSymbol, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
         
         self.compile_expr(symbol, init)?;
-        self.emit_const(symbol, Constant::from(name))?;
         
+        self.emit_const(symbol, Constant::from(name))?;
         match decl {
             DeclType::Immutable => self.emit_instr(symbol, OpCode::InsertGlobal),
             DeclType::Mutable => self.emit_instr(symbol, OpCode::InsertGlobalMut),

@@ -1,7 +1,7 @@
 use crate::debug::DebugSymbol;
 use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
-use crate::parser::assign::Assignment;
+use crate::parser::assign::{Assignment, Declaration};
 use crate::parser::fundefs::FunctionDef;
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::stmt::{StmtMeta, Stmt, Label};
@@ -19,6 +19,8 @@ pub enum Expr {
     BinaryOp(BinaryOp, Box<(Expr, Expr)>),
     
     Assignment(Box<Assignment>), // box the whole Assignment (instead of just lhs Expr) to keep size of ExprMeta down
+    
+    Declaration(Box<Declaration>),
     
     Tuple(Box<[ExprMeta]>),
     

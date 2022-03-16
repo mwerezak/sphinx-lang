@@ -83,7 +83,7 @@ impl<'c, 's> Disassembler<'c, 's> {
         match opcode {
             Some(opcode) => match opcode {
                 
-                OpCode::PopMany => {
+                OpCode::Drop | OpCode::DropLocals => {
                     let len = instr[1];
                     write!(line, "{:16} {: >4}    ", opcode, len)?;
                 }

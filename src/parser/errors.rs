@@ -35,7 +35,7 @@ pub enum ContextTag {
     FunDefStmt,
     FunDefExpr,
     FunParam,
-    DeclaraionStmt,
+    DeclarationExpr,
     AssignmentExpr,
     BinaryOpExpr,
     UnaryOpExpr,
