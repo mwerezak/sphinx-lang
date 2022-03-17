@@ -357,33 +357,53 @@ let anon_func = fun(x) x + 1 end
 let a = anon_func(3)
 
 
-# Commenting this out because its kind of experimental
-# # Decorator Syntax
 
-# # The "@" syntax can be used to pass a single argument to a function without needing parens
-# @f @g h(x)  # equivalent to f(g(h(x)))
+# Decorator Syntax
 
-# # This is useful for wrapping functions (and classes, which we'll see later), e.g.
+# Using "@" syntax you can apply a function to any value being assigned in a declaration, essentially:
 
-# fun trace(tag)
-#   return fun(func)
-#     echo "Calling " + tag + "!"  # TODO string interpolation
-#   end
-# end
+@decorator let name = value
 
-# @trace("do_stuff")
-# fun do_stuff()
-#   # do some stuff here
-# end
+# becomes:
 
-# # There is a bit of subtlety required to make this work.
-# # All function definitions are *expressions*, even named functions.
-# # Defining a named function e.g. "fun name() ... end" is equivalent to the
-# # assignment expression "(name = fun() ... end)"
+let name = decorator(value)
 
-# # However, whenver a
+# Since named function and class definitions are just syntactic sugar over a variable declaration,
+# You can use this to wrap functions and classes like you might see in other languages like Python.
+
+fun trace(wrapped)
+  return fun(args...)
+    echo "trace"
+    wrapped(...args)
+  end
+end
+
+@trace
+fun increment(x)
+  return x + 1
+end
+
+# The decorator can be any expression that evaluates to a callable, as long as the callable takes a single argument:
+@some["strange"].decorator(true)
+fun example() end
 
 
+# A contrived example to show that the mechanism is not specific to functions.
+
+fun super_int(n) return 9001 * n end
+
+@super_int
+let super_seven = 7
+
+echo super_seven  # 63,007
+
+# It could even work with regular assignment, although the usefulness of this is dubious
+# I'm debating whether or not this should even be allowed.
+
+@super_int
+super_seven /= 1  # makes it un-super thanks to division
+
+echo super_seven  # 7
 
 # Classes
 

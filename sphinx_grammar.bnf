@@ -25,6 +25,7 @@ expression ::= primary
              | expression BINARY_OP expression
              | assignment_expression
              | declaration_expression
+             | decorator_expression
              | function_def
              | class_def
              | object_constructor
@@ -71,6 +72,8 @@ assignment_op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | 
 assignment_expression ::= ( "nonlocal" )? ( lvalue_annotated assignment_op | lvalue_expr_annotated "=" ) expression ;
 
 declaration_expression ::= ( "let" | "var" ) lvalue_expr_annotated "=" expression ;
+
+decorator_expression ::= "@" expression ( assignment_expression | declaration_expression )
 
 
 (*** Function/Method Calls ***)
