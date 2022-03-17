@@ -1,0 +1,12 @@
+
+let a, b, c = false, true, false
+
+if a then 
+    assert false
+elif b then 
+    echo "condition b"
+elif c then 
+    assert false
+else 
+    assert false
+end
