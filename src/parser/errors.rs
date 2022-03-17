@@ -89,11 +89,11 @@ pub struct ParserError {
 
 impl ParserError {
     pub fn with_context_tag(mut self, context: ContextTag) -> Self {
-        self.context.replace(context); self
+        self.context.get_or_insert(context); self
     }
     
     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
-        self.symbol.replace(symbol); self
+        self.symbol.get_or_insert(symbol); self
     }
     
     pub fn with_symbol_from_ctx(mut self, ctx: &ErrorContext) -> Self {

@@ -36,7 +36,7 @@ impl CompileError {
     }
     
     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
-        self.symbol.replace(symbol); self 
+        self.symbol.get_or_insert(symbol); self 
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }

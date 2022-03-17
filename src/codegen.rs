@@ -273,8 +273,9 @@ impl CodeGenerator {
     }
     
     pub fn push_stmt(&mut self, stmt: &StmtMeta) {
-        if let Err(error) = self.compile_stmt(stmt.debug_symbol(), stmt.variant()) {
-            self.errors.push(error);
+        let symbol = stmt.debug_symbol();
+        if let Err(error) = self.compile_stmt(symbol, stmt.variant()) {
+            self.errors.push(error.with_symbol(*symbol));
         }
     }
     
@@ -320,7 +321,6 @@ impl CodeGenerator {
     
     fn get_or_make_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<ConstID> {
         self.chunk.get_or_insert_const(value)
-            .map_err(|error| error.with_symbol(*symbol))
     }
     
     fn emit_load_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<()> {
@@ -473,7 +473,8 @@ impl CodeGenerator {
         // compile stmt suite
         for stmt in stmt_list.suite().iter() {
             let inner_symbol = stmt.debug_symbol();
-            self.compile_stmt(inner_symbol, stmt.variant())?;
+            self.compile_stmt(inner_symbol, stmt.variant())
+                .map_err(|err| err.with_symbol(*inner_symbol))?;
         }
         
         // handle control flow
@@ -485,7 +486,9 @@ impl CodeGenerator {
             
             Some(control) => match control {
                 ControlFlow::Expression(expr) => if is_expr_block {
-                    self.compile_expr(expr.debug_symbol(), expr.variant())?;
+                    let inner_symbol = expr.debug_symbol();
+                    self.compile_expr(inner_symbol, expr.variant())
+                        .map_err(|err| err.with_symbol(*inner_symbol))?;
                 }
                 
                 ControlFlow::Continue(label) => {
@@ -520,7 +523,7 @@ impl CodeGenerator {
                 
                 Expr::Tuple(init_list) => {
                     if target_list.len() != init_list.len() {
-                        return Err(CompileError::new("can't assign tuples of different lengths").with_symbol(*symbol))
+                        return Err(CompileError::new("can't assign tuples of different lengths"))
                     }
                     
                     for (inner_lhs, inner_expr) in target_list.iter().zip(init_list.iter()) {
@@ -533,12 +536,13 @@ impl CodeGenerator {
                             init: inner_init,
                         };
                         
-                        self.compile_declaration(inner_symbol, inner_decl)?;
+                        self.compile_declaration(inner_symbol, inner_decl)
+                            .map_err(|err| err.with_symbol(*inner_symbol))?;
                     }
                     
                     // declarations are also expressions
                     let tuple_len = u8::try_from(init_list.len())
-                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit).with_symbol(*symbol))?;
+                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
                     self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
                     
                     Ok(())
@@ -553,7 +557,7 @@ impl CodeGenerator {
         
         self.compile_expr(symbol, init)?;  // make sure to evaluate initializer first in order for shadowing to work
         
-        self.state.insert_local(decl, name).map_err(|err| err.with_symbol(*symbol))?;
+        self.state.insert_local(decl, name)?;
         self.emit_instr(symbol, OpCode::InsertLocal);
         Ok(())
     }
@@ -579,14 +583,14 @@ impl CodeGenerator {
             LValue::Index(target) => unimplemented!(),
             
             LValue::Tuple(..) if assign.op.is_some() => {
-                return Err(CompileError::new("can't use update-assigment when assigning to a tuple").with_symbol(*symbol))
+                return Err(CompileError::new("can't use update-assigment when assigning to a tuple"))
             },
             
             LValue::Tuple(target_list) => match assign.rhs {
 
                 Expr::Tuple(rhs_list) => {
                     if target_list.len() != rhs_list.len() {
-                        return Err(CompileError::new("can't assign tuples of different lengths").with_symbol(*symbol))
+                        return Err(CompileError::new("can't assign tuples of different lengths"))
                     }
                     
                     for (inner_lhs, inner_expr) in target_list.iter().zip(rhs_list.iter()) {
@@ -600,12 +604,13 @@ impl CodeGenerator {
                             nonlocal: assign.nonlocal,
                         };
                         
-                        self.compile_assignment(inner_symbol, inner_assign)?;
+                        self.compile_assignment(inner_symbol, inner_assign)
+                            .map_err(|err| err.with_symbol(*inner_symbol))?;
                     }
                     
                     // assignments are also expressions
                     let tuple_len = u8::try_from(rhs_list.len())
-                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit).with_symbol(*symbol))?;
+                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
                     self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
                     
                     Ok(())
@@ -642,7 +647,7 @@ impl CodeGenerator {
             
             if let Some((decl, offset)) = result {
                 if decl != DeclType::Mutable {
-                    return Err(CompileError::from(ErrorKind::CantAssignImmutable).with_symbol(*symbol));
+                    return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                 }
                 self.emit_assign_local(symbol, offset);
                 
@@ -652,14 +657,14 @@ impl CodeGenerator {
             // otherwise search enclosing scopes...
             
             if !assign.nonlocal {
-                return Err(CompileError::from(ErrorKind::CantAssignNonLocal).with_symbol(*symbol));
+                return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
             }
             
             let result = self.state.resolve_nonlocal(name).map(|local| (local.decl, local.offset));
             
             if let Some((decl, offset)) = result {
                 if decl != DeclType::Mutable {
-                    return Err(CompileError::from(ErrorKind::CantAssignImmutable).with_symbol(*symbol));
+                    return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                 }
                 self.emit_assign_local(symbol, offset);
                 
@@ -683,11 +688,12 @@ impl CodeGenerator {
     
     fn compile_tuple(&mut self, symbol: &DebugSymbol, expr_list: &[ExprMeta]) -> CompileResult<()> {
         let len = u8::try_from(expr_list.len())
-            .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit).with_symbol(*symbol))?;
+            .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
         
         for expr in expr_list.iter() {
             let inner_symbol = expr.debug_symbol();
-            self.compile_expr(inner_symbol, expr.variant())?;
+            self.compile_expr(inner_symbol, expr.variant())
+                .map_err(|err| err.with_symbol(*inner_symbol))?;
         }
         
         self.emit_instr_byte(symbol, OpCode::Tuple, len);
