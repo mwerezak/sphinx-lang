@@ -638,20 +638,14 @@ impl CodeGenerator {
         if let Some(local_scope) = self.state.local_scope() {
             
             // check if the name is found in the local scope...
-            let local_offset = 
-                if let Some(local) = self.state.resolve_local_strict(name) {
-                    if local.decl != DeclType::Mutable {
-                        return Err(CompileError::from(ErrorKind::CantAssignImmutable).with_symbol(*symbol));
-                    }
-                    Some(local.offset)
-                } else { None };
+            let result = self.state.resolve_local_strict(name).map(|local| (local.decl, local.offset));
             
-            if let Some(offset) = local_offset {
-                if let Ok(offset) = u8::try_from(offset) {
-                    self.emit_instr_byte(symbol, OpCode::StoreLocal, offset);
-                } else {
-                    self.emit_instr_data(symbol, OpCode::StoreLocal16, &offset.to_le_bytes());
+            if let Some((decl, offset)) = result {
+                if decl != DeclType::Mutable {
+                    return Err(CompileError::from(ErrorKind::CantAssignImmutable).with_symbol(*symbol));
                 }
+                self.emit_assign_local(symbol, offset);
+                
                 return Ok(());
             }
             
@@ -661,9 +655,16 @@ impl CodeGenerator {
                 return Err(CompileError::from(ErrorKind::CantAssignNonLocal).with_symbol(*symbol));
             }
             
-            unimplemented!();
+            let result = self.state.resolve_nonlocal(name).map(|local| (local.decl, local.offset));
             
-            // return Ok(());
+            if let Some((decl, offset)) = result {
+                if decl != DeclType::Mutable {
+                    return Err(CompileError::from(ErrorKind::CantAssignImmutable).with_symbol(*symbol));
+                }
+                self.emit_assign_local(symbol, offset);
+                
+                return Ok(());
+            }
         }
         
         // ...finally, try to assign global
@@ -672,6 +673,13 @@ impl CodeGenerator {
         Ok(())
     }
     
+    fn emit_assign_local(&mut self, symbol: &DebugSymbol, offset: Offset) {
+        if let Ok(offset) = u8::try_from(offset) {
+            self.emit_instr_byte(symbol, OpCode::StoreLocal, offset);
+        } else {
+            self.emit_instr_data(symbol, OpCode::StoreLocal16, &offset.to_le_bytes());
+        }
+    }
     
     fn compile_tuple(&mut self, symbol: &DebugSymbol, expr_list: &[ExprMeta]) -> CompileResult<()> {
         let len = u8::try_from(expr_list.len())
