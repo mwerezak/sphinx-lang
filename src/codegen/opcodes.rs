@@ -92,6 +92,7 @@ const OP_GT:            u8 = 0x6D;
 
 const OP_JUMP:          u8 = 0x70;  // (i16);
 const OP_JUMP_FALSE:    u8 = 0x71;  // (i16);
+const OP_JUMP_TRUE:     u8 = 0x72;  // (i16);
 
 
 // 0xF0         Debugging/Tracing/Misc
@@ -158,6 +159,10 @@ pub enum OpCode {
     GE = OP_GE,
     GT = OP_GT,
     
+    Jump = OP_JUMP,
+    JumpIfFalse = OP_JUMP_FALSE,
+    JumpIfTrue = OP_JUMP_TRUE,
+    
     Inspect = DBG_INSPECT,
     Assert = DBG_ASSERT,
 }
@@ -219,6 +224,10 @@ impl OpCode {
             OP_GE => Self::GE,
             OP_GT => Self::GT,
             
+            OP_JUMP => Self::Jump,
+            OP_JUMP_FALSE => Self::JumpIfFalse,
+            OP_JUMP_TRUE => Self::JumpIfTrue,
+            
             DBG_INSPECT => Self::Inspect,
             DBG_ASSERT => Self::Assert,
             
@@ -247,6 +256,10 @@ impl OpCode {
             Self::UInt8        => 1 + size_of::<u8>(),
             Self::Int8         => 1 + size_of::<i8>(),
             Self::Float8       => 1 + size_of::<i8>(),
+            
+            Self::Jump         => 1 + size_of::<i16>(),
+            Self::JumpIfFalse  => 1 + size_of::<i16>(),
+            Self::JumpIfTrue   => 1 + size_of::<i16>(),
             
             _ => 1,
         }
@@ -317,6 +330,10 @@ impl std::fmt::Display for OpCode {
             Self::LE => "OP_LE",
             Self::GE => "OP_GE",
             Self::GT => "OP_GT",
+            
+            Self::Jump => "OP_JUMP",
+            Self::JumpIfFalse => "OP_JUMP_FALSE",
+            Self::JumpIfTrue => "OP_JUMP_TRUE",
             
             Self::Inspect => "DBG_INSPECT",
             Self::Assert => "DBG_ASSERT",
