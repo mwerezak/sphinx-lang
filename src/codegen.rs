@@ -1,5 +1,7 @@
 #![allow(unused_variables)]
 
+use log;
+
 use crate::language::FloatType;
 use crate::parser::stmt::{StmtMeta, Stmt, Label};
 use crate::parser::expr::{Expr, ExprMeta, Conditional};
@@ -89,7 +91,6 @@ enum ScopeTag {
     Function,
     Class,
 }
-
 
 
 #[derive(Debug)]
@@ -289,8 +290,8 @@ impl CodeGenerator {
         self.chunk.push_byte(byte);
     }
     
-    fn emit_instr_data<const N: usize>(&mut self, symbol: &DebugSymbol, opcode: OpCode, bytes: [u8; N]) {
-        debug_assert!(opcode.instr_len() == 1 + N);
+    fn emit_instr_data(&mut self, symbol: &DebugSymbol, opcode: OpCode, bytes: &[u8]) {
+        debug_assert!(opcode.instr_len() == 1 + bytes.len());
         self.symbols.push(symbol);
         self.chunk.push_byte(opcode);
         self.chunk.extend_bytes(&bytes);
@@ -300,10 +301,20 @@ impl CodeGenerator {
     fn emit_dummy_instr(&mut self, symbol: &DebugSymbol, opcode: OpCode) -> usize {
         self.symbols.push(symbol);
         
-        for i in 0..opcode.instr_len() {
-            self.chunk.push_byte(OpCode::Nop);
+        let bytes = std::iter::repeat(OpCode::Nop).take(opcode.instr_len());
+        for byte in bytes {
+            self.chunk.push_byte(byte);
         }
         self.chunk.bytes().len()
+    }
+    
+    // the given offset is the offset that is expected to be the *end* of the patched instruction
+    fn patch_instr_data<const N: usize>(&mut self, end_offset: usize, opcode: OpCode, bytes: &[u8; N]) {
+        debug_assert!(opcode.instr_len() == 1 + N);
+        
+        let offset = end_offset - opcode.instr_len();
+        self.chunk.bytes_mut()[offset] = u8::from(opcode);
+        self.chunk.patch_bytes(offset + 1, bytes);
     }
     
     fn make_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<ConstID> {
@@ -317,7 +328,7 @@ impl CodeGenerator {
         if cid <= u8::MAX.into() {
             self.emit_instr_byte(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap());
         } else {
-            self.emit_instr_data(symbol, OpCode::LoadConst16, cid.to_le_bytes());
+            self.emit_instr_data(symbol, OpCode::LoadConst16, &cid.to_le_bytes());
         }
         Ok(())
     }
@@ -337,7 +348,9 @@ impl CodeGenerator {
             discard -= usize::from(u8::MAX);
         }
         
-        self.emit_instr_byte(&symbol, OpCode::DropLocals, u8::try_from(discard).unwrap());
+        if discard > 0 {
+            self.emit_instr_byte(&symbol, OpCode::DropLocals, u8::try_from(discard).unwrap());
+        }
     }
     
     fn compile_stmt(&mut self, symbol: &DebugSymbol, stmt: &Stmt) -> CompileResult<()> {
@@ -387,7 +400,7 @@ impl CodeGenerator {
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list)?,
             
             Expr::Block(label, suite) => self.compile_block(symbol, label.as_ref(), suite)?,
-            Expr::IfExpr(if_expr) => unimplemented!(),
+            Expr::IfExpr(cond) => self.compile_if_expr(symbol, cond)?,
             
             Expr::FunctionDef(fundef) => unimplemented!(),
         }
@@ -395,38 +408,72 @@ impl CodeGenerator {
     }
     
     fn compile_block(&mut self, symbol: &DebugSymbol, label: Option<&Label>, suite: &[StmtMeta]) -> CompileResult<()> {
+        
         self.emit_begin_scope(ScopeTag::Block, symbol);
-        
-        // TODO control flow
-        for stmt in suite.iter() {
-            let inner_symbol = stmt.debug_symbol();
-            self.compile_stmt(inner_symbol, stmt.variant())?;
-        }
-        
+        self.compile_stmt_list(suite)?;
         self.emit_end_scope();
         
         self.emit_instr(symbol, OpCode::Nil); // implicit nil if we don't break out of block
         Ok(())
     }
     
-    fn compile_if_expr(&mut self, symbol: &DebugSymbol, cond_expr: &Conditional) -> CompileResult<()> {
+    fn compile_if_expr(&mut self, symbol: &DebugSymbol, conditional: &Conditional) -> CompileResult<()> {
+        debug_assert!(!conditional.branches.is_empty());
         
         // track the sites where we jump to the end, so we can patch them later
-        // let end_jump_sites;
+        let mut end_jump_sites = Vec::new();
         
-        for branch in cond_expr.branches.iter() {
+        for (index, branch) in conditional.branches.iter().enumerate() {
             
             self.compile_expr(symbol, &branch.cond)?;
-            let next_offset = self.emit_dummy_instr(symbol, OpCode::JumpIfFalse);
+            let branch_jump_site = self.emit_dummy_instr(symbol, OpCode::JumpIfFalse);
             
             self.emit_begin_scope(ScopeTag::Branch, symbol);
+            self.compile_stmt_list(&branch.suite)?;
+            self.emit_end_scope();
             
+            // site for the jump to end
+            if conditional.else_branch.is_some() || index < conditional.branches.len() - 1 {
+                let end_offset = self.emit_dummy_instr(symbol, OpCode::Jump);
+                end_jump_sites.push(end_offset);
+            }
             
-            
-            // let next_jump_site;
+            // target for the jump from the conditional of the now compiled branch
+            let branch_target = self.chunk.bytes().len();
+            let jump_offset = i16::try_from(branch_target - branch_jump_site).expect("exceeded max jump offset");
+            self.patch_instr_data(branch_jump_site, OpCode::JumpIfFalse, &jump_offset.to_le_bytes());
         }
         
-        unimplemented!()
+        if let Some(suite) = &conditional.else_branch {
+            
+            self.emit_begin_scope(ScopeTag::Branch, symbol);
+            self.compile_stmt_list(suite)?;
+            self.emit_end_scope();
+            
+        }
+        
+        // patch all of the end jump sites
+        let end_target = self.chunk.bytes().len();
+        for jump_site in end_jump_sites.iter() {
+            
+            let jump_offset = i16::try_from(end_target - jump_site).expect("exceeded max jump offset");
+            self.patch_instr_data(*jump_site, OpCode::Jump, &jump_offset.to_le_bytes());
+        }
+        
+        // TODO result value
+        self.emit_instr(symbol, OpCode::Nil);
+        
+        Ok(())
+    }
+    
+    fn compile_stmt_list(&mut self, suite: &[StmtMeta]) -> CompileResult<()> {
+        // TODO control flow
+        for stmt in suite.iter() {
+            let inner_symbol = stmt.debug_symbol();
+            self.compile_stmt(inner_symbol, stmt.variant())?;
+        }
+        
+        Ok(())
     }
     
     fn compile_declaration(&mut self, symbol: &DebugSymbol, decl: DeclarationRef) -> CompileResult<()> {
@@ -459,6 +506,11 @@ impl CodeGenerator {
                         
                         self.compile_declaration(inner_symbol, inner_decl)?;
                     }
+                    
+                    // declarations are also expressions
+                    let tuple_len = u8::try_from(init_list.len())
+                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit).with_symbol(*symbol))?;
+                    self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
                     
                     Ok(())
                 },
@@ -522,6 +574,11 @@ impl CodeGenerator {
                         self.compile_assignment(inner_symbol, inner_assign)?;
                     }
                     
+                    // assignments are also expressions
+                    let tuple_len = u8::try_from(rhs_list.len())
+                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit).with_symbol(*symbol))?;
+                    self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
+                    
                     Ok(())
                 },
                 
@@ -564,7 +621,7 @@ impl CodeGenerator {
                 if let Ok(offset) = u8::try_from(offset) {
                     self.emit_instr_byte(symbol, OpCode::StoreLocal, offset);
                 } else {
-                    self.emit_instr_data(symbol, OpCode::StoreLocal16, offset.to_le_bytes());
+                    self.emit_instr_data(symbol, OpCode::StoreLocal16, &offset.to_le_bytes());
                 }
                 return Ok(());
             }
@@ -613,7 +670,7 @@ impl CodeGenerator {
                 } else if let Ok(value) = i8::try_from(*value) {
                     self.emit_instr_byte(symbol, OpCode::Int8, value.to_le_bytes()[0]);
                 } else {
-                    self.emit_load_const(symbol, Constant::from(*value));
+                    self.emit_load_const(symbol, Constant::from(*value))?;
                 }
             },
             
@@ -622,7 +679,7 @@ impl CodeGenerator {
                     let value = *value as i8;
                     self.emit_instr_byte(symbol, OpCode::Float8, value.to_le_bytes()[0]);
                 } else {
-                    self.emit_load_const(symbol, Constant::from(*value));
+                    self.emit_load_const(symbol, Constant::from(*value))?;
                 }
             },
             
@@ -646,7 +703,7 @@ impl CodeGenerator {
             if let Ok(offset) = u8::try_from(offset) {
                 self.emit_instr_byte(symbol, OpCode::LoadLocal, offset);
             } else {
-                self.emit_instr_data(symbol, OpCode::LoadLocal16, offset.to_le_bytes());
+                self.emit_instr_data(symbol, OpCode::LoadLocal16, &offset.to_le_bytes());
             }
         
         } else {

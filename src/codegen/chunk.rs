@@ -55,6 +55,10 @@ impl ChunkBuilder {
         self.bytes.as_slice()
     }
     
+    pub fn bytes_mut(&mut self) -> &mut [u8] {
+        self.bytes.as_mut_slice()
+    }
+    
     // using Into<u8> so that OpCodes can be accepted without extra fuss
     pub fn push_byte(&mut self, byte: impl Into<u8>) {
         self.bytes.push(byte.into());
