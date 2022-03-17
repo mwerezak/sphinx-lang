@@ -318,13 +318,13 @@ impl CodeGenerator {
         self.chunk.patch_bytes(offset + 1, bytes);
     }
     
-    fn make_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<ConstID> {
-        self.chunk.push_const(value)
+    fn get_or_make_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<ConstID> {
+        self.chunk.get_or_insert_const(value)
             .map_err(|error| error.with_symbol(*symbol))
     }
     
     fn emit_load_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<()> {
-        let cid = self.make_const(symbol, value)?;
+        let cid = self.get_or_make_const(symbol, value)?;
         
         if cid <= u8::MAX.into() {
             self.emit_instr_byte(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap());

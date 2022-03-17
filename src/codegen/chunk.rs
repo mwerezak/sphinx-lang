@@ -75,7 +75,7 @@ impl ChunkBuilder {
     
     // Constants
     
-    pub fn push_const(&mut self, value: Constant) -> CompileResult<ConstID> {
+    pub fn get_or_insert_const(&mut self, value: Constant) -> CompileResult<ConstID> {
         if let Constant::String(symbol) = value {
             debug_assert!(self.strings.resolve(symbol).is_some());
         }
@@ -91,9 +91,9 @@ impl ChunkBuilder {
         }
     }
     
-    pub fn push_str(&mut self, string: &str) -> CompileResult<ConstID> {
+    pub fn get_or_insert_str(&mut self, string: &str) -> CompileResult<ConstID> {
         let symbol = self.strings.get_or_intern(string);
-        self.push_const(Constant::String(symbol))
+        self.get_or_insert_const(Constant::String(symbol))
     }
     
     pub fn build(mut self) -> UnloadedChunk {
