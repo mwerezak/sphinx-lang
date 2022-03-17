@@ -312,6 +312,19 @@ impl VirtualMachine {
                 let offset = i16::from(!cond).wrapping_sub(1) & i16::from_le_bytes([data[0], data[1]]);
                 self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
             }
+            OpCode::PopJumpIfFalse => {
+                let mut offset = i16::from_le_bytes([data[0], data[1]]);
+                let cond = self.pop_stack().truth_value();
+                offset &= i16::from(cond).wrapping_sub(1);
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
+            OpCode::PopJumpIfTrue => {
+                let mut offset = i16::from_le_bytes([data[0], data[1]]);
+                let cond = self.pop_stack().truth_value();
+                offset &= i16::from(!cond).wrapping_sub(1);
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
+            
             
             OpCode::Inspect => println!("{:?}", self.pop_stack()),
             OpCode::Assert => {

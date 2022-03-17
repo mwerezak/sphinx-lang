@@ -12,3 +12,8 @@ end
 
 # Declaration in if condition.
 if let b = true then echo b end # expect: true
+
+
+if (if a then true else false end) then
+    echo "if-ception"
+end

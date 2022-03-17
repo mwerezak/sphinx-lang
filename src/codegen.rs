@@ -419,25 +419,28 @@ impl CodeGenerator {
         for (index, branch) in conditional.branches().iter().enumerate() {
             
             self.compile_expr(symbol, branch.cond_expr())?;
-            let branch_jump_site = self.emit_dummy_instr(symbol, OpCode::JumpIfFalse);
+            let branch_jump_site = self.emit_dummy_instr(symbol, OpCode::PopJumpIfFalse);
             
             self.compile_stmt_list(ScopeTag::Branch, symbol, branch.suite())?;
             
             // site for the jump to end
-            if conditional.else_branch().is_some() || index < conditional.branches().len() - 1 {
-                let end_offset = self.emit_dummy_instr(symbol, OpCode::Jump);
-                end_jump_sites.push(end_offset);
-            }
+            let end_offset = self.emit_dummy_instr(symbol, OpCode::Jump);
+            end_jump_sites.push(end_offset);
             
             // target for the jump from the conditional of the now compiled branch
             let branch_target = self.chunk.bytes().len();
             let jump_offset = i16::try_from(branch_target - branch_jump_site).expect("exceeded max jump offset");
-            self.patch_instr_data(branch_jump_site, OpCode::JumpIfFalse, &jump_offset.to_le_bytes());
+            self.patch_instr_data(branch_jump_site, OpCode::PopJumpIfFalse, &jump_offset.to_le_bytes());
         }
         
         if let Some(suite) = &conditional.else_branch() {
             
             self.compile_stmt_list(ScopeTag::Branch, symbol, suite)?;
+            
+        } else {
+            
+            // since if-expressions are expressions, there is always an implicit else
+            self.emit_instr(symbol, OpCode::Nil);
             
         }
         

@@ -58,7 +58,7 @@ const OP_U8:            u8 = 0x3D;  // (u8); _ => [ value ]
 const OP_I8:            u8 = 0x3E;  // (i8); _ => [ value ]
 const OP_F8:            u8 = 0x3F;  // (i8); _ => [ value ]
 
-const OP_DYN_TARGET:    u8 = 0x48;  // (u8); [ ... ] => [ dyn_target ]
+// const OP_DYN_TARGET:    u8 = 0x48;  // (u8); [ ... ] => [ dyn_target ]
 
 // 0x50-57      Unary Operations
 
@@ -93,6 +93,16 @@ const OP_GT:            u8 = 0x6D;
 const OP_JUMP:          u8 = 0x70;  // (i16);
 const OP_JUMP_FALSE:    u8 = 0x71;  // (i16);
 const OP_JUMP_TRUE:     u8 = 0x72;  // (i16);
+// const OP_LJUMP:         u8 = 0x73;  // (i32);
+// const OP_LJUMP_FALSE:   u8 = 0x74;  // (i32);
+// const OP_LJUMP_TRUE:    u8 = 0x75;  // (i32);
+
+const OP_POPJMP_FALSE:  u8 = 0x76;  // (i16); [ _ ] => []
+const OP_POPJMP_TRUE:   u8 = 0x77;  // (i16); [ _ ] => []
+// const OP_POPLJMP:       u8 = 0x78;  // (i32); [ _ ] => []
+// const OP_POPLJMP_FALSE: u8 = 0x79;  // (i32); [ _ ] => []
+// const OP_POPLJMP_TRUE:  u8 = 0x7A;  // (i32); [ _ ] => []
+
 
 
 // 0xF0         Debugging/Tracing/Misc
@@ -162,6 +172,8 @@ pub enum OpCode {
     Jump = OP_JUMP,
     JumpIfFalse = OP_JUMP_FALSE,
     JumpIfTrue = OP_JUMP_TRUE,
+    PopJumpIfFalse = OP_POPJMP_FALSE,
+    PopJumpIfTrue = OP_POPJMP_TRUE,
     
     Inspect = DBG_INSPECT,
     Assert = DBG_ASSERT,
@@ -227,6 +239,8 @@ impl OpCode {
             OP_JUMP => Self::Jump,
             OP_JUMP_FALSE => Self::JumpIfFalse,
             OP_JUMP_TRUE => Self::JumpIfTrue,
+            OP_POPJMP_FALSE => Self::PopJumpIfFalse,
+            OP_POPJMP_TRUE => Self::PopJumpIfTrue,
             
             DBG_INSPECT => Self::Inspect,
             DBG_ASSERT => Self::Assert,
@@ -241,25 +255,27 @@ impl OpCode {
         match self {
             // don't really need size_of() for most of these, but it's a nice little bit of self-documentation
             
-            Self::Drop         => 1 + size_of::<u8>(),
+            Self::Drop           => 1 + size_of::<u8>(),
             
-            Self::LoadConst    => 1 + size_of::<u8>(),
-            Self::LoadConst16  => 1 + size_of::<u16>(),
+            Self::LoadConst      => 1 + size_of::<u8>(),
+            Self::LoadConst16    => 1 + size_of::<u16>(),
             
-            Self::StoreLocal   => 1 + size_of::<u8>(),
-            Self::StoreLocal16 => 1 + size_of::<u16>(),
-            Self::LoadLocal    => 1 + size_of::<u8>(),
-            Self::LoadLocal16  => 1 + size_of::<u16>(),
-            Self::DropLocals   => 1 + size_of::<u8>(),
+            Self::StoreLocal     => 1 + size_of::<u8>(),
+            Self::StoreLocal16   => 1 + size_of::<u16>(),
+            Self::LoadLocal      => 1 + size_of::<u8>(),
+            Self::LoadLocal16    => 1 + size_of::<u16>(),
+            Self::DropLocals     => 1 + size_of::<u8>(),
             
-            Self::Tuple        => 1 + size_of::<u8>(),
-            Self::UInt8        => 1 + size_of::<u8>(),
-            Self::Int8         => 1 + size_of::<i8>(),
-            Self::Float8       => 1 + size_of::<i8>(),
+            Self::Tuple          => 1 + size_of::<u8>(),
+            Self::UInt8          => 1 + size_of::<u8>(),
+            Self::Int8           => 1 + size_of::<i8>(),
+            Self::Float8         => 1 + size_of::<i8>(),
             
-            Self::Jump         => 1 + size_of::<i16>(),
-            Self::JumpIfFalse  => 1 + size_of::<i16>(),
-            Self::JumpIfTrue   => 1 + size_of::<i16>(),
+            Self::Jump           => 1 + size_of::<i16>(),
+            Self::JumpIfFalse    => 1 + size_of::<i16>(),
+            Self::JumpIfTrue     => 1 + size_of::<i16>(),
+            Self::PopJumpIfFalse => 1 + size_of::<i16>(),
+            Self::PopJumpIfTrue  => 1 + size_of::<i16>(),
             
             _ => 1,
         }
@@ -334,6 +350,8 @@ impl std::fmt::Display for OpCode {
             Self::Jump => "OP_JUMP",
             Self::JumpIfFalse => "OP_JUMP_FALSE",
             Self::JumpIfTrue => "OP_JUMP_TRUE",
+            Self::PopJumpIfFalse => "OP_POPJMP_FALSE",
+            Self::PopJumpIfTrue => "OP_POPJMP_TRUE",
             
             Self::Inspect => "DBG_INSPECT",
             Self::Assert => "DBG_ASSERT",
