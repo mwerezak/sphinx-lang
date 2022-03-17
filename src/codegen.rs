@@ -90,6 +90,8 @@ enum ScopeTag {
     Class,
 }
 
+
+
 #[derive(Debug)]
 struct Scope {
     tag: ScopeTag,
@@ -124,6 +126,15 @@ impl Scope {
         };
         self.locals.push(local);
         Ok(self.locals.last().unwrap())
+    }
+    
+    // i.e., without the "nonlocal" keyword
+    // this returns true if we can assign into the enclosing scope
+    fn allow_enclosing_assignment(&self) -> bool {
+        match self.tag {
+            ScopeTag::Loop | ScopeTag::Branch => true,
+            _ => false,
+        }
     }
 }
 
@@ -177,8 +188,43 @@ impl CompilerState {
         Ok(())
     }
     
-    fn resolve_local(&mut self, name: &InternSymbol) -> Option<&Local> {
+    // find the nearest local in any scope
+    fn resolve_local(&self, name: &InternSymbol) -> Option<&Local> {
         self.scopes.iter().rev().find_map(|scope| scope.find_local(name))
+    }
+    
+    // find the nearest local in scopes that allow nonlocal assignment
+    fn resolve_local_strict(&self, name: &InternSymbol) -> Option<&Local> {
+        for scope in self.scopes.iter().rev() {
+            let local = scope.find_local(name);
+            if local.is_some() {
+                return local;
+            }
+            
+            if !scope.allow_enclosing_assignment() {
+                break;
+            }
+        }
+        
+        None
+    }
+    
+    // search scopes that would have been skipped by resolve_local_strict()
+    fn resolve_nonlocal(&self, name: &InternSymbol) -> Option<&Local> {
+        let mut is_local = true;
+        for scope in self.scopes.iter().rev() {
+            if is_local {
+                is_local &= scope.allow_enclosing_assignment();
+                continue;
+            }
+            
+            let local = scope.find_local(name);
+            if local.is_some() {
+                return local;
+            }
+        }
+        
+        None
     }
 }
 
@@ -480,7 +526,7 @@ impl CodeGenerator {
             
             // check if the name is found in the local scope...
             let local_offset = 
-                if let Some(local) = self.state.resolve_local(name) {
+                if let Some(local) = self.state.resolve_local_strict(name) {
                     if local.decl != DeclType::Mutable {
                         return Err(CompileError::from(ErrorKind::CantAssignImmutable).with_symbol(*symbol));
                     }
