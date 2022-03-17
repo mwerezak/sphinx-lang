@@ -4,7 +4,7 @@ use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration};
 use crate::parser::fundefs::FunctionDef;
 use crate::parser::structs::{ObjectConstructor};
-use crate::parser::stmt::{StmtMeta, Stmt, Label};
+use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList};
 
 // TODO replace Vecs with boxed slices
 #[derive(Debug, Clone)]
@@ -28,7 +28,7 @@ pub enum Expr {
     
     IfExpr(Conditional),
     
-    Block(Option<Label>, Box<[StmtMeta]>),
+    Block(Option<Label>, StmtList),
     
     FunctionDef(FunctionDef),
     
@@ -37,14 +37,32 @@ pub enum Expr {
 
 #[derive(Debug, Clone)]
 pub struct Conditional {
-    pub branches: Box<[CondBranch]>,
-    pub else_branch: Option<Box<[StmtMeta]>>,
+    branches: Box<[CondBranch]>,
+    else_branch: Option<StmtList>,
+}
+
+impl Conditional {
+    pub fn new(branches: Vec<CondBranch>, else_branch: Option<StmtList>) -> Self {
+        Self {
+            branches: branches.into_boxed_slice(),
+            else_branch,
+        }
+    }
+    
+    pub fn branches(&self) -> &[CondBranch] { &self.branches }
+    pub fn else_branch(&self) -> Option<&StmtList> { self.else_branch.as_ref() }
 }
 
 #[derive(Debug, Clone)]
-pub struct CondBranch {
-    pub cond: Expr,
-    pub suite: Box<[StmtMeta]>,
+pub struct CondBranch(Expr, StmtList);
+
+impl CondBranch {
+    pub fn new(cond: Expr, stmt_list: StmtList) -> Self {
+        Self(cond, stmt_list)
+    }
+    
+    pub fn cond_expr(&self) -> &Expr { &self.0 }
+    pub fn suite(&self) -> &StmtList { &self.1 }
 }
 
 

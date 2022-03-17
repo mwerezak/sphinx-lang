@@ -3,7 +3,7 @@
 use log;
 
 use crate::language::FloatType;
-use crate::parser::stmt::{StmtMeta, Stmt, Label};
+use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, Conditional};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::assign::{Assignment, Declaration, LValue, DeclType};
@@ -83,7 +83,7 @@ struct Local {
     offset: Offset,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ScopeTag {
     Block,
     Loop,
@@ -368,10 +368,6 @@ impl CodeGenerator {
                 self.compile_expr(symbol, expr)?;
                 self.emit_instr(symbol, OpCode::Pop);
             },
-            
-            Stmt::Continue(label) => unimplemented!(),
-            Stmt::Break(label, expr) => unimplemented!(),
-            Stmt::Return(expr) => unimplemented!(),
         }
         Ok(())
     }
@@ -399,7 +395,7 @@ impl CodeGenerator {
             
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list)?,
             
-            Expr::Block(label, suite) => self.compile_block(symbol, label.as_ref(), suite)?,
+            Expr::Block(label, stmt_list) => self.compile_block(symbol, label.as_ref(), stmt_list)?,
             Expr::IfExpr(cond) => self.compile_if_expr(symbol, cond)?,
             
             Expr::FunctionDef(fundef) => unimplemented!(),
@@ -407,33 +403,28 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_block(&mut self, symbol: &DebugSymbol, label: Option<&Label>, suite: &[StmtMeta]) -> CompileResult<()> {
+    fn compile_block(&mut self, symbol: &DebugSymbol, label: Option<&Label>, stmt_list: &StmtList) -> CompileResult<()> {
         
-        self.emit_begin_scope(ScopeTag::Block, symbol);
-        self.compile_stmt_list(suite)?;
-        self.emit_end_scope();
+        self.compile_stmt_list(ScopeTag::Block, symbol, stmt_list)?;
         
-        self.emit_instr(symbol, OpCode::Nil); // implicit nil if we don't break out of block
         Ok(())
     }
     
     fn compile_if_expr(&mut self, symbol: &DebugSymbol, conditional: &Conditional) -> CompileResult<()> {
-        debug_assert!(!conditional.branches.is_empty());
+        debug_assert!(!conditional.branches().is_empty());
         
         // track the sites where we jump to the end, so we can patch them later
         let mut end_jump_sites = Vec::new();
         
-        for (index, branch) in conditional.branches.iter().enumerate() {
+        for (index, branch) in conditional.branches().iter().enumerate() {
             
-            self.compile_expr(symbol, &branch.cond)?;
+            self.compile_expr(symbol, branch.cond_expr())?;
             let branch_jump_site = self.emit_dummy_instr(symbol, OpCode::JumpIfFalse);
             
-            self.emit_begin_scope(ScopeTag::Branch, symbol);
-            self.compile_stmt_list(&branch.suite)?;
-            self.emit_end_scope();
+            self.compile_stmt_list(ScopeTag::Branch, symbol, branch.suite())?;
             
             // site for the jump to end
-            if conditional.else_branch.is_some() || index < conditional.branches.len() - 1 {
+            if conditional.else_branch().is_some() || index < conditional.branches().len() - 1 {
                 let end_offset = self.emit_dummy_instr(symbol, OpCode::Jump);
                 end_jump_sites.push(end_offset);
             }
@@ -444,11 +435,9 @@ impl CodeGenerator {
             self.patch_instr_data(branch_jump_site, OpCode::JumpIfFalse, &jump_offset.to_le_bytes());
         }
         
-        if let Some(suite) = &conditional.else_branch {
+        if let Some(suite) = &conditional.else_branch() {
             
-            self.emit_begin_scope(ScopeTag::Branch, symbol);
-            self.compile_stmt_list(suite)?;
-            self.emit_end_scope();
+            self.compile_stmt_list(ScopeTag::Branch, symbol, suite)?;
             
         }
         
@@ -460,18 +449,44 @@ impl CodeGenerator {
             self.patch_instr_data(*jump_site, OpCode::Jump, &jump_offset.to_le_bytes());
         }
         
-        // TODO result value
-        self.emit_instr(symbol, OpCode::Nil);
-        
         Ok(())
     }
     
-    fn compile_stmt_list(&mut self, suite: &[StmtMeta]) -> CompileResult<()> {
-        // TODO control flow
-        for stmt in suite.iter() {
+    fn compile_stmt_list(&mut self, tag: ScopeTag, symbol: &DebugSymbol, stmt_list: &StmtList) -> CompileResult<()> {
+        
+        self.emit_begin_scope(tag, symbol);
+        
+        // compile stmt suite
+        for stmt in stmt_list.suite().iter() {
             let inner_symbol = stmt.debug_symbol();
             self.compile_stmt(inner_symbol, stmt.variant())?;
         }
+        
+        // handle control flow
+        let is_expr_block = matches!(tag, ScopeTag::Block | ScopeTag::Branch);
+        match stmt_list.control() {
+            None => if is_expr_block {
+                self.emit_instr(symbol, OpCode::Nil); // implicit nil
+            },
+            
+            Some(control) => match control {
+                ControlFlow::Expression(expr) => if is_expr_block {
+                    self.compile_expr(expr.debug_symbol(), expr.variant())?;
+                }
+                
+                ControlFlow::Continue(label) => {
+                    unimplemented!()
+                }
+                ControlFlow::Break(label, expr) => {
+                    unimplemented!()
+                }
+                ControlFlow::Return(expr) => {
+                    unimplemented!()
+                }
+            }
+        }
+        
+        self.emit_end_scope();
         
         Ok(())
     }

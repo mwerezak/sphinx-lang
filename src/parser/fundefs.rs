@@ -1,21 +1,20 @@
 use crate::runtime::strings::InternSymbol;
 use crate::parser::assign::DeclType;
 use crate::parser::expr::Expr;
-use crate::parser::stmt::StmtMeta;
+use crate::parser::stmt::{StmtMeta, StmtList};
 
 // Function Definitions
 #[derive(Debug, Clone)]
 pub struct FunctionDef {
     signature: FunSignature,
-    body: Box<[StmtMeta]>,
+    body: StmtList,
 }
 
 
 impl FunctionDef {
-    pub fn new(signature: FunSignature, body: Vec<StmtMeta>) -> Self {
+    pub fn new(signature: FunSignature, body: StmtList) -> Self {
         FunctionDef {
-            signature,
-            body: body.into_boxed_slice(),
+            signature, body,
         }
     }
 }

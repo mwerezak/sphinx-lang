@@ -20,7 +20,7 @@ mod tests;
 pub use errors::{ParserError, ParseResult};
 
 use expr::{ExprMeta, Expr, Conditional, CondBranch};
-use stmt::{StmtMeta, Stmt, Label};
+use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
 use primary::{Primary, Atom, AccessItem};
 use assign::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
@@ -268,10 +268,11 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     }
     
     // parses a list of statements, stopping when the given closure returns true. The final token is not consumed.
-    fn parse_stmt_list(&mut self, ctx: &mut ErrorContext, end_list: impl Fn(&Token) -> bool) -> ParseResult<Vec<StmtMeta>> {
+    fn parse_stmt_list(&mut self, ctx: &mut ErrorContext, end_list: impl Fn(&Token) -> bool) -> ParseResult<StmtList> {
         ctx.push(ContextTag::StmtList);
         
         let mut suite = Vec::new();
+        let mut control = None;
         
         debug!("enter stmt list at index {}...", self.current_index());
         
@@ -282,23 +283,24 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 break;
             }
             
-            let parse_result = self.try_parse_control_flow_stmt(ctx);
-            let control_stmt = match self.catch_error_and_sync(ctx, parse_result, true) {
+            let parse_result = self.try_parse_control_flow(ctx);
+            
+            control = match self.catch_error_and_sync(ctx, parse_result, true) {
                 Some(result) => result?,
                 None => continue,
             };
             
-            if let Some(control) = control_stmt {
+            if let Some(control) = control.as_ref() {
                 
                 let next = self.peek()?;
                 if !end_list(&next.token) {
                     // consume the unexpected token so that it is included in the error message
                     ctx.set_end(&self.advance().unwrap());
                     
-                    let name = match control.variant() {
-                        Stmt::Continue(..) => "continue",
-                        Stmt::Break(..) => "break",
-                        Stmt::Return(..) => "return",
+                    let name = match control {
+                        ControlFlow::Continue(..) => "continue",
+                        ControlFlow::Break(..) => "break",
+                        ControlFlow::Return(..) => "return",
                         _ => unreachable!(),
                     };
                     
@@ -307,9 +309,6 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                         .with_symbol_from_ctx(&ctx);
                     
                     self.errors.push_back(error);
-                
-                } else{
-                    suite.push(control);
                 }
                 
                 break;
@@ -327,7 +326,24 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         debug!("exit stmt list at {}...", self.current_index());
         
         ctx.pop_extend();
-        Ok(suite)
+        
+        Ok(StmtList::new(suite, control))
+    }
+    
+    // if the last statement is an expression statement it becomes the expression for the block
+    fn parse_stmt_list_expr(&mut self, ctx: &mut ErrorContext, end_list: impl Fn(&Token) -> bool) -> ParseResult<StmtList> {
+        let (mut suite, mut control_flow) = self.parse_stmt_list(ctx, end_list)?.take();
+        
+        if control_flow.is_none() && !suite.is_empty() {
+            match ExprMeta::try_from(suite.pop().unwrap()) {
+                Err(stmt) => suite.push(stmt),
+                Ok(expr) => {
+                    control_flow.replace(ControlFlow::Expression(Box::new(expr)));
+                }
+            }
+        }
+        
+        Ok(StmtList::new(suite, control_flow))
     }
     
     fn try_parse_label(&mut self, _ctx: &mut ErrorContext) -> ParseResult<Option<Label>> {
@@ -344,17 +360,17 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(label)
     }
     
-    fn try_parse_control_flow_stmt(&mut self, ctx: &mut ErrorContext) -> ParseResult<Option<StmtMeta>> {
+    fn try_parse_control_flow(&mut self, ctx: &mut ErrorContext) -> ParseResult<Option<ControlFlow>> {
         let next = self.peek()?;
         
-        let stmt = match next.token {
+        let control_flow = match next.token {
             Token::Continue => {
                 ctx.push(ContextTag::ControlFlow);
                 ctx.set_start(&self.advance().unwrap());
                 
                 let label = self.try_parse_label(ctx)?;
                 
-                Stmt::Continue(label)
+                ControlFlow::Continue(label)
             },
             
             Token::Break => {
@@ -365,10 +381,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 
                 let expr = 
                     if !matches!(self.peek()?.token, Token::End | Token::Semicolon) {
-                        Some(self.parse_expr_variant(ctx)?)
+                        Some(Box::new(self.parse_expr_variant(ctx)?))
                     } else { None };
                 
-                Stmt::Break(label, expr)
+                ControlFlow::Break(label, expr)
             },
             
             Token::Return => {
@@ -377,19 +393,19 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 
                 let expr = 
                     if !matches!(self.peek()?.token, Token::End | Token::Semicolon) {
-                        Some(self.parse_expr_variant(ctx)?)
+                        Some(Box::new(self.parse_expr_variant(ctx)?))
                     } else { None };
                 
-                Stmt::Return(expr)
+                ControlFlow::Return(expr)
             }
             
             _ => return Ok(None),
         };
         
-        let symbol = ctx.frame().as_debug_symbol().unwrap();
+        // let symbol = ctx.frame().as_debug_symbol().unwrap();
         
         ctx.pop_extend();
-        Ok(Some(StmtMeta::new(stmt, symbol)))
+        Ok(Some(control_flow))
     }
     
     /*** Expression Parsing ***/
@@ -730,23 +746,11 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             return Err("block labels must be followed by either a block or a loop".into());
         }
         
-        let mut suite = self.parse_stmt_list(ctx, |token| matches!(token, Token::End))?;
+        let stmt_list = self.parse_stmt_list_expr(ctx, |token| matches!(token, Token::End))?;
         ctx.set_end(&self.advance().unwrap()); // consume "end"
         
-        // SYNTACTIC SUGAR: convert expression statement at end of block into "break <expr>"
-        match suite.pop().map(|stmt| ExprMeta::try_from(stmt)) {
-            None => { }
-            Some(Err(stmt)) => suite.push(stmt),
-            
-            Some(Ok(expr)) => {
-                let (expr, symbol) = expr.take();
-                let break_stmt = StmtMeta::new(Stmt::Break(None, Some(expr)), symbol);
-                suite.push(break_stmt);
-            },
-        }
-        
         ctx.pop_extend();
-        Ok(Expr::Block(block_label, suite.into_boxed_slice()))
+        Ok(Expr::Block(block_label, stmt_list))
     }
     
     fn parse_if_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
@@ -763,7 +767,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         loop {
             
             // parse condition
-            let cond = self.parse_expr_variant(ctx)?;
+            let cond_expr = self.parse_expr_variant(ctx)?;
             
             let next = self.advance()?;
             ctx.set_end(&next);
@@ -772,12 +776,9 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 return Err("missing \"then\" after condition in if-expression".into());
             }
             
-            let suite = self.parse_stmt_list(ctx, |token| matches!(token, Token::Elif | Token::Else | Token::End))?;
+            let stmt_list = self.parse_stmt_list_expr(ctx, |token| matches!(token, Token::Elif | Token::Else | Token::End))?;
             
-            let branch = CondBranch {
-                cond, suite: suite.into_boxed_slice(),
-            };
-            branches.push(branch);
+            branches.push(CondBranch::new(cond_expr, stmt_list));
             
             let next = self.advance().unwrap();
             ctx.set_end(&next);
@@ -786,8 +787,8 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 Token::End => break,
                 Token::Else => {
                     
-                    let suite = self.parse_stmt_list(ctx, |token| matches!(token, Token::End))?;
-                    else_branch.replace(suite.into_boxed_slice());
+                    let stmt_list = self.parse_stmt_list_expr(ctx, |token| matches!(token, Token::End))?;
+                    else_branch.replace(stmt_list);
                     
                     ctx.set_end(&self.advance().unwrap()); // consume "end"
                     
@@ -799,13 +800,9 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
         }
         
-        let if_expr = Conditional {
-            branches: branches.into_boxed_slice(),
-            else_branch,
-        };
-        
         ctx.pop_extend();
-        Ok(Expr::IfExpr(if_expr))
+        
+        Ok(Expr::IfExpr(Conditional::new(branches, else_branch)))
     }
     
     fn parse_function_decl_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
