@@ -136,6 +136,16 @@ impl VirtualMachine {
         peek
     }
     
+    #[inline(always)]
+    fn offset_pc(&self, offset: isize) -> Option<usize> {
+        if offset >= 0 {
+            usize::checked_add(self.pc, offset as usize)
+        } else {
+            usize::checked_sub(self.pc, offset.unsigned_abs())
+        }
+    }
+    
+    
     fn into_name(value: &Variant) -> StringSymbol {
         match value {
             Variant::String(symbol) => *symbol,
@@ -287,6 +297,21 @@ impl VirtualMachine {
             OpCode::LE => eval_cmp!(self, eval_le),
             OpCode::GE => eval_cmp!(self, eval_ge),
             OpCode::GT => eval_cmp!(self, eval_gt),
+            
+            OpCode::Jump => {
+                let offset = i16::from_le_bytes([data[0], data[1]]);
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
+            OpCode::JumpIfFalse => {
+                let cond = self.peek_stack().truth_value();
+                let offset = i16::from(cond).wrapping_sub(1) & i16::from_le_bytes([data[0], data[1]]);
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
+            OpCode::JumpIfTrue => {
+                let cond = self.peek_stack().truth_value();
+                let offset = i16::from(!cond).wrapping_sub(1) & i16::from_le_bytes([data[0], data[1]]);
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
             
             OpCode::Inspect => println!("{:?}", self.pop_stack()),
             OpCode::Assert => {
