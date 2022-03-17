@@ -734,16 +734,15 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         ctx.set_end(&self.advance().unwrap()); // consume "end"
         
         // SYNTACTIC SUGAR: convert expression statement at end of block into "break <expr>"
-        if let Some(Stmt::Expression(..)) = suite.last().map(|stmt| stmt.variant()) {
-            let (stmt, symbol) = suite.pop().unwrap().take();
+        match suite.pop().map(|stmt| ExprMeta::try_from(stmt)) {
+            None => { }
+            Some(Err(stmt)) => suite.push(stmt),
             
-            let expr = match stmt {
-                Stmt::Expression(expr) => expr,
-                _ => unreachable!(),
-            };
-            
-            let break_stmt = StmtMeta::new(Stmt::Break(None, Some(expr)), symbol);
-            suite.push(break_stmt);
+            Some(Ok(expr)) => {
+                let (expr, symbol) = expr.take();
+                let break_stmt = StmtMeta::new(Stmt::Break(None, Some(expr)), symbol);
+                suite.push(break_stmt);
+            },
         }
         
         ctx.pop_extend();

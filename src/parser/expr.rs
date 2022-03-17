@@ -83,12 +83,23 @@ impl From<Expr> for Stmt {
 }
 
 impl TryFrom<Stmt> for Expr {
-    type Error = ();
+    type Error = Stmt;
     
     #[inline]
-    fn try_from(stmt: Stmt) -> Result<Self, Self::Error> {
+    fn try_from(stmt: Stmt) -> Result<Self, Stmt> {
         if let Stmt::Expression(expr) = stmt { Ok(expr) }
-        else { Err(()) }
+        else { Err(stmt) }
+    }
+}
+
+impl TryFrom<StmtMeta> for Expr {
+    type Error = StmtMeta;
+    
+    #[inline]
+    fn try_from(stmt: StmtMeta) -> Result<Self, StmtMeta> {
+        let (stmt, symbol) = stmt.take();
+        if let Stmt::Expression(expr) = stmt { Ok(expr) }
+        else { Err(StmtMeta::new(stmt, symbol)) }
     }
 }
 
@@ -102,11 +113,14 @@ impl From<ExprMeta> for StmtMeta {
 }
 
 impl TryFrom<StmtMeta> for ExprMeta {
-    type Error = ();
+    type Error = StmtMeta;
     
     #[inline]
-    fn try_from(stmt: StmtMeta) -> Result<Self, Self::Error> {
+    fn try_from(stmt: StmtMeta) -> Result<Self, StmtMeta> {
         let (stmt, symbol) = stmt.take();
-        Ok(ExprMeta::new(stmt.try_into()?, symbol))
+        match Expr::try_from(stmt) {
+            Ok(expr) => Ok(ExprMeta::new(expr, symbol)),
+            Err(stmt) => Err(StmtMeta::new(stmt, symbol)),
+        }
     }
 }

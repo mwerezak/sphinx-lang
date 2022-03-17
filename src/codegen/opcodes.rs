@@ -90,7 +90,8 @@ const OP_GT:            u8 = 0x6D;
 
 // 0x70         Jumps
 
-const OP_JMP_FALSE:     u8 = 0x70;  // (i16);
+const OP_JUMP:          u8 = 0x70;  // (i16);
+const OP_JUMP_FALSE:    u8 = 0x71;  // (i16);
 
 
 // 0xF0         Debugging/Tracing/Misc
