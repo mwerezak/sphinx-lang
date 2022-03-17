@@ -1,6 +1,7 @@
 #![allow(unused_variables)]
 
 use log;
+use std::iter;
 
 use crate::language::FloatType;
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
@@ -301,7 +302,7 @@ impl CodeGenerator {
     fn emit_dummy_instr(&mut self, symbol: &DebugSymbol, opcode: OpCode) -> usize {
         self.symbols.push(symbol);
         
-        let bytes = std::iter::repeat(OpCode::Nop).take(opcode.instr_len());
+        let bytes = iter::repeat(OpCode::Nop).take(opcode.instr_len());
         for byte in bytes {
             self.chunk.push_byte(byte);
         }
@@ -416,31 +417,41 @@ impl CodeGenerator {
         // track the sites where we jump to the end, so we can patch them later
         let mut end_jump_sites = Vec::new();
         
-        for (index, branch) in conditional.branches().iter().enumerate() {
+        let else_branch = conditional.else_branch();
+        
+        // if there is no else branch, the last non-else branch won't have a jump to end, and won't pop the condition 
+        let (last_branch, rest) = conditional.branches().split_last().unwrap();
+        let iter_branches = rest.iter()
+            .map(|branch| (false, branch))
+            .chain(iter::once((true, last_branch)));
+        
+        for (is_last, branch) in iter_branches {
+            let is_final_branch = is_last && else_branch.is_none();
+            
+            let cond_jump = 
+                if is_final_branch { OpCode::JumpIfFalse } // keep condition value
+                else { OpCode::PopJumpIfFalse };
             
             self.compile_expr(symbol, branch.cond_expr())?;
-            let branch_jump_site = self.emit_dummy_instr(symbol, OpCode::PopJumpIfFalse);
+            let branch_jump_site = self.emit_dummy_instr(symbol, cond_jump);
             
             self.compile_stmt_list(ScopeTag::Branch, symbol, branch.suite())?;
             
             // site for the jump to end
-            let end_offset = self.emit_dummy_instr(symbol, OpCode::Jump);
-            end_jump_sites.push(end_offset);
+            if !is_final_branch {
+                let end_offset = self.emit_dummy_instr(symbol, OpCode::Jump);
+                end_jump_sites.push(end_offset);
+            }
             
             // target for the jump from the conditional of the now compiled branch
             let branch_target = self.chunk.bytes().len();
             let jump_offset = i16::try_from(branch_target - branch_jump_site).expect("exceeded max jump offset");
-            self.patch_instr_data(branch_jump_site, OpCode::PopJumpIfFalse, &jump_offset.to_le_bytes());
+            self.patch_instr_data(branch_jump_site, cond_jump, &jump_offset.to_le_bytes());
         }
         
         if let Some(suite) = &conditional.else_branch() {
             
             self.compile_stmt_list(ScopeTag::Branch, symbol, suite)?;
-            
-        } else {
-            
-            // since if-expressions are expressions, there is always an implicit else
-            self.emit_instr(symbol, OpCode::Nil);
             
         }
         
@@ -467,7 +478,7 @@ impl CodeGenerator {
         
         // handle control flow
         let is_expr_block = matches!(tag, ScopeTag::Block | ScopeTag::Branch);
-        match stmt_list.control() {
+        match stmt_list.end_control() {
             None => if is_expr_block {
                 self.emit_instr(symbol, OpCode::Nil); // implicit nil
             },

@@ -284,12 +284,12 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             }
             
             let parse_result = self.try_parse_control_flow(ctx);
-            
             control = match self.catch_error_and_sync(ctx, parse_result, true) {
                 Some(result) => result?,
                 None => continue,
             };
             
+            // if we found a control flow statement, it must be the last item in the statement list
             if let Some(control) = control.as_ref() {
                 
                 let next = self.peek()?;

@@ -12,11 +12,12 @@ end
 # Declaration in if condition.
 if let b = true then echo b end # expect: true
 
-
-if (if a then true else false end) then
+# If-expressions evaluate to the last item of the branch that they enter
+if (if a then true end) then
     echo "if-ception"
 end
 
-if (if false then true else false end) then
+# If-expressions evaluate to their condition if they don't enter a branch
+if (if false then true end) then
     assert false
 end

@@ -26,18 +26,17 @@ pub enum Stmt {
 
 
 #[derive(Debug, Clone)]
+pub struct StmtList {
+    suite: Box<[StmtMeta]>,
+    control: Option<ControlFlow>,
+}
+
+#[derive(Debug, Clone)]
 pub enum ControlFlow {
     Continue(Option<Label>),
     Break(Option<Label>, Option<Box<Expr>>),
     Return(Option<Box<Expr>>),
     Expression(Box<ExprMeta>),
-}
-
-
-#[derive(Debug, Clone)]
-pub struct StmtList {
-    suite: Box<[StmtMeta]>,
-    control: Option<ControlFlow>,
 }
 
 impl StmtList {
@@ -49,7 +48,7 @@ impl StmtList {
     }
     
     pub fn suite(&self) -> &[StmtMeta] { &self.suite }
-    pub fn control(&self) -> Option<&ControlFlow> { self.control.as_ref() }
+    pub fn end_control(&self) -> Option<&ControlFlow> { self.control.as_ref() }
     
     pub fn take(self) -> (Vec<StmtMeta>, Option<ControlFlow>) {
         (self.suite.into_vec(), self.control)

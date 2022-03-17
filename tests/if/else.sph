@@ -11,4 +11,4 @@ if (begin echo "block" true end) then   # expect: block
     nil 
 else 
     assert false
-end 
+end

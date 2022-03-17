@@ -176,21 +176,7 @@ del collection[key]  # mostly useful for removing values from objects
 
 # Control Flow
 # branching constructs are expressions
-# looping constructs are statements - in fact, they are the only non-expression statements in Sphinx
-
-if condition then
-    echo "yes"
-else
-    echo "no"
-end
-
-if condition1 then
-  "first"
-elif condition2 then
-  "second"
-else
-  "default"
-end
+# looping constructs are statements
 
 cond_expr = 
   if condition1 then
@@ -200,16 +186,19 @@ cond_expr =
   else
     "default"
   end
-  
-# if-expressions and assigment expressions
 
-# This is not allowed, otherwise anytime an identifier is encountered
-# it would be ambiguous whether you want to lookup the value of a variable
-# or use it as an assignment target
-if cond then a else b end += 1  # error, found if-expression, expected assignment target on LHS of assignment
+# If no branch is entered in an if-expression (which can happen if there is no "else")
+# the whole expression evaluates to the last value that was tested. So for example:
 
-# You have to do this
-if cond then a += 1 else b += 1 end  # works
+# If-expressions evaluate to the last item of the branch that they enter
+if (if a then true end) then
+    echo "if-ception"
+end
+
+# If-expressions evaluate to their condition if they don't enter a branch
+if (if false then true end) then
+    assert false
+end
 
 
 # loops support both break and continue statements
