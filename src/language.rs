@@ -46,6 +46,7 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(SingleCharRule::new(Token::Comma,           ','))
     .add_rule(SingleCharRule::new(Token::Colon,           ':'))
     .add_rule(SingleCharRule::new(Token::Semicolon,       ';'))
+    .add_rule(SingleCharRule::new(Token::Decorator,       '@'))
     
     .add_rule(MultiCharRule::new(Token::Ellipsis,         "..."))
     

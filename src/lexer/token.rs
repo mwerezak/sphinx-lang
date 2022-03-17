@@ -4,7 +4,7 @@ use crate::language;
 
 #[derive(Clone, Debug)]
 pub enum Token {
-    // Delimiters and Separators
+    // Delimiters, Separators, punctuation
     OpenParen,
     CloseParen,
     OpenBrace,
@@ -15,6 +15,7 @@ pub enum Token {
     Colon,
     Semicolon,
     Ellipsis,
+    Decorator,
     
     // Operator Symbols
     OpAdd, OpSub, OpMul, OpDiv, OpMod, OpExp,
