@@ -31,6 +31,8 @@ pub enum ContextTag {
     StmtMeta,
     StmtList,
     ControlFlow,
+    WhileLoop,
+    DoWhileLoop,
     ExprMeta,
     BlockExpr,
     IfExpr,

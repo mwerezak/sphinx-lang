@@ -356,6 +356,10 @@ impl CodeGenerator {
     
     fn compile_stmt(&mut self, symbol: &DebugSymbol, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
+            Stmt::WhileLoop(label, cond_expr, body) => unimplemented!(),
+            
+            Stmt::DoWhileLoop(label, body, cond_expr) => unimplemented!(),
+            
             Stmt::Echo(expr) => {
                 self.compile_expr(symbol, expr)?;
                 self.emit_instr(symbol, OpCode::Inspect);

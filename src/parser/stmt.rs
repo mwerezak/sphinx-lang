@@ -16,15 +16,16 @@ pub enum Stmt {
     
     Expression(Expr),
     
-    // WhileLoop
-    // DoWhileLoop
-    // ForLoop
+    WhileLoop(Option<Label>, Expr, StmtList),
+    DoWhileLoop(Option<Label>, StmtList, Option<Expr>),
     
     Echo(Expr),
     Assert(Expr),
 }
 
 
+// Stmt blocks (called "statement lists" in Sphinx so 
+// as not to be confused with "block expressions")
 #[derive(Debug, Clone)]
 pub struct StmtList {
     suite: Box<[StmtMeta]>,

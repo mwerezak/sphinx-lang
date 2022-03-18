@@ -1,0 +1,24 @@
+# Single-expression body.
+var c = 0;
+while c < 3 do echo c += 1 end
+# expect: 1
+# expect: 2
+# expect: 3
+
+# Block body.
+var a = 0;
+while a < 3 do
+  echo a
+  a += 1;
+end
+# expect: 0
+# expect: 1
+# expect: 2
+
+# Statement bodies.
+while false do 
+  echo if true then 1 else 2 end 
+end
+while false do 
+  while true do echo 1 end
+end

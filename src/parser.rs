@@ -224,18 +224,22 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         ctx.push(ContextTag::StmtMeta);
         
-        let stmt = self.parse_toplevel_stmt(ctx)?;
+        let stmt = self.parse_stmt_variant(ctx)?;
         let symbol = ctx.frame().as_debug_symbol().unwrap();
         
         ctx.pop_extend();
         Ok(StmtMeta::new(stmt, symbol))
     }
     
-    fn parse_toplevel_stmt(&mut self, ctx: &mut ErrorContext) -> ParseResult<Stmt> {
+    fn parse_stmt_variant(&mut self, ctx: &mut ErrorContext) -> ParseResult<Stmt> {
         let stmt = match  self.peek()?.token {
-            Token::While => unimplemented!(),
-            Token::Do => unimplemented!(),
+            
+            Token::While => self.parse_while_loop(ctx, None)?,
+            Token::Do => self.parse_do_while_loop(ctx, None)?,
             Token::For => unimplemented!(),
+            
+            Token::Label(..) => self.parse_stmt_label(ctx)?,
+            
             Token::Echo => {
                 ctx.set_start(&self.advance().unwrap());
                 Stmt::Echo(self.parse_expr_variant(ctx)?)
@@ -265,6 +269,73 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             _ => Stmt::Expression(self.parse_expr_variant(ctx)?),
         };
         Ok(stmt)
+    }
+    
+    fn parse_stmt_label(&mut self, ctx: &mut ErrorContext) -> ParseResult<Stmt> {
+        let label = self.try_parse_label(ctx)?.unwrap();
+        
+        match self.peek()?.token {
+            Token::While => self.parse_while_loop(ctx, Some(label)),
+            Token::Do => self.parse_do_while_loop(ctx, Some(label)),
+            Token::For => unimplemented!(),
+            
+            _ => return Err("labels must be followed by either a block or a loop".into()),
+        }
+    }
+    
+    fn parse_while_loop(&mut self, ctx: &mut ErrorContext, label: Option<Label>) -> ParseResult<Stmt> {
+        ctx.push(ContextTag::WhileLoop);
+        
+        let next = self.advance()?;
+        ctx.set_start(&next);
+        
+        debug_assert!(matches!(next.token, Token::While));
+        
+        let cond_expr = self.parse_expr_variant(ctx)?;
+        
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        if !matches!(next.token, Token::Do) {
+            return Err("missing \"do\" after condition in while-loop".into());
+        }
+        
+        let body = self.parse_stmt_list_expr(ctx, |token| matches!(token, Token::End))?;
+        
+        ctx.set_end(&self.advance().unwrap()); // consume "end"
+        
+        ctx.pop_extend();
+        Ok(Stmt::WhileLoop(label, cond_expr, body))
+    }
+    
+    fn parse_do_while_loop(&mut self, ctx: &mut ErrorContext, label: Option<Label>) -> ParseResult<Stmt> {
+        ctx.push(ContextTag::DoWhileLoop);
+        
+        let next = self.advance()?;
+        ctx.set_start(&next);
+        
+        debug_assert!(matches!(next.token, Token::Do));
+        
+        let body = self.parse_stmt_list_expr(ctx, |token| matches!(token, Token::While | Token::End))?;
+        
+        let mut cond_expr = None;
+        
+        let next = self.advance().unwrap(); 
+        ctx.set_end(&next);
+        
+        if let Token::While = next.token {
+            cond_expr.replace(self.parse_expr_variant(ctx)?);
+            
+            let next = self.advance()?;
+            ctx.set_end(&next);
+            
+            if !matches!(next.token, Token::End) {
+                return Err("missing \"end\" after condition in do-while loop".into());
+            }
+        }
+        
+        ctx.pop_extend();
+        Ok(Stmt::DoWhileLoop(label, body, cond_expr))
     }
     
     // parses a list of statements, stopping when the given closure returns true. The final token is not consumed.
@@ -719,8 +790,11 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let expr = match self.peek()?.token {
             Token::Class => unimplemented!(),
             Token::Fun => self.parse_function_decl_expr(ctx)?,
+            
             Token::If => self.parse_if_expr(ctx)?,
-            Token::Begin | Token::Label(..) => self.parse_block_expr(ctx)?,
+            Token::Begin => self.parse_block_expr(ctx, None)?,
+            
+            Token::Label(..) => self.parse_expr_label(ctx)?,
             
             // Token::OpenBrace => Ok(ExprMeta::ObjectCtor(self.parse_object_constructor(ctx)?)),
             
@@ -729,28 +803,33 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(expr)
     }
     
+    fn parse_expr_label(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
+        let label = self.try_parse_label(ctx)?.unwrap();
+        
+        let expr = match self.peek()?.token {
+            Token::Begin => self.parse_block_expr(ctx, Some(label))?,
+            _ => return Err("labels must be followed by either a block or a loop".into()),
+        };
+        
+        Ok(expr)
+    }
+    
     /*
         block-expression ::= ( label )? "begin" ( statement | control-flow | "break" ( label )? expression )* "end" ;  (* break can be supplied a value inside of begin-blocks *)
     */
-    fn parse_block_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
+    fn parse_block_expr(&mut self, ctx: &mut ErrorContext, label: Option<Label>) -> ParseResult<Expr> {
         ctx.push(ContextTag::BlockExpr);
         ctx.set_start(self.peek()?);
         
-        // check for label
-        let block_label = self.try_parse_label(ctx)?;
-        
         // consume "begin"
         let next = self.advance()?;
-        ctx.set_end(&next);
-        if !matches!(next.token, Token::Begin) {
-            return Err("block labels must be followed by either a block or a loop".into());
-        }
+        ctx.set_start(&next);
         
         let stmt_list = self.parse_stmt_list_expr(ctx, |token| matches!(token, Token::End))?;
         ctx.set_end(&self.advance().unwrap()); // consume "end"
         
         ctx.pop_extend();
-        Ok(Expr::Block(block_label, stmt_list))
+        Ok(Expr::Block(label, stmt_list))
     }
     
     fn parse_if_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {

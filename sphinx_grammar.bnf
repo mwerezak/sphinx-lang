@@ -110,7 +110,7 @@ statement_list ::= ( statement )* ( control_flow )? ;  (* control flow only allo
 control_flow ::= "continue" ( label )? | "break" ( label )? ( expression )? | "return" ( expression )? ;
 
 while_loop ::=  ( label )? "while" expression "do" statement_list "end" ;
-do_while_loop ::= ( label )? "do" statement_list "while" expression "end" ;
+do_while_loop ::= ( label )? "do" statement_list ( "while" expression )? "end" ;
 
 for_loop ::= ( label )? "for" lvalue_list "in" expression "end" ;
 

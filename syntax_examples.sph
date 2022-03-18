@@ -11,7 +11,7 @@
 # Your first Sphinx program!
 echo "Hello, world!"  # print() function will be available later once there is a builtin library
 
-# Semicolons are optional.
+# Semicolons are optional. The syntax has been designed so that the end of a statement can always be inferred.
 "One Stmt"; "Two Stmt"
 
 # Like Lua, the syntax has been chosen to ensure that 
@@ -39,6 +39,9 @@ false # Not *not* false.
 'And then she said, "woah."'  # Can be single or double quoted.
 "\ttab\nnewline, literal\\backslash" # Escape sequences
 r"/[\w._%+-]+@[\w.-]+\.[a-zA-Z]{2,4}/"  # Literal with escape sequences disabled
+
+let two = 2
+$"numbers: 1 {two} 3 {2*2}"  # interpolated string
 
 # Nil
 nil
