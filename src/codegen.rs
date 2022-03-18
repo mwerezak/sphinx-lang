@@ -27,16 +27,6 @@ use opcodes::*;
 use chunk::{Constant, ChunkBuilder, UnloadedChunk};
 
 
-
-
-// Output container
-
-#[derive(Debug)]
-pub struct Program {
-    pub bytecode: UnloadedChunk,
-    pub symbols: DebugSymbols,
-}
-
 // Helpers
 
 struct AssignmentRef<'a> {
@@ -274,6 +264,14 @@ impl CompilerState {
     }
 }
 
+
+// Output container
+
+#[derive(Debug)]
+pub struct Program {
+    pub bytecode: UnloadedChunk,
+    pub symbols: DebugSymbols,
+}
 
 // Code Generator
 

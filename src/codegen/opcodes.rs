@@ -102,6 +102,11 @@ const OP_LJUMP_TRUE:    u8 = 0x7A;  // (i32);
 const OP_PLJMP_FALSE:   u8 = 0x7B;  // (i32); [ _ ] => []
 const OP_PLJMP_TRUE:    u8 = 0x7C;  // (i32); [ _ ] => []
 
+// 0x80-8F      Iteration
+
+// const OP_IT_INIT   // replace value with iterator state
+// const OP_IT_NEXT   // replace iterator state with next state
+
 
 
 // 0xF0         Debugging/Tracing/Misc
