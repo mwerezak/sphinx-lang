@@ -73,7 +73,6 @@ impl<'a> From<&'a Declaration> for DeclarationRef<'a> {
     }
 }
 
-static DUMMY_JMP_WIDTH: usize = get_jump_opcode(Jump::Uncond, JumpOffset::Short(0)).instr_len();
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum JumpOffset {
@@ -88,6 +87,12 @@ enum Jump {
     IfTrue,
     PopIfFalse,
     PopIfTrue,
+}
+
+impl Jump {
+    pub const fn dummy_width(&self) -> usize {
+        get_jump_opcode(Jump::Uncond, JumpOffset::Short(0)).instr_len()
+    }
 }
 
 const fn get_jump_opcode(jump: Jump, offset: JumpOffset) -> OpCode {
@@ -382,12 +387,29 @@ impl CodeGenerator {
     
     fn emit_jump_instr(&mut self, symbol: &DebugSymbol, jump: Jump, target: usize) -> CompileResult<()> {
         let jump_site = self.current_offset();
-        let jump_offset = Self::calc_jump_offset(jump_site, target)?;
-        let jump_opcode = get_jump_opcode(jump, jump_offset);
+        let guess_width = jump.dummy_width();  // guess the width of the jump instruction
+        
+        let mut jump_offset = Self::calc_jump_offset(jump_site + guess_width, target)?;
+        let mut jump_opcode = get_jump_opcode(jump, jump_offset);
+        
+        if guess_width != jump_opcode.instr_len() {
+            // guessed wrong, need to recalc offset with new width
+            let new_width = jump_opcode.instr_len();
+            let new_offset = Self::calc_jump_offset(jump_site + new_width, target)?;
+            let new_opcode = get_jump_opcode(jump, new_offset);
+            
+            // if we *still* don't have the right width, just abort
+            if new_width != new_opcode.instr_len() {
+                return Err(ErrorKind::CalcJumpOffsetFailed.into());
+            }
+            
+            jump_offset = new_offset;
+            jump_opcode = new_opcode;
+        }
         
         match jump_offset {
             JumpOffset::Short(offset) => self.emit_instr_data(symbol, jump_opcode, &offset.to_le_bytes()),
-            JumpOffset::Long(offset) =>  self.emit_instr_data(symbol, jump_opcode, &offset.to_le_bytes()),
+            JumpOffset::Long(offset)  => self.emit_instr_data(symbol, jump_opcode, &offset.to_le_bytes()),
         }
         Ok(())
     }
@@ -559,7 +581,7 @@ impl CodeGenerator {
             let branch_jump = 
                 if is_final_branch { Jump::IfFalse } // keep condition value
                 else { Jump::PopIfFalse };
-            self.emit_dummy_instr(symbol, DUMMY_JMP_WIDTH);
+            self.emit_dummy_instr(symbol, branch_jump.dummy_width());
             
             self.compile_stmt_list_scoped(ScopeTag::Branch, symbol, branch.suite())?;
             
@@ -567,12 +589,12 @@ impl CodeGenerator {
             if !is_final_branch {
                 let end_offset = self.current_offset();
                 end_jump_sites.push(end_offset);
-                self.emit_dummy_instr(symbol, DUMMY_JMP_WIDTH);
+                self.emit_dummy_instr(symbol, Jump::Uncond.dummy_width());
             }
             
             // target for the jump from the conditional of the now compiled branch
             let branch_target = self.current_offset();
-            self.patch_jump_instr(branch_jump, branch_jump_site, DUMMY_JMP_WIDTH, branch_target)?;
+            self.patch_jump_instr(branch_jump, branch_jump_site, branch_jump.dummy_width(), branch_target)?;
         }
         
         // else clause
@@ -585,7 +607,7 @@ impl CodeGenerator {
         // patch all of the end jump sites
         let end_target = self.current_offset();
         for jump_site in end_jump_sites.iter() {
-            self.patch_jump_instr(Jump::Uncond, *jump_site, DUMMY_JMP_WIDTH, end_target)?;
+            self.patch_jump_instr(Jump::Uncond, *jump_site, Jump::Uncond.dummy_width(), end_target)?;
         }
         
         Ok(())
