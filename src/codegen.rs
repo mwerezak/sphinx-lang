@@ -484,9 +484,11 @@ impl CodeGenerator {
     
     fn compile_stmt(&mut self, symbol: &DebugSymbol, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
-            Stmt::Loop { label, body } => self.compile_loop(symbol, *label, body)?,
+            Stmt::Loop { label, body } => self.compile_loop(symbol, label.as_ref(), body)?,
             
-            Stmt::WhileLoop { label, condition, body } => unimplemented!(),
+            Stmt::WhileLoop { label, condition, body } => self.compile_while_loop(symbol, label.as_ref(), condition, body)?,
+            
+            Stmt::ForLoop { } => unimplemented!(),
             
             Stmt::Echo(expr) => {
                 self.compile_expr(symbol, expr)?;
@@ -505,7 +507,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_loop(&mut self, symbol: &DebugSymbol, label: Option<Label>, body: &StmtList) -> CompileResult<()> {
+    fn compile_loop(&mut self, symbol: &DebugSymbol, label: Option<&Label>, body: &StmtList) -> CompileResult<()> {
         
         let loop_target = self.current_offset();
         
@@ -514,6 +516,30 @@ impl CodeGenerator {
         self.emit_end_scope();
         
         self.emit_jump_instr(symbol, Jump::Uncond, loop_target)?;
+        
+        Ok(())
+    }
+    
+    fn compile_while_loop(&mut self, symbol: &DebugSymbol, label: Option<&Label>, condition: &Expr, body: &StmtList) -> CompileResult<()> {
+        
+        // first iteration conditional jump
+        self.compile_expr(symbol, condition)?;
+        
+        let end_jump_site = self.current_offset();
+        self.emit_dummy_instr(symbol, Jump::PopIfFalse.dummy_width());
+        
+        let loop_target = self.current_offset();
+        
+        self.emit_begin_scope(ScopeTag::Loop, symbol);
+        self.compile_stmt_list(body)?;
+        self.emit_end_scope();
+        
+        // rest iteration conditional jump
+        self.compile_expr(symbol, condition)?;
+        self.emit_jump_instr(symbol, Jump::PopIfTrue, loop_target)?;
+        
+        let end_jump_target = self.current_offset();
+        self.patch_jump_instr(Jump::PopIfFalse, end_jump_site, Jump::PopIfFalse.dummy_width(), end_jump_target)?;
         
         Ok(())
     }

@@ -27,6 +27,8 @@ pub enum Stmt {
         body: StmtList,
     },
     
+    ForLoop { },
+    
     Echo(Expr),
     Assert(Expr),
 }
