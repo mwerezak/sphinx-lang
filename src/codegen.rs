@@ -225,6 +225,10 @@ impl CompilerState {
         Ok(())
     }
     
+    fn iter_scopes(&self) -> impl Iterator<Item=&Scope> {
+        self.scopes.iter().rev()
+    }
+    
     // find the nearest local in any scope
     fn resolve_local(&self, name: &InternSymbol) -> Option<&Local> {
         self.scopes.iter().rev().find_map(|scope| scope.find_local(name))
@@ -232,7 +236,7 @@ impl CompilerState {
     
     // find the nearest local in scopes that allow nonlocal assignment
     fn resolve_local_strict(&self, name: &InternSymbol) -> Option<&Local> {
-        for scope in self.scopes.iter().rev() {
+        for scope in self.iter_scopes() {
             let local = scope.find_local(name);
             if local.is_some() {
                 return local;
@@ -249,7 +253,7 @@ impl CompilerState {
     // search scopes that would have been skipped by resolve_local_strict()
     fn resolve_nonlocal(&self, name: &InternSymbol) -> Option<&Local> {
         let mut is_local = true;
-        for scope in self.scopes.iter().rev() {
+        for scope in self.iter_scopes() {
             if is_local {
                 is_local &= scope.allow_enclosing_assignment();
                 continue;
@@ -777,13 +781,12 @@ impl CodeGenerator {
             
             // otherwise search enclosing scopes...
             
-            if !assign.nonlocal {
-                return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
-            }
-            
             let result = self.state.resolve_nonlocal(name).map(|local| (local.decl, local.offset));
             
             if let Some((decl, offset)) = result {
+                if !assign.nonlocal {
+                    return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
+                }
                 if decl != DeclType::Mutable {
                     return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                 }
@@ -791,9 +794,16 @@ impl CodeGenerator {
                 
                 return Ok(());
             }
+            
         }
         
         // ...finally, try to assign global
+        
+        // allow assignment to global only if all enclosing scopes permit it
+        if !assign.nonlocal && !self.state.iter_scopes().all(|scope| scope.allow_enclosing_assignment()) {
+            return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
+        }
+        
         self.emit_load_const(symbol, Constant::from(*name))?;
         self.emit_instr(symbol, OpCode::StoreGlobal);
         Ok(())
