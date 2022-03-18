@@ -334,9 +334,9 @@ impl VirtualMachine {
             OpCode::PopLongJumpIfFalse => cond_jump!(self, !self.pop_stack().truth_value(),  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             OpCode::PopLongJumpIfTrue  => cond_jump!(self, self.pop_stack().truth_value(),   isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             
-            OpCode::Inspect => println!("{:?}", self.pop_stack()),
+            OpCode::Inspect => println!("{:?}", self.peek_stack()),
             OpCode::Assert => {
-                if !self.pop_stack().truth_value() {
+                if !self.peek_stack().truth_value() {
                     return Err(ErrorKind::AssertFailed.into());
                 }
             }
