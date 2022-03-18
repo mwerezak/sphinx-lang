@@ -93,14 +93,14 @@ const OP_GT:            u8 = 0x6D;
 const OP_JUMP:          u8 = 0x70;  // (i16);
 const OP_JUMP_FALSE:    u8 = 0x71;  // (i16);
 const OP_JUMP_TRUE:     u8 = 0x72;  // (i16);
-const OP_POPJMP_FALSE:  u8 = 0x73;  // (i16); [ _ ] => []
-const OP_POPJMP_TRUE:   u8 = 0x74;  // (i16); [ _ ] => []
+const OP_PJMP_FALSE:    u8 = 0x73;  // (i16); [ _ ] => []
+const OP_PJMP_TRUE:     u8 = 0x74;  // (i16); [ _ ] => []
 
 const OP_LJUMP:         u8 = 0x78;  // (i32);
 const OP_LJUMP_FALSE:   u8 = 0x79;  // (i32);
 const OP_LJUMP_TRUE:    u8 = 0x7A;  // (i32);
-const OP_POPLJMP_FALSE: u8 = 0x7B;  // (i32); [ _ ] => []
-const OP_POPLJMP_TRUE:  u8 = 0x7C;  // (i32); [ _ ] => []
+const OP_PLJMP_FALSE:   u8 = 0x7B;  // (i32); [ _ ] => []
+const OP_PLJMP_TRUE:    u8 = 0x7C;  // (i32); [ _ ] => []
 
 
 
@@ -171,14 +171,14 @@ pub enum OpCode {
     Jump = OP_JUMP,
     JumpIfFalse = OP_JUMP_FALSE,
     JumpIfTrue = OP_JUMP_TRUE,
-    PopJumpIfFalse = OP_POPJMP_FALSE,
-    PopJumpIfTrue = OP_POPJMP_TRUE,
+    PopJumpIfFalse = OP_PJMP_FALSE,
+    PopJumpIfTrue = OP_PJMP_TRUE,
     
     LongJump = OP_LJUMP,
     LongJumpIfFalse = OP_LJUMP_FALSE,
     LongJumpIfTrue = OP_LJUMP_TRUE,
-    PopLongJumpIfFalse = OP_POPLJMP_FALSE,
-    PopLongJumpIfTrue = OP_POPLJMP_TRUE,
+    PopLongJumpIfFalse = OP_PLJMP_FALSE,
+    PopLongJumpIfTrue = OP_PLJMP_TRUE,
     
     Inspect = DBG_INSPECT,
     Assert = DBG_ASSERT,
@@ -244,14 +244,14 @@ impl OpCode {
             OP_JUMP => Self::Jump,
             OP_JUMP_FALSE => Self::JumpIfFalse,
             OP_JUMP_TRUE => Self::JumpIfTrue,
-            OP_POPJMP_FALSE => Self::PopJumpIfFalse,
-            OP_POPJMP_TRUE => Self::PopJumpIfTrue,
+            OP_PJMP_FALSE => Self::PopJumpIfFalse,
+            OP_PJMP_TRUE => Self::PopJumpIfTrue,
             
             OP_LJUMP => Self::LongJump,
             OP_LJUMP_FALSE => Self::LongJumpIfFalse,
             OP_LJUMP_TRUE => Self::LongJumpIfTrue,
-            OP_POPLJMP_FALSE => Self::PopLongJumpIfFalse,
-            OP_POPLJMP_TRUE => Self::PopLongJumpIfTrue,
+            OP_PLJMP_FALSE => Self::PopLongJumpIfFalse,
+            OP_PLJMP_TRUE => Self::PopLongJumpIfTrue,
             
             DBG_INSPECT => Self::Inspect,
             DBG_ASSERT => Self::Assert,
@@ -361,14 +361,14 @@ impl std::fmt::Display for OpCode {
             Self::Jump => "OP_JUMP",
             Self::JumpIfFalse => "OP_JUMP_FALSE",
             Self::JumpIfTrue => "OP_JUMP_TRUE",
-            Self::PopJumpIfFalse => "OP_POPJMP_FALSE",
-            Self::PopJumpIfTrue => "OP_POPJMP_TRUE",
+            Self::PopJumpIfFalse => "OP_PJMP_FALSE",
+            Self::PopJumpIfTrue => "OP_PJMP_TRUE",
             
             Self::LongJump => "OP_LJUMP",
             Self::LongJumpIfFalse => "OP_LJUMP_FALSE",
             Self::LongJumpIfTrue => "OP_LJUMP_TRUE",
-            Self::PopLongJumpIfFalse => "OP_POPLJMP_FALSE",
-            Self::PopLongJumpIfTrue => "OP_POPLJMP_TRUE",
+            Self::PopLongJumpIfFalse => "OP_PLJMP_FALSE",
+            Self::PopLongJumpIfTrue => "OP_PLJMP_TRUE",
             
             Self::Inspect => "DBG_INSPECT",
             Self::Assert => "DBG_ASSERT",
