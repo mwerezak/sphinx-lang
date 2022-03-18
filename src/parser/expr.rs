@@ -28,12 +28,12 @@ pub enum Expr {
     
     IfExpr {
         branches: Box<[ConditionalBranch]>,
-        else_clause: Option<StmtList>,
+        else_clause: Option<Box<ExprBlock>>,
     },
     
     Block {
         label: Option<Label>, 
-        suite: StmtList 
+        suite: Box<ExprBlock>,
     },
     
     FunctionDef(FunctionDef),
@@ -42,19 +42,50 @@ pub enum Expr {
 }
 
 
+/// represents a statement list used as an expression
+#[derive(Debug, Clone)]
+pub struct ExprBlock {
+    stmt_list: StmtList,
+    result: Option<ExprMeta>,
+}
+
+impl From<StmtList> for ExprBlock {
+    fn from(stmt_list: StmtList) -> Self {
+        let (mut suite, control) = stmt_list.take();
+        
+        let mut result = None;
+        if control.is_none() && !suite.is_empty() {
+            match ExprMeta::try_from(suite.pop().unwrap()) {
+                Err(stmt) => suite.push(stmt), // put it back
+                Ok(expr) => { result.replace(expr); },
+            }
+        }
+        
+        let stmt_list = StmtList::new(suite, control);
+        Self { stmt_list, result }
+    }
+}
+
+impl ExprBlock {
+    pub fn stmt_list(&self) -> &StmtList { &self.stmt_list }
+    pub fn result(&self) -> Option<&ExprMeta> { self.result.as_ref() }
+}
+
+
+
 #[derive(Debug, Clone)]
 pub struct ConditionalBranch {
     condition: Expr,
-    suite: StmtList,
+    suite: ExprBlock,
 }
 
 impl ConditionalBranch {
-    pub fn new(condition: Expr, suite: StmtList) -> Self {
+    pub fn new(condition: Expr, suite: ExprBlock) -> Self {
         Self { condition, suite }
     }
     
     pub fn condition(&self) -> &Expr { &self.condition }
-    pub fn suite(&self) -> &StmtList { &self.suite }
+    pub fn suite(&self) -> &ExprBlock { &self.suite }
 }
 
 

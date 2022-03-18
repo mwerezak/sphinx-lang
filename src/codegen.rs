@@ -6,7 +6,7 @@ use std::mem;
 
 use crate::language::FloatType;
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
-use crate::parser::expr::{Expr, ExprMeta, ConditionalBranch};
+use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
@@ -509,7 +509,9 @@ impl CodeGenerator {
         
         let loop_target = self.current_offset();
         
-        self.compile_stmt_list_scoped(ScopeTag::Loop, symbol, body)?;
+        self.emit_begin_scope(ScopeTag::Loop, symbol);
+        self.compile_stmt_list(body)?;
+        self.emit_end_scope();
         
         self.emit_jump_instr(symbol, Jump::Uncond, loop_target)?;
         
@@ -542,21 +544,23 @@ impl CodeGenerator {
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list)?,
             
             Expr::Block { label, suite } => self.compile_block(symbol, label.as_ref(), suite)?,
-            Expr::IfExpr { branches, else_clause } => self.compile_if_expr(symbol, branches, else_clause.as_ref())?,
+            Expr::IfExpr { branches, else_clause } => self.compile_if_expr(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
             
             Expr::FunctionDef(fundef) => unimplemented!(),
         }
         Ok(())
     }
     
-    fn compile_block(&mut self, symbol: &DebugSymbol, label: Option<&Label>, stmt_list: &StmtList) -> CompileResult<()> {
+    fn compile_block(&mut self, symbol: &DebugSymbol, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
         
-        self.compile_stmt_list_scoped(ScopeTag::Block, symbol, stmt_list)?;
+        self.emit_begin_scope(ScopeTag::Block, symbol);
+        self.compile_expr_block(symbol, suite)?;
+        self.emit_end_scope();
         
         Ok(())
     }
     
-    fn compile_if_expr(&mut self, symbol: &DebugSymbol, branches: &[ConditionalBranch], else_clause: Option<&StmtList>) -> CompileResult<()> {
+    fn compile_if_expr(&mut self, symbol: &DebugSymbol, branches: &[ConditionalBranch], else_clause: Option<&ExprBlock>) -> CompileResult<()> {
         debug_assert!(!branches.is_empty());
         
         // track the sites where we jump to the end, so we can patch them later
@@ -579,7 +583,9 @@ impl CodeGenerator {
                 else { Jump::PopIfFalse };
             self.emit_dummy_instr(symbol, branch_jump.dummy_width());
             
-            self.compile_stmt_list_scoped(ScopeTag::Branch, symbol, branch.suite())?;
+            self.emit_begin_scope(ScopeTag::Branch, symbol);
+            self.compile_expr_block(symbol, branch.suite())?;
+            self.emit_end_scope();
             
             // site for the jump to the end of if-expression
             if !is_final_branch {
@@ -596,7 +602,9 @@ impl CodeGenerator {
         // else clause
         if let Some(suite) = else_clause {
             
-            self.compile_stmt_list_scoped(ScopeTag::Branch, symbol, suite)?;
+            self.emit_begin_scope(ScopeTag::Branch, symbol);
+            self.compile_expr_block(symbol, suite)?;
+            self.emit_end_scope();
             
         }
         
@@ -609,10 +617,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_stmt_list_scoped(&mut self, tag: ScopeTag, symbol: &DebugSymbol, stmt_list: &StmtList) -> CompileResult<()> {
-        
-        self.emit_begin_scope(tag, symbol);
-        
+    fn compile_stmt_list(&mut self, stmt_list: &StmtList) -> CompileResult<()> {
         // compile stmt suite
         for stmt in stmt_list.suite().iter() {
             let inner_symbol = stmt.debug_symbol();
@@ -621,19 +626,8 @@ impl CodeGenerator {
         }
         
         // handle control flow
-        let is_expr_block = matches!(tag, ScopeTag::Block | ScopeTag::Branch);
-        match stmt_list.end_control() {
-            None => if is_expr_block {
-                self.emit_instr(symbol, OpCode::Nil); // implicit nil
-            },
-            
-            Some(control) => match control {
-                ControlFlow::Expression(expr) => if is_expr_block {
-                    let inner_symbol = expr.debug_symbol();
-                    self.compile_expr(inner_symbol, expr.variant())
-                        .map_err(|err| err.with_symbol(*inner_symbol))?;
-                }
-                
+        if let Some(control) = stmt_list.end_control() {
+            match control {
                 ControlFlow::Continue(label) => {
                     unimplemented!()
                 }
@@ -646,7 +640,20 @@ impl CodeGenerator {
             }
         }
         
-        self.emit_end_scope();
+        Ok(())
+    }
+    
+    fn compile_expr_block(&mut self, symbol: &DebugSymbol, suite: &ExprBlock) -> CompileResult<()> {
+        self.compile_stmt_list(suite.stmt_list())?;
+        
+        // result expression
+        if let Some(expr) = suite.result() {
+            let inner_symbol = expr.debug_symbol();
+            self.compile_expr(inner_symbol, expr.variant())
+                .map_err(|err| err.with_symbol(*inner_symbol))?;
+        } else {
+            self.emit_instr(symbol, OpCode::Nil); // implicit nil
+        }
         
         Ok(())
     }

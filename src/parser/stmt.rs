@@ -45,7 +45,6 @@ pub enum ControlFlow {
     Continue(Option<Label>),
     Break(Option<Label>, Option<Box<Expr>>),
     Return(Option<Box<Expr>>),
-    Expression(Box<ExprMeta>),
 }
 
 impl StmtList {
