@@ -251,7 +251,7 @@ impl OpCode {
     }
     
     #[inline]
-    pub fn instr_len(&self) -> usize {
+    pub const fn instr_len(&self) -> usize {
         match self {
             // don't really need size_of() for most of these, but it's a nice little bit of self-documentation
             

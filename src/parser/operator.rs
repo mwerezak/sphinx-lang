@@ -50,7 +50,7 @@ pub const PRECEDENCE_START: Precedence = 10; // weakest binding
 
 impl BinaryOp {
     
-    pub fn precedence_level(&self) -> Precedence {
+    pub const fn precedence_level(&self) -> Precedence {
         match self {
             BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => 1,
             
