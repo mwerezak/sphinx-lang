@@ -242,14 +242,16 @@ impl VirtualMachine {
             },
             OpCode::LoadLocal => {
                 let offset = usize::from(data[0]);
+                debug_assert!(offset < self.locals.into());
                 self.push_stack(self.peek_offset(offset).clone());
             },
             OpCode::LoadLocal16 => {
                 let offset = usize::from(read_le_bytes!(u16, data));
+                debug_assert!(offset < self.locals.into());
                 self.push_stack(self.peek_offset(offset).clone());
             },
             OpCode::DropLocals => {
-                debug_assert!(usize::from(self.locals) == self.stack_len(), "drop with immediate values on stack");
+                debug_assert!(usize::from(self.locals) == self.stack_len(), "immediate values on stack");
                 let count = data[0];
                 self.discard_stack(count.into());
                 self.locals -= LocalIndex::from(count);
