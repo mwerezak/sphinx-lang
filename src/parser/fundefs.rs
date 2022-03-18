@@ -1,5 +1,5 @@
 use crate::runtime::strings::InternSymbol;
-use crate::parser::assign::DeclType;
+use crate::parser::lvalue::DeclType;
 use crate::parser::expr::Expr;
 use crate::parser::stmt::{StmtMeta, StmtList};
 

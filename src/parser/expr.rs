@@ -1,7 +1,7 @@
 use crate::debug::DebugSymbol;
 use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
-use crate::parser::assign::{Assignment, Declaration};
+use crate::parser::lvalue::{Assignment, Declaration};
 use crate::parser::fundefs::FunctionDef;
 use crate::parser::structs::{ObjectConstructor};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList};
@@ -26,9 +26,15 @@ pub enum Expr {
     
     // ObjectCtor(Box<ObjectConstructor>),
     
-    IfExpr(Conditional),
+    IfExpr {
+        branches: Box<[ConditionalBranch]>,
+        else_clause: Option<StmtList>,
+    },
     
-    Block(Option<Label>, StmtList),
+    Block {
+        label: Option<Label>, 
+        suite: StmtList 
+    },
     
     FunctionDef(FunctionDef),
     
@@ -36,37 +42,20 @@ pub enum Expr {
 }
 
 
-/// If expressions
 #[derive(Debug, Clone)]
-pub struct Conditional {
-    branches: Box<[CondBranch]>,
-    else_branch: Option<StmtList>,
+pub struct ConditionalBranch {
+    condition: Expr,
+    suite: StmtList,
 }
 
-impl Conditional {
-    pub fn new(branches: Vec<CondBranch>, else_branch: Option<StmtList>) -> Self {
-        Self {
-            branches: branches.into_boxed_slice(),
-            else_branch,
-        }
+impl ConditionalBranch {
+    pub fn new(condition: Expr, suite: StmtList) -> Self {
+        Self { condition, suite }
     }
     
-    pub fn branches(&self) -> &[CondBranch] { &self.branches }
-    pub fn else_branch(&self) -> Option<&StmtList> { self.else_branch.as_ref() }
+    pub fn condition(&self) -> &Expr { &self.condition }
+    pub fn suite(&self) -> &StmtList { &self.suite }
 }
-
-#[derive(Debug, Clone)]
-pub struct CondBranch(Expr, StmtList);
-
-impl CondBranch {
-    pub fn new(cond: Expr, stmt_list: StmtList) -> Self {
-        Self(cond, stmt_list)
-    }
-    
-    pub fn cond_expr(&self) -> &Expr { &self.0 }
-    pub fn suite(&self) -> &StmtList { &self.1 }
-}
-
 
 
 /// An `Expr` plus a `DebugSymbol`

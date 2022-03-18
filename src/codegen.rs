@@ -5,9 +5,9 @@ use std::iter;
 
 use crate::language::FloatType;
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
-use crate::parser::expr::{Expr, ExprMeta, Conditional};
+use crate::parser::expr::{Expr, ExprMeta, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary};
-use crate::parser::assign::{Assignment, Declaration, LValue, DeclType};
+use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::strings::{StringInterner, InternSymbol};
 use crate::runtime::vm::LocalIndex;
@@ -356,9 +356,9 @@ impl CodeGenerator {
     
     fn compile_stmt(&mut self, symbol: &DebugSymbol, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
-            Stmt::WhileLoop(label, cond_expr, body) => unimplemented!(),
+            Stmt::WhileLoop { label, condition, body } => unimplemented!(),
             
-            Stmt::DoWhileLoop(label, body, cond_expr) => unimplemented!(),
+            Stmt::DoWhileLoop { label, body, condition } => unimplemented!(),
             
             Stmt::Echo(expr) => {
                 self.compile_expr(symbol, expr)?;
@@ -400,8 +400,8 @@ impl CodeGenerator {
             
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list)?,
             
-            Expr::Block(label, stmt_list) => self.compile_block(symbol, label.as_ref(), stmt_list)?,
-            Expr::IfExpr(cond) => self.compile_if_expr(symbol, cond)?,
+            Expr::Block { label, suite } => self.compile_block(symbol, label.as_ref(), suite)?,
+            Expr::IfExpr { branches, else_clause } => self.compile_if_expr(symbol, branches, else_clause.as_ref())?,
             
             Expr::FunctionDef(fundef) => unimplemented!(),
         }
@@ -415,28 +415,26 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_if_expr(&mut self, symbol: &DebugSymbol, conditional: &Conditional) -> CompileResult<()> {
-        debug_assert!(!conditional.branches().is_empty());
+    fn compile_if_expr(&mut self, symbol: &DebugSymbol, branches: &[ConditionalBranch], else_clause: Option<&StmtList>) -> CompileResult<()> {
+        debug_assert!(!branches.is_empty());
         
         // track the sites where we jump to the end, so we can patch them later
         let mut end_jump_sites = Vec::new();
         
-        let else_branch = conditional.else_branch();
-        
         // if there is no else branch, the last non-else branch won't have a jump to end, and won't pop the condition 
-        let (last_branch, rest) = conditional.branches().split_last().unwrap();
+        let (last_branch, rest) = branches.split_last().unwrap();
         let iter_branches = rest.iter()
             .map(|branch| (false, branch))
             .chain(iter::once((true, last_branch)));
         
         for (is_last, branch) in iter_branches {
-            let is_final_branch = is_last && else_branch.is_none();
+            let is_final_branch = is_last && else_clause.is_none();
             
             let cond_jump = 
                 if is_final_branch { OpCode::JumpIfFalse } // keep condition value
                 else { OpCode::PopJumpIfFalse };
             
-            self.compile_expr(symbol, branch.cond_expr())?;
+            self.compile_expr(symbol, branch.condition())?;
             let branch_jump_site = self.emit_dummy_instr(symbol, cond_jump);
             
             self.compile_stmt_list(ScopeTag::Branch, symbol, branch.suite())?;
@@ -453,7 +451,7 @@ impl CodeGenerator {
             self.patch_instr_data(branch_jump_site, cond_jump, &jump_offset.to_le_bytes());
         }
         
-        if let Some(suite) = &conditional.else_branch() {
+        if let Some(suite) = else_clause {
             
             self.compile_stmt_list(ScopeTag::Branch, symbol, suite)?;
             
