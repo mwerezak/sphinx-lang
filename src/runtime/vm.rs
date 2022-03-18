@@ -302,29 +302,63 @@ impl VirtualMachine {
                 let offset = i16::from_le_bytes([data[0], data[1]]);
                 self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
             }
+            OpCode::LongJump => {
+                let offset = i32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+                let offset = isize::try_from(offset).unwrap();
+                self.pc = self.offset_pc(offset).expect("pc overflow/underflow");
+            }
+            
             OpCode::JumpIfFalse => {
                 let cond = self.peek_stack().truth_value();
-                let offset = i16::from(cond).wrapping_sub(1) & i16::from_le_bytes([data[0], data[1]]);
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+                let offset = i16::from_le_bytes([data[0], data[1]]);
+                let offset = isize::from(cond).wrapping_sub(1) & isize::from(offset);
+                self.pc = self.offset_pc(offset).expect("pc overflow/underflow");
             }
-            OpCode::JumpIfTrue => {
+            OpCode::LongJumpIfFalse => {
                 let cond = self.peek_stack().truth_value();
-                let offset = i16::from(!cond).wrapping_sub(1) & i16::from_le_bytes([data[0], data[1]]);
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
-            }
-            OpCode::PopJumpIfFalse => {
-                let mut offset = i16::from_le_bytes([data[0], data[1]]);
-                let cond = self.pop_stack().truth_value();
-                offset &= i16::from(cond).wrapping_sub(1);
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
-            }
-            OpCode::PopJumpIfTrue => {
-                let mut offset = i16::from_le_bytes([data[0], data[1]]);
-                let cond = self.pop_stack().truth_value();
-                offset &= i16::from(!cond).wrapping_sub(1);
+                let offset = i32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+                let offset = isize::from(cond).wrapping_sub(1) & isize::try_from(offset).unwrap();
                 self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
             }
             
+            OpCode::JumpIfTrue => {
+                let cond = self.peek_stack().truth_value();
+                let offset = i16::from_le_bytes([data[0], data[1]]);
+                let offset = isize::from(!cond).wrapping_sub(1) & isize::try_from(offset).unwrap();
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
+            OpCode::LongJumpIfTrue => {
+                let cond = self.peek_stack().truth_value();
+                let offset = i32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+                let offset = isize::from(!cond).wrapping_sub(1) & isize::try_from(offset).unwrap();
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
+            
+            OpCode::PopJumpIfFalse => {
+                let mut offset = isize::from(i16::from_le_bytes([data[0], data[1]]));
+                let cond = self.pop_stack().truth_value();
+                offset &= isize::from(cond).wrapping_sub(1);
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
+            OpCode::PopLongJumpIfFalse => {
+                let mut offset = isize::from(i16::from_le_bytes([data[0], data[1]]));
+                let cond = self.pop_stack().truth_value();
+                offset &= isize::from(cond).wrapping_sub(1);
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
+            
+            OpCode::PopJumpIfTrue => {
+                let mut offset = isize::from(i16::from_le_bytes([data[0], data[1]]));
+                let cond = self.pop_stack().truth_value();
+                offset &= isize::from(!cond).wrapping_sub(1);
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
+            OpCode::PopLongJumpIfTrue => {
+                let mut offset = isize::try_from(i32::from_le_bytes([data[0], data[1], data[2], data[3]])).unwrap();
+                let cond = self.pop_stack().truth_value();
+                offset &= isize::from(!cond).wrapping_sub(1);
+                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+            }
             
             OpCode::Inspect => println!("{:?}", self.pop_stack()),
             OpCode::Assert => {
