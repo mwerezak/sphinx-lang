@@ -8,8 +8,14 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
 // Helper macros
+macro_rules! read_le_bytes {
+    ( $type:ty, $data:expr ) => {
+        <$type>::from_le_bytes($data.try_into().unwrap())
+    };
+}
+
 macro_rules! eval_binary_op {
-    ($self:expr, $eval_func:tt ) => {
+    ( $self:expr, $eval_func:tt ) => {
         {
             // need to pop only after eval, to ensure operands stay rooted in GC
             let operand = $self.peek_many(2);
@@ -21,7 +27,7 @@ macro_rules! eval_binary_op {
 }
 
 macro_rules! eval_cmp {
-    ($self:expr, $eval_func:tt ) => {
+    ( $self:expr, $eval_func:tt ) => {
         {
             let operand = $self.peek_many(2);
             let result = ops::$eval_func(&operand[0], &operand[1])?;
@@ -29,6 +35,16 @@ macro_rules! eval_cmp {
             $self.replace_stack(Variant::from(result));
         }
     };
+}
+
+macro_rules! cond_jump {
+    ( $self:expr, $cond:expr, $offset:expr ) => {
+        {
+            let mut offset = $offset;
+            offset &= isize::from(!$cond).wrapping_sub(1);
+            $self.pc = $self.offset_pc(offset).expect("pc overflow/underflow");
+        }
+    }
 }
 
 
@@ -169,7 +185,7 @@ impl VirtualMachine {
                 self.pop_stack(); 
             },
             OpCode::Drop => { 
-                let count = data[0].into();
+                let count = usize::from(data[0]);
                 self.discard_stack(count); 
             }
             OpCode::Clone => {
@@ -177,11 +193,12 @@ impl VirtualMachine {
             }
             
             OpCode::LoadConst => {
-                let value = self.program.lookup_value(data[0]);
+                let cid = ConstID::from(data[0]);
+                let value = self.program.lookup_value(cid);
                 self.push_stack(value);
             },
             OpCode::LoadConst16 => {
-                let cid = ConstID::from_le_bytes([data[0], data[1]]);
+                let cid = ConstID::from(read_le_bytes!(u16, data));
                 let value = self.program.lookup_value(cid);
                 self.push_stack(value);
             },
@@ -220,8 +237,7 @@ impl VirtualMachine {
                 self.replace_offset(offset, self.peek_stack().clone());
             },
             OpCode::StoreLocal16 => {
-                let offset = u16::from_le_bytes([data[0], data[1]]);
-                let offset = usize::from(offset);
+                let offset = usize::from(read_le_bytes!(u16, data));
                 self.replace_offset(offset, self.peek_stack().clone());
             },
             OpCode::LoadLocal => {
@@ -229,8 +245,7 @@ impl VirtualMachine {
                 self.push_stack(self.peek_offset(offset).clone());
             },
             OpCode::LoadLocal16 => {
-                let offset = u16::from_le_bytes([data[0], data[1]]);
-                let offset = usize::from(offset);
+                let offset = usize::from(read_le_bytes!(u16, data));
                 self.push_stack(self.peek_offset(offset).clone());
             },
             OpCode::DropLocals => {
@@ -299,66 +314,23 @@ impl VirtualMachine {
             OpCode::GT => eval_cmp!(self, eval_gt),
             
             OpCode::Jump => {
-                let offset = i16::from_le_bytes([data[0], data[1]]);
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
+                let offset = isize::from(read_le_bytes!(i16, data));
+                self.pc = self.offset_pc(offset).expect("pc overflow/underflow");
             }
             OpCode::LongJump => {
-                let offset = i32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-                let offset = isize::try_from(offset).unwrap();
+                let offset = isize::try_from(read_le_bytes!(i32, data)).unwrap();
                 self.pc = self.offset_pc(offset).expect("pc overflow/underflow");
             }
             
-            OpCode::JumpIfFalse => {
-                let cond = self.peek_stack().truth_value();
-                let offset = i16::from_le_bytes([data[0], data[1]]);
-                let offset = isize::from(cond).wrapping_sub(1) & isize::from(offset);
-                self.pc = self.offset_pc(offset).expect("pc overflow/underflow");
-            }
-            OpCode::LongJumpIfFalse => {
-                let cond = self.peek_stack().truth_value();
-                let offset = i32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-                let offset = isize::from(cond).wrapping_sub(1) & isize::try_from(offset).unwrap();
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
-            }
+            OpCode::JumpIfFalse    => cond_jump!(self, !self.peek_stack().truth_value(), isize::from(read_le_bytes!(i16, data))),
+            OpCode::JumpIfTrue     => cond_jump!(self, self.peek_stack().truth_value(),  isize::from(read_le_bytes!(i16, data))),
+            OpCode::PopJumpIfFalse => cond_jump!(self, !self.pop_stack().truth_value(),  isize::from(read_le_bytes!(i16, data))),
+            OpCode::PopJumpIfTrue  => cond_jump!(self, self.pop_stack().truth_value(),   isize::from(read_le_bytes!(i16, data))),
             
-            OpCode::JumpIfTrue => {
-                let cond = self.peek_stack().truth_value();
-                let offset = i16::from_le_bytes([data[0], data[1]]);
-                let offset = isize::from(!cond).wrapping_sub(1) & isize::try_from(offset).unwrap();
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
-            }
-            OpCode::LongJumpIfTrue => {
-                let cond = self.peek_stack().truth_value();
-                let offset = i32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-                let offset = isize::from(!cond).wrapping_sub(1) & isize::try_from(offset).unwrap();
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
-            }
-            
-            OpCode::PopJumpIfFalse => {
-                let mut offset = isize::from(i16::from_le_bytes([data[0], data[1]]));
-                let cond = self.pop_stack().truth_value();
-                offset &= isize::from(cond).wrapping_sub(1);
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
-            }
-            OpCode::PopLongJumpIfFalse => {
-                let mut offset = isize::from(i16::from_le_bytes([data[0], data[1]]));
-                let cond = self.pop_stack().truth_value();
-                offset &= isize::from(cond).wrapping_sub(1);
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
-            }
-            
-            OpCode::PopJumpIfTrue => {
-                let mut offset = isize::from(i16::from_le_bytes([data[0], data[1]]));
-                let cond = self.pop_stack().truth_value();
-                offset &= isize::from(!cond).wrapping_sub(1);
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
-            }
-            OpCode::PopLongJumpIfTrue => {
-                let mut offset = isize::try_from(i32::from_le_bytes([data[0], data[1], data[2], data[3]])).unwrap();
-                let cond = self.pop_stack().truth_value();
-                offset &= isize::from(!cond).wrapping_sub(1);
-                self.pc = self.offset_pc(offset.into()).expect("pc overflow/underflow");
-            }
+            OpCode::LongJumpIfFalse    => cond_jump!(self, !self.peek_stack().truth_value(), isize::try_from(read_le_bytes!(i32, data)).unwrap()),
+            OpCode::LongJumpIfTrue     => cond_jump!(self, self.peek_stack().truth_value(),  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
+            OpCode::PopLongJumpIfFalse => cond_jump!(self, !self.pop_stack().truth_value(),  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
+            OpCode::PopLongJumpIfTrue  => cond_jump!(self, self.pop_stack().truth_value(),   isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             
             OpCode::Inspect => println!("{:?}", self.pop_stack()),
             OpCode::Assert => {
