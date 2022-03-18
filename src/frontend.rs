@@ -8,27 +8,36 @@ use crate::utils;
 use crate::debug::SourceError;
 use crate::debug::symbol::{ResolvedSymbol, DebugSymbolResolver};
 
-pub fn print_source_errors(resolver: &impl DebugSymbolResolver, errors: &[impl SourceError]) {
+pub fn print_source_errors<E>(resolver: &impl DebugSymbolResolver, errors: &[E]) where E: SourceError {
     let symbols = errors.iter().filter_map(|err| err.debug_symbol());
-        
+    
     let resolved_table = resolver.resolve_symbols(symbols).unwrap();
     
-    for error in errors.iter() {
-        let debug_symbol = error.debug_symbol();
-        if debug_symbol.is_none() {
-            println!("{}", RenderError(error, None));
-            continue;
-        }
-        
-        let resolved = resolved_table.get(&debug_symbol.unwrap()).unwrap().as_ref();
-        
-        match resolved {
-            Ok(resolved) => println!("{}", RenderError(error, Some(resolved))),
-            Err(resolve_error) => {
-                println!("{}", error);
-                println!("Could not resolve symbol: {}", resolve_error);
-            }
-        }
+    // resolve errors and collect into vec
+    let mut render_errors = errors.iter().filter_map(
+        |error| match error.debug_symbol() {
+            None => Some(RenderError(error, None)),
+            Some(symbol) => {
+                let resolved = resolved_table.get(&symbol).unwrap().as_ref();
+                match resolved {
+                    Ok(resolved) => Some(RenderError(error, Some(resolved))),
+                    Err(resolve_error) => {
+                        println!("{}", error);
+                        println!("Could not resolve symbol: {}", resolve_error);
+                        None
+                    }
+                }
+            },
+        })
+        .collect::<Vec<RenderError<E>>>();
+    
+    // sort errors by line number
+    render_errors.sort_by_key(|render| render.1.map_or_else(
+        || (1, 0), |resolved| (0, resolved.lineno())
+    ));
+    
+    for render in render_errors.iter() {
+        println!("{}", render);
     }
 }
 
