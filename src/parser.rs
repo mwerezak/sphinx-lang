@@ -338,7 +338,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(Stmt::DoWhileLoop(label, body, cond_expr))
     }
     
-    // parses a list of statements, stopping when the given closure returns true. The final token is not consumed.
+    /// Parses a list of statements, stopping when the given closure returns true. The final token is not consumed.
     fn parse_stmt_list(&mut self, ctx: &mut ErrorContext, end_list: impl Fn(&Token) -> bool) -> ParseResult<StmtList> {
         ctx.push(ContextTag::StmtList);
         
@@ -348,6 +348,11 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         debug!("enter stmt list at index {}...", self.current_index());
         
         loop {
+            
+            // statement separators
+            while matches!(self.peek()?.token, Token::Semicolon) {
+                ctx.set_end(&self.advance().unwrap());
+            }
             
             let next = self.peek()?;
             if end_list(&next.token) {
@@ -472,8 +477,6 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             _ => return Ok(None),
         };
-        
-        // let symbol = ctx.frame().as_debug_symbol().unwrap();
         
         ctx.pop_extend();
         Ok(Some(control_flow))
