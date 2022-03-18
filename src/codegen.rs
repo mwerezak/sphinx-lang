@@ -435,12 +435,8 @@ impl CodeGenerator {
         }
         
         match jump_offset {
-            JumpOffset::Short(offset) => {
-                self.patch_instr_data(jump_site, jump_opcode, &offset.to_le_bytes())
-            },
-            JumpOffset::Long(offset) => {
-                self.patch_instr_data(jump_site, jump_opcode, &offset.to_le_bytes())
-            },
+            JumpOffset::Short(offset) => self.patch_instr_data(jump_site, jump_opcode, &offset.to_le_bytes()),
+            JumpOffset::Long(offset)  => self.patch_instr_data(jump_site, jump_opcode, &offset.to_le_bytes()),
         }
         Ok(())
     }
