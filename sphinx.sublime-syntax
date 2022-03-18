@@ -20,7 +20,7 @@ contexts:
       scope: invalid
     - include: early-expressions
     - include: misc-keywords
-    - include: while-statements
+    - include: loop-statements
     - include: for-statements
     - include: control-flow-keywords
     - include: late-expressions
@@ -108,14 +108,16 @@ contexts:
       scope: keyword.operator.bitwise keyword.operator.assignment
     - match: \=
       scope: keyword.operator.assignment
+    - match: \@
+      scope: keyword.operator
 
   strings:
     # Strings begin and end with quotes, and use backslashes as an escape
     # character.
-    - match: \"
+    - match: \$?\"
       scope: punctuation.definition.string.begin
       push: inside_double_string
-    - match: \'
+    - match: \$?\'
       scope: punctuation.definition.string.begin
       push: inside_single_string
     - match: r\"
@@ -258,7 +260,13 @@ contexts:
       pop: true
     - include: statements
 
-  while-statements:
+  loop-statements:
+    - match: (::\w+)?\s*\b(loop)\b
+      captures:
+        1: entity.name.label
+        2: keyword.control
+      push: loop-body
+
     # normal while loops
     - match: (::\w+)?\s*\b(while)\b
       captures:
@@ -267,19 +275,10 @@ contexts:
       push:
         - match: \b(do)\b
           scope: keyword.control
-          set: while-body
+          set: loop-body
         - include: expressions
-    # do-while loops
-    - match: \b(do)\b
-      scope: keyword.control
-      push:
-        - meta_scope: meta.block
-        - match: \b(while)\b
-          scope: keyword.control
-          pop: true
-        - include: statements
 
-  while-body:
+  loop-body:
     - meta_scope: meta.block
     - match: \b(end)\b
       scope: keyword.control

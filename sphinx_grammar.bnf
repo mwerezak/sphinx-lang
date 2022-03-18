@@ -101,16 +101,17 @@ tuple_constructor ::= expression_list | "(" expression "," ")" | "(" ")" ;
 (*** Statements ***)
 
 statement ::= ";"
+            | loop
             | while_loop
-            | do_while_loop
             | for_loop 
             | expression ;
 
 statement_list ::= ( statement )* ( control_flow )? ;  (* control flow only allowed at end of block, much like Lua *)
 control_flow ::= "continue" ( label )? | "break" ( label )? ( expression )? | "return" ( expression )? ;
 
+loop ::= ( label )? "loop" statement_list "end" ;
+
 while_loop ::=  ( label )? "while" expression "do" statement_list "end" ;
-do_while_loop ::= ( label )? "do" statement_list ( "while" expression )? "end" ;
 
 for_loop ::= ( label )? "for" lvalue_list "in" expression "end" ;
 

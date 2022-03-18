@@ -16,16 +16,15 @@ pub enum Stmt {
     
     Expression(Expr),
     
+    Loop {
+        label: Option<Label>, 
+        body: StmtList, 
+    },
+    
     WhileLoop {
         label: Option<Label>, 
         condition: Expr,
         body: StmtList,
-    },
-    
-    DoWhileLoop {
-        label: Option<Label>, 
-        body: StmtList, 
-        condition: Option<Expr>
     },
     
     Echo(Expr),

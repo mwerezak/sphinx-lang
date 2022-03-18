@@ -462,9 +462,9 @@ impl CodeGenerator {
     
     fn compile_stmt(&mut self, symbol: &DebugSymbol, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
-            Stmt::WhileLoop { label, condition, body } => unimplemented!(),
+            Stmt::Loop { label, body } => self.compile_loop(symbol, *label, body)?,
             
-            Stmt::DoWhileLoop { label, body, condition } => self.compile_do_while_loop(symbol, *label, body, condition.as_ref())?,
+            Stmt::WhileLoop { label, condition, body } => unimplemented!(),
             
             Stmt::Echo(expr) => {
                 self.compile_expr(symbol, expr)?;
@@ -483,28 +483,16 @@ impl CodeGenerator {
         Ok(())
     }
     
-    
-    fn compile_do_while_loop(&mut self, symbol: &DebugSymbol, label: Option<Label>, body: &StmtList, cond_expr: Option<&Expr>) -> CompileResult<()> {
+    fn compile_loop(&mut self, symbol: &DebugSymbol, label: Option<Label>, body: &StmtList) -> CompileResult<()> {
         
         let loop_target = self.current_offset();
         
         self.compile_stmt_list_scoped(ScopeTag::Loop, symbol, body)?;
         
-        if let Some(cond_expr) = cond_expr {
-            
-            self.compile_expr(symbol, cond_expr)?;
-            
-            self.emit_jump_instr(symbol, Jump::PopIfTrue, loop_target)?;
-            
-        } else {
-            
-            self.emit_jump_instr(symbol, Jump::Uncond, loop_target)?;
-            
-        }
+        self.emit_jump_instr(symbol, Jump::Uncond, loop_target)?;
         
         Ok(())
     }
-    
     
     ///////// Expressions /////////
     

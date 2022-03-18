@@ -32,7 +32,7 @@ pub enum Token {
     True, False, Nil,
     Let, Var, NonLocal, Del,
     If, Then, Elif, Else,
-    Begin, For, In, While, Do,
+    Begin, Loop, While, For, In, Do,
     Continue, Break, Return,
     Fun, Class,
     // Self_, Super,
