@@ -12,6 +12,7 @@ pub enum ErrorKind {
     ConstPoolLimit,
     TupleLengthLimit,
     LocalVariableLimit,
+    CalcJumpOffsetFailed,
     CantAssignImmutable,
     CantAssignNonLocal,
     Other(String),
@@ -37,6 +38,10 @@ impl CompileError {
     
     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
         self.symbol.get_or_insert(symbol); self 
+    }
+    
+    pub fn caused_by(mut self, error: impl Error + 'static) -> Self {
+        self.cause.replace(Box::new(error)); self
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
@@ -65,6 +70,7 @@ impl fmt::Display for CompileError {
             ErrorKind::ConstPoolLimit => "constant pool limit reached",
             ErrorKind::TupleLengthLimit => "tuple length limit exceeded",
             ErrorKind::LocalVariableLimit => "local variable limit reached",
+            ErrorKind::CalcJumpOffsetFailed => "could not calculate jump offset",
             ErrorKind::CantAssignImmutable => "can't assign to immutable local variable",
             ErrorKind::CantAssignNonLocal => "can't assign to a non-local variable without the \"nonlocal\" keyword",
             ErrorKind::Other(message) => message,

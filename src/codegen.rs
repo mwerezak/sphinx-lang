@@ -2,6 +2,7 @@
 
 use log;
 use std::iter;
+use std::mem;
 
 use crate::language::FloatType;
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
@@ -71,6 +72,40 @@ impl<'a> From<&'a Declaration> for DeclarationRef<'a> {
         }
     }
 }
+
+static DUMMY_JMP_WIDTH: usize = get_jump_opcode(Jump::Uncond, JumpOffset::Short(0)).instr_len();
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum JumpOffset {
+    Short(i16),
+    Long(i32),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum Jump {
+    Uncond,
+    IfFalse,
+    IfTrue,
+    PopIfFalse,
+    PopIfTrue,
+}
+
+const fn get_jump_opcode(jump: Jump, offset: JumpOffset) -> OpCode {
+    match (jump, offset) {
+        (Jump::Uncond,  JumpOffset::Short(..)) => OpCode::Jump,
+        (Jump::IfFalse, JumpOffset::Short(..)) => OpCode::JumpIfFalse,
+        (Jump::IfTrue,  JumpOffset::Short(..)) => OpCode::JumpIfTrue,
+        (Jump::Uncond,  JumpOffset::Long(..))  => unimplemented!(),
+        (Jump::IfFalse, JumpOffset::Long(..))  => unimplemented!(),
+        (Jump::IfTrue,  JumpOffset::Long(..))  => unimplemented!(),
+        
+        (Jump::PopIfFalse, JumpOffset::Short(..))  => OpCode::PopJumpIfFalse,
+        (Jump::PopIfTrue,  JumpOffset::Short(..))  => OpCode::PopJumpIfTrue,
+        (Jump::PopIfFalse, JumpOffset::Long(..))   => unimplemented!(),
+        (Jump::PopIfTrue,  JumpOffset::Long(..))   => unimplemented!(),
+    }
+}
+
 
 
 // Scope Tracking
@@ -279,6 +314,12 @@ impl CodeGenerator {
         }
     }
     
+    fn current_offset(&self) -> usize {
+        self.chunk.bytes().len()
+    }
+    
+    ///////// Emitting Bytecode /////////
+    
     fn emit_instr(&mut self, symbol: &DebugSymbol, opcode: OpCode) {
         debug_assert!(opcode.instr_len() == 1);
         self.symbols.push(symbol);
@@ -299,25 +340,24 @@ impl CodeGenerator {
         self.chunk.extend_bytes(&bytes);
     }
     
-    // returns the offset to end of the instruction, for use with jump site patching
-    fn emit_dummy_instr(&mut self, symbol: &DebugSymbol, opcode: OpCode) -> usize {
-        self.symbols.push(symbol);
-        
-        let bytes = iter::repeat(OpCode::Nop).take(opcode.instr_len());
-        for byte in bytes {
-            self.chunk.push_byte(byte);
-        }
-        self.chunk.bytes().len()
-    }
+    ///////// Patching Bytecode /////////
     
-    // the given offset is the offset that is expected to be the *end* of the patched instruction
-    fn patch_instr_data<const N: usize>(&mut self, end_offset: usize, opcode: OpCode, bytes: &[u8; N]) {
+    fn patch_instr_data<const N: usize>(&mut self, offset: usize, opcode: OpCode, bytes: &[u8; N]) {
         debug_assert!(opcode.instr_len() == 1 + N);
         
-        let offset = end_offset - opcode.instr_len();
         self.chunk.bytes_mut()[offset] = u8::from(opcode);
         self.chunk.patch_bytes(offset + 1, bytes);
     }
+    
+    fn emit_dummy_instr(&mut self, symbol: &DebugSymbol, width: usize) {
+        self.symbols.push(symbol);
+        
+        for i in 0..width {
+            self.chunk.push_byte(OpCode::Nop);
+        }
+    }
+    
+    ///////// Constants /////////
     
     fn get_or_make_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<ConstID> {
         self.chunk.get_or_insert_const(value)
@@ -333,6 +373,70 @@ impl CodeGenerator {
         }
         Ok(())
     }
+    
+    ///////// Jumps /////////
+    
+    fn emit_jump_instr(&mut self, symbol: &DebugSymbol, jump: Jump, target: usize) -> CompileResult<()> {
+        let jump_site = self.current_offset();
+        let jump_offset = Self::calc_jump_offset(jump_site, target)?;
+        let jump_opcode = get_jump_opcode(jump, jump_offset);
+        
+        match jump_offset {
+            JumpOffset::Short(offset) => self.emit_instr_data(symbol, jump_opcode, &offset.to_le_bytes()),
+            JumpOffset::Long(offset) =>  self.emit_instr_data(symbol, jump_opcode, &offset.to_le_bytes()),
+        }
+        Ok(())
+    }
+    
+    fn patch_jump_instr(&mut self, jump: Jump, jump_site: usize, dummy_width: usize, target: usize) -> CompileResult<()> {
+        let mut jump_offset = Self::calc_jump_offset(jump_site + dummy_width, target)?;
+        let mut jump_opcode = get_jump_opcode(jump, jump_offset);
+        
+        if dummy_width != jump_opcode.instr_len() {
+            // need to recalculate offset with the new width
+            let new_width = jump_opcode.instr_len();
+            let new_offset = Self::calc_jump_offset(jump_site + new_width, target)?;
+            let new_opcode = get_jump_opcode(jump, new_offset);
+            
+            // if we *still* don't have the right width, just abort
+            if new_width != new_opcode.instr_len() {
+                return Err(ErrorKind::CalcJumpOffsetFailed.into());
+            }
+            
+            jump_offset = new_offset;
+            jump_opcode = new_opcode;
+            self.chunk.resize_patch(jump_site, dummy_width, new_width);
+        }
+        
+        match jump_offset {
+            JumpOffset::Short(offset) => {
+                self.patch_instr_data(jump_site, jump_opcode, &offset.to_le_bytes())
+            },
+            JumpOffset::Long(offset) => {
+                self.patch_instr_data(jump_site, jump_opcode, &offset.to_le_bytes())
+            },
+        }
+        Ok(())
+    }
+    
+    // Expects the *end* offset of the jump instruction
+    fn calc_jump_offset(jump_end_offset: usize, target: usize) -> CompileResult<JumpOffset> {
+        // inefficent, but this is compile time so that's okay
+        let target = i128::try_from(target).unwrap();
+        let jump_site = i128::try_from(jump_end_offset).unwrap();
+        
+        if let Ok(offset) = i16::try_from(target - jump_site) {
+            return Ok(JumpOffset::Short(offset));
+        }
+        
+        if let Ok(offset) = i32::try_from(target - jump_site) {
+            return Ok(JumpOffset::Long(offset));
+        }
+        
+        Err(ErrorKind::CalcJumpOffsetFailed.into())
+    }
+    
+    ///////// Scopes /////////
     
     fn emit_begin_scope(&mut self, tag: ScopeTag, symbol: &DebugSymbol) {
         self.state.push_scope(tag, *symbol);
@@ -354,11 +458,13 @@ impl CodeGenerator {
         }
     }
     
+    ///////// Statements /////////
+    
     fn compile_stmt(&mut self, symbol: &DebugSymbol, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
             Stmt::WhileLoop { label, condition, body } => unimplemented!(),
             
-            Stmt::DoWhileLoop { label, body, condition } => unimplemented!(),
+            Stmt::DoWhileLoop { label, body, condition } => self.compile_do_while_loop(symbol, *label, body, condition.as_ref())?,
             
             Stmt::Echo(expr) => {
                 self.compile_expr(symbol, expr)?;
@@ -376,6 +482,31 @@ impl CodeGenerator {
         }
         Ok(())
     }
+    
+    
+    fn compile_do_while_loop(&mut self, symbol: &DebugSymbol, label: Option<Label>, body: &StmtList, cond_expr: Option<&Expr>) -> CompileResult<()> {
+        
+        let loop_target = self.current_offset();
+        
+        self.compile_stmt_list_scoped(ScopeTag::Loop, symbol, body)?;
+        
+        if let Some(cond_expr) = cond_expr {
+            
+            self.compile_expr(symbol, cond_expr)?;
+            
+            self.emit_jump_instr(symbol, Jump::PopIfTrue, loop_target)?;
+            
+        } else {
+            
+            self.emit_jump_instr(symbol, Jump::Uncond, loop_target)?;
+            
+        }
+        
+        Ok(())
+    }
+    
+    
+    ///////// Expressions /////////
     
     fn compile_expr(&mut self, symbol: &DebugSymbol, expr: &Expr) -> CompileResult<()> {
         match expr {
@@ -410,7 +541,7 @@ impl CodeGenerator {
     
     fn compile_block(&mut self, symbol: &DebugSymbol, label: Option<&Label>, stmt_list: &StmtList) -> CompileResult<()> {
         
-        self.compile_stmt_list(ScopeTag::Block, symbol, stmt_list)?;
+        self.compile_stmt_list_scoped(ScopeTag::Block, symbol, stmt_list)?;
         
         Ok(())
     }
@@ -430,45 +561,45 @@ impl CodeGenerator {
         for (is_last, branch) in iter_branches {
             let is_final_branch = is_last && else_clause.is_none();
             
-            let cond_jump = 
-                if is_final_branch { OpCode::JumpIfFalse } // keep condition value
-                else { OpCode::PopJumpIfFalse };
-            
             self.compile_expr(symbol, branch.condition())?;
-            let branch_jump_site = self.emit_dummy_instr(symbol, cond_jump);
             
-            self.compile_stmt_list(ScopeTag::Branch, symbol, branch.suite())?;
+            let branch_jump_site = self.current_offset();
+            let branch_jump = 
+                if is_final_branch { Jump::IfFalse } // keep condition value
+                else { Jump::PopIfFalse };
+            self.emit_dummy_instr(symbol, DUMMY_JMP_WIDTH);
             
-            // site for the jump to end
+            self.compile_stmt_list_scoped(ScopeTag::Branch, symbol, branch.suite())?;
+            
+            // site for the jump to the end of if-expression
             if !is_final_branch {
-                let end_offset = self.emit_dummy_instr(symbol, OpCode::Jump);
+                let end_offset = self.current_offset();
                 end_jump_sites.push(end_offset);
+                self.emit_dummy_instr(symbol, DUMMY_JMP_WIDTH);
             }
             
             // target for the jump from the conditional of the now compiled branch
-            let branch_target = self.chunk.bytes().len();
-            let jump_offset = i16::try_from(branch_target - branch_jump_site).expect("exceeded max jump offset");
-            self.patch_instr_data(branch_jump_site, cond_jump, &jump_offset.to_le_bytes());
+            let branch_target = self.current_offset();
+            self.patch_jump_instr(branch_jump, branch_jump_site, DUMMY_JMP_WIDTH, branch_target)?;
         }
         
+        // else clause
         if let Some(suite) = else_clause {
             
-            self.compile_stmt_list(ScopeTag::Branch, symbol, suite)?;
+            self.compile_stmt_list_scoped(ScopeTag::Branch, symbol, suite)?;
             
         }
         
         // patch all of the end jump sites
-        let end_target = self.chunk.bytes().len();
+        let end_target = self.current_offset();
         for jump_site in end_jump_sites.iter() {
-            
-            let jump_offset = i16::try_from(end_target - jump_site).expect("exceeded max jump offset");
-            self.patch_instr_data(*jump_site, OpCode::Jump, &jump_offset.to_le_bytes());
+            self.patch_jump_instr(Jump::Uncond, *jump_site, DUMMY_JMP_WIDTH, end_target)?;
         }
         
         Ok(())
     }
     
-    fn compile_stmt_list(&mut self, tag: ScopeTag, symbol: &DebugSymbol, stmt_list: &StmtList) -> CompileResult<()> {
+    fn compile_stmt_list_scoped(&mut self, tag: ScopeTag, symbol: &DebugSymbol, stmt_list: &StmtList) -> CompileResult<()> {
         
         self.emit_begin_scope(tag, symbol);
         

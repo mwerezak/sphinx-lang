@@ -69,8 +69,16 @@ impl ChunkBuilder {
     }
     
     pub fn patch_bytes(&mut self, offset: usize, patch: &[u8]) {
-        let target = &mut self.bytes[offset..(offset + patch.len())];
+        let patch_range = offset..(offset + patch.len());
+        let target = &mut self.bytes[patch_range];
         target.copy_from_slice(patch);
+    }
+    
+    /// anything previously inside the patch is overwritten
+    pub fn resize_patch(&mut self, offset: usize, from_len: usize, to_len: usize) {
+        let patch_range = offset..(offset + from_len);
+        let patch = std::iter::repeat(u8::default()).take(to_len);
+        self.bytes.splice(patch_range, patch);
     }
     
     // Constants
