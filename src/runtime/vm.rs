@@ -1,9 +1,9 @@
 use crate::language::{IntType, FloatType};
-use crate::codegen::{Chunk, ConstID, OpCode};
+use crate::codegen::{Program, ConstID, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::ops;
 use crate::runtime::strings::StringSymbol;
-use crate::runtime::module::{Access, Namespace};
+use crate::runtime::module::{Module, Access, Namespace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -59,35 +59,41 @@ pub type LocalIndex = u16;
 // Stack-based Virtual Machine
 #[derive(Debug)]
 pub struct VirtualMachine {
+    // module: Module,
     pc: usize, // program counter
-    program: Chunk,
+    program: Program,
     globals: Namespace,
     locals: LocalIndex,
     immediate: Vec<Variant>,
 }
 
 impl VirtualMachine {
-    pub fn new(chunk: Chunk) -> Self {
+    pub fn new(program: Program) -> Self {
         Self {
             pc: 0,
-            program: chunk,
             globals: Namespace::new(),
             locals: 0,
             immediate: Vec::new(),
+            program,
         }
     }
     
-    pub fn reload_program(&mut self, chunk: Chunk) {
+    pub fn reload_program(&mut self, program: Program) {
         self.immediate.clear();
-        self.program = chunk;
+        self.program = program;
         self.pc = 0;
     }
     
-    pub fn take_chunk(self) -> Chunk { self.program }
+    pub fn program(&self) -> &Program { &self.program }
+    pub fn take_program(self) -> Program { self.program }
+    
+    fn current_chunk(&self) -> &[u8] {
+        self.program.chunk(0)
+    }
     
     pub fn run(&mut self) -> ExecResult<()> {
         loop {
-            let op_byte = self.program.bytes().get(self.pc).expect("pc out of bounds");
+            let op_byte = self.current_chunk().get(self.pc).expect("pc out of bounds");
             
             let opcode = OpCode::from_byte(*op_byte)
                 .unwrap_or_else(|| panic!("invalid instruction: {:x}", op_byte));
@@ -172,10 +178,9 @@ impl VirtualMachine {
     fn exec_instr(&mut self, opcode: OpCode) -> ExecResult<Control> {
         let len = opcode.instr_len();
         let data_slice = (self.pc+1)..(self.pc+len);
-        let data = self.program.bytes().get(data_slice).expect("truncated instruction");
-        
         self.pc += opcode.instr_len(); // pc points to next instruction
         
+        let data = self.current_chunk().get(data_slice).expect("truncated instruction");
         match opcode {
             OpCode::Nop => { },
             

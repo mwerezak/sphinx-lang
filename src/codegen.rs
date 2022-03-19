@@ -12,7 +12,6 @@ use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::strings::{StringInterner, InternSymbol};
 use crate::runtime::vm::LocalIndex;
-use crate::debug::dasm::DebugSymbols;
 use crate::debug::DebugSymbol;
 
 pub mod chunk;
@@ -20,11 +19,11 @@ pub mod opcodes;
 pub mod errors;
 
 pub use opcodes::OpCode;
-pub use chunk::{Chunk, ConstID};
+pub use chunk::{Chunk, ChunkID, Constant, ConstID, UnloadedProgram, Program};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
 use opcodes::*;
-use chunk::{Constant, ChunkBuilder, UnloadedChunk};
+use chunk::{ChunkBuilder, ChunkBuf};
 
 
 // Helpers
@@ -265,19 +264,10 @@ impl CompilerState {
 }
 
 
-// Output container
-
-#[derive(Debug)]
-pub struct Program {
-    pub bytecode: UnloadedChunk,
-    pub symbols: DebugSymbols,
-}
-
 // Code Generator
 
 pub struct CodeGenerator {
     chunk: ChunkBuilder,
-    symbols: DebugSymbols,
     state: CompilerState,
     errors: Vec<CompileError>,
 }
@@ -286,29 +276,24 @@ impl CodeGenerator {
     pub fn new(strings: StringInterner) -> Self {
         CodeGenerator {
             chunk: ChunkBuilder::with_strings(strings),
-            symbols: DebugSymbols::default(),
             state: CompilerState::new(),
             errors: Vec::new(),
         }
     }
     
-    pub fn compile_program<'a>(mut self, program: impl Iterator<Item=&'a StmtMeta>) -> Result<Program, Vec<CompileError>> {
+    pub fn compile_program<'a>(mut self, program: impl Iterator<Item=&'a StmtMeta>) -> Result<UnloadedProgram, Vec<CompileError>> {
         for stmt in program {
             self.push_stmt(stmt);
         }
         self.finish()
     }
     
-    pub fn finish(self) -> Result<Program, Vec<CompileError>> {
+    pub fn finish(self) -> Result<UnloadedProgram, Vec<CompileError>> {
         if self.errors.is_empty() {
             let mut chunk = self.chunk;
-            chunk.push_byte(OpCode::Return);
+            chunk.chunk_mut(0).push_byte(OpCode::Return);
             
-            let program = Program {
-                bytecode: chunk.build(),
-                symbols: self.symbols,
-            };
-            Ok(program)
+            Ok(chunk.build())
         } else {
             Err(self.errors)
         }
@@ -321,30 +306,38 @@ impl CodeGenerator {
         }
     }
     
+    fn chunk(&self) -> &ChunkBuf {
+        self.chunk.chunk(0)
+    }
+    
+    fn chunk_mut(&mut self) -> &mut ChunkBuf {
+        self.chunk.chunk_mut(0)
+    }
+    
     fn current_offset(&self) -> usize {
-        self.chunk.bytes().len()
+        self.chunk().len()
     }
     
     ///////// Emitting Bytecode /////////
     
     fn emit_instr(&mut self, symbol: &DebugSymbol, opcode: OpCode) {
         debug_assert!(opcode.instr_len() == 1);
-        self.symbols.push(symbol);
-        self.chunk.push_byte(opcode);
+        self.chunk_mut().push_symbol(*symbol);
+        self.chunk_mut().push_byte(opcode);
     }
     
     fn emit_instr_byte(&mut self, symbol: &DebugSymbol, opcode: OpCode, byte: u8) {
         debug_assert!(opcode.instr_len() == 2);
-        self.symbols.push(symbol);
-        self.chunk.push_byte(opcode);
-        self.chunk.push_byte(byte);
+        self.chunk_mut().push_symbol(*symbol);
+        self.chunk_mut().push_byte(opcode);
+        self.chunk_mut().push_byte(byte);
     }
     
     fn emit_instr_data(&mut self, symbol: &DebugSymbol, opcode: OpCode, bytes: &[u8]) {
         debug_assert!(opcode.instr_len() == 1 + bytes.len());
-        self.symbols.push(symbol);
-        self.chunk.push_byte(opcode);
-        self.chunk.extend_bytes(&bytes);
+        self.chunk_mut().push_symbol(*symbol);
+        self.chunk_mut().push_byte(opcode);
+        self.chunk_mut().extend_bytes(&bytes);
     }
     
     ///////// Patching Bytecode /////////
@@ -352,15 +345,15 @@ impl CodeGenerator {
     fn patch_instr_data<const N: usize>(&mut self, offset: usize, opcode: OpCode, bytes: &[u8; N]) {
         debug_assert!(opcode.instr_len() == 1 + N);
         
-        self.chunk.bytes_mut()[offset] = u8::from(opcode);
-        self.chunk.patch_bytes(offset + 1, bytes);
+        self.chunk_mut().as_mut_slice()[offset] = u8::from(opcode);
+        self.chunk_mut().patch_bytes(offset + 1, bytes);
     }
     
     fn emit_dummy_instr(&mut self, symbol: &DebugSymbol, width: usize) {
-        self.symbols.push(symbol);
+        self.chunk_mut().push_symbol(*symbol);
         
         for i in 0..width {
-            self.chunk.push_byte(OpCode::Nop);
+            self.chunk_mut().push_byte(OpCode::Nop);
         }
     }
     
@@ -429,7 +422,7 @@ impl CodeGenerator {
             
             jump_offset = new_offset;
             jump_opcode = new_opcode;
-            self.chunk.resize_patch(jump_site, dummy_width, new_width);
+            self.chunk_mut().resize_patch(jump_site, dummy_width, new_width);
         }
         
         match jump_offset {

@@ -7,6 +7,8 @@
 ///! resulting module to a name.
 
 use std::collections::HashMap;
+use crate::source::ModuleSource;
+use crate::codegen::{Chunk, Constant};
 use crate::runtime::{Variant, DefaultBuildHasher};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -68,6 +70,16 @@ impl Namespace {
 }
 
 
+pub type ModuleID = u64; // TODO probably a hash of some type
+
 pub struct Module {
+    id: ModuleID,
+    source: ModuleSource,
     globals: Namespace,
+    consts: Box<[Constant]>,
+    strings: Box<[StringSymbol]>,
+}
+
+impl Module {
+    
 }

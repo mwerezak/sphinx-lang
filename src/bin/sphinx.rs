@@ -7,7 +7,7 @@ use sphinx_lang::frontend;
 use sphinx_lang::BuildErrors;
 use sphinx_lang::source::{ModuleSource, SourceType, SourceText};
 use sphinx_lang::parser::stmt::{Stmt, StmtMeta};
-use sphinx_lang::codegen::Chunk;
+use sphinx_lang::codegen::Program;
 use sphinx_lang::runtime::VirtualMachine;
 use sphinx_lang::runtime::strings::StringInterner;
 use sphinx_lang::debug::symbol::BufferedResolver;
@@ -119,8 +119,7 @@ fn build_and_execute(_args: &ArgMatches, module: ModuleSource) -> Result<Virtual
     }
     
     let program = build_result.unwrap();
-    let chunk = Chunk::load(program.bytecode);
-    let mut vm = VirtualMachine::new(chunk);
+    let mut vm = VirtualMachine::new(Program::load(program));
     
     vm.run().expect("runtime error");
     
@@ -277,10 +276,10 @@ impl Repl {
                 }
             };
             
-            let chunk = Chunk::load(program.bytecode);
+            let program = Program::load(program);
             match self.vm {
-                Some(ref mut vm) => vm.reload_program(chunk),
-                None => { self.vm.replace(VirtualMachine::new(chunk)); },
+                Some(ref mut vm) => vm.reload_program(program),
+                None => { self.vm.replace(VirtualMachine::new(program)); },
             }
             
             if let Err(error) = self.vm.as_mut().unwrap().run() {

@@ -24,7 +24,7 @@ pub mod debug;
 use source::{SourceText, ModuleSource, ParseContext};
 use parser::ParserError;
 use parser::stmt::StmtMeta;
-use codegen::{Program, CodeGenerator, CompileError};
+use codegen::{UnloadedProgram, CodeGenerator, CompileError};
 use runtime::strings::StringInterner;
 
 #[derive(Debug)]
@@ -35,7 +35,7 @@ pub enum BuildErrors {
     Compile(Box<[CompileError]>),
 }
 
-pub fn build_module(module: &ModuleSource) -> Result<Program, BuildErrors> {
+pub fn build_module(module: &ModuleSource) -> Result<UnloadedProgram, BuildErrors> {
     let source_text = module.source_text();
     if source_text.is_err() {
         return Err(BuildErrors::Source(source_text.unwrap_err()));
@@ -44,7 +44,7 @@ pub fn build_module(module: &ModuleSource) -> Result<Program, BuildErrors> {
     build_source(source_text.unwrap())
 }
 
-pub fn build_source(source_text: SourceText) -> Result<Program, BuildErrors> {
+pub fn build_source(source_text: SourceText) -> Result<UnloadedProgram, BuildErrors> {
     let mut interner = StringInterner::new();
     
     // parsing
@@ -74,7 +74,7 @@ pub fn parse_source(interner: &mut StringInterner, source_text: SourceText) -> R
 }
 
 /// Produce bytecode from AST
-pub fn compile_ast(interner: StringInterner, ast: Vec<StmtMeta>) -> Result<Program, Vec<CompileError>> {
+pub fn compile_ast(interner: StringInterner, ast: Vec<StmtMeta>) -> Result<UnloadedProgram, Vec<CompileError>> {
     let codegen = CodeGenerator::new(interner);
     codegen.compile_program(ast.iter())
 }

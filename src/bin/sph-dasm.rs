@@ -78,11 +78,10 @@ fn main() {
     }
     
     let program = build_result.unwrap();
-    let symbol_table = module.resolve_symbols(program.symbols.iter());
+    let symbol_table = module.resolve_symbols(program.debug_symbols());
     
     let dasm = {
-        let dasm = Disassembler::new(&program.bytecode)
-            .with_symbols(&program.symbols);
+        let dasm = Disassembler::new(&program);
         
         if let Ok(ref symbol_table) = symbol_table {
             dasm.with_symbol_table(&symbol_table)

@@ -9,6 +9,7 @@ pub type CompileResult<T> = Result<T, CompileError>;
 
 #[derive(Debug)]
 pub enum ErrorKind {
+    ChunkCountLimit,
     ConstPoolLimit,
     TupleLengthLimit,
     LocalVariableLimit,
@@ -67,6 +68,7 @@ impl fmt::Display for CompileError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         
         let message = match self.kind() {
+            ErrorKind::ChunkCountLimit => "chunk count limit reached",
             ErrorKind::ConstPoolLimit => "constant pool limit reached",
             ErrorKind::TupleLengthLimit => "tuple length limit exceeded",
             ErrorKind::LocalVariableLimit => "local variable limit reached",
