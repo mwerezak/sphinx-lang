@@ -24,7 +24,7 @@ use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
 use primary::{Primary, Atom, AccessItem};
 use lvalue::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
-use fundefs::{FunctionDef, FunSignature, FunParam};
+use fundefs::{FunctionDef, SignatureDef, ParamDef};
 use structs::{ObjectConstructor};
 use errors::{ErrorKind, ErrorContext, ContextTag};
 
@@ -933,7 +933,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(FunctionDef::new(signature, body))
     }
     
-    fn parse_function_param_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<FunSignature> {
+    fn parse_function_param_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<SignatureDef> {
 
         let mut required = Vec::new();
         let mut default = Vec::new();
@@ -1002,14 +1002,14 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                     return Err("a variadic parameter must be the last one in the parameter list".into());
                 }
                 Token::CloseParen if is_variadic => {
-                    variadic.replace(FunParam::new(name, decl, default_value));
+                    variadic.replace(ParamDef::new(name, decl, default_value));
                 },
                 
                 // normal parameter
                 Token::Comma | Token::CloseParen if !is_variadic => {
                     let has_default = default_value.is_some();
                     
-                    let param = FunParam::new(name, decl, default_value);
+                    let param = ParamDef::new(name, decl, default_value);
                     if has_default {
                         default.push(param);
                     } else {
@@ -1030,7 +1030,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.pop_extend();
         }
         
-        Ok(FunSignature::new(required, default, variadic))
+        Ok(SignatureDef::new(required, default, variadic))
     }
     
     /*
