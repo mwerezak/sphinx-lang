@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use crate::source::ModuleSource;
-use crate::codegen::{Chunk, Constant};
+use crate::codegen::Constant;
 use crate::runtime::{Variant, DefaultBuildHasher};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};

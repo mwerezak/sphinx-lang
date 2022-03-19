@@ -5,7 +5,7 @@ use string_interner::Symbol as _;
 
 use crate::language::FloatType;
 use crate::codegen::OpCode;
-use crate::codegen::chunk::{Chunk, UnloadedProgram, Constant, ConstID, ChunkSymbols};
+use crate::codegen::chunk::{UnloadedProgram, Constant, ConstID};
 use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, SymbolResolutionError};
 
 
@@ -13,6 +13,7 @@ const PAD_WIDTH: usize = 60;
 
 pub struct Disassembler<'c, 's> {
     program: &'c UnloadedProgram,
+    symbols: Option<&'s DebugSymbolsRLE>,
     symbol_table: Option<&'s ResolvedSymbolTable<'s>>,
 }
 
@@ -26,7 +27,11 @@ enum Symbol<'s> {
 
 impl<'c, 's> Disassembler<'c, 's> {
     pub fn new(program: &'c UnloadedProgram) -> Self {
-        Self { program, symbol_table: None }
+        Self { program, symbols: None, symbol_table: None }
+    }
+    
+    pub fn with_symbols(mut self, symbols: &'s DebugSymbolsRLE) -> Self {
+        self.symbols.replace(symbols); self
     }
     
     pub fn with_symbol_table(mut self, symbol_table: &'s ResolvedSymbolTable<'s>) -> Self {
@@ -34,24 +39,26 @@ impl<'c, 's> Disassembler<'c, 's> {
     }
     
     pub fn write_disassembly(&self, fmt: &mut impl Write) -> fmt::Result {
-        for (index, chunk) in self.program.iter_chunks().enumerate() {
-            writeln!(fmt, "\n\nchunk {}:\n", index)?;
+        for chunk_id in self.program.chunk_ids() {
+            writeln!(fmt, "\n\nchunk {}:\n", chunk_id)?;
+            
+            let chunk = self.program.chunk(chunk_id);
             self.decode_chunk(fmt, chunk)?;
         }
         
         Ok(())
     }
     
-    fn decode_chunk(&self, fmt: &mut impl Write, chunk: &Chunk) -> fmt::Result {
-        let mut symbols = chunk.debug_symbols().map(|symbols| symbols.iter());
+    fn decode_chunk(&self, fmt: &mut impl Write, chunk: &[u8]) -> fmt::Result {
+        let mut symbols = self.symbols.map(|symbols| symbols.iter());
         let mut last_symbol = None;
         
         let mut offset = 0;
-        while offset < chunk.bytes().len() {
-            let (_, bytes) = chunk.bytes().split_at(offset);
+        while offset < chunk.len() {
+            let (_, bytes) = chunk.split_at(offset);
             
             // get the next unresolved symbol if there are any
-            let unresolved = symbols.as_mut().map_or(None, |iter| iter.next());
+            let unresolved = symbols.as_mut().map_or(None, |iter| iter.next().flatten());
             let symbol = self.try_resolve_symbol(unresolved, last_symbol);
             last_symbol = unresolved;
             
@@ -209,13 +216,12 @@ impl<'c, 's> Disassembler<'c, 's> {
     }
     
     fn write_const(&self, fmt: &mut impl fmt::Write, value: &Constant) -> fmt::Result {
-        if let Constant::String(symbol) = value {
-            if let Some(string) = self.program.strings().resolve(*symbol) {
-                if string.len() > 16 {
-                    return write!(fmt, "\"{}...\"", &string[..13]);
-                }
-                return write!(fmt, "\"{}\"", string);
+        if let Constant::String(index) = value {
+            let string = self.program.string(*index);
+            if string.len() > 16 {
+                return write!(fmt, "\"{}...\"", &string[..13]);
             }
+            return write!(fmt, "\"{}\"", string);
         }
         
         write!(fmt, "{}", value)
@@ -241,3 +247,73 @@ impl fmt::Display for Constant {
 }
 
 
+// Container for debug symbols generated for bytecode
+// Should contain a DebugSymbol for each opcode in the 
+// associated Chunk, and in the same order.
+#[derive(Debug, Default, Clone)]
+pub struct DebugSymbolsRLE {
+    symbols: Vec<(Option<DebugSymbol>, u8)>,  // run length encoding
+}
+
+impl DebugSymbolsRLE {
+    pub fn new() -> Self {
+        Self {
+            symbols: Vec::default(),
+        }
+    }
+    
+    pub fn push(&mut self, symbol: Option<DebugSymbol>) {
+        match self.symbols.last_mut() {
+            Some((last, ref mut count)) if *last == symbol && *count < u8::MAX => { 
+                *count += 1 
+            },
+            _ => { self.symbols.push((symbol, 0)) }
+        }
+    }
+    
+    pub fn iter(&self) -> impl Iterator<Item=Option<&DebugSymbol>> { 
+        self.symbols.iter().flat_map(
+            |(sym, count)| std::iter::repeat(sym.as_ref()).take(usize::from(*count) + 1)
+        )
+    }
+}
+
+
+#[derive(Debug, Default, Clone)]
+struct OffsetSpan {
+    offset: usize,
+    length: usize,
+}
+
+impl OffsetSpan {
+    pub fn start_offset(&self) -> usize { self.offset }
+    pub fn end_offset(&self) -> usize { self.offset + self.length }
+}
+
+
+#[derive(Debug, Default, Clone)]
+pub struct DebugSymbolOffsets {
+    symbols: Vec<(DebugSymbol, OffsetSpan)>,  // (symbol, offset) pairs
+}
+
+impl DebugSymbolOffsets {
+    pub fn new() -> Self {
+        Self {
+            symbols: Vec::default(),
+        }
+    }
+    
+    pub fn push(&mut self, symbol: DebugSymbol, offset: usize, length: usize) {
+        match self.symbols.last_mut() {
+            Some((_, ref mut span)) if span.end_offset() > offset => {
+                panic!("symbol inserted out of order");
+            }
+            
+            Some((last, ref mut span)) if *last == symbol && span.end_offset() == offset => { 
+                (*span).length += length
+            },
+            
+            _ => { self.symbols.push((symbol, OffsetSpan { offset, length })) }
+        }
+    }
+}

@@ -1,4 +1,6 @@
 use std::mem;
+use std::str;
+use std::ops::Range;
 use std::collections::HashMap;
 use string_interner::Symbol as _;
 use crate::language::{IntType, FloatType};
@@ -9,6 +11,7 @@ use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
 use crate::debug::DebugSymbol;
 
 
+// these are limited to u16 right now because they are loaded by opcodes
 pub type ConstID = u16;
 pub type ChunkID = u16;
 pub type FunctionID = u16;
@@ -20,7 +23,7 @@ pub type FunctionID = u16;
 pub enum Constant {
     Integer(IntType),
     Float([u8; mem::size_of::<FloatType>()]),
-    String(InternSymbol),
+    String(usize),
     Function(ChunkID, FunctionID),
 }
 
@@ -32,24 +35,27 @@ impl From<FloatType> for Constant {
     fn from(value: FloatType) -> Self { Self::Float(value.to_le_bytes()) }
 }
 
-impl From<InternSymbol> for Constant {
-    fn from(value: InternSymbol) -> Self { Self::String(value) }
+impl From<usize> for Constant {
+    fn from(index: usize) -> Self { Self::String(index) }
 }
 
+impl From<InternSymbol> for Constant {
+    fn from(symbol: InternSymbol) -> Self { Self::String(symbol.to_usize()) }
+}
 
 
 /// A buffer used by ChunkBuilder
 #[derive(Default)]
 pub struct ChunkBuf {
     bytes: Vec<u8>,
-    symbols: ChunkSymbolBuf,
+    symbol: Option<DebugSymbol>,
 }
 
 impl ChunkBuf {
     pub fn new() -> Self {
         Self {
             bytes: Vec::new(),
-            symbols: ChunkSymbolBuf::new(),
+            symbol: None,
         }
     }
     
@@ -88,13 +94,6 @@ impl ChunkBuf {
         let patch = std::iter::repeat(u8::default()).take(to_len);
         self.bytes.splice(patch_range, patch);
     }
-    
-    // Symbols
-    
-    pub fn push_symbol(&mut self, symbol: DebugSymbol) {
-        self.symbols.push(symbol)
-    }
-    
 }
 
 
@@ -148,8 +147,9 @@ impl ChunkBuilder {
     // Constants
     
     pub fn get_or_insert_const(&mut self, value: Constant) -> CompileResult<ConstID> {
-        if let Constant::String(symbol) = value {
-            debug_assert!(self.strings.resolve(symbol).is_some());
+        if let Constant::String(index) = value {
+            let symbol = InternSymbol::try_from_usize(index);
+            debug_assert!(self.strings.resolve(symbol.unwrap()).is_some());
         }
         
         if let Some(cid) = self.dedup.get(&value) {
@@ -165,72 +165,119 @@ impl ChunkBuilder {
     
     pub fn get_or_insert_str(&mut self, string: &str) -> CompileResult<ConstID> {
         let symbol = self.strings.get_or_intern(string);
-        self.get_or_insert_const(Constant::String(symbol))
+        self.get_or_insert_const(Constant::String(symbol.to_usize()))
     }
     
-    pub fn build(mut self) -> UnloadedProgram {
-        self.strings.shrink_to_fit();
+    pub fn build(self) -> UnloadedProgram {
+        let mut bytes = Vec::new();
+        let mut chunks = Vec::with_capacity(self.chunks.len());
         
-        let chunks = self.chunks.into_iter()
-            .map(|buf| Chunk {
-                bytes: buf.bytes.into_boxed_slice(),
-                symbols: Some(buf.symbols.build()),
-            })
-            .collect::<Vec<Chunk>>();
+        for chunk in self.chunks.into_iter() {
+            let offset = bytes.len();
+            let length = chunk.bytes.len();
+            bytes.extend(chunk.bytes);
+            
+            let index = ChunkIndex {
+                offset, length,
+                symbol: chunk.symbol,
+            };
+            chunks.push(index);
+        }
+        
+        let mut strings = Vec::new();
+        strings.resize_with(self.strings.len(), StringIndex::default);
+        
+        for (symbol, string) in self.strings.into_iter() {
+            let string = string.as_bytes();
+            let offset = bytes.len();
+            let length = string.len();
+            bytes.extend(string);
+            
+            let index = StringIndex {
+                offset, length
+            };
+            strings.insert(symbol.to_usize(), index);
+        }
         
         UnloadedProgram {
-            consts: self.consts.into_boxed_slice(),
+            bytes: bytes.into_boxed_slice(),
             chunks: chunks.into_boxed_slice(),
+            strings: strings.into_boxed_slice(),
+            consts: self.consts.into_boxed_slice(),
             functions: self.functions.into_boxed_slice(),
-            strings: self.strings,
         }
     }
 }
 
 
-#[derive(Debug)]
-pub struct Chunk {
-    bytes: Box<[u8]>,
-    symbols: Option<ChunkSymbols>,
+// TODO store all chunk bytes in a single array
+// TODO figure out how debug symbols will work, esp. at runtime
+
+#[derive(Debug, Default, Clone)]
+pub struct ChunkIndex {
+    offset: usize,
+    length: usize,
+    symbol: Option<DebugSymbol>, // will be used for tracebacks
 }
 
-impl Chunk {
-    pub fn bytes(&self) -> &[u8] { &*self.bytes }
+impl ChunkIndex {
+    pub fn as_range(&self) -> Range<usize> {
+        self.offset..(self.offset + self.length)
+    }
     
-    pub fn debug_symbols(&self) -> Option<&ChunkSymbols> {
-        self.symbols.as_ref()
+    pub fn debug_symbols(&self) -> Option<&DebugSymbol> {
+        self.symbol.as_ref()
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct StringIndex {
+    offset: usize,
+    length: usize,
+}
+
+impl StringIndex {
+    pub fn as_range(&self) -> Range<usize> {
+        self.offset..(self.offset + self.length)
+    }
+}
 
 /// A program whose strings have not been yet been loaded into the thread-local string table
-#[derive(Debug)]
+/// This means that an `UnloadedProgram` cannot be executed. However, it also means that an
+/// `UnloadedProgram` is also self-contained, which is useful for exporting to a file or
+/// between threads.
+#[derive(Debug, Clone)]
 pub struct UnloadedProgram {
-    chunks: Box<[Chunk]>,
+    bytes: Box<[u8]>,
+    chunks: Box<[ChunkIndex]>,
+    strings: Box<[StringIndex]>,
     consts: Box<[Constant]>,
     functions: Box<[Signature]>,
-    strings: StringInterner,
 }
 
 impl UnloadedProgram {
     pub fn chunk(&self, chunk_id: ChunkID) -> &[u8] {
-        self.chunks[usize::from(chunk_id)].bytes()
+        let chunk_idx = &self.chunks[usize::from(chunk_id)];
+        &self.bytes[chunk_idx.as_range()]
     }
     
-    pub fn iter_chunks(&self) -> impl Iterator<Item=&Chunk> {
-        self.chunks.iter()
+    pub fn chunk_ids(&self) -> impl Iterator<Item=ChunkID> {
+        ChunkID::from(0u16)..ChunkID::try_from(self.chunks.len()).unwrap()
     }
     
-    pub fn strings(&self) -> &StringInterner { &self.strings }
+    pub fn string(&self, index: usize) -> &str {
+        let string_idx = &self.strings[index];
+        str::from_utf8(&self.bytes[string_idx.as_range()]).expect("invalid string")
+    }
+    
+    pub fn iter_strings(&self) -> impl Iterator<Item=&str> {
+        self.strings.iter()
+            .map(|index| &self.bytes[index.as_range()])
+            .map(|slice| str::from_utf8(slice).expect("invalid string"))
+    }
     
     pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {
         &self.consts[usize::from(index.into())]
-    }
-    
-    pub fn debug_symbols(&self) -> impl Iterator<Item=&DebugSymbol> {
-        self.chunks.iter()
-            .filter_map(|chunk| chunk.debug_symbols())
-            .flat_map(|symbols| symbols.iter_raw())
     }
 }
 
@@ -239,7 +286,8 @@ impl UnloadedProgram {
 
 #[derive(Debug)]
 pub struct Program {
-    chunks: Box<[Chunk]>,
+    bytes: Box<[u8]>,
+    chunks: Box<[ChunkIndex]>,
     consts: Box<[Constant]>,
     functions: Box<[Signature]>,
     strings: Box<[StringSymbol]>,
@@ -248,7 +296,8 @@ pub struct Program {
 impl Program {
     #[inline(always)]
     pub fn chunk(&self, chunk_id: ChunkID) -> &[u8] {
-        self.chunks[usize::from(chunk_id)].bytes()
+        let chunk = &self.chunks[usize::from(chunk_id)];
+        &self.bytes[chunk.as_range()]
     }
     
     pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {
@@ -269,8 +318,7 @@ impl Program {
             let mut interner = string_table.interner_mut();
             
             let mut strings = Vec::with_capacity(program.strings.len());
-            for (idx, string) in program.strings.into_iter() {
-                debug_assert!(idx.to_usize() == strings.len());
+            for string in program.iter_strings() {
                 let symbol = StringSymbol::from(interner.get_or_intern(string));
                 strings.push(symbol);
             }
@@ -278,7 +326,15 @@ impl Program {
             strings.into_boxed_slice()
         });
         
+        let byte_len = program.chunk_ids()
+            .map(|chunk_id| program.chunk(chunk_id).len())
+            .sum();
+        
+        let mut bytes = program.bytes.into_vec();
+        bytes.truncate(byte_len);
+        
         Self {
+            bytes: bytes.into_boxed_slice(),
             chunks: program.chunks,
             consts: program.consts,
             functions: program.functions,
@@ -286,72 +342,37 @@ impl Program {
         }
     }
     
-    // prepares a Chunk for exporting to a file
+    /// prepares an `UnloadedProgram` for exporting to a file
     pub fn unload(self) -> UnloadedProgram {
-        let strings = STRING_TABLE.with(|string_table| {
+        let mut bytes = self.bytes.into_vec();
+        let mut strings = Vec::with_capacity(self.strings.len());
+        
+        STRING_TABLE.with(|string_table| {
             let interner = string_table.interner();
             
-            let mut strings = StringInterner::with_capacity(self.strings.len());
             for symbol in self.strings.into_iter() {
-                let string = interner.resolve((*symbol).into()).unwrap();
-                strings.get_or_intern(string);
+                let string = interner
+                    .resolve((*symbol).into())
+                    .unwrap().as_bytes();
+                
+                let offset = bytes.len();
+                let length = string.len();
+                let index = StringIndex {
+                    offset, length,
+                };
+                
+                bytes.extend(string);
+                strings.push(index);
             }
-            strings.shrink_to_fit();
-            strings
+            
         });
         
         UnloadedProgram {
+            bytes: bytes.into_boxed_slice(),
             chunks: self.chunks,
+            strings: strings.into_boxed_slice(),
             consts: self.consts,
             functions: self.functions,
-            strings,
         }
-    }
-}
-
-
-// Container for debug symbols generated for bytecode
-// Should contain a DebugSymbol for each opcode in the 
-// associated Chunk, and in the same order.
-#[derive(Debug, Default, Clone)]
-pub struct ChunkSymbolBuf {
-    symbols: Vec<(DebugSymbol, u8)>,  // run length encoding
-}
-
-impl ChunkSymbolBuf {
-    pub fn new() -> Self {
-        Self {
-            symbols: Vec::default(),
-        }
-    }
-    
-    pub fn push(&mut self, symbol: DebugSymbol) {
-        match self.symbols.last_mut() {
-            Some((last, ref mut count)) if *last == symbol && *count < u8::MAX => { 
-                *count += 1 
-            },
-            _ => { self.symbols.push((symbol, 0)) }
-        }
-    }
-    
-    pub fn build(self) -> ChunkSymbols {
-        ChunkSymbols { symbols: self.symbols.into_boxed_slice() }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ChunkSymbols {
-    symbols: Box<[(DebugSymbol, u8)]>,  // run length encoding
-}
-
-impl ChunkSymbols {
-    pub fn iter(&self) -> impl Iterator<Item=&DebugSymbol> { 
-        self.symbols.iter().flat_map(
-            |(sym, count)| std::iter::repeat(sym).take(usize::from(*count) + 1)
-        )
-    }
-    
-    pub fn iter_raw(&self) -> impl Iterator<Item=&DebugSymbol> {
-        self.symbols.iter().map(|(sym, count)| sym)
     }
 }

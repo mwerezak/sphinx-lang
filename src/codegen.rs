@@ -13,13 +13,14 @@ use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Sh
 use crate::runtime::strings::{StringInterner, InternSymbol};
 use crate::runtime::vm::LocalIndex;
 use crate::debug::DebugSymbol;
+use crate::debug::dasm::DebugSymbolsRLE;
 
 pub mod chunk;
 pub mod opcodes;
 pub mod errors;
 
 pub use opcodes::OpCode;
-pub use chunk::{Chunk, ChunkID, Constant, ConstID, UnloadedProgram, Program};
+pub use chunk::{ChunkID, Constant, ConstID, UnloadedProgram, Program};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
 use opcodes::*;
@@ -266,10 +267,17 @@ impl CompilerState {
 
 // Code Generator
 
+#[derive(Debug)]
+pub struct CompileOutput {
+    pub program: UnloadedProgram,
+    pub symbols: Box<[DebugSymbolsRLE]>,
+}
+
 pub struct CodeGenerator {
     chunk: ChunkBuilder,
     state: CompilerState,
     errors: Vec<CompileError>,
+    symbols: Vec<DebugSymbolsRLE>,
 }
 
 impl CodeGenerator {
@@ -278,22 +286,28 @@ impl CodeGenerator {
             chunk: ChunkBuilder::with_strings(strings),
             state: CompilerState::new(),
             errors: Vec::new(),
+            symbols: vec![ DebugSymbolsRLE::new() ],
         }
     }
     
-    pub fn compile_program<'a>(mut self, program: impl Iterator<Item=&'a StmtMeta>) -> Result<UnloadedProgram, Vec<CompileError>> {
+    pub fn compile_program<'a>(mut self, program: impl Iterator<Item=&'a StmtMeta>) -> Result<CompileOutput, Vec<CompileError>> {
         for stmt in program {
             self.push_stmt(stmt);
         }
         self.finish()
     }
     
-    pub fn finish(self) -> Result<UnloadedProgram, Vec<CompileError>> {
+    pub fn finish(self) -> Result<CompileOutput, Vec<CompileError>> {
         if self.errors.is_empty() {
             let mut chunk = self.chunk;
             chunk.chunk_mut(0).push_byte(OpCode::Return);
             
-            Ok(chunk.build())
+            let output = CompileOutput {
+                program: chunk.build(),
+                symbols: self.symbols.into_boxed_slice(),
+            };
+            
+            Ok(output)
         } else {
             Err(self.errors)
         }
@@ -318,24 +332,28 @@ impl CodeGenerator {
         self.chunk().len()
     }
     
+    fn push_symbol(&mut self, symbol: DebugSymbol) {
+        self.symbols[0].push(Some(symbol))
+    }
+    
     ///////// Emitting Bytecode /////////
     
     fn emit_instr(&mut self, symbol: &DebugSymbol, opcode: OpCode) {
         debug_assert!(opcode.instr_len() == 1);
-        self.chunk_mut().push_symbol(*symbol);
+        self.push_symbol(*symbol);
         self.chunk_mut().push_byte(opcode);
     }
     
     fn emit_instr_byte(&mut self, symbol: &DebugSymbol, opcode: OpCode, byte: u8) {
         debug_assert!(opcode.instr_len() == 2);
-        self.chunk_mut().push_symbol(*symbol);
+        self.push_symbol(*symbol);
         self.chunk_mut().push_byte(opcode);
         self.chunk_mut().push_byte(byte);
     }
     
     fn emit_instr_data(&mut self, symbol: &DebugSymbol, opcode: OpCode, bytes: &[u8]) {
         debug_assert!(opcode.instr_len() == 1 + bytes.len());
-        self.chunk_mut().push_symbol(*symbol);
+        self.push_symbol(*symbol);
         self.chunk_mut().push_byte(opcode);
         self.chunk_mut().extend_bytes(&bytes);
     }
@@ -350,7 +368,7 @@ impl CodeGenerator {
     }
     
     fn emit_dummy_instr(&mut self, symbol: &DebugSymbol, width: usize) {
-        self.chunk_mut().push_symbol(*symbol);
+        self.push_symbol(*symbol);
         
         for i in 0..width {
             self.chunk_mut().push_byte(OpCode::Nop);

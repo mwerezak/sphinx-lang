@@ -118,7 +118,7 @@ fn build_and_execute(_args: &ArgMatches, module: ModuleSource) -> Result<Virtual
         return Err(());
     }
     
-    let program = build_result.unwrap();
+    let program = build_result.unwrap().program;
     let mut vm = VirtualMachine::new(Program::load(program));
     
     vm.run().expect("runtime error");
@@ -267,7 +267,7 @@ impl Repl {
             }
             
             let program = match sphinx_lang::compile_ast(interner, ast) {
-                Ok(program) => program,
+                Ok(output) => output.program,
                 
                 Err(errors) => {
                     let resolver = BufferedResolver::new(input);
