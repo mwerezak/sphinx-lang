@@ -44,25 +44,23 @@ impl From<InternSymbol> for Constant {
 }
 
 
+#[derive(Default, Debug, Clone)]
+pub struct ChunkInfo {
+    pub symbol: Option<DebugSymbol>,
+}
+
 /// A buffer used by ChunkBuilder
 #[derive(Default)]
 pub struct ChunkBuf {
+    info: ChunkInfo,
     bytes: Vec<u8>,
-    symbol: Option<DebugSymbol>,
 }
 
 impl ChunkBuf {
-    pub fn new() -> Self {
+    pub fn new(info: ChunkInfo) -> Self {
         Self {
+            info,
             bytes: Vec::new(),
-            symbol: None,
-        }
-    }
-    
-    pub fn with_symbol(symbol: DebugSymbol) -> Self {
-        Self {
-            bytes: Vec::new(),
-            symbol: Some(symbol),
         }
     }
     
@@ -139,11 +137,10 @@ impl ChunkBuilder {
         let chunk_id = ChunkID::try_from(self.chunks.len())
             .map_err(|_| CompileError::from(ErrorKind::ChunkCountLimit))?;
         
-        if let Some(symbol) = symbol {
-            self.chunks.push(ChunkBuf::with_symbol(*symbol));
-        } else {
-            self.chunks.push(ChunkBuf::new())
-        }
+        let info = ChunkInfo { 
+            symbol: symbol.map(|symbol| *symbol)
+        };
+        self.chunks.push(ChunkBuf::new(info));
         
         Ok(chunk_id)
     }
@@ -193,7 +190,7 @@ impl ChunkBuilder {
             
             let index = ChunkIndex {
                 offset, length,
-                symbol: chunk.symbol,
+                info: chunk.info,
             };
             chunk_index.push(index);
         }
@@ -231,9 +228,9 @@ impl ChunkBuilder {
 
 #[derive(Debug, Default, Clone)]
 pub struct ChunkIndex {
+    info: ChunkInfo,
     offset: usize,
     length: usize,
-    symbol: Option<DebugSymbol>, // will be used for tracebacks
 }
 
 impl ChunkIndex {
@@ -241,8 +238,8 @@ impl ChunkIndex {
         self.offset..(self.offset + self.length)
     }
     
-    pub fn debug_symbols(&self) -> Option<&DebugSymbol> {
-        self.symbol.as_ref()
+    pub fn info(&self) -> &ChunkInfo {
+        &self.info
     }
 }
 
@@ -276,6 +273,11 @@ impl UnloadedProgram {
     pub fn chunk(&self, chunk_id: ChunkID) -> &[u8] {
         let chunk_idx = &self.chunk_index[usize::from(chunk_id)];
         &self.chunks[chunk_idx.as_range()]
+    }
+    
+    pub fn chunk_info(&self, chunk_id: ChunkID) -> &ChunkInfo {
+        let chunk_idx = &self.chunk_index[usize::from(chunk_id)];
+        chunk_idx.info()
     }
     
     pub fn iter_chunks(&self) -> impl Iterator<Item=(ChunkID, &[u8])> {
