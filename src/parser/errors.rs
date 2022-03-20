@@ -46,6 +46,7 @@ pub enum ContextTag {
     PrimaryExpr,
     MemberAccess,
     IndexAccess,
+    Invocation,
     ObjectCtor,
     TupleCtor,
     Atom,

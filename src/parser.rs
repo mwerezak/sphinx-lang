@@ -20,7 +20,7 @@ pub use errors::{ParserError, ParseResult};
 
 use expr::{ExprMeta, Expr, ExprBlock, ConditionalBranch};
 use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
-use primary::{Primary, Atom, AccessItem};
+use primary::{Primary, Atom, AccessItem, Argument};
 use lvalue::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use fundefs::{FunctionDef, SignatureDef, ParamDef};
@@ -1100,15 +1100,12 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 // subscript ::= "[" expression "]" ;
                 Token::OpenSquare => items.push(self.parse_index_access(ctx)?),
                 
-                // Invocation is a special case. 
-                // The parens containing the argument list are not allowed to be on a separate line
-                // Lua has a similar issue, but doesn't have tuples so it isn't as big a problem there
-                // By checking next.newline we ensure that a () on the next line is properly parsed as a tuple
                 
-                // invocation ::= "(" ... ")" ;  (* WIP *)
-                Token::OpenParen if !next.newline => {
-                    unimplemented!()
-                }
+                // invocation ::= "(" ")" | "(" argument ( "," argument )* ")" ; 
+                // argument ::= expression ( "..." )? ;  (* "..." is for argument unpacking syntax *)
+                
+                // invocations are not allowed to be on a separate line from the invocation receiver
+                Token::OpenParen if !next.newline => items.push(self.parse_invocation(ctx)?),
                 
                 // object-constructor ::= "{" ... "}"
                 Token::OpenBrace => {
@@ -1178,15 +1175,46 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let next = self.advance()?;
         ctx.set_end(&next);
         
-        let item;
-        if matches!(next.token, Token::CloseSquare) {
-            item = AccessItem::Index(index_expr);
-        } else {
+        if !matches!(next.token, Token::CloseSquare) {
             return Err("missing closing \"]\"".into());
         }
         
         ctx.pop_extend();
-        Ok(item)
+        Ok(AccessItem::Index(index_expr))
+    }
+    
+    fn parse_invocation(&mut self, ctx: &mut ErrorContext) -> ParseResult<AccessItem> {
+        let next = self.advance().unwrap();
+        
+        ctx.push(ContextTag::Invocation);
+        ctx.set_start(&next);
+        debug_assert!(matches!(next.token, Token::OpenParen));
+        
+        let mut args = Vec::new();
+        
+        loop {
+            if matches!(self.peek()?.token, Token::CloseParen) {
+                break;
+            }
+            
+            let arg_expr = self.parse_expr(ctx)?;
+            if let Token::Ellipsis = self.peek()?.token {
+                ctx.set_end(&self.advance().unwrap());
+                
+                args.push(Argument::unpack(arg_expr));
+            } else { 
+                args.push(Argument::new(arg_expr));
+            }
+            
+            match self.peek()?.token {
+                Token::Comma => ctx.set_end(&self.advance().unwrap()),
+                Token::CloseParen => break,
+                _ => return Err("missing \",\" between invocation arguments".into()),
+            }
+        }
+        
+        ctx.pop_extend();
+        Ok(AccessItem::Invoke(args.into_boxed_slice()))
     }
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;

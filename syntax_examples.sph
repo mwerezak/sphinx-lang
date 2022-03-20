@@ -366,7 +366,7 @@ let name = decorator(value)
 fun trace(wrapped)
   return fun(args...)
     echo "trace"
-    wrapped(...args)
+    wrapped(args...)
   end
 end
 
@@ -512,8 +512,8 @@ var mylist = list.new("red", "green", "blue")  # important use case: constructor
 # Argument unpacking
 
 var things = ("second", "third")
-variadic_fun("first", ...things)  # prints "first" then "second"
-variadic_fun(...things)  # prints "second" then "third"
+variadic_fun("first", things...)  # prints "first" then "second"
+variadic_fun(things...)  # prints "second" then "third"
 
 # named arguments are not supported
 # instead, use a function that takes an object as a single argument

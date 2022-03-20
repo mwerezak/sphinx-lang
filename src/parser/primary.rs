@@ -24,7 +24,7 @@ pub enum Atom {
 pub enum AccessItem {
     Attribute(InternSymbol),
     Index(ExprMeta),
-    Invoke(),       // TODO
+    Invoke(Box<[Argument]>),
     // Construct(ObjectConstructor),
 }
 
@@ -47,3 +47,23 @@ impl Primary {
     pub fn path_mut(&mut self) -> &mut Vec<AccessItem> { &mut self.path }
 }
 
+
+#[derive(Debug, Clone)]
+pub struct Argument {
+    value: ExprMeta,
+    unpack: bool,
+}
+
+impl Argument {
+    pub fn new(value: ExprMeta) -> Self {
+        Self { value, unpack: false }
+    }
+    
+    pub fn unpack(value: ExprMeta) -> Self {
+        Self { value, unpack: true }
+    }
+    
+    pub fn is_unpack(&self) -> bool { self.unpack }
+    pub fn value(&self) -> &ExprMeta { &self.value }
+    
+}

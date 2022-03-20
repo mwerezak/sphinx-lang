@@ -85,7 +85,7 @@ This prevents function calls from splitting across lines (an issue that Lua also
 However Sphinx has tuples, so its important for us to deal with that.
 *)
 invocation ::= "(" ")" | "(" argument ( "," argument )* ")" ; 
-argument ::= ( "..." )? expression ;  (* "..." is for argument unpacking syntax *)
+argument ::= expression ( "..." )? ;  (* "..." is for argument unpacking syntax *)
 
 (*** Constructors ***)
 
