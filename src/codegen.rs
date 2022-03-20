@@ -9,6 +9,7 @@ use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
+use crate::parser::fundefs::{FunctionDef};
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::strings::{StringInterner, InternSymbol};
 use crate::runtime::vm::LocalIndex;
@@ -20,11 +21,11 @@ pub mod opcodes;
 pub mod errors;
 
 pub use opcodes::OpCode;
-pub use chunk::{ChunkID, Constant, ConstID, UnloadedProgram, Program};
+pub use chunk::{UnloadedProgram, Program, ChunkID, ConstID, Constant};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
 use opcodes::*;
-use chunk::{ChunkBuilder, ChunkBuf};
+use chunk::{ChunkBuilder, ChunkInfo, ChunkBuf};
 
 
 // Helpers
@@ -299,14 +300,18 @@ impl Compiler {
         };
         
         // create main chunk
-        let chunk_main = compiler.push_chunk(None).unwrap();
-        debug_assert!(chunk_main == CHUNK_MAIN);
+        let info = ChunkInfo {
+            symbol: None,
+        };
+        
+        let chunk_id = compiler.new_chunk(info).unwrap();
+        debug_assert!(chunk_id == CHUNK_MAIN);
         
         compiler
     }
     
-    fn push_chunk(&mut self, symbol: Option<&DebugSymbol>) -> CompileResult<ChunkID> {
-        let chunk_id = self.builder.new_chunk(symbol)?;
+    fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<ChunkID> {
+        let chunk_id = self.builder.new_chunk(info)?;
         if !self.symbols.contains_key(&chunk_id) {
             self.symbols.insert(chunk_id, DebugSymbolsRLE::new());
         }
@@ -332,19 +337,14 @@ impl Compiler {
     }
     
     pub fn push_stmt(&mut self, stmt: &StmtMeta) {
-        let symbol = stmt.debug_symbol();
-        
-        let result = self.main_chunk().compile_stmt(Some(symbol), stmt.variant());
-        
-        if let Err(error) = result {
-            self.errors.push(error.with_symbol(*symbol));
+        if let Err(error) = self.main_chunk().push_stmt(stmt) {
+            self.errors.push(error);
         }
     }
     
     pub fn finish(mut self) -> Result<CompiledProgram, Vec<CompileError>> {
         if self.errors.is_empty() {
-            
-            self.main_chunk().emit_instr(None, OpCode::Return);
+            self.main_chunk().finish();
             
             let output = CompiledProgram {
                 program: self.builder.build(),
@@ -356,7 +356,6 @@ impl Compiler {
             Err(self.errors)
         }
     }
-    
 
 }
 
@@ -366,6 +365,22 @@ struct CodeGenerator<'c> {
 }
 
 impl CodeGenerator<'_> {
+    
+    pub fn push_stmt(&mut self, stmt: &StmtMeta) -> CompileResult<()> {
+        let symbol = stmt.debug_symbol();
+        
+        let result = self.compile_stmt(Some(symbol), stmt.variant());
+        if let Err(error) = result {
+            Err(error.with_symbol(*symbol))
+        } else {
+            Ok(())
+        }
+    }
+    
+    pub fn finish(mut self) {
+        self.emit_instr(None, OpCode::Return);
+    }
+    
     fn chunk_id(&self) -> ChunkID { self.chunk_id }
     
     fn builder(&self) -> &ChunkBuilder { &self.compiler.builder }
@@ -393,7 +408,15 @@ impl CodeGenerator<'_> {
         let chunk_id = self.chunk_id;
         self.symbols_mut()
             .get_mut(&chunk_id).unwrap()
-            .push(symbol.map(|sym| *sym))
+            .push(symbol.map(|symbol| *symbol))
+    }
+    
+    fn create_chunk(&self, symbol: Option<&DebugSymbol>) -> CompileResult<CodeGenerator> {
+        let info = ChunkInfo {
+            symbol: symbol.map(|symbol| *symbol),
+        };
+        let chunk_id = self.compiler.new_chunk(info)?;
+        Ok(self.compiler.get_chunk(chunk_id))
     }
     
     ///////// Emitting Bytecode /////////
@@ -643,7 +666,7 @@ impl CodeGenerator<'_> {
             Expr::Block { label, suite } => self.compile_block(symbol, label.as_ref(), suite)?,
             Expr::IfExpr { branches, else_clause } => self.compile_if_expr(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
             
-            Expr::FunctionDef(fundef) => unimplemented!(),
+            Expr::FunctionDef(fundef) => self.compile_function_def(symbol, fundef)?,
         }
         Ok(())
     }
@@ -712,6 +735,10 @@ impl CodeGenerator<'_> {
         }
         
         Ok(())
+    }
+    
+    fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
+        unimplemented!()
     }
     
     fn compile_stmt_list(&mut self, stmt_list: &StmtList) -> CompileResult<()> {

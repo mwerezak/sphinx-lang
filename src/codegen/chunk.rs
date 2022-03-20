@@ -139,13 +139,10 @@ impl ChunkBuilder {
     
     // Bytecode
     
-    pub fn new_chunk(&mut self, symbol: Option<&DebugSymbol>) -> CompileResult<ChunkID> {
+    pub fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<ChunkID> {
         let chunk_id = ChunkID::try_from(self.chunks.len())
             .map_err(|_| CompileError::from(ErrorKind::ChunkCountLimit))?;
         
-        let info = ChunkInfo { 
-            symbol: symbol.map(|symbol| *symbol)
-        };
         self.chunks.push(ChunkBuf::new(info));
         
         Ok(chunk_id)
