@@ -57,7 +57,10 @@ impl StmtList {
         }
     }
     
-    pub fn suite(&self) -> &[StmtMeta] { &self.suite }
+    pub fn iter(&self) -> impl Iterator<Item=&StmtMeta> {
+        self.suite.iter()
+    }
+    
     pub fn end_control(&self) -> Option<&ControlFlow> { self.control.as_ref() }
     
     pub fn take(self) -> (Vec<StmtMeta>, Option<ControlFlow>) {

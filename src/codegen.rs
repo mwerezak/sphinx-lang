@@ -738,12 +738,16 @@ impl CodeGenerator<'_> {
     }
     
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
+        // compile function body first
+        let fun_chunk = self.create_chunk(symbol)?;
+        
+        
         unimplemented!()
     }
     
     fn compile_stmt_list(&mut self, stmt_list: &StmtList) -> CompileResult<()> {
         // compile stmt suite
-        for stmt in stmt_list.suite().iter() {
+        for stmt in stmt_list.iter() {
             let inner_symbol = stmt.debug_symbol();
             self.compile_stmt(Some(inner_symbol), stmt.variant())
                 .map_err(|err| err.with_symbol(*inner_symbol))?;
