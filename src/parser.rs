@@ -23,7 +23,7 @@ use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
 use primary::{Primary, Atom, AccessItem, Argument};
 use lvalue::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
-use fundefs::{FunctionDef, SignatureDef, ParamDef};
+use fundefs::{FunctionDef, SignatureDef, RequiredDef, DefaultDef, VariadicDef};
 use errors::{ErrorKind, ErrorContext, ContextTag};
 
 
@@ -1003,10 +1003,11 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 if matches!(next.token, Token::OpAssign) {
                     ctx.set_end(&self.advance().unwrap());
                     
-                    Some(self.parse_expr_variant(ctx)?)
+                    Some(self.parse_expr(ctx)?)
                 } else {
                     None
                 };
+            let default_value = default_value.map(|expr| Box::new(expr));
             
             // expect either a comma "," or the closing ")"
             let next = self.peek()?;
@@ -1016,21 +1017,18 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                     return Err("a variadic parameter must be the last one in the parameter list".into());
                 }
                 Token::CloseParen if is_variadic => {
-                    variadic.replace(ParamDef::new(name, decl, default_value));
+                    variadic.replace(VariadicDef { name, decl, default: default_value });
                 },
                 
                 // normal parameter
                 Token::Comma | Token::CloseParen if !is_variadic => {
-                    let has_default = default_value.is_some();
-                    
-                    let param = ParamDef::new(name, decl, default_value);
-                    if has_default {
-                        default.push(param);
+                    if default_value.is_some() {
+                        default.push(DefaultDef { name, decl, default: default_value.unwrap() });
                     } else {
                         if !default.is_empty() {
                             return Err("cannot have a non-default parameter after a default parameter".into());
                         }
-                        required.push(param);
+                        required.push(RequiredDef { name, decl });
                     }
                 },
                 

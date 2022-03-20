@@ -9,10 +9,11 @@ use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
-use crate::parser::fundefs::{FunctionDef};
-use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
-use crate::runtime::strings::{StringInterner, InternSymbol};
+use crate::parser::fundefs::{FunctionDef, SignatureDef, RequiredDef, DefaultDef};
 use crate::runtime::vm::LocalIndex;
+use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
+use crate::runtime::types::function::{Function, Signature, Parameter};
+use crate::runtime::strings::{StringInterner, InternSymbol};
 use crate::debug::DebugSymbol;
 use crate::debug::dasm::{ChunkSymbols, DebugSymbolsRLE};
 
@@ -411,7 +412,7 @@ impl CodeGenerator<'_> {
             .push(symbol.map(|symbol| *symbol))
     }
     
-    fn create_chunk(&self, symbol: Option<&DebugSymbol>) -> CompileResult<CodeGenerator> {
+    fn create_chunk(&mut self, symbol: Option<&DebugSymbol>) -> CompileResult<CodeGenerator> {
         let info = ChunkInfo {
             symbol: symbol.map(|symbol| *symbol),
         };
@@ -739,10 +740,65 @@ impl CodeGenerator<'_> {
     
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
         // compile function body first
-        let fun_chunk = self.create_chunk(symbol)?;
+        let mut codegen = self.create_chunk(symbol)?;
+        let chunk_id = codegen.chunk_id();
         
+        for stmt in fundef.body().iter() {
+            codegen.push_stmt(stmt);
+        }
+        codegen.finish();
         
-        unimplemented!()
+        let signature = self.compile_function_signature(symbol, fundef.signature())?;
+        let function_id = self.builder_mut().push_function(signature);
+        
+        self.emit_load_const(symbol, Constant::Function(chunk_id, function_id))
+    }
+    
+    fn compile_function_signature(&mut self, symbol: Option<&DebugSymbol>, sigdef: &SignatureDef) -> CompileResult<Signature> {
+        let mut required = Vec::new();
+        for paramdef in sigdef.required.iter() {
+            let name = self.get_or_make_const(symbol, Constant::from(paramdef.name))?;
+            let param = Parameter::new(name, paramdef.decl, None);
+            required.push(param);
+        }
+        
+        let mut default = Vec::new();
+        for paramdef in sigdef.default.iter() {
+            let name = self.get_or_make_const(symbol, Constant::from(paramdef.name))?;
+            
+            // compile default value expression
+            let inner_symbol = Some(paramdef.default.debug_symbol());
+            let default_expr = paramdef.default.variant();
+            let mut codegen = self.create_chunk(inner_symbol)?;
+            let chunk_id = codegen.chunk_id();
+            
+            codegen.compile_expr(inner_symbol, default_expr)?;
+            codegen.finish();
+            
+            let param = Parameter::new(name, paramdef.decl, Some(chunk_id));
+            default.push(param);
+        }
+        
+        let mut variadic = None;
+        if let Some(paramdef) = &sigdef.variadic {
+            let name = self.get_or_make_const(symbol, Constant::from(paramdef.name))?;
+            
+            // compile default value expression
+            let mut default_value = None;
+            if let Some(expr) = &paramdef.default {
+                let inner_symbol = Some(expr.debug_symbol());
+                let mut codegen = self.create_chunk(inner_symbol)?;
+                default_value.replace(codegen.chunk_id());
+                
+                codegen.compile_expr(inner_symbol, expr.variant())?;
+                codegen.finish();
+            }
+            
+            let param = Parameter::new(name, paramdef.decl, default_value);
+            variadic.replace(param);
+        }
+        
+        Ok(Signature::new(required, default, variadic))
     }
     
     fn compile_stmt_list(&mut self, stmt_list: &StmtList) -> CompileResult<()> {

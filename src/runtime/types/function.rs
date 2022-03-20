@@ -1,4 +1,5 @@
-use crate::codegen::ChunkID;
+use crate::parser::lvalue::DeclType;
+use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::module::{ModuleID, Access};
 use crate::runtime::strings::StringSymbol;
 
@@ -18,6 +19,14 @@ pub struct Signature {
 }
 
 impl Signature {
+    pub fn new(required: Vec<Parameter>, default: Vec<Parameter>, variadic: Option<Parameter>) -> Self {
+        Self {
+            required: required.into_boxed_slice(),
+            default: default.into_boxed_slice(),
+            variadic,
+        }
+    }
+    
     pub fn is_variadic(&self) -> bool { 
         self.variadic.is_some()
     }
@@ -34,13 +43,17 @@ impl Signature {
 
 #[derive(Clone, Debug)]
 pub struct Parameter {
-    name: StringSymbol,
-    access: Access,
+    name: ConstID,
+    decl: DeclType,
     default: Option<ChunkID>,
 }
 
 impl Parameter {
-    pub fn name(&self) -> &StringSymbol { &self.name }
-    pub fn access(&self) -> &Access { &self.access }
+    pub fn new(name: ConstID, decl: DeclType, default: Option<ChunkID>) -> Self {
+        Self { name, decl, default }
+    }
+    
+    pub fn name(&self) -> &ConstID { &self.name }
+    pub fn decl(&self) -> &DeclType { &self.decl }
     pub fn has_default(&self) -> bool { self.default.is_some() }
 }

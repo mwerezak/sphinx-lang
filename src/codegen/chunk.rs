@@ -14,7 +14,9 @@ use crate::debug::DebugSymbol;
 // these are limited to u16 right now because they are loaded by opcodes
 pub type ConstID = u16;
 pub type ChunkID = u16;
-pub type FunctionID = u16;
+
+pub type StringID = usize;
+pub type FunctionID = usize;
 
 
 // Constants
@@ -23,7 +25,7 @@ pub type FunctionID = u16;
 pub enum Constant {
     Integer(IntType),
     Float([u8; mem::size_of::<FloatType>()]),
-    String(usize),
+    String(StringID),
     Function(ChunkID, FunctionID),
 }
 
@@ -33,10 +35,6 @@ impl From<IntType> for Constant {
 
 impl From<FloatType> for Constant {
     fn from(value: FloatType) -> Self { Self::Float(value.to_le_bytes()) }
-}
-
-impl From<usize> for Constant {
-    fn from(index: usize) -> Self { Self::String(index) }
 }
 
 impl From<InternSymbol> for Constant {
@@ -180,6 +178,12 @@ impl ChunkBuilder {
         self.get_or_insert_const(Constant::String(symbol.to_usize()))
     }
     
+    pub fn push_function(&mut self, signature: Signature) -> FunctionID {
+        let function_id = FunctionID::from(self.functions.len());
+        self.functions.push(signature);
+        function_id
+    }
+    
     // Output
     
     pub fn build(self) -> UnloadedProgram {
@@ -290,12 +294,12 @@ impl UnloadedProgram {
             .map(|(chunk_id, chunk)| (ChunkID::try_from(chunk_id).unwrap(), chunk))
     }
     
-    pub fn string(&self, string_id: usize) -> &str {
-        let string_idx = &self.string_index[string_id];
+    pub fn string(&self, string_id: StringID) -> &str {
+        let string_idx = &self.string_index[usize::from(string_id)];
         str::from_utf8(&self.strings[string_idx.as_range()]).expect("invalid string")
     }
     
-    pub fn iter_strings(&self) -> impl Iterator<Item=(usize, &str)> {
+    pub fn iter_strings(&self) -> impl Iterator<Item=(StringID, &str)> {
         self.string_index.iter()
             .map(|index| &self.strings[index.as_range()])
             .map(|slice| str::from_utf8(slice).expect("invalid string"))

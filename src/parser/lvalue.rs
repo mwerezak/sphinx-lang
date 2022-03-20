@@ -39,6 +39,7 @@ pub struct Assignment {
 
 // Declarations
 
+// TODO rename
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DeclType {
     Immutable,

@@ -1,6 +1,6 @@
 use crate::runtime::strings::InternSymbol;
 use crate::parser::lvalue::DeclType;
-use crate::parser::expr::Expr;
+use crate::parser::expr::ExprMeta;
 use crate::parser::stmt::{StmtMeta, StmtList};
 
 // Function Definitions
@@ -10,25 +10,28 @@ pub struct FunctionDef {
     body: StmtList,
 }
 
-
 impl FunctionDef {
     pub fn new(signature: SignatureDef, body: StmtList) -> Self {
         FunctionDef {
             signature, body,
         }
     }
+    
+    pub fn signature(&self) -> &SignatureDef { &self.signature }
+    
+    pub fn body(&self) -> &StmtList { &self.body }
 }
 
 
 #[derive(Debug, Clone)]
 pub struct SignatureDef {
-    required: Box<[ParamDef]>,
-    default: Box<[ParamDef]>,
-    variadic: Option<ParamDef>,
+    pub required: Box<[RequiredDef]>,
+    pub default: Box<[DefaultDef]>,
+    pub variadic: Option<VariadicDef>,
 }
 
 impl SignatureDef {
-    pub fn new(required: Vec<ParamDef>, default: Vec<ParamDef>, variadic: Option<ParamDef>) -> Self {
+    pub fn new(required: Vec<RequiredDef>, default: Vec<DefaultDef>, variadic: Option<VariadicDef>) -> Self {
         SignatureDef {
             required: required.into_boxed_slice(),
             default: default.into_boxed_slice(),
@@ -41,17 +44,21 @@ impl SignatureDef {
 
 
 #[derive(Debug, Clone)]
-pub struct ParamDef {
-    name: InternSymbol,
-    decl: DeclType,
-    default: Option<Box<Expr>>,
+pub struct RequiredDef {
+    pub name: InternSymbol,
+    pub decl: DeclType,
 }
 
-impl ParamDef {
-    pub fn new(name: InternSymbol, decl: DeclType, default: Option<Expr>) -> Self {
-        ParamDef {
-            name, decl,
-            default: default.map(|expr| Box::new(expr)),
-        }
-    }
+#[derive(Debug, Clone)]
+pub struct DefaultDef {
+    pub name: InternSymbol,
+    pub decl: DeclType,
+    pub default: Box<ExprMeta>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VariadicDef {
+    pub name: InternSymbol,
+    pub decl: DeclType,
+    pub default: Option<Box<ExprMeta>>,
 }
