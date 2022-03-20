@@ -6,6 +6,7 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::types::Metatable;
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
+use crate::runtime::gc::GCHandle;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -33,7 +34,7 @@ pub enum Variant {
     String(StringSymbol),
     // TODO just GC tuples
     Tuple(Rc<[Variant]>),  //  will use COW semantics, so if we need to send to another thread we can just clone the underlying data
-    //Object(GCHandle),
+    Object(GCHandle),
 }
 
 impl Variant {
@@ -212,6 +213,8 @@ impl fmt::Debug for Variant {
                 }
                 write!(fmt, "{:?})", last)
             }
+            
+            Self::Object(_handle) => unimplemented!(),
         }
     }
 }
