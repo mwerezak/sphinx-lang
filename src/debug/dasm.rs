@@ -40,10 +40,9 @@ impl<'c, 's> Disassembler<'c, 's> {
     }
     
     pub fn write_disassembly(&self, fmt: &mut impl Write) -> fmt::Result {
-        for chunk_id in self.program.chunk_ids() {
+        for (chunk_id, chunk) in self.program.iter_chunks() {
             writeln!(fmt, "\n\nchunk {}:\n", chunk_id)?;
             
-            let chunk = self.program.chunk(chunk_id);
             let symbols = self.symbols.map(|symbols| symbols.get(&chunk_id)).flatten();
             self.decode_chunk(fmt, chunk, symbols)?;
         }

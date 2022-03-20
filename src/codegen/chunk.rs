@@ -183,40 +183,42 @@ impl ChunkBuilder {
     // Output
     
     pub fn build(self) -> UnloadedProgram {
-        let mut bytes = Vec::new();
-        let mut chunks = Vec::with_capacity(self.chunks.len());
+        let mut chunks = Vec::new();
+        let mut chunk_index = Vec::with_capacity(self.chunks.len());
         
         for chunk in self.chunks.into_iter() {
-            let offset = bytes.len();
+            let offset = chunks.len();
             let length = chunk.bytes.len();
-            bytes.extend(chunk.bytes);
+            chunks.extend(chunk.bytes);
             
             let index = ChunkIndex {
                 offset, length,
                 symbol: chunk.symbol,
             };
-            chunks.push(index);
+            chunk_index.push(index);
         }
         
         let mut strings = Vec::new();
-        strings.resize_with(self.strings.len(), StringIndex::default);
+        let mut string_index = Vec::new();
+        string_index.resize_with(self.strings.len(), StringIndex::default);
         
         for (symbol, string) in self.strings.into_iter() {
-            let string = string.as_bytes();
-            let offset = bytes.len();
-            let length = string.len();
-            bytes.extend(string);
+            let bytes = string.as_bytes();
+            let offset = strings.len();
+            let length = bytes.len();
+            strings.extend(bytes);
             
             let index = StringIndex {
                 offset, length
             };
-            strings.insert(symbol.to_usize(), index);
+            string_index.insert(symbol.to_usize(), index);
         }
         
         UnloadedProgram {
-            bytes: bytes.into_boxed_slice(),
             chunks: chunks.into_boxed_slice(),
+            chunk_index: chunk_index.into_boxed_slice(),
             strings: strings.into_boxed_slice(),
+            string_index: string_index.into_boxed_slice(),
             consts: self.consts.into_boxed_slice(),
             functions: self.functions.into_boxed_slice(),
         }
@@ -262,32 +264,37 @@ impl StringIndex {
 /// between threads.
 #[derive(Debug, Clone)]
 pub struct UnloadedProgram {
-    bytes: Box<[u8]>,
-    chunks: Box<[ChunkIndex]>,
-    strings: Box<[StringIndex]>,
+    chunks: Box<[u8]>,
+    chunk_index: Box<[ChunkIndex]>,
+    strings: Box<[u8]>,
+    string_index: Box<[StringIndex]>,
     consts: Box<[Constant]>,
     functions: Box<[Signature]>,
 }
 
 impl UnloadedProgram {
     pub fn chunk(&self, chunk_id: ChunkID) -> &[u8] {
-        let chunk_idx = &self.chunks[usize::from(chunk_id)];
-        &self.bytes[chunk_idx.as_range()]
+        let chunk_idx = &self.chunk_index[usize::from(chunk_id)];
+        &self.chunks[chunk_idx.as_range()]
     }
     
-    pub fn chunk_ids(&self) -> impl Iterator<Item=ChunkID> {
-        ChunkID::from(0u16)..ChunkID::try_from(self.chunks.len()).unwrap()
+    pub fn iter_chunks(&self) -> impl Iterator<Item=(ChunkID, &[u8])> {
+        self.chunk_index.iter()
+            .map(|index| &self.chunks[index.as_range()])
+            .enumerate()
+            .map(|(chunk_id, chunk)| (ChunkID::try_from(chunk_id).unwrap(), chunk))
     }
     
-    pub fn string(&self, index: usize) -> &str {
-        let string_idx = &self.strings[index];
-        str::from_utf8(&self.bytes[string_idx.as_range()]).expect("invalid string")
+    pub fn string(&self, string_id: usize) -> &str {
+        let string_idx = &self.string_index[string_id];
+        str::from_utf8(&self.strings[string_idx.as_range()]).expect("invalid string")
     }
     
-    pub fn iter_strings(&self) -> impl Iterator<Item=&str> {
-        self.strings.iter()
-            .map(|index| &self.bytes[index.as_range()])
+    pub fn iter_strings(&self) -> impl Iterator<Item=(usize, &str)> {
+        self.string_index.iter()
+            .map(|index| &self.strings[index.as_range()])
             .map(|slice| str::from_utf8(slice).expect("invalid string"))
+            .enumerate()
     }
     
     pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {
@@ -300,18 +307,18 @@ impl UnloadedProgram {
 
 #[derive(Debug)]
 pub struct Program {
-    bytes: Box<[u8]>,
-    chunks: Box<[ChunkIndex]>,
+    chunks: Box<[u8]>,
+    chunk_index: Box<[ChunkIndex]>,
+    strings: Box<[StringSymbol]>,
     consts: Box<[Constant]>,
     functions: Box<[Signature]>,
-    strings: Box<[StringSymbol]>,
 }
 
 impl Program {
     #[inline(always)]
     pub fn chunk(&self, chunk_id: ChunkID) -> &[u8] {
-        let chunk = &self.chunks[usize::from(chunk_id)];
-        &self.bytes[chunk.as_range()]
+        let index = &self.chunk_index[usize::from(chunk_id)];
+        &self.chunks[index.as_range()]
     }
     
     pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {
@@ -332,7 +339,7 @@ impl Program {
             let mut interner = string_table.interner_mut();
             
             let mut strings = Vec::with_capacity(program.strings.len());
-            for string in program.iter_strings() {
+            for (_, string) in program.iter_strings() {
                 let symbol = StringSymbol::from(interner.get_or_intern(string));
                 strings.push(symbol);
             }
@@ -340,16 +347,9 @@ impl Program {
             strings.into_boxed_slice()
         });
         
-        let byte_len = program.chunk_ids()
-            .map(|chunk_id| program.chunk(chunk_id).len())
-            .sum();
-        
-        let mut bytes = program.bytes.into_vec();
-        bytes.truncate(byte_len);
-        
         Self {
-            bytes: bytes.into_boxed_slice(),
             chunks: program.chunks,
+            chunk_index: program.chunk_index,
             consts: program.consts,
             functions: program.functions,
             strings
@@ -358,33 +358,34 @@ impl Program {
     
     /// prepares an `UnloadedProgram` for exporting to a file
     pub fn unload(self) -> UnloadedProgram {
-        let mut bytes = self.bytes.into_vec();
-        let mut strings = Vec::with_capacity(self.strings.len());
+        let mut strings = Vec::new();
+        let mut string_index = Vec::with_capacity(self.strings.len());
         
         STRING_TABLE.with(|string_table| {
             let interner = string_table.interner();
             
             for symbol in self.strings.into_iter() {
-                let string = interner
+                let bytes = interner
                     .resolve((*symbol).into())
                     .unwrap().as_bytes();
                 
-                let offset = bytes.len();
-                let length = string.len();
+                let offset = strings.len();
+                let length = bytes.len();
                 let index = StringIndex {
                     offset, length,
                 };
                 
-                bytes.extend(string);
-                strings.push(index);
+                strings.extend(bytes);
+                string_index.push(index);
             }
             
         });
         
         UnloadedProgram {
-            bytes: bytes.into_boxed_slice(),
             chunks: self.chunks,
+            chunk_index: self.chunk_index,
             strings: strings.into_boxed_slice(),
+            string_index: string_index.into_boxed_slice(),
             consts: self.consts,
             functions: self.functions,
         }
