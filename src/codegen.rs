@@ -175,11 +175,11 @@ impl Scope {
 }
 
 #[derive(Debug)]
-struct CompilerState {
+struct ScopeTracker {
     scopes: Vec<Scope>,
 }
 
-impl CompilerState {
+impl ScopeTracker {
     fn new() -> Self {
         Self { scopes: Vec::new() }
     }
@@ -284,7 +284,7 @@ const CHUNK_MAIN: ChunkID = 0;
 
 pub struct Compiler {
     builder: ChunkBuilder,
-    state: CompilerState,
+    scope: ScopeTracker,
     errors: Vec<CompileError>,
     symbols: ChunkSymbols,
 }
@@ -293,7 +293,7 @@ impl Compiler {
     pub fn new(strings: StringInterner) -> Self {
         let mut compiler = Compiler {
             builder: ChunkBuilder::with_strings(strings),
-            state: CompilerState::new(),
+            scope: ScopeTracker::new(),
             errors: Vec::new(),
             symbols: ChunkSymbols::new(),
         };
@@ -371,8 +371,8 @@ impl CodeGenerator<'_> {
     fn builder(&self) -> &ChunkBuilder { &self.compiler.builder }
     fn builder_mut(&mut self) -> &mut ChunkBuilder { &mut self.compiler.builder }
     
-    fn state(&self) -> &CompilerState { &self.compiler.state }
-    fn state_mut(&mut self) -> &mut CompilerState { &mut self.compiler.state }
+    fn scope(&self) -> &ScopeTracker { &self.compiler.scope }
+    fn scope_mut(&mut self) -> &mut ScopeTracker { &mut self.compiler.scope }
     
     fn symbols(&self) -> &ChunkSymbols { &self.compiler.symbols }
     fn symbols_mut(&mut self) -> &mut ChunkSymbols { &mut self.compiler.symbols }
@@ -530,11 +530,11 @@ impl CodeGenerator<'_> {
     ///////// Scopes /////////
     
     fn emit_begin_scope(&mut self, tag: ScopeTag, symbol: Option<&DebugSymbol>) {
-        self.state_mut().push_scope(tag, symbol);
+        self.scope_mut().push_scope(tag, symbol);
     }
     
     fn emit_end_scope(&mut self) {
-        let scope = self.state_mut().pop_scope();
+        let scope = self.scope_mut().pop_scope();
         let symbol = scope.debug_symbol();
         
         // discard all the locals from the stack
@@ -757,7 +757,7 @@ impl CodeGenerator<'_> {
     
     fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclarationRef) -> CompileResult<()> {
         match &decl.lhs {
-            LValue::Identifier(name) => if self.state().is_global_scope() {
+            LValue::Identifier(name) => if self.scope().is_global_scope() {
                 self.compile_decl_global_name(symbol, decl.decl, *name, &decl.init)
             } else {
                 self.compile_decl_local_name(symbol, decl.decl, *name, &decl.init)
@@ -804,7 +804,7 @@ impl CodeGenerator<'_> {
         
         self.compile_expr(symbol, init)?;  // make sure to evaluate initializer first in order for shadowing to work
         
-        self.state_mut().insert_local(decl, name)?;
+        self.scope_mut().insert_local(decl, name)?;
         self.emit_instr(symbol, OpCode::InsertLocal);
         Ok(())
     }
@@ -887,10 +887,10 @@ impl CodeGenerator<'_> {
         
         // Generate assignment
         
-        if self.state().local_scope().is_some() {
+        if self.scope().local_scope().is_some() {
             
             // check if the name is found in the local scope...
-            let result = self.state().resolve_local_strict(name).map(|local| (local.decl, local.offset));
+            let result = self.scope().resolve_local_strict(name).map(|local| (local.decl, local.offset));
             
             if let Some((decl, offset)) = result {
                 if decl != DeclType::Mutable {
@@ -903,7 +903,7 @@ impl CodeGenerator<'_> {
             
             // otherwise search enclosing scopes...
             
-            let result = self.state().resolve_nonlocal(name).map(|local| (local.decl, local.offset));
+            let result = self.scope().resolve_nonlocal(name).map(|local| (local.decl, local.offset));
             
             if let Some((decl, offset)) = result {
                 if !assign.nonlocal {
@@ -922,7 +922,7 @@ impl CodeGenerator<'_> {
         // ...finally, try to assign global
         
         // allow assignment to global only if all enclosing scopes permit it
-        if !assign.nonlocal && !self.state().iter_scopes().all(|scope| scope.allow_enclosing_assignment()) {
+        if !assign.nonlocal && !self.scope().iter_scopes().all(|scope| scope.allow_enclosing_assignment()) {
             return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
         }
         
@@ -992,7 +992,7 @@ impl CodeGenerator<'_> {
     
     fn compile_name_lookup(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol) -> CompileResult<()> {
         
-        let local_offset = self.state().resolve_local(name).map(|local| local.offset);
+        let local_offset = self.scope().resolve_local(name).map(|local| local.offset);
         if let Some(offset) = local_offset {
             
             // Local Variable

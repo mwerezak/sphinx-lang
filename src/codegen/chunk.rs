@@ -44,6 +44,12 @@ impl From<InternSymbol> for Constant {
 }
 
 
+// pub enum ChunkTag {
+//     Module,
+//     Function,
+//     DefaultArg,
+// }
+
 #[derive(Default, Debug, Clone)]
 pub struct ChunkInfo {
     pub symbol: Option<DebugSymbol>,
