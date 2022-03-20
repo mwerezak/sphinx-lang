@@ -77,12 +77,12 @@ fn main() {
         return;
     }
     
-    let output = build_result.unwrap();
-    let symbols = output.symbols.iter().flat_map(|rle| rle.iter().filter_map(|sym| sym));
+    let build = build_result.unwrap();
+    let symbols = build.symbols.values().flat_map(|rle| rle.iter().filter_map(|sym| sym));
     let symbol_table = module.resolve_symbols(symbols);
     
     let dasm = {
-        let dasm = Disassembler::new(&output.program);
+        let dasm = Disassembler::new(&build.program);
         
         if let Ok(ref symbol_table) = symbol_table {
             dasm.with_symbol_table(&symbol_table)

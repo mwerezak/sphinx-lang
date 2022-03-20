@@ -1,11 +1,12 @@
 use std::fmt;
 use std::fmt::{Write, Formatter};
 use std::iter;
+use std::collections::HashMap;
 use string_interner::Symbol as _;
 
 use crate::language::FloatType;
 use crate::codegen::OpCode;
-use crate::codegen::chunk::{UnloadedProgram, Constant, ConstID};
+use crate::codegen::chunk::{UnloadedProgram, Constant, ConstID, ChunkID};
 use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, SymbolResolutionError};
 
 
@@ -13,7 +14,7 @@ const PAD_WIDTH: usize = 60;
 
 pub struct Disassembler<'c, 's> {
     program: &'c UnloadedProgram,
-    symbols: Option<&'s DebugSymbolsRLE>,
+    symbols: Option<&'s ChunkSymbols>,
     symbol_table: Option<&'s ResolvedSymbolTable<'s>>,
 }
 
@@ -30,7 +31,7 @@ impl<'c, 's> Disassembler<'c, 's> {
         Self { program, symbols: None, symbol_table: None }
     }
     
-    pub fn with_symbols(mut self, symbols: &'s DebugSymbolsRLE) -> Self {
+    pub fn with_symbols(mut self, symbols: &'s ChunkSymbols) -> Self {
         self.symbols.replace(symbols); self
     }
     
@@ -43,14 +44,15 @@ impl<'c, 's> Disassembler<'c, 's> {
             writeln!(fmt, "\n\nchunk {}:\n", chunk_id)?;
             
             let chunk = self.program.chunk(chunk_id);
-            self.decode_chunk(fmt, chunk)?;
+            let symbols = self.symbols.map(|symbols| symbols.get(&chunk_id)).flatten();
+            self.decode_chunk(fmt, chunk, symbols)?;
         }
         
         Ok(())
     }
     
-    fn decode_chunk(&self, fmt: &mut impl Write, chunk: &[u8]) -> fmt::Result {
-        let mut symbols = self.symbols.map(|symbols| symbols.iter());
+    fn decode_chunk(&self, fmt: &mut impl Write, chunk: &[u8], symbols: Option<&DebugSymbolsRLE>) -> fmt::Result {
+        let mut symbols = symbols.map(|symbols| symbols.iter());
         let mut last_symbol = None;
         
         let mut offset = 0;
@@ -246,6 +248,8 @@ impl fmt::Display for Constant {
     }
 }
 
+
+pub type ChunkSymbols = HashMap<ChunkID, DebugSymbolsRLE>;
 
 // Container for debug symbols generated for bytecode
 // Should contain a DebugSymbol for each opcode in the 

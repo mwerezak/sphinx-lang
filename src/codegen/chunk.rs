@@ -59,6 +59,13 @@ impl ChunkBuf {
         }
     }
     
+    pub fn with_symbol(symbol: DebugSymbol) -> Self {
+        Self {
+            bytes: Vec::new(),
+            symbol: Some(symbol),
+        }
+    }
+    
     // Bytes
     
     pub fn len(&self) -> usize {
@@ -110,7 +117,7 @@ impl ChunkBuilder {
         Self {
             consts: Vec::new(),
             functions: Vec::new(),
-            chunks: vec![ ChunkBuf::new() ],
+            chunks: Vec::new(),
             dedup: HashMap::new(),
             strings: StringInterner::new(),
         }
@@ -118,7 +125,7 @@ impl ChunkBuilder {
     
     pub fn with_strings(strings: StringInterner) -> Self {
         Self {
-            chunks: vec![ ChunkBuf::new() ],
+            chunks: Vec::new(),
             functions: Vec::new(),
             consts: Vec::new(),
             dedup: HashMap::new(),
@@ -128,11 +135,16 @@ impl ChunkBuilder {
     
     // Bytecode
     
-    pub fn new_chunk(&mut self) -> CompileResult<ChunkID> {
+    pub fn new_chunk(&mut self, symbol: Option<&DebugSymbol>) -> CompileResult<ChunkID> {
         let chunk_id = ChunkID::try_from(self.chunks.len())
             .map_err(|_| CompileError::from(ErrorKind::ChunkCountLimit))?;
         
-        self.chunks.push(ChunkBuf::new());
+        if let Some(symbol) = symbol {
+            self.chunks.push(ChunkBuf::with_symbol(*symbol));
+        } else {
+            self.chunks.push(ChunkBuf::new())
+        }
+        
         Ok(chunk_id)
     }
 
@@ -167,6 +179,8 @@ impl ChunkBuilder {
         let symbol = self.strings.get_or_intern(string);
         self.get_or_insert_const(Constant::String(symbol.to_usize()))
     }
+    
+    // Output
     
     pub fn build(self) -> UnloadedProgram {
         let mut bytes = Vec::new();

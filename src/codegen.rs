@@ -13,7 +13,7 @@ use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Sh
 use crate::runtime::strings::{StringInterner, InternSymbol};
 use crate::runtime::vm::LocalIndex;
 use crate::debug::DebugSymbol;
-use crate::debug::dasm::DebugSymbolsRLE;
+use crate::debug::dasm::{ChunkSymbols, DebugSymbolsRLE};
 
 pub mod chunk;
 pub mod opcodes;
@@ -130,10 +130,14 @@ struct Scope {
     depth: usize,
     offset: Option<Offset>,
     locals: Vec<Local>,
-    symbol: DebugSymbol,
+    symbol: Option<DebugSymbol>,
 }
 
 impl Scope {
+    fn debug_symbol(&self) -> Option<&DebugSymbol> {
+        self.symbol.as_ref()
+    }
+    
     fn last_offset(&self) -> Option<Offset> {
         self.locals.last().map_or(self.offset, |local| Some(local.offset))
     }
@@ -192,11 +196,12 @@ impl CompilerState {
         self.scopes.last_mut()
     }
     
-    fn push_scope(&mut self, tag: ScopeTag, symbol: DebugSymbol) {
+    fn push_scope(&mut self, tag: ScopeTag, symbol: Option<&DebugSymbol>) {
         let offset = self.local_scope().and_then(|scope| scope.last_offset());
         
         let scope = Scope {
-            tag, symbol,
+            tag, 
+            symbol: symbol.map(|sym| *sym),
             depth: self.scopes.len(),
             offset,
             locals: Vec::new(),
@@ -265,46 +270,85 @@ impl CompilerState {
 }
 
 
+
+/// Output container
+#[derive(Debug)]
+pub struct CompiledProgram {
+    pub program: UnloadedProgram,
+    pub symbols: ChunkSymbols,
+}
+
 // Code Generator
 
-#[derive(Debug)]
-pub struct CompileOutput {
-    pub program: UnloadedProgram,
-    pub symbols: Box<[DebugSymbolsRLE]>,
-}
+const CHUNK_MAIN: ChunkID = 0;
 
-pub struct CodeGenerator {
-    chunk: ChunkBuilder,
+pub struct Compiler {
+    builder: ChunkBuilder,
     state: CompilerState,
     errors: Vec<CompileError>,
-    symbols: Vec<DebugSymbolsRLE>,
+    symbols: ChunkSymbols,
 }
 
-impl CodeGenerator {
+impl Compiler {
     pub fn new(strings: StringInterner) -> Self {
-        CodeGenerator {
-            chunk: ChunkBuilder::with_strings(strings),
+        let mut compiler = Compiler {
+            builder: ChunkBuilder::with_strings(strings),
             state: CompilerState::new(),
             errors: Vec::new(),
-            symbols: vec![ DebugSymbolsRLE::new() ],
+            symbols: ChunkSymbols::new(),
+        };
+        
+        // create main chunk
+        let chunk_main = compiler.push_chunk(None).unwrap();
+        debug_assert!(chunk_main == CHUNK_MAIN);
+        
+        compiler
+    }
+    
+    fn push_chunk(&mut self, symbol: Option<&DebugSymbol>) -> CompileResult<ChunkID> {
+        let chunk_id = self.builder.new_chunk(symbol)?;
+        if !self.symbols.contains_key(&chunk_id) {
+            self.symbols.insert(chunk_id, DebugSymbolsRLE::new());
+        }
+        Ok(chunk_id)
+    }
+    
+    fn get_chunk(&mut self, chunk_id: ChunkID) -> CodeGenerator {
+        CodeGenerator {
+            compiler: self,
+            chunk_id,
         }
     }
     
-    pub fn compile_program<'a>(mut self, program: impl Iterator<Item=&'a StmtMeta>) -> Result<CompileOutput, Vec<CompileError>> {
+    fn main_chunk(&mut self) -> CodeGenerator {
+        self.get_chunk(CHUNK_MAIN)
+    }
+    
+    pub fn compile_program<'a>(mut self, program: impl Iterator<Item=&'a StmtMeta>) -> Result<CompiledProgram, Vec<CompileError>> {
         for stmt in program {
             self.push_stmt(stmt);
         }
         self.finish()
     }
     
-    pub fn finish(self) -> Result<CompileOutput, Vec<CompileError>> {
+    pub fn push_stmt(&mut self, stmt: &StmtMeta) {
+        let symbol = stmt.debug_symbol();
+        
+        let result = self.main_chunk().compile_stmt(Some(symbol), stmt.variant());
+        
+        if let Err(error) = result {
+            self.errors.push(error.with_symbol(*symbol));
+        }
+    }
+    
+    pub fn finish(mut self) -> Result<CompiledProgram, Vec<CompileError>> {
         if self.errors.is_empty() {
-            let mut chunk = self.chunk;
-            chunk.chunk_mut(0).push_byte(OpCode::Return);
             
-            let output = CompileOutput {
-                program: chunk.build(),
-                symbols: self.symbols.into_boxed_slice(),
+            self.main_chunk().emit_instr(None, OpCode::Return);
+            
+            let output = CompiledProgram {
+                program: self.builder.build(),
+                symbols: self.symbols,
             };
             
             Ok(output)
@@ -313,47 +357,63 @@ impl CodeGenerator {
         }
     }
     
-    pub fn push_stmt(&mut self, stmt: &StmtMeta) {
-        let symbol = stmt.debug_symbol();
-        if let Err(error) = self.compile_stmt(symbol, stmt.variant()) {
-            self.errors.push(error.with_symbol(*symbol));
-        }
-    }
+
+}
+
+struct CodeGenerator<'c> {
+    compiler: &'c mut Compiler,
+    chunk_id: ChunkID,
+}
+
+impl CodeGenerator<'_> {
+    fn chunk_id(&self) -> ChunkID { self.chunk_id }
+    
+    fn builder(&self) -> &ChunkBuilder { &self.compiler.builder }
+    fn builder_mut(&mut self) -> &mut ChunkBuilder { &mut self.compiler.builder }
+    
+    fn state(&self) -> &CompilerState { &self.compiler.state }
+    fn state_mut(&mut self) -> &mut CompilerState { &mut self.compiler.state }
+    
+    fn symbols(&self) -> &ChunkSymbols { &self.compiler.symbols }
+    fn symbols_mut(&mut self) -> &mut ChunkSymbols { &mut self.compiler.symbols }
     
     fn chunk(&self) -> &ChunkBuf {
-        self.chunk.chunk(0)
+        self.builder().chunk(self.chunk_id)
     }
     
     fn chunk_mut(&mut self) -> &mut ChunkBuf {
-        self.chunk.chunk_mut(0)
+        self.builder_mut().chunk_mut(0)
     }
     
     fn current_offset(&self) -> usize {
         self.chunk().len()
     }
     
-    fn push_symbol(&mut self, symbol: DebugSymbol) {
-        self.symbols[0].push(Some(symbol))
+    fn push_symbol(&mut self, symbol: Option<&DebugSymbol>) {
+        let chunk_id = self.chunk_id;
+        self.symbols_mut()
+            .get_mut(&chunk_id).unwrap()
+            .push(symbol.map(|sym| *sym))
     }
     
     ///////// Emitting Bytecode /////////
     
-    fn emit_instr(&mut self, symbol: &DebugSymbol, opcode: OpCode) {
+    fn emit_instr(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode) {
         debug_assert!(opcode.instr_len() == 1);
-        self.push_symbol(*symbol);
+        self.push_symbol(symbol);
         self.chunk_mut().push_byte(opcode);
     }
     
-    fn emit_instr_byte(&mut self, symbol: &DebugSymbol, opcode: OpCode, byte: u8) {
+    fn emit_instr_byte(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode, byte: u8) {
         debug_assert!(opcode.instr_len() == 2);
-        self.push_symbol(*symbol);
+        self.push_symbol(symbol);
         self.chunk_mut().push_byte(opcode);
         self.chunk_mut().push_byte(byte);
     }
     
-    fn emit_instr_data(&mut self, symbol: &DebugSymbol, opcode: OpCode, bytes: &[u8]) {
+    fn emit_instr_data(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode, bytes: &[u8]) {
         debug_assert!(opcode.instr_len() == 1 + bytes.len());
-        self.push_symbol(*symbol);
+        self.push_symbol(symbol);
         self.chunk_mut().push_byte(opcode);
         self.chunk_mut().extend_bytes(&bytes);
     }
@@ -367,8 +427,8 @@ impl CodeGenerator {
         self.chunk_mut().patch_bytes(offset + 1, bytes);
     }
     
-    fn emit_dummy_instr(&mut self, symbol: &DebugSymbol, width: usize) {
-        self.push_symbol(*symbol);
+    fn emit_dummy_instr(&mut self, symbol: Option<&DebugSymbol>, width: usize) {
+        self.push_symbol(symbol);
         
         for i in 0..width {
             self.chunk_mut().push_byte(OpCode::Nop);
@@ -377,11 +437,11 @@ impl CodeGenerator {
     
     ///////// Constants /////////
     
-    fn get_or_make_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<ConstID> {
-        self.chunk.get_or_insert_const(value)
+    fn get_or_make_const(&mut self, symbol: Option<&DebugSymbol>, value: Constant) -> CompileResult<ConstID> {
+        self.builder_mut().get_or_insert_const(value)
     }
     
-    fn emit_load_const(&mut self, symbol: &DebugSymbol, value: Constant) -> CompileResult<()> {
+    fn emit_load_const(&mut self, symbol: Option<&DebugSymbol>, value: Constant) -> CompileResult<()> {
         let cid = self.get_or_make_const(symbol, value)?;
         
         if cid <= u8::MAX.into() {
@@ -394,7 +454,7 @@ impl CodeGenerator {
     
     ///////// Jumps /////////
     
-    fn emit_jump_instr(&mut self, symbol: &DebugSymbol, jump: Jump, target: usize) -> CompileResult<()> {
+    fn emit_jump_instr(&mut self, symbol: Option<&DebugSymbol>, jump: Jump, target: usize) -> CompileResult<()> {
         let jump_site = self.current_offset();
         let guess_width = jump.dummy_width();  // guess the width of the jump instruction
         
@@ -469,29 +529,29 @@ impl CodeGenerator {
     
     ///////// Scopes /////////
     
-    fn emit_begin_scope(&mut self, tag: ScopeTag, symbol: &DebugSymbol) {
-        self.state.push_scope(tag, *symbol);
+    fn emit_begin_scope(&mut self, tag: ScopeTag, symbol: Option<&DebugSymbol>) {
+        self.state_mut().push_scope(tag, symbol);
     }
     
     fn emit_end_scope(&mut self) {
-        let scope = self.state.pop_scope();
-        let symbol = scope.symbol;
+        let scope = self.state_mut().pop_scope();
+        let symbol = scope.debug_symbol();
         
         // discard all the locals from the stack
         let mut discard = scope.locals.len();
         while discard > u8::MAX.into() {
-            self.emit_instr_byte(&symbol, OpCode::DropLocals, u8::MAX);
+            self.emit_instr_byte(symbol, OpCode::DropLocals, u8::MAX);
             discard -= usize::from(u8::MAX);
         }
         
         if discard > 0 {
-            self.emit_instr_byte(&symbol, OpCode::DropLocals, u8::try_from(discard).unwrap());
+            self.emit_instr_byte(symbol, OpCode::DropLocals, u8::try_from(discard).unwrap());
         }
     }
     
     ///////// Statements /////////
     
-    fn compile_stmt(&mut self, symbol: &DebugSymbol, stmt: &Stmt) -> CompileResult<()> {
+    fn compile_stmt(&mut self, symbol: Option<&DebugSymbol>, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
             Stmt::Loop { label, body } => self.compile_loop(symbol, label.as_ref(), body)?,
             
@@ -518,7 +578,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_loop(&mut self, symbol: &DebugSymbol, label: Option<&Label>, body: &StmtList) -> CompileResult<()> {
+    fn compile_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, body: &StmtList) -> CompileResult<()> {
         
         let loop_target = self.current_offset();
         
@@ -531,7 +591,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_while_loop(&mut self, symbol: &DebugSymbol, label: Option<&Label>, condition: &Expr, body: &StmtList) -> CompileResult<()> {
+    fn compile_while_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, condition: &Expr, body: &StmtList) -> CompileResult<()> {
         
         // first iteration conditional jump
         self.compile_expr(symbol, condition)?;
@@ -557,7 +617,7 @@ impl CodeGenerator {
     
     ///////// Expressions /////////
     
-    fn compile_expr(&mut self, symbol: &DebugSymbol, expr: &Expr) -> CompileResult<()> {
+    fn compile_expr(&mut self, symbol: Option<&DebugSymbol>, expr: &Expr) -> CompileResult<()> {
         match expr {
             Expr::Atom(atom) => self.compile_atom(symbol, atom)?,
             
@@ -588,7 +648,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_block(&mut self, symbol: &DebugSymbol, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
+    fn compile_block(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
         
         self.emit_begin_scope(ScopeTag::Block, symbol);
         self.compile_expr_block(symbol, suite)?;
@@ -597,7 +657,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_if_expr(&mut self, symbol: &DebugSymbol, branches: &[ConditionalBranch], else_clause: Option<&ExprBlock>) -> CompileResult<()> {
+    fn compile_if_expr(&mut self, symbol: Option<&DebugSymbol>, branches: &[ConditionalBranch], else_clause: Option<&ExprBlock>) -> CompileResult<()> {
         debug_assert!(!branches.is_empty());
         
         // track the sites where we jump to the end, so we can patch them later
@@ -658,7 +718,7 @@ impl CodeGenerator {
         // compile stmt suite
         for stmt in stmt_list.suite().iter() {
             let inner_symbol = stmt.debug_symbol();
-            self.compile_stmt(inner_symbol, stmt.variant())
+            self.compile_stmt(Some(inner_symbol), stmt.variant())
                 .map_err(|err| err.with_symbol(*inner_symbol))?;
         }
         
@@ -680,13 +740,13 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_expr_block(&mut self, symbol: &DebugSymbol, suite: &ExprBlock) -> CompileResult<()> {
+    fn compile_expr_block(&mut self, symbol: Option<&DebugSymbol>, suite: &ExprBlock) -> CompileResult<()> {
         self.compile_stmt_list(suite.stmt_list())?;
         
         // result expression
         if let Some(expr) = suite.result() {
             let inner_symbol = expr.debug_symbol();
-            self.compile_expr(inner_symbol, expr.variant())
+            self.compile_expr(Some(inner_symbol), expr.variant())
                 .map_err(|err| err.with_symbol(*inner_symbol))?;
         } else {
             self.emit_instr(symbol, OpCode::Nil); // implicit nil
@@ -695,9 +755,9 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_declaration(&mut self, symbol: &DebugSymbol, decl: DeclarationRef) -> CompileResult<()> {
+    fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclarationRef) -> CompileResult<()> {
         match &decl.lhs {
-            LValue::Identifier(name) => if self.state.is_global_scope() {
+            LValue::Identifier(name) => if self.state().is_global_scope() {
                 self.compile_decl_global_name(symbol, decl.decl, *name, &decl.init)
             } else {
                 self.compile_decl_local_name(symbol, decl.decl, *name, &decl.init)
@@ -723,7 +783,7 @@ impl CodeGenerator {
                             init: inner_init,
                         };
                         
-                        self.compile_declaration(inner_symbol, inner_decl)
+                        self.compile_declaration(Some(inner_symbol), inner_decl)
                             .map_err(|err| err.with_symbol(*inner_symbol))?;
                     }
                     
@@ -740,16 +800,16 @@ impl CodeGenerator {
         }
     }
     
-    fn compile_decl_local_name(&mut self, symbol: &DebugSymbol, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
+    fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
         
         self.compile_expr(symbol, init)?;  // make sure to evaluate initializer first in order for shadowing to work
         
-        self.state.insert_local(decl, name)?;
+        self.state_mut().insert_local(decl, name)?;
         self.emit_instr(symbol, OpCode::InsertLocal);
         Ok(())
     }
     
-    fn compile_decl_global_name(&mut self, symbol: &DebugSymbol, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
+    fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
         
         self.compile_expr(symbol, init)?;
         
@@ -761,7 +821,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_assignment(&mut self, symbol: &DebugSymbol, assign: AssignmentRef) -> CompileResult<()> {
+    fn compile_assignment(&mut self, symbol: Option<&DebugSymbol>, assign: AssignmentRef) -> CompileResult<()> {
         match assign.lhs {
             // LValue::Identifier(name) if self.state.is_global_scope() => self.compile_assign_global_name(symbol, op, *name, &rhs),
             LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, assign),
@@ -791,7 +851,7 @@ impl CodeGenerator {
                             nonlocal: assign.nonlocal,
                         };
                         
-                        self.compile_assignment(inner_symbol, inner_assign)
+                        self.compile_assignment(Some(inner_symbol), inner_assign)
                             .map_err(|err| err.with_symbol(*inner_symbol))?;
                     }
                     
@@ -809,7 +869,7 @@ impl CodeGenerator {
         }
     }
     
-    fn compile_assign_identifier(&mut self, symbol: &DebugSymbol, name: &InternSymbol, assign: AssignmentRef) -> CompileResult<()> {
+    fn compile_assign_identifier(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol, assign: AssignmentRef) -> CompileResult<()> {
         
         // Compile RHS
         
@@ -827,10 +887,10 @@ impl CodeGenerator {
         
         // Generate assignment
         
-        if let Some(local_scope) = self.state.local_scope() {
+        if self.state().local_scope().is_some() {
             
             // check if the name is found in the local scope...
-            let result = self.state.resolve_local_strict(name).map(|local| (local.decl, local.offset));
+            let result = self.state().resolve_local_strict(name).map(|local| (local.decl, local.offset));
             
             if let Some((decl, offset)) = result {
                 if decl != DeclType::Mutable {
@@ -843,7 +903,7 @@ impl CodeGenerator {
             
             // otherwise search enclosing scopes...
             
-            let result = self.state.resolve_nonlocal(name).map(|local| (local.decl, local.offset));
+            let result = self.state().resolve_nonlocal(name).map(|local| (local.decl, local.offset));
             
             if let Some((decl, offset)) = result {
                 if !assign.nonlocal {
@@ -862,7 +922,7 @@ impl CodeGenerator {
         // ...finally, try to assign global
         
         // allow assignment to global only if all enclosing scopes permit it
-        if !assign.nonlocal && !self.state.iter_scopes().all(|scope| scope.allow_enclosing_assignment()) {
+        if !assign.nonlocal && !self.state().iter_scopes().all(|scope| scope.allow_enclosing_assignment()) {
             return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
         }
         
@@ -871,7 +931,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn emit_assign_local(&mut self, symbol: &DebugSymbol, offset: Offset) {
+    fn emit_assign_local(&mut self, symbol: Option<&DebugSymbol>, offset: Offset) {
         if let Ok(offset) = u8::try_from(offset) {
             self.emit_instr_byte(symbol, OpCode::StoreLocal, offset);
         } else {
@@ -879,13 +939,13 @@ impl CodeGenerator {
         }
     }
     
-    fn compile_tuple(&mut self, symbol: &DebugSymbol, expr_list: &[ExprMeta]) -> CompileResult<()> {
+    fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, expr_list: &[ExprMeta]) -> CompileResult<()> {
         let len = u8::try_from(expr_list.len())
             .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
         
         for expr in expr_list.iter() {
             let inner_symbol = expr.debug_symbol();
-            self.compile_expr(inner_symbol, expr.variant())
+            self.compile_expr(Some(inner_symbol), expr.variant())
                 .map_err(|err| err.with_symbol(*inner_symbol))?;
         }
         
@@ -893,7 +953,7 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_atom(&mut self, symbol: &DebugSymbol, atom: &Atom) -> CompileResult<()> {
+    fn compile_atom(&mut self, symbol: Option<&DebugSymbol>, atom: &Atom) -> CompileResult<()> {
         match atom {
             Atom::Nil => self.emit_instr(symbol, OpCode::Nil),
             Atom::EmptyTuple => self.emit_instr(symbol, OpCode::Empty),
@@ -930,9 +990,9 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_name_lookup(&mut self, symbol: &DebugSymbol, name: &InternSymbol) -> CompileResult<()> {
+    fn compile_name_lookup(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol) -> CompileResult<()> {
         
-        let local_offset = self.state.resolve_local(name).map(|local| local.offset);
+        let local_offset = self.state().resolve_local(name).map(|local| local.offset);
         if let Some(offset) = local_offset {
             
             // Local Variable
@@ -951,11 +1011,11 @@ impl CodeGenerator {
         Ok(())
     }
     
-    fn compile_primary(&mut self, symbol: &DebugSymbol, primary: &Primary) -> CompileResult<()> {
+    fn compile_primary(&mut self, symbol: Option<&DebugSymbol>, primary: &Primary) -> CompileResult<()> {
         unimplemented!()
     }
     
-    fn emit_unary_op(&mut self, symbol: &DebugSymbol, op: &UnaryOp) {
+    fn emit_unary_op(&mut self, symbol: Option<&DebugSymbol>, op: &UnaryOp) {
         match op {
             UnaryOp::Neg => self.emit_instr(symbol, OpCode::Neg),
             UnaryOp::Pos => self.emit_instr(symbol, OpCode::Pos),
@@ -964,7 +1024,7 @@ impl CodeGenerator {
         }
     }
     
-    fn emit_binary_op(&mut self, symbol: &DebugSymbol, op: &BinaryOp) {
+    fn emit_binary_op(&mut self, symbol: Option<&DebugSymbol>, op: &BinaryOp) {
         match op {
             BinaryOp::Logical(logic) => unimplemented!(),
             
