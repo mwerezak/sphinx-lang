@@ -120,21 +120,10 @@ impl From<StringSymbol> for Variant {
     fn from(value: StringSymbol) -> Self { Variant::String(value) }
 }
 
-
-const AUTO_INTERN_MAX: usize = 40;
-
 impl From<&str> for Variant {
     fn from(value: &str) -> Self {
-        if value.len() <= AUTO_INTERN_MAX {
-            return STRING_TABLE.with(|string_table| string_table.get_or_intern(value)).into();
-        }
-        
-        if let Some(symbol) = STRING_TABLE.with(|string_table| string_table.get(value)) {
-            return symbol.into();
-        }
-        
-        // long strings
-        unimplemented!()
+        let symbol = STRING_TABLE.with(|string_table| string_table.borrow_mut().get_or_intern(value));
+        symbol.into()
     }
 }
 

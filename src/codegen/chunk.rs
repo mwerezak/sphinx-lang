@@ -344,11 +344,11 @@ impl Program {
     
     pub fn load(program: UnloadedProgram) -> Self {
         let strings = STRING_TABLE.with(|string_table| {
-            let mut interner = string_table.interner_mut();
+            let mut string_table = string_table.borrow_mut();
             
             let mut strings = Vec::with_capacity(program.strings.len());
             for (_, string) in program.iter_strings() {
-                let symbol = StringSymbol::from(interner.get_or_intern(string));
+                let symbol = string_table.get_or_intern(string);
                 strings.push(symbol);
             }
             
@@ -370,12 +370,10 @@ impl Program {
         let mut string_index = Vec::with_capacity(self.strings.len());
         
         STRING_TABLE.with(|string_table| {
-            let interner = string_table.interner();
+            let string_table = string_table.borrow();
             
             for symbol in self.strings.into_iter() {
-                let bytes = interner
-                    .resolve((*symbol).into())
-                    .unwrap().as_bytes();
+                let bytes = string_table.resolve(symbol).as_bytes();
                 
                 let offset = strings.len();
                 let length = bytes.len();

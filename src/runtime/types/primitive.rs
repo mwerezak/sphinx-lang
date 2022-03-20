@@ -23,12 +23,8 @@ lazy_static! {
 
 fn string_add(lhs: &Variant, rhs: &Variant) -> ExecResult<Option<Variant>> {
     if let (Variant::String(a), Variant::String(b)) = (lhs, rhs) {
-        return STRING_TABLE.with(|string_table| {
-            let mut buf = String::new();
-            buf.push_str(&string_table.resolve(a));
-            buf.push_str(&string_table.resolve(b));
-            Ok(Some(Variant::from(buf.as_str())))
-        })
+        Ok(Some(Variant::String(a.concat(b))))
+    } else {
+        Ok(None)
     }
-    Ok(None)
 }
