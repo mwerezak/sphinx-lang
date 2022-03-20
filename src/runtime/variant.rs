@@ -10,18 +10,6 @@ use crate::runtime::gc::GCHandle;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
-// Temporary until a proper type system is implemented?
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TypeTag {
-    Nil,
-    Tuple,
-    Bool,
-    Integer,
-    Float,
-    String,
-    Object,
-}
-
 // Fundamental data value type
 #[derive(Clone)] // add Copy?
 pub enum Variant {
@@ -38,18 +26,6 @@ pub enum Variant {
 }
 
 impl Variant {
-    //TODO type system
-    pub fn type_tag(&self) -> TypeTag {
-        match self {
-            Self::Nil => TypeTag::Nil,
-            Self::BoolTrue | Self::BoolFalse => TypeTag::Bool,
-            Self::Integer(..) => TypeTag::Integer,
-            Self::Float(..) => TypeTag::Float,
-            Self::String(..) => TypeTag::String,
-            Self::EmptyTuple | Self::Tuple(..) => TypeTag::Tuple,
-        }
-    }
-    
     pub fn metatable(&self) -> &Metatable {
         match self {
             Self::String(..) => &METATABLE_STRING,
