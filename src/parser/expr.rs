@@ -3,7 +3,6 @@ use crate::runtime::types::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::lvalue::{Assignment, Declaration};
 use crate::parser::fundefs::FunctionDef;
-use crate::parser::structs::{ObjectConstructor};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList};
 
 // TODO replace Vecs with boxed slices
