@@ -95,6 +95,11 @@ impl<'c, 's> Disassembler<'c, 's> {
         match opcode {
             Some(opcode) => match opcode {
                 
+                OpCode::Call => {
+                    let nargs = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, nargs)?;
+                },
+                
                 OpCode::Drop | OpCode::DropLocals => {
                     let len = instr[1];
                     write!(line, "{:16} {: >4}    ", opcode, len)?;
@@ -242,7 +247,7 @@ impl fmt::Display for Constant {
             Self::Integer(value) => write!(fmt, "'{}'", value),
             Self::Float(bytes) => write!(fmt, "'{:.6}'", FloatType::from_le_bytes(*bytes)),
             Self::String(symbol) => write!(fmt, "${}", symbol.to_usize() + 1),
-            Self::Function(_chunk_id, _function_id) => unimplemented!(), // write signature?
+            Self::Function(chunk_id, _) => write!(fmt, "fun #{}", chunk_id),
         }
     }
 }

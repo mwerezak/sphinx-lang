@@ -39,9 +39,6 @@ impl Variant {
         !matches!(self, Self::Nil | Self::BoolFalse)
     }
     
-    // Note, bit_value() and float_value() are defined based on what is needed for the language *implementation*
-    // They do not reflect the semantics of the Sphinx language
-    
     pub fn bit_value(&self) -> Option<IntType> {
         let value = match self {
             Self::Integer(value) => *value,

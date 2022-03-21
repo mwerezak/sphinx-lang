@@ -107,10 +107,20 @@ const fn get_jump_opcode(jump: Jump, offset: JumpOffset) -> OpCode {
 
 // Scope Tracking
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum LocalName {
+    // local variable names defined by AST string symbols
+    Symbol(InternSymbol),
+    
+    // special local variables
+    Receiver,  // inside a function call, this refers to the object that was called
+    NArgs,     // inside a function call, the number of arguments passed at the call site
+}
+
 #[derive(Debug)]
 struct Local {
     decl: DeclType,
-    name: InternSymbol,
+    name: LocalName,
     offset: LocalIndex,
 }
 
@@ -142,15 +152,15 @@ impl Scope {
         self.locals.last().map_or(self.offset, |local| Some(local.offset))
     }
     
-    fn find_local(&self, name: &InternSymbol) -> Option<&Local> {
+    fn find_local(&self, name: &LocalName) -> Option<&Local> {
         self.locals.iter().find(|local| local.name == *name)
     }
     
-    fn find_local_mut(&mut self, name: &InternSymbol) -> Option<&mut Local> {
+    fn find_local_mut(&mut self, name: &LocalName) -> Option<&mut Local> {
         self.locals.iter_mut().find(|local| local.name == *name)
     }
     
-    fn push_local(&mut self, decl: DeclType, name: InternSymbol) -> CompileResult<&Local> {
+    fn push_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<&Local> {
         let offset = self.last_offset().map_or(
             Ok(0),
             |offset| offset.checked_add(1)
@@ -213,7 +223,7 @@ impl ScopeTracker {
         self.scopes.pop().expect("pop global scope")
     }
     
-    fn insert_local(&mut self, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
+    fn insert_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<()> {
         let local_scope = self.local_scope_mut().expect("insert local in global scope");
         
         // see if this local already exists in the current scope
@@ -230,12 +240,12 @@ impl ScopeTracker {
     }
     
     // find the nearest local in any scope
-    fn resolve_local(&self, name: &InternSymbol) -> Option<&Local> {
+    fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
         self.scopes.iter().rev().find_map(|scope| scope.find_local(name))
     }
     
     // find the nearest local in scopes that allow nonlocal assignment
-    fn resolve_local_strict(&self, name: &InternSymbol) -> Option<&Local> {
+    fn resolve_local_strict(&self, name: &LocalName) -> Option<&Local> {
         for scope in self.iter_scopes() {
             let local = scope.find_local(name);
             if local.is_some() {
@@ -251,7 +261,7 @@ impl ScopeTracker {
     }
     
     // search scopes that would have been skipped by resolve_local_strict()
-    fn resolve_nonlocal(&self, name: &InternSymbol) -> Option<&Local> {
+    fn resolve_nonlocal(&self, name: &LocalName) -> Option<&Local> {
         let mut is_local = true;
         for scope in self.iter_scopes() {
             if is_local {
@@ -396,7 +406,8 @@ impl CodeGenerator<'_> {
     }
     
     fn chunk_mut(&mut self) -> &mut ChunkBuf {
-        self.builder_mut().chunk_mut(0)
+        let chunk_id = self.chunk_id;
+        self.builder_mut().chunk_mut(chunk_id)
     }
     
     fn current_offset(&self) -> usize {
@@ -571,6 +582,21 @@ impl CodeGenerator<'_> {
         }
     }
     
+    // If the local name cannot be found, no instructions are emitted and None is returned
+    fn try_emit_load_local(&mut self, symbol: Option<&DebugSymbol>, name: &LocalName) -> Option<u16> {
+        if let Some(offset) = self.scope().resolve_local(name).map(|local| local.offset) {
+            if let Ok(offset) = u8::try_from(offset) {
+                self.emit_instr_byte(symbol, OpCode::LoadLocal, offset);
+            } else {
+                self.emit_instr_data(symbol, OpCode::LoadLocal16, &offset.to_le_bytes());
+            }
+            
+            Some(offset)
+        } else{
+            None
+        }
+    }
+    
     ///////// Statements /////////
     
     fn compile_stmt(&mut self, symbol: Option<&DebugSymbol>, stmt: &Stmt) -> CompileResult<()> {
@@ -737,63 +763,190 @@ impl CodeGenerator<'_> {
     }
     
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
-        // compile function body first
-        let mut codegen = self.create_chunk(symbol)?;
-        let chunk_id = codegen.chunk_id();
+        // create a new chunk for the function
+        let mut chunk = self.create_chunk(symbol)?;
+        let chunk_id = chunk.chunk_id();
         
+        // and a new local scope
+        chunk.emit_begin_scope(ScopeTag::Function, symbol);
+        
+        chunk.compile_function_preamble(symbol, fundef)?;
+        
+        // function body
         for stmt in fundef.body().iter() {
-            codegen.push_stmt(stmt)?;
+            chunk.push_stmt(stmt)?;
         }
-        codegen.finish();
         
+        // end the function scope
+        chunk.emit_end_scope();
+        
+        chunk.emit_instr(symbol, OpCode::Nil);  // implicit nil return
+        chunk.finish();
+        
+        // compile the function signature
         let signature = self.compile_function_signature(symbol, fundef.signature())?;
         let function_id = self.builder_mut().push_function(signature);
         
-        self.emit_load_const(symbol, Constant::Function(chunk_id, function_id))
+        // load the function object as the expression result
+        self.emit_load_const(symbol, Constant::Function(chunk_id, function_id))?;
+        
+        Ok(())
     }
     
-    fn compile_function_signature(&mut self, symbol: Option<&DebugSymbol>, sigdef: &SignatureDef) -> CompileResult<Signature> {
+    fn compile_function_preamble(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
+        
+        // define locals
+        let signature = fundef.signature();
+        
+        self.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
+        self.emit_instr(None, OpCode::InsertLocal);
+        
+        self.scope_mut().insert_local(DeclType::Immutable, LocalName::NArgs)?;
+        self.emit_instr(None, OpCode::InsertLocal);
+        
+        for param in signature.required.iter() {
+            self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
+            self.emit_instr(None, OpCode::InsertLocal);
+        }
+        
+        // will define local variables for all default arguments
+        if !signature.default.is_empty() {
+            self.compile_default_args(signature)?;
+            
+            for param in signature.default.iter() {
+                self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
+                self.emit_instr(symbol, OpCode::InsertLocal);
+            }
+        }
+        
+        if let Some(param) = &signature.variadic {
+            self.compile_variadic_arg(signature)?;
+
+            self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
+            self.emit_instr(symbol, OpCode::InsertLocal);
+        }
+
+        Ok(())
+    }
+    
+    fn compile_default_args(&mut self, signature: &SignatureDef) -> CompileResult<()> {
+        debug_assert!(!signature.default.is_empty());
+        
+        let mut jump_sites = Vec::new();
+        let mut jump_targets = Vec::new();
+        let mut jump_types = Vec::new();
+        
+        // depending on the number of arguments, jump into the default argument sequence
+        let required_count = u8::try_from(signature.required.len())
+            .map_err(|_| CompileError::from(ErrorKind::ParamCountLimit))?;
+        let default_count = u8::try_from(signature.default.len())
+            .map_err(|_| CompileError::from(ErrorKind::ParamCountLimit))?;
+        
+        // "defaults passed" = NArgs - required_count
+        self.try_emit_load_local(None, &LocalName::NArgs).unwrap();
+        self.emit_instr_byte(None, OpCode::UInt8, required_count);
+        self.emit_instr(None, OpCode::Sub);
+        
+        /*
+            NArgs - required count:
+            
+            <  0   => impossible, missing required argument
+               0   => jump to default[0]
+               1   => jump to default[1]
+               ...
+               N-1 => jump to default[N-1]
+            >= N   => jump to end
+        */
+        
+        for count in 0..default_count {
+            self.emit_instr(None, OpCode::Clone);
+            self.emit_instr_byte(None, OpCode::UInt8, count);
+            self.emit_instr(None, OpCode::EQ);
+            
+            jump_sites.insert(count.into(), self.current_offset());
+            jump_types.insert(count.into(), Jump::PopIfTrue);
+            self.emit_dummy_instr(None, Jump::PopIfTrue.dummy_width());
+            
+        }
+        
+        // if we get here, jump unconditionally to the end
+        jump_sites.insert(default_count.into(), self.current_offset());
+        jump_types.insert(default_count.into(), Jump::Uncond);
+        self.emit_dummy_instr(None, Jump::Uncond.dummy_width());
+        
+        // generate default arguments
+        for (idx, param) in signature.default.iter().enumerate() {
+            jump_targets.insert(idx, self.current_offset());
+            
+            let symbol = Some(param.default.debug_symbol());
+            let expr = param.default.variant();
+            self.compile_expr(symbol, expr)?;
+        }
+        
+        self.emit_instr(None, OpCode::Pop);  // drop "defaults passed"
+        jump_targets.insert(default_count.into(), self.current_offset());
+        
+        // patch all jumps
+        for idx in 0..=default_count.into() {
+            self.patch_jump_instr(jump_types[idx], jump_sites[idx], jump_types[idx].dummy_width(), jump_targets[idx])?;
+        }
+        
+        Ok(())
+    }
+    
+    fn compile_variadic_arg(&mut self, signature: &SignatureDef) -> CompileResult<()> {
+        debug_assert!(signature.variadic.is_some());
+        
+        let positional_count = u8::try_from(signature.required.len() + signature.default.len())
+            .map_err(|_| CompileError::from(ErrorKind::ParamCountLimit))?;
+        
+        // "variadic count" = NArgs - required_count - default_count
+        self.try_emit_load_local(None, &LocalName::NArgs).unwrap();
+        self.emit_instr_byte(None, OpCode::UInt8, positional_count);
+        self.emit_instr(None, OpCode::Sub);
+        
+        // check if "variadic count" > 0
+        self.emit_instr(None, OpCode::Clone);
+        self.emit_instr_byte(None, OpCode::UInt8, 0);
+        self.emit_instr(None, OpCode::GT);
+        
+        let tuple_jump_site = self.current_offset();
+        self.emit_dummy_instr(None, Jump::PopIfTrue.dummy_width());
+        
+        // if we get here then the variadic arg is empty
+        self.emit_instr(None, OpCode::Pop);
+        self.emit_instr(None, OpCode::Empty);
+        
+        let end_jump_site = self.current_offset();
+        self.emit_dummy_instr(None, Jump::Uncond.dummy_width());
+        
+        let tuple_jump_target = self.current_offset();
+        self.patch_jump_instr(Jump::PopIfTrue, tuple_jump_site, Jump::PopIfTrue.dummy_width(), tuple_jump_target)?;
+        self.emit_instr(None, OpCode::TupleN);
+        
+        let end_jump_target = self.current_offset();
+        self.patch_jump_instr(Jump::Uncond, end_jump_site, Jump::Uncond.dummy_width(), end_jump_target)?;
+        
+        Ok(())
+    }
+    
+    fn compile_function_signature(&mut self, symbol: Option<&DebugSymbol>, signature: &SignatureDef) -> CompileResult<Signature> {
         let mut required = Vec::new();
-        for paramdef in sigdef.required.iter() {
-            let name = self.get_or_make_const(symbol, Constant::from(paramdef.name))?;
-            let param = Parameter::new(name, paramdef.decl, None);
-            required.push(param);
+        for param in signature.required.iter() {
+            let name = self.get_or_make_const(symbol, Constant::from(param.name))?;
+            required.push(Parameter::new(name, param.decl));
         }
         
         let mut default = Vec::new();
-        for paramdef in sigdef.default.iter() {
-            let name = self.get_or_make_const(symbol, Constant::from(paramdef.name))?;
-            
-            // compile default value expression
-            let inner_symbol = Some(paramdef.default.debug_symbol());
-            let default_expr = paramdef.default.variant();
-            let mut codegen = self.create_chunk(inner_symbol)?;
-            let chunk_id = codegen.chunk_id();
-            
-            codegen.compile_expr(inner_symbol, default_expr)?;
-            codegen.finish();
-            
-            let param = Parameter::new(name, paramdef.decl, Some(chunk_id));
-            default.push(param);
+        for param in signature.default.iter() {
+            let name = self.get_or_make_const(symbol, Constant::from(param.name))?;
+            default.push(Parameter::new(name, param.decl));
         }
         
         let mut variadic = None;
-        if let Some(paramdef) = &sigdef.variadic {
-            let name = self.get_or_make_const(symbol, Constant::from(paramdef.name))?;
-            
-            // compile default value expression
-            let mut default_value = None;
-            if let Some(expr) = &paramdef.default {
-                let inner_symbol = Some(expr.debug_symbol());
-                let mut codegen = self.create_chunk(inner_symbol)?;
-                default_value.replace(codegen.chunk_id());
-                
-                codegen.compile_expr(inner_symbol, expr.variant())?;
-                codegen.finish();
-            }
-            
-            let param = Parameter::new(name, paramdef.decl, default_value);
-            variadic.replace(param);
+        if let Some(param) = &signature.variadic {
+            let name = self.get_or_make_const(symbol, Constant::from(param.name))?;
+            variadic.replace(Parameter::new(name, param.decl));
         }
         
         Ok(Signature::new(required, default, variadic))
@@ -889,7 +1042,7 @@ impl CodeGenerator<'_> {
         
         self.compile_expr(symbol, init)?;  // make sure to evaluate initializer first in order for shadowing to work
         
-        self.scope_mut().insert_local(decl, name)?;
+        self.scope_mut().insert_local(decl, LocalName::Symbol(name))?;
         self.emit_instr(symbol, OpCode::InsertLocal);
         Ok(())
     }
@@ -973,9 +1126,10 @@ impl CodeGenerator<'_> {
         // Generate assignment
         
         if self.scope().local_scope().is_some() {
+            let local = LocalName::Symbol(*name);
             
             // check if the name is found in the local scope...
-            let result = self.scope().resolve_local_strict(name).map(|local| (local.decl, local.offset));
+            let result = self.scope().resolve_local_strict(&local).map(|local| (local.decl, local.offset));
             
             if let Some((decl, offset)) = result {
                 if decl != DeclType::Mutable {
@@ -988,7 +1142,7 @@ impl CodeGenerator<'_> {
             
             // otherwise search enclosing scopes...
             
-            let result = self.scope().resolve_nonlocal(name).map(|local| (local.decl, local.offset));
+            let result = self.scope().resolve_nonlocal(&local).map(|local| (local.decl, local.offset));
             
             if let Some((decl, offset)) = result {
                 if !assign.nonlocal {
@@ -1077,22 +1231,14 @@ impl CodeGenerator<'_> {
     
     fn compile_name_lookup(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol) -> CompileResult<()> {
         
-        let local_offset = self.scope().resolve_local(name).map(|local| local.offset);
-        if let Some(offset) = local_offset {
+        // Try loading a Local variable
+        if self.try_emit_load_local(symbol, &LocalName::Symbol(*name)).is_none() {
             
-            // Local Variable
-            if let Ok(offset) = u8::try_from(offset) {
-                self.emit_instr_byte(symbol, OpCode::LoadLocal, offset);
-            } else {
-                self.emit_instr_data(symbol, OpCode::LoadLocal16, &offset.to_le_bytes());
-            }
-        
-        } else {
-            
-            // Global variable
+            // Otherwise, it must be a Global variable
             self.emit_load_const(symbol, Constant::from(*name))?;
             self.emit_instr(symbol, OpCode::LoadGlobal);
         }
+        
         Ok(())
     }
     

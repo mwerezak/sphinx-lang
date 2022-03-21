@@ -197,12 +197,28 @@ impl<'m> VirtualMachine<'m> {
     }
     
     
-    fn into_name(value: &Variant) -> StringSymbol {
+    fn into_name(value: Variant) -> StringSymbol {
         match value {
-            Variant::String(symbol) => *symbol,
-            _ => panic!("invalid operand type"),
+            Variant::String(symbol) => symbol,
+            _ => panic!("invalid operand"),
         }
     }
+    
+    fn into_usize(value: Variant) -> usize {
+        if let Variant::Integer(value) = value {
+            if let Ok(value) = usize::try_from(value) {
+                return value;
+            }
+        }
+        panic!("invalid operand")
+    }
+    
+    // fn into_indirect_offset(value: &Variant) -> isize {
+    //     match value {
+    //         Variant::Integer(value) => isize::try_from(*value).expect("indirect offset overflow"),
+    //         _ => panic!("invalid operand"),
+    //     }
+    // }
     
     fn exec_instr(&mut self, opcode: OpCode) -> ExecResult<Control> {
         let len = opcode.instr_len();
@@ -214,6 +230,8 @@ impl<'m> VirtualMachine<'m> {
             OpCode::Nop => { },
             
             OpCode::Return => return Ok(Control::Return),
+            
+            OpCode::Call => unimplemented!(),
             
             OpCode::Pop => { 
                 self.pop_stack(); 
@@ -238,17 +256,17 @@ impl<'m> VirtualMachine<'m> {
             },
             
             OpCode::InsertGlobal => {
-                let name = Self::into_name(&self.pop_stack());
+                let name = Self::into_name(self.pop_stack());
                 let value = self.peek_stack().clone();
                 self.globals_mut().create(name, Access::ReadOnly, value)?;
             },
             OpCode::InsertGlobalMut => {
-                let name = Self::into_name(&self.pop_stack());
+                let name = Self::into_name(self.pop_stack());
                 let value = self.peek_stack().clone();
                 self.globals_mut().create(name, Access::ReadWrite, value)?;
             },
             OpCode::StoreGlobal => {
-                let name = Self::into_name(&self.pop_stack());
+                let name = Self::into_name(self.pop_stack());
                 let value = self.peek_stack().clone();
                 
                 let mut globals = self.globals_mut();
@@ -257,7 +275,7 @@ impl<'m> VirtualMachine<'m> {
             },
             OpCode::LoadGlobal => {
                 let value = {
-                    let name = Self::into_name(self.peek_stack());
+                    let name = Self::into_name(self.peek_stack().clone());
                     self.globals().lookup(&name)?.clone()
                 };
                 self.replace_stack(value);
@@ -300,6 +318,11 @@ impl<'m> VirtualMachine<'m> {
 
             OpCode::Tuple => {
                 let tuple_len = usize::from(data[0]);
+                let items = self.immediate.split_off(self.stack_len() - tuple_len).into_boxed_slice();
+                self.push_stack(Variant::make_tuple(items));
+            },
+            OpCode::TupleN => {
+                let tuple_len = Self::into_usize(self.pop_stack());
                 let items = self.immediate.split_off(self.stack_len() - tuple_len).into_boxed_slice();
                 self.push_stack(Variant::make_tuple(items));
             },
@@ -369,6 +392,11 @@ impl<'m> VirtualMachine<'m> {
             OpCode::LongJumpIfTrue     => cond_jump!(self, self.peek_stack().truth_value(),  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             OpCode::PopLongJumpIfFalse => cond_jump!(self, !self.pop_stack().truth_value(),  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             OpCode::PopLongJumpIfTrue  => cond_jump!(self, self.pop_stack().truth_value(),   isize::try_from(read_le_bytes!(i32, data)).unwrap()),
+            
+            // OpCode::JumpIndirect => {
+            //     let offset = Self::into_indirect_offset(&self.pop_stack());
+            //     self.state.pc = self.offset_pc(offset).expect("pc overflow/underflow");
+            // }
             
             OpCode::Inspect => println!("{:?}", self.peek_stack()),
             OpCode::Assert => {

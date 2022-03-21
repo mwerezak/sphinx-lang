@@ -55,7 +55,7 @@ pub struct ChunkInfo {
 }
 
 /// A buffer used by ChunkBuilder
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ChunkBuf {
     info: ChunkInfo,
     bytes: Vec<u8>,

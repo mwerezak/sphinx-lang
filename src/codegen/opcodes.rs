@@ -11,7 +11,10 @@ use std::mem::size_of;
                         // width set here so that the longest mnemonic is 16 chars
 const OP_NOP:           u8 = 0x00;
 const OP_RETURN:        u8 = 0x01;  // return from current function?
-const OP_EXIT:          u8 = 0x02;
+
+// yes, Nargs is both in the immediate stack and encoded in the call instruction
+// this bit of redundancy helps us deal with default and variadic arguments efficiently
+const OP_CALL:          u8 = 0x02;  // (u8); [ callobj Nargs arg_0 ... arg_n ] => [ ret_value ] 
 
 // 0x08-40        Immediate Values
 
@@ -35,8 +38,8 @@ const OP_ST_LOCAL_16:   u8 = 0x22;  // (u16); [ value ] => [ value ]
 // const OP_LD_LOCAL_32:   u8 = 0x23;  // (u32); _ => [ value ]
 const OP_LD_LOCAL:      u8 = 0x24;  // (u8);  _ => [ value ]
 const OP_LD_LOCAL_16:   u8 = 0x25;  // (u16); _ => [ value ]
-const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ ... ] => [] -- panics if there are any immediate values
 // const OP_LD_LOCAL_32:   u8 = 0x27;  // (u32); _ => [ value ]
+const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ ... ] => [] -- panics if there are any immediate values
 
 // const OP_LD_NAME:       u8 = 0x28;
 // const OP_LD_INDEX:      u8 = 0x29;
@@ -44,7 +47,8 @@ const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ ... ] => [] -- panics if there ar
 
 // Dynamic Insert/Store
 
-// const OP_IN_DYN         u8 = 0x30;  // [ value dyn_target bool ] => []
+// These are used to implement tuple-destructuring assignment/declaration
+// const OP_IN_DYN         u8 = 0x30;  // [ value dyn_target bool ] => [] 
 // const OP_ST_DYN         u8 = 0x31;  // [ value dyn_target ] => []
 
 const OP_NIL:           u8 = 0x38;  // _ => [ nil ]
@@ -52,11 +56,12 @@ const OP_FALSE:         u8 = 0x39;  // _ => [ false ]
 const OP_TRUE:          u8 = 0x3A;  // _ => [ true ]
 const OP_EMPTY:         u8 = 0x3B;  // _ => [ () ]
 const OP_TUPLE:         u8 = 0x3C;  // (u8); [ ... ] => [ tuple ]
+const OP_TUPLEN:        u8 = 0x3D;  // [ ... N ] => [ tuple ]
 
 // small numbers
-const OP_U8:            u8 = 0x3D;  // (u8); _ => [ value ]
-const OP_I8:            u8 = 0x3E;  // (i8); _ => [ value ]
-const OP_F8:            u8 = 0x3F;  // (i8); _ => [ value ]
+const OP_U8:            u8 = 0x3E;  // (u8); _ => [ value ]
+const OP_I8:            u8 = 0x3F;  // (i8); _ => [ value ]
+const OP_F8:            u8 = 0x40;  // (i8); _ => [ value ]
 
 // const OP_DYN_TARGET:    u8 = 0x48;  // (u8); [ ... ] => [ dyn_target ]
 
@@ -88,25 +93,31 @@ const OP_LE:            u8 = 0x6B;
 const OP_GE:            u8 = 0x6C;
 const OP_GT:            u8 = 0x6D;
 
-// 0x70         Jumps
+// 0x70-7F      Jumps
 
 const OP_JUMP:          u8 = 0x70;  // (i16);
-const OP_JUMP_FALSE:    u8 = 0x71;  // (i16);
-const OP_JUMP_TRUE:     u8 = 0x72;  // (i16);
-const OP_PJMP_FALSE:    u8 = 0x73;  // (i16); [ _ ] => []
-const OP_PJMP_TRUE:     u8 = 0x74;  // (i16); [ _ ] => []
+const OP_JUMP_FALSE:    u8 = 0x71;  // (i16); [ cond ] => [ cond ]
+const OP_JUMP_TRUE:     u8 = 0x72;  // (i16); [ cond ] => [ cond ]
+const OP_PJMP_FALSE:    u8 = 0x73;  // (i16); [ cond ] => []
+const OP_PJMP_TRUE:     u8 = 0x74;  // (i16); [ cond ] => []
 
-const OP_LJUMP:         u8 = 0x78;  // (i32);
-const OP_LJUMP_FALSE:   u8 = 0x79;  // (i32);
-const OP_LJUMP_TRUE:    u8 = 0x7A;  // (i32);
-const OP_PLJMP_FALSE:   u8 = 0x7B;  // (i32); [ _ ] => []
-const OP_PLJMP_TRUE:    u8 = 0x7C;  // (i32); [ _ ] => []
+const OP_LJUMP:         u8 = 0x75;  // (i32);
+const OP_LJUMP_FALSE:   u8 = 0x76;  // (i32); [ cond ] => [ cond ]
+const OP_LJUMP_TRUE:    u8 = 0x77;  // (i32); [ cond ] => [ cond ]
+const OP_PLJMP_FALSE:   u8 = 0x78;  // (i32); [ cond ] => []
+const OP_PLJMP_TRUE:    u8 = 0x79;  // (i32); [ cond ] => []
+
+// const OP_JUMPN:         u8 = 0x7A;  // [ offset ] => []  -- offset added to PC
+// const OP_JUMPN_TRUE:    u8 = 0x7B;  // [ cond offset ] => [ cond ]
+// const OP_JUMPN_FALSE:   u8 = 0x7C;  // [ cond offset ] => [ cond ]
+// const OP_PJMPN_TRUE:    u8 = 0x7D;  // [ cond offset ] => []
+// const OP_PJMPN_FALSE:   u8 = 0x7E;  // [ cond offset ] => []
 
 // 0x80-8F      Iteration
 
 // const OP_IT_INIT   // replace value with iterator state
 // const OP_IT_NEXT   // replace iterator state with next state
-
+// const OP_UNPACK:   // [ seq ] => [ item_0 ... item_n N ] -- used by unpack syntax in function calls
 
 
 // 0xF0         Debugging/Tracing/Misc
@@ -119,10 +130,11 @@ const DBG_DUMP_STRINGS: u8 = 0xF4;
 
 
 #[repr(u8)]
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum OpCode {
     Nop = OP_NOP,
     Return = OP_RETURN, 
+    Call = OP_CALL,
     
     Pop = OP_POP,
     Drop = OP_DROP,
@@ -147,6 +159,8 @@ pub enum OpCode {
     False = OP_FALSE,
     Empty = OP_EMPTY,
     Tuple = OP_TUPLE,
+    TupleN = OP_TUPLEN,
+    
     UInt8 = OP_U8,
     Int8 = OP_I8,
     Float8 = OP_F8,
@@ -185,6 +199,8 @@ pub enum OpCode {
     PopLongJumpIfFalse = OP_PLJMP_FALSE,
     PopLongJumpIfTrue = OP_PLJMP_TRUE,
     
+    // JumpIndirect = OP_JUMPN,
+    
     Inspect = DBG_INSPECT,
     Assert = DBG_ASSERT,
 }
@@ -195,6 +211,7 @@ impl OpCode {
         let opcode = match byte {
             OP_NOP => Self::Nop,
             OP_RETURN => Self::Return,
+            OP_CALL => Self::Call,
             
             OP_POP => Self::Pop,
             OP_DROP => Self::Drop,
@@ -220,6 +237,7 @@ impl OpCode {
             OP_FALSE => Self::False,
             OP_EMPTY => Self::Empty,
             OP_TUPLE => Self::Tuple,
+            OP_TUPLEN => Self::TupleN,
             OP_U8 => Self::UInt8,
             OP_I8 => Self::Int8,
             OP_F8 => Self::Float8,
@@ -258,6 +276,8 @@ impl OpCode {
             OP_PLJMP_FALSE => Self::PopLongJumpIfFalse,
             OP_PLJMP_TRUE => Self::PopLongJumpIfTrue,
             
+            // OP_JUMPN => Self::JumpIndirect,
+            
             DBG_INSPECT => Self::Inspect,
             DBG_ASSERT => Self::Assert,
             
@@ -270,6 +290,7 @@ impl OpCode {
     pub const fn instr_len(&self) -> usize {
         match self {
             // don't really need size_of() for most of these, but it's a nice little bit of self-documentation
+            Self::Call           => 1 + size_of::<u8>(),
             
             Self::Drop           => 1 + size_of::<u8>(),
             
@@ -312,6 +333,7 @@ impl std::fmt::Display for OpCode {
         let mnemonic = match *self {
             Self::Nop => "OP_NOP",
             Self::Return => "OP_RETURN",
+            Self::Call => "OP_CALL",
             
             Self::Pop => "OP_POP",
             Self::Drop => "OP_DROP",
@@ -337,6 +359,7 @@ impl std::fmt::Display for OpCode {
             Self::False => "OP_FALSE",
             Self::Empty => "OP_EMPTY",
             Self::Tuple => "OP_TUPLE",
+            Self::TupleN => "OP_TUPLEN",
             Self::UInt8 => "OP_U8",
             Self::Int8 => "OP_I8",
             Self::Float8 => "OP_F8",
@@ -374,6 +397,8 @@ impl std::fmt::Display for OpCode {
             Self::LongJumpIfTrue => "OP_LJUMP_TRUE",
             Self::PopLongJumpIfFalse => "OP_PLJMP_FALSE",
             Self::PopLongJumpIfTrue => "OP_PLJMP_TRUE",
+            
+            // Self::JumpIndirect => "OP_JUMPN",
             
             Self::Inspect => "DBG_INSPECT",
             Self::Assert => "DBG_ASSERT",

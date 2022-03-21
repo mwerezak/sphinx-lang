@@ -11,6 +11,7 @@ pub type CompileResult<T> = Result<T, CompileError>;
 pub enum ErrorKind {
     ChunkCountLimit,
     ConstPoolLimit,
+    ParamCountLimit,
     TupleLengthLimit,
     LocalVariableLimit,
     CalcJumpOffsetFailed,
@@ -70,6 +71,7 @@ impl fmt::Display for CompileError {
         let message = match self.kind() {
             ErrorKind::ChunkCountLimit => "chunk count limit reached",
             ErrorKind::ConstPoolLimit => "constant pool limit reached",
+            ErrorKind::ParamCountLimit => "parameter count limit exceeded",
             ErrorKind::TupleLengthLimit => "tuple length limit exceeded",
             ErrorKind::LocalVariableLimit => "local variable limit reached",
             ErrorKind::CalcJumpOffsetFailed => "could not calculate jump offset",

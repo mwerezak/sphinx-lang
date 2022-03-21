@@ -27,11 +27,11 @@ impl Signature {
         }
     }
     
-    pub fn is_variadic(&self) -> bool { 
+    pub fn is_variadic(&self) -> bool {
         self.variadic.is_some()
     }
     
-    pub fn min_arity(&self) -> usize { 
+    pub fn min_arity(&self) -> usize {
         self.required.len()
     }
     
