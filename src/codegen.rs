@@ -626,6 +626,32 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
+    fn compile_stmt_list(&mut self, stmt_list: &StmtList) -> CompileResult<()> {
+        // compile stmt suite
+        for stmt in stmt_list.iter() {
+            let inner_symbol = stmt.debug_symbol();
+            self.compile_stmt(Some(inner_symbol), stmt.variant())
+                .map_err(|err| err.with_symbol(*inner_symbol))?;
+        }
+        
+        // handle control flow
+        if let Some(control) = stmt_list.end_control() {
+            match control {
+                ControlFlow::Continue(label) => {
+                    unimplemented!()
+                }
+                ControlFlow::Break(label, expr) => {
+                    unimplemented!()
+                }
+                ControlFlow::Return(expr) => {
+                    unimplemented!()
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
     fn compile_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, body: &StmtList) -> CompileResult<()> {
         
         let loop_target = self.current_offset();
@@ -688,15 +714,331 @@ impl CodeGenerator<'_> {
             
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list)?,
             
-            Expr::Block { label, suite } => self.compile_block(symbol, label.as_ref(), suite)?,
-            Expr::IfExpr { branches, else_clause } => self.compile_if_expr(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
+            Expr::Block { label, suite } => self.compile_block_expression(symbol, label.as_ref(), suite)?,
+            Expr::IfExpr { branches, else_clause } => self.compile_if_expression(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
             
             Expr::FunctionDef(fundef) => self.compile_function_def(symbol, fundef)?,
         }
         Ok(())
     }
     
-    fn compile_block(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
+    fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, expr_list: &[ExprMeta]) -> CompileResult<()> {
+        let len = u8::try_from(expr_list.len())
+            .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
+        
+        for expr in expr_list.iter() {
+            let inner_symbol = expr.debug_symbol();
+            self.compile_expr(Some(inner_symbol), expr.variant())
+                .map_err(|err| err.with_symbol(*inner_symbol))?;
+        }
+        
+        self.emit_instr_byte(symbol, OpCode::Tuple, len);
+        Ok(())
+    }
+    
+    fn compile_atom(&mut self, symbol: Option<&DebugSymbol>, atom: &Atom) -> CompileResult<()> {
+        match atom {
+            Atom::Nil => self.emit_instr(symbol, OpCode::Nil),
+            Atom::EmptyTuple => self.emit_instr(symbol, OpCode::Empty),
+            Atom::BooleanLiteral(true) => self.emit_instr(symbol, OpCode::True),
+            Atom::BooleanLiteral(false) => self.emit_instr(symbol, OpCode::False),
+            
+            Atom::IntegerLiteral(value) => {
+                if let Ok(value) = u8::try_from(*value) {
+                    self.emit_instr_byte(symbol, OpCode::UInt8, value);
+                } else if let Ok(value) = i8::try_from(*value) {
+                    self.emit_instr_byte(symbol, OpCode::Int8, value.to_le_bytes()[0]);
+                } else {
+                    self.emit_load_const(symbol, Constant::from(*value))?;
+                }
+            },
+            
+            Atom::FloatLiteral(value) => {
+                if FloatType::from(i8::MIN) <= *value && *value <= FloatType::from(i8::MAX) {
+                    let value = *value as i8;
+                    self.emit_instr_byte(symbol, OpCode::Float8, value.to_le_bytes()[0]);
+                } else {
+                    self.emit_load_const(symbol, Constant::from(*value))?;
+                }
+            },
+            
+            Atom::StringLiteral(value) => self.emit_load_const(symbol, Constant::from(*value))?,
+            Atom::Identifier(name) => self.compile_name_lookup(symbol, name)?,
+            
+            // Atom::Self_ => unimplemented!(),
+            // Atom::Super => unimplemented!(),
+            
+            Atom::Group(expr) => self.compile_expr(symbol, expr)?,
+        }
+        Ok(())
+    }
+    
+    fn compile_name_lookup(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol) -> CompileResult<()> {
+        
+        // Try loading a Local variable
+        if self.try_emit_load_local(symbol, &LocalName::Symbol(*name)).is_none() {
+            
+            // Otherwise, it must be a Global variable
+            self.emit_load_const(symbol, Constant::from(*name))?;
+            self.emit_instr(symbol, OpCode::LoadGlobal);
+        }
+        
+        Ok(())
+    }
+    
+    fn compile_primary(&mut self, symbol: Option<&DebugSymbol>, primary: &Primary) -> CompileResult<()> {
+        unimplemented!()
+    }
+    
+    fn emit_unary_op(&mut self, symbol: Option<&DebugSymbol>, op: &UnaryOp) {
+        match op {
+            UnaryOp::Neg => self.emit_instr(symbol, OpCode::Neg),
+            UnaryOp::Pos => self.emit_instr(symbol, OpCode::Pos),
+            UnaryOp::Inv => self.emit_instr(symbol, OpCode::Inv),
+            UnaryOp::Not => self.emit_instr(symbol, OpCode::Not),
+        }
+    }
+    
+    fn emit_binary_op(&mut self, symbol: Option<&DebugSymbol>, op: &BinaryOp) {
+        match op {
+            BinaryOp::Logical(logic) => unimplemented!(),
+            
+            BinaryOp::Arithmetic(op) => match op {
+                Arithmetic::Mul => self.emit_instr(symbol, OpCode::Mul),
+                Arithmetic::Div => self.emit_instr(symbol, OpCode::Div),
+                Arithmetic::Mod => self.emit_instr(symbol, OpCode::Mod),
+                Arithmetic::Add => self.emit_instr(symbol, OpCode::Add),
+                Arithmetic::Sub => self.emit_instr(symbol, OpCode::Sub),
+            },
+            
+            BinaryOp::Bitwise(op) => match op {
+                Bitwise::And => self.emit_instr(symbol, OpCode::And),
+                Bitwise::Xor => self.emit_instr(symbol, OpCode::Xor),
+                Bitwise::Or  => self.emit_instr(symbol, OpCode::Or),
+            },
+            
+            BinaryOp::Shift(op) => match op {
+                Shift::Left  => self.emit_instr(symbol, OpCode::Shl),
+                Shift::Right => self.emit_instr(symbol, OpCode::Shr),
+            },
+            
+            BinaryOp::Comparison(op) => match op {
+                Comparison::LT => self.emit_instr(symbol, OpCode::LT),
+                Comparison::GT => self.emit_instr(symbol, OpCode::GT),
+                Comparison::LE => self.emit_instr(symbol, OpCode::LE),
+                Comparison::GE => self.emit_instr(symbol, OpCode::GE),
+                Comparison::EQ => self.emit_instr(symbol, OpCode::EQ),
+                Comparison::NE => self.emit_instr(symbol, OpCode::NE),
+            },
+        }
+    }
+    
+    ///////// Declarations and Assignments /////////
+    
+    fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclarationRef) -> CompileResult<()> {
+        match &decl.lhs {
+            LValue::Identifier(name) => if self.scope().is_global_scope() {
+                self.compile_decl_global_name(symbol, decl.decl, *name, &decl.init)
+            } else {
+                self.compile_decl_local_name(symbol, decl.decl, *name, &decl.init)
+            },
+            
+            LValue::Attribute(target) => unimplemented!(),
+            LValue::Index(target) => unimplemented!(),
+            
+            LValue::Tuple(target_list) => match &decl.init {
+                
+                Expr::Tuple(init_list) => {
+                    if target_list.len() != init_list.len() {
+                        return Err(CompileError::new("can't assign tuples of different lengths"))
+                    }
+                    
+                    for (inner_lhs, inner_expr) in target_list.iter().zip(init_list.iter()) {
+                        let inner_symbol = inner_expr.debug_symbol();
+                        let inner_init = inner_expr.variant();
+                        
+                        let inner_decl = DeclarationRef {
+                            decl: decl.decl,
+                            lhs: inner_lhs,
+                            init: inner_init,
+                        };
+                        
+                        self.compile_declaration(Some(inner_symbol), inner_decl)
+                            .map_err(|err| err.with_symbol(*inner_symbol))?;
+                    }
+                    
+                    // declarations are also expressions
+                    let tuple_len = u8::try_from(init_list.len())
+                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
+                    self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
+                    
+                    Ok(())
+                },
+                
+                _ => unimplemented!(), // dynamic declaration
+            },
+        }
+    }
+    
+    fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
+        
+        self.compile_expr(symbol, init)?;  // make sure to evaluate initializer first in order for shadowing to work
+        
+        self.scope_mut().insert_local(decl, LocalName::Symbol(name))?;
+        self.emit_instr(symbol, OpCode::InsertLocal);
+        Ok(())
+    }
+    
+    fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
+        
+        self.compile_expr(symbol, init)?;
+        
+        self.emit_load_const(symbol, Constant::from(name))?;
+        match decl {
+            DeclType::Immutable => self.emit_instr(symbol, OpCode::InsertGlobal),
+            DeclType::Mutable => self.emit_instr(symbol, OpCode::InsertGlobalMut),
+        }
+        Ok(())
+    }
+    
+    fn compile_assignment(&mut self, symbol: Option<&DebugSymbol>, assign: AssignmentRef) -> CompileResult<()> {
+        match assign.lhs {
+            // LValue::Identifier(name) if self.state.is_global_scope() => self.compile_assign_global_name(symbol, op, *name, &rhs),
+            LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, assign),
+            
+            LValue::Attribute(target) => unimplemented!(),
+            LValue::Index(target) => unimplemented!(),
+            
+            LValue::Tuple(..) if assign.op.is_some() => {
+                return Err(CompileError::new("can't use update-assigment when assigning to a tuple"))
+            },
+            
+            LValue::Tuple(target_list) => match assign.rhs {
+
+                Expr::Tuple(rhs_list) => {
+                    if target_list.len() != rhs_list.len() {
+                        return Err(CompileError::new("can't assign tuples of different lengths"))
+                    }
+                    
+                    for (inner_lhs, inner_expr) in target_list.iter().zip(rhs_list.iter()) {
+                        let inner_symbol = inner_expr.debug_symbol();
+                        let inner_rhs = inner_expr.variant();
+                        
+                        let inner_assign = AssignmentRef {
+                            lhs: inner_lhs,
+                            op: None,
+                            rhs: inner_rhs,
+                            nonlocal: assign.nonlocal,
+                        };
+                        
+                        self.compile_assignment(Some(inner_symbol), inner_assign)
+                            .map_err(|err| err.with_symbol(*inner_symbol))?;
+                    }
+                    
+                    // assignments are also expressions
+                    let tuple_len = u8::try_from(rhs_list.len())
+                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
+                    self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
+                    
+                    Ok(())
+                },
+                
+                _ => unimplemented!(), // dynamic declaration
+
+            },
+        }
+    }
+    
+    fn compile_assign_identifier(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol, assign: AssignmentRef) -> CompileResult<()> {
+        
+        // Compile RHS
+        
+        if let Some(op) = assign.op {
+            // update assignment
+            self.compile_name_lookup(symbol, name)?;
+            self.compile_expr(symbol, &assign.rhs)?;
+            self.emit_binary_op(symbol, &op);
+            
+        } else {
+            // normal assignment
+            self.compile_expr(symbol, &assign.rhs)?;
+            
+        }
+        
+        // Generate assignment
+        
+        if self.scope().local_scope().is_some() {
+            let local = LocalName::Symbol(*name);
+            
+            // check if the name is found in the local scope...
+            let result = self.scope().resolve_local_strict(&local).map(|local| (local.decl, local.offset));
+            
+            if let Some((decl, offset)) = result {
+                if decl != DeclType::Mutable {
+                    return Err(CompileError::from(ErrorKind::CantAssignImmutable));
+                }
+                self.emit_assign_local(symbol, offset);
+                
+                return Ok(());
+            }
+            
+            // otherwise search enclosing scopes...
+            
+            let result = self.scope().resolve_nonlocal(&local).map(|local| (local.decl, local.offset));
+            
+            if let Some((decl, offset)) = result {
+                if !assign.nonlocal {
+                    return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
+                }
+                if decl != DeclType::Mutable {
+                    return Err(CompileError::from(ErrorKind::CantAssignImmutable));
+                }
+                self.emit_assign_local(symbol, offset);
+                
+                return Ok(());
+            }
+            
+        }
+        
+        // ...finally, try to assign global
+        
+        // allow assignment to global only if all enclosing scopes permit it
+        if !assign.nonlocal && !self.scope().iter_scopes().all(|scope| scope.allow_enclosing_assignment()) {
+            return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
+        }
+        
+        self.emit_load_const(symbol, Constant::from(*name))?;
+        self.emit_instr(symbol, OpCode::StoreGlobal);
+        Ok(())
+    }
+    
+    fn emit_assign_local(&mut self, symbol: Option<&DebugSymbol>, offset: LocalIndex) {
+        if let Ok(offset) = u8::try_from(offset) {
+            self.emit_instr_byte(symbol, OpCode::StoreLocal, offset);
+        } else {
+            self.emit_instr_data(symbol, OpCode::StoreLocal16, &offset.to_le_bytes());
+        }
+    }
+    
+    
+    ///////// Blocks and If-Expressions /////////
+    
+    fn compile_expr_block(&mut self, symbol: Option<&DebugSymbol>, suite: &ExprBlock) -> CompileResult<()> {
+        self.compile_stmt_list(suite.stmt_list())?;
+        
+        // result expression
+        if let Some(expr) = suite.result() {
+            let inner_symbol = expr.debug_symbol();
+            self.compile_expr(Some(inner_symbol), expr.variant())
+                .map_err(|err| err.with_symbol(*inner_symbol))?;
+        } else {
+            self.emit_instr(symbol, OpCode::Nil); // implicit nil
+        }
+        
+        Ok(())
+    }
+    
+    fn compile_block_expression(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
         
         self.emit_begin_scope(ScopeTag::Block, symbol);
         self.compile_expr_block(symbol, suite)?;
@@ -705,7 +1047,7 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_if_expr(&mut self, symbol: Option<&DebugSymbol>, branches: &[ConditionalBranch], else_clause: Option<&ExprBlock>) -> CompileResult<()> {
+    fn compile_if_expression(&mut self, symbol: Option<&DebugSymbol>, branches: &[ConditionalBranch], else_clause: Option<&ExprBlock>) -> CompileResult<()> {
         debug_assert!(!branches.is_empty());
         
         // track the sites where we jump to the end, so we can patch them later
@@ -761,6 +1103,8 @@ impl CodeGenerator<'_> {
         
         Ok(())
     }
+    
+    ///////// Function Definitions /////////
     
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
         // create a new chunk for the function
@@ -952,340 +1296,5 @@ impl CodeGenerator<'_> {
         Ok(Signature::new(required, default, variadic))
     }
     
-    fn compile_stmt_list(&mut self, stmt_list: &StmtList) -> CompileResult<()> {
-        // compile stmt suite
-        for stmt in stmt_list.iter() {
-            let inner_symbol = stmt.debug_symbol();
-            self.compile_stmt(Some(inner_symbol), stmt.variant())
-                .map_err(|err| err.with_symbol(*inner_symbol))?;
-        }
-        
-        // handle control flow
-        if let Some(control) = stmt_list.end_control() {
-            match control {
-                ControlFlow::Continue(label) => {
-                    unimplemented!()
-                }
-                ControlFlow::Break(label, expr) => {
-                    unimplemented!()
-                }
-                ControlFlow::Return(expr) => {
-                    unimplemented!()
-                }
-            }
-        }
-        
-        Ok(())
-    }
-    
-    fn compile_expr_block(&mut self, symbol: Option<&DebugSymbol>, suite: &ExprBlock) -> CompileResult<()> {
-        self.compile_stmt_list(suite.stmt_list())?;
-        
-        // result expression
-        if let Some(expr) = suite.result() {
-            let inner_symbol = expr.debug_symbol();
-            self.compile_expr(Some(inner_symbol), expr.variant())
-                .map_err(|err| err.with_symbol(*inner_symbol))?;
-        } else {
-            self.emit_instr(symbol, OpCode::Nil); // implicit nil
-        }
-        
-        Ok(())
-    }
-    
-    fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclarationRef) -> CompileResult<()> {
-        match &decl.lhs {
-            LValue::Identifier(name) => if self.scope().is_global_scope() {
-                self.compile_decl_global_name(symbol, decl.decl, *name, &decl.init)
-            } else {
-                self.compile_decl_local_name(symbol, decl.decl, *name, &decl.init)
-            },
-            
-            LValue::Attribute(target) => unimplemented!(),
-            LValue::Index(target) => unimplemented!(),
-            
-            LValue::Tuple(target_list) => match &decl.init {
-                
-                Expr::Tuple(init_list) => {
-                    if target_list.len() != init_list.len() {
-                        return Err(CompileError::new("can't assign tuples of different lengths"))
-                    }
-                    
-                    for (inner_lhs, inner_expr) in target_list.iter().zip(init_list.iter()) {
-                        let inner_symbol = inner_expr.debug_symbol();
-                        let inner_init = inner_expr.variant();
-                        
-                        let inner_decl = DeclarationRef {
-                            decl: decl.decl,
-                            lhs: inner_lhs,
-                            init: inner_init,
-                        };
-                        
-                        self.compile_declaration(Some(inner_symbol), inner_decl)
-                            .map_err(|err| err.with_symbol(*inner_symbol))?;
-                    }
-                    
-                    // declarations are also expressions
-                    let tuple_len = u8::try_from(init_list.len())
-                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
-                    self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
-                    
-                    Ok(())
-                },
-                
-                _ => unimplemented!(), // dynamic declaration
-            },
-        }
-    }
-    
-    fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
-        
-        self.compile_expr(symbol, init)?;  // make sure to evaluate initializer first in order for shadowing to work
-        
-        self.scope_mut().insert_local(decl, LocalName::Symbol(name))?;
-        self.emit_instr(symbol, OpCode::InsertLocal);
-        Ok(())
-    }
-    
-    fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
-        
-        self.compile_expr(symbol, init)?;
-        
-        self.emit_load_const(symbol, Constant::from(name))?;
-        match decl {
-            DeclType::Immutable => self.emit_instr(symbol, OpCode::InsertGlobal),
-            DeclType::Mutable => self.emit_instr(symbol, OpCode::InsertGlobalMut),
-        }
-        Ok(())
-    }
-    
-    fn compile_assignment(&mut self, symbol: Option<&DebugSymbol>, assign: AssignmentRef) -> CompileResult<()> {
-        match assign.lhs {
-            // LValue::Identifier(name) if self.state.is_global_scope() => self.compile_assign_global_name(symbol, op, *name, &rhs),
-            LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, assign),
-            
-            LValue::Attribute(target) => unimplemented!(),
-            LValue::Index(target) => unimplemented!(),
-            
-            LValue::Tuple(..) if assign.op.is_some() => {
-                return Err(CompileError::new("can't use update-assigment when assigning to a tuple"))
-            },
-            
-            LValue::Tuple(target_list) => match assign.rhs {
 
-                Expr::Tuple(rhs_list) => {
-                    if target_list.len() != rhs_list.len() {
-                        return Err(CompileError::new("can't assign tuples of different lengths"))
-                    }
-                    
-                    for (inner_lhs, inner_expr) in target_list.iter().zip(rhs_list.iter()) {
-                        let inner_symbol = inner_expr.debug_symbol();
-                        let inner_rhs = inner_expr.variant();
-                        
-                        let inner_assign = AssignmentRef {
-                            lhs: inner_lhs,
-                            op: None,
-                            rhs: inner_rhs,
-                            nonlocal: assign.nonlocal,
-                        };
-                        
-                        self.compile_assignment(Some(inner_symbol), inner_assign)
-                            .map_err(|err| err.with_symbol(*inner_symbol))?;
-                    }
-                    
-                    // assignments are also expressions
-                    let tuple_len = u8::try_from(rhs_list.len())
-                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
-                    self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
-                    
-                    Ok(())
-                },
-                
-                _ => unimplemented!(), // dynamic declaration
-
-            },
-        }
-    }
-    
-    fn compile_assign_identifier(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol, assign: AssignmentRef) -> CompileResult<()> {
-        
-        // Compile RHS
-        
-        if let Some(op) = assign.op {
-            // update assignment
-            self.compile_name_lookup(symbol, name)?;
-            self.compile_expr(symbol, &assign.rhs)?;
-            self.emit_binary_op(symbol, &op);
-            
-        } else {
-            // normal assignment
-            self.compile_expr(symbol, &assign.rhs)?;
-            
-        }
-        
-        // Generate assignment
-        
-        if self.scope().local_scope().is_some() {
-            let local = LocalName::Symbol(*name);
-            
-            // check if the name is found in the local scope...
-            let result = self.scope().resolve_local_strict(&local).map(|local| (local.decl, local.offset));
-            
-            if let Some((decl, offset)) = result {
-                if decl != DeclType::Mutable {
-                    return Err(CompileError::from(ErrorKind::CantAssignImmutable));
-                }
-                self.emit_assign_local(symbol, offset);
-                
-                return Ok(());
-            }
-            
-            // otherwise search enclosing scopes...
-            
-            let result = self.scope().resolve_nonlocal(&local).map(|local| (local.decl, local.offset));
-            
-            if let Some((decl, offset)) = result {
-                if !assign.nonlocal {
-                    return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
-                }
-                if decl != DeclType::Mutable {
-                    return Err(CompileError::from(ErrorKind::CantAssignImmutable));
-                }
-                self.emit_assign_local(symbol, offset);
-                
-                return Ok(());
-            }
-            
-        }
-        
-        // ...finally, try to assign global
-        
-        // allow assignment to global only if all enclosing scopes permit it
-        if !assign.nonlocal && !self.scope().iter_scopes().all(|scope| scope.allow_enclosing_assignment()) {
-            return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
-        }
-        
-        self.emit_load_const(symbol, Constant::from(*name))?;
-        self.emit_instr(symbol, OpCode::StoreGlobal);
-        Ok(())
-    }
-    
-    fn emit_assign_local(&mut self, symbol: Option<&DebugSymbol>, offset: LocalIndex) {
-        if let Ok(offset) = u8::try_from(offset) {
-            self.emit_instr_byte(symbol, OpCode::StoreLocal, offset);
-        } else {
-            self.emit_instr_data(symbol, OpCode::StoreLocal16, &offset.to_le_bytes());
-        }
-    }
-    
-    fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, expr_list: &[ExprMeta]) -> CompileResult<()> {
-        let len = u8::try_from(expr_list.len())
-            .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
-        
-        for expr in expr_list.iter() {
-            let inner_symbol = expr.debug_symbol();
-            self.compile_expr(Some(inner_symbol), expr.variant())
-                .map_err(|err| err.with_symbol(*inner_symbol))?;
-        }
-        
-        self.emit_instr_byte(symbol, OpCode::Tuple, len);
-        Ok(())
-    }
-    
-    fn compile_atom(&mut self, symbol: Option<&DebugSymbol>, atom: &Atom) -> CompileResult<()> {
-        match atom {
-            Atom::Nil => self.emit_instr(symbol, OpCode::Nil),
-            Atom::EmptyTuple => self.emit_instr(symbol, OpCode::Empty),
-            Atom::BooleanLiteral(true) => self.emit_instr(symbol, OpCode::True),
-            Atom::BooleanLiteral(false) => self.emit_instr(symbol, OpCode::False),
-            
-            Atom::IntegerLiteral(value) => {
-                if let Ok(value) = u8::try_from(*value) {
-                    self.emit_instr_byte(symbol, OpCode::UInt8, value);
-                } else if let Ok(value) = i8::try_from(*value) {
-                    self.emit_instr_byte(symbol, OpCode::Int8, value.to_le_bytes()[0]);
-                } else {
-                    self.emit_load_const(symbol, Constant::from(*value))?;
-                }
-            },
-            
-            Atom::FloatLiteral(value) => {
-                if FloatType::from(i8::MIN) <= *value && *value <= FloatType::from(i8::MAX) {
-                    let value = *value as i8;
-                    self.emit_instr_byte(symbol, OpCode::Float8, value.to_le_bytes()[0]);
-                } else {
-                    self.emit_load_const(symbol, Constant::from(*value))?;
-                }
-            },
-            
-            Atom::StringLiteral(value) => self.emit_load_const(symbol, Constant::from(*value))?,
-            Atom::Identifier(name) => self.compile_name_lookup(symbol, name)?,
-            
-            // Atom::Self_ => unimplemented!(),
-            // Atom::Super => unimplemented!(),
-            
-            Atom::Group(expr) => self.compile_expr(symbol, expr)?,
-        }
-        Ok(())
-    }
-    
-    fn compile_name_lookup(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol) -> CompileResult<()> {
-        
-        // Try loading a Local variable
-        if self.try_emit_load_local(symbol, &LocalName::Symbol(*name)).is_none() {
-            
-            // Otherwise, it must be a Global variable
-            self.emit_load_const(symbol, Constant::from(*name))?;
-            self.emit_instr(symbol, OpCode::LoadGlobal);
-        }
-        
-        Ok(())
-    }
-    
-    fn compile_primary(&mut self, symbol: Option<&DebugSymbol>, primary: &Primary) -> CompileResult<()> {
-        unimplemented!()
-    }
-    
-    fn emit_unary_op(&mut self, symbol: Option<&DebugSymbol>, op: &UnaryOp) {
-        match op {
-            UnaryOp::Neg => self.emit_instr(symbol, OpCode::Neg),
-            UnaryOp::Pos => self.emit_instr(symbol, OpCode::Pos),
-            UnaryOp::Inv => self.emit_instr(symbol, OpCode::Inv),
-            UnaryOp::Not => self.emit_instr(symbol, OpCode::Not),
-        }
-    }
-    
-    fn emit_binary_op(&mut self, symbol: Option<&DebugSymbol>, op: &BinaryOp) {
-        match op {
-            BinaryOp::Logical(logic) => unimplemented!(),
-            
-            BinaryOp::Arithmetic(op) => match op {
-                Arithmetic::Mul => self.emit_instr(symbol, OpCode::Mul),
-                Arithmetic::Div => self.emit_instr(symbol, OpCode::Div),
-                Arithmetic::Mod => self.emit_instr(symbol, OpCode::Mod),
-                Arithmetic::Add => self.emit_instr(symbol, OpCode::Add),
-                Arithmetic::Sub => self.emit_instr(symbol, OpCode::Sub),
-            },
-            
-            BinaryOp::Bitwise(op) => match op {
-                Bitwise::And => self.emit_instr(symbol, OpCode::And),
-                Bitwise::Xor => self.emit_instr(symbol, OpCode::Xor),
-                Bitwise::Or  => self.emit_instr(symbol, OpCode::Or),
-            },
-            
-            BinaryOp::Shift(op) => match op {
-                Shift::Left  => self.emit_instr(symbol, OpCode::Shl),
-                Shift::Right => self.emit_instr(symbol, OpCode::Shr),
-            },
-            
-            BinaryOp::Comparison(op) => match op {
-                Comparison::LT => self.emit_instr(symbol, OpCode::LT),
-                Comparison::GT => self.emit_instr(symbol, OpCode::GT),
-                Comparison::LE => self.emit_instr(symbol, OpCode::LE),
-                Comparison::GE => self.emit_instr(symbol, OpCode::GE),
-                Comparison::EQ => self.emit_instr(symbol, OpCode::EQ),
-                Comparison::NE => self.emit_instr(symbol, OpCode::NE),
-            },
-        }
-    }
 }
