@@ -107,13 +107,11 @@ const fn get_jump_opcode(jump: Jump, offset: JumpOffset) -> OpCode {
 
 // Scope Tracking
 
-type Offset = LocalIndex;
-
 #[derive(Debug)]
 struct Local {
     decl: DeclType,
     name: InternSymbol,
-    offset: Offset,
+    offset: LocalIndex,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -130,7 +128,7 @@ enum ScopeTag {
 struct Scope {
     tag: ScopeTag,
     depth: usize,
-    offset: Option<Offset>,
+    offset: Option<LocalIndex>,
     locals: Vec<Local>,
     symbol: Option<DebugSymbol>,
 }
@@ -140,7 +138,7 @@ impl Scope {
         self.symbol.as_ref()
     }
     
-    fn last_offset(&self) -> Option<Offset> {
+    fn last_offset(&self) -> Option<LocalIndex> {
         self.locals.last().map_or(self.offset, |local| Some(local.offset))
     }
     
@@ -1018,7 +1016,7 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn emit_assign_local(&mut self, symbol: Option<&DebugSymbol>, offset: Offset) {
+    fn emit_assign_local(&mut self, symbol: Option<&DebugSymbol>, offset: LocalIndex) {
         if let Ok(offset) = u8::try_from(offset) {
             self.emit_instr_byte(symbol, OpCode::StoreLocal, offset);
         } else {

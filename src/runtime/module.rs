@@ -6,6 +6,7 @@
 ///! Importing a Sphinx module simply means executing a Sphinx sub-program and binding the
 ///! resulting module to a name.
 
+use std::cell::{RefCell, Ref, RefMut};
 use std::hash::{Hash, Hasher, BuildHasher};
 use std::collections::HashMap;
 use crate::source::ModuleSource;
@@ -73,17 +74,26 @@ impl Namespace {
 
 pub type ModuleID = u64;
 
+#[derive(Debug)]
 pub struct Module {
     source: ModuleSource,
-    globals: Namespace,
     program: Program,
+    globals: RefCell<Namespace>,
 }
 
 impl Module {
+    pub fn module_id(&self) -> ModuleID { self.program.module_id() }
+    pub fn source(&self) -> &ModuleSource { &self.source }
     
+    #[inline(always)]
+    pub fn program(&self) -> &Program { &self.program }
+    
+    pub fn globals(&self) -> Ref<Namespace> { self.globals.borrow() }
+    pub fn globals_mut(&self) -> RefMut<Namespace> { self.globals.borrow_mut() }
 }
 
 
+#[derive(Debug)]
 pub struct ModuleCache {
     modules: HashMap<ModuleID, Module, DefaultBuildHasher>,
     id_hasher: DefaultBuildHasher,
@@ -104,7 +114,7 @@ impl ModuleCache {
         
         let module = Module {
             source, program,
-            globals: Namespace::new(),
+            globals: RefCell::new(Namespace::new()),
         };
         
         self.modules.insert(module_id, module);
@@ -121,5 +131,9 @@ impl ModuleCache {
             new_id = new_id.wrapping_add(1);
         }
         new_id
+    }
+    
+    pub fn get(&self, module_id: &ModuleID) -> Option<&Module> {
+        self.modules.get(module_id)
     }
 }

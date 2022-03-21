@@ -8,7 +8,7 @@ use sphinx_lang::BuildErrors;
 use sphinx_lang::source::{ModuleSource, SourceType, SourceText};
 use sphinx_lang::parser::stmt::{Stmt, StmtMeta};
 use sphinx_lang::codegen::Program;
-use sphinx_lang::runtime::VirtualMachine;
+use sphinx_lang::runtime::{VirtualMachine, ModuleCache, Module, ModuleID};
 use sphinx_lang::runtime::strings::StringInterner;
 use sphinx_lang::debug::symbol::BufferedResolver;
 
@@ -73,7 +73,8 @@ fn main() {
         unimplemented!()
     }
     else {
-        let exec_result = build_and_execute(&args, module);
+        let mut module_cache = ModuleCache::new();
+        let exec_result = build_and_execute(&args, &mut module_cache, module);
         
         if let Ok(vm) = exec_result {
             if args.is_present("interactive") {
@@ -89,16 +90,18 @@ fn start_repl(_args: &ArgMatches, version: &str, vm: Option<VirtualMachine>) {
     let mut repl;
     if let Some(vm) = vm {
         repl = Repl::with_vm(vm);
+        repl.run();
     } else {
-        repl = Repl::new();
+        let module_cache = ModuleCache::new();
+        repl = Repl::new(&module_cache);
+        repl.run();
     }
     
-    repl.run();
 }
 
-fn build_and_execute(_args: &ArgMatches, module: ModuleSource) -> Result<VirtualMachine, ()> {
+fn build_and_execute<'m>(_args: &ArgMatches, module_cache: &'m mut ModuleCache, source: ModuleSource) -> Result<VirtualMachine<'m>, ()> {
     // build module
-    let build_result = sphinx_lang::build_module(&module);
+    let build_result = sphinx_lang::build_module(&source);
     if build_result.is_err() {
         match build_result.unwrap_err() {
             BuildErrors::Source(error) => {
@@ -106,20 +109,22 @@ fn build_and_execute(_args: &ArgMatches, module: ModuleSource) -> Result<Virtual
             }
             
             BuildErrors::Syntax(errors) => {
-                println!("Errors in file \"{}\":\n", module.name());
-                frontend::print_source_errors(&module, &errors);
+                println!("Errors in file \"{}\":\n", source.name());
+                frontend::print_source_errors(&source, &errors);
             }
             
             BuildErrors::Compile(errors) => {
-                println!("Errors in file \"{}\":\n", module.name());
-                frontend::print_source_errors(&module, &errors);
+                println!("Errors in file \"{}\":\n", source.name());
+                frontend::print_source_errors(&source, &errors);
             }
         }
         return Err(());
     }
     
     let build = build_result.unwrap();
-    let mut vm = VirtualMachine::new(Program::load(build.program));
+    let module = module_cache.load(build.program, source);
+    let module_id = module.module_id();
+    let mut vm = VirtualMachine::new(module_cache, &module_id);
     
     vm.run().expect("runtime error");
     
@@ -156,8 +161,8 @@ fn parse_and_print_ast(_args: &ArgMatches, module: ModuleSource) {
 const PROMT_START: &str = ">>> ";
 const PROMT_CONTINUE: &str = "... ";
 
-struct Repl {
-    vm: Option<VirtualMachine>,
+struct Repl<'m> {
+    vm: Option<VirtualMachine<'m>>,
 }
 
 enum ReadLine {
@@ -167,13 +172,17 @@ enum ReadLine {
     Quit,
 }
 
-impl Repl {
-    pub fn new() -> Self {
-        Self { vm: None }
+impl<'m> Repl<'m> {
+    pub fn new(module_cache: &'m ModuleCache) -> Self {
+        Self {
+            vm: None
+        }
     }
     
-    pub fn with_vm(vm: VirtualMachine) -> Self {
-        Self { vm: Some(vm) }
+    pub fn with_vm(vm: VirtualMachine<'m>) -> Self {
+        Self { 
+            vm: Some(vm) 
+        }
     }
     
     fn read_line(&self, prompt: &'static str) -> ReadLine {
@@ -276,11 +285,13 @@ impl Repl {
                 }
             };
             
-            let program = Program::load(build.program);
-            match self.vm {
-                Some(ref mut vm) => vm.reload_program(program),
-                None => { self.vm.replace(VirtualMachine::new(program)); },
-            }
+            // match self.vm {
+            //     Some(ref mut vm) => vm.reload_program(program),
+            //     None => { 
+            //         let module = self.module_cache.unwrap().load(build.program, )
+            //         self.vm.replace(VirtualMachine::new(program)); 
+            //     },
+            // }
             
             if let Err(error) = self.vm.as_mut().unwrap().run() {
                 println!("Runtime error: {:?}", error);

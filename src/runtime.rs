@@ -15,6 +15,7 @@ mod tests;
 pub use strings::STRING_TABLE;
 pub use variant::{Variant, VariantKey};
 pub use vm::VirtualMachine;
+pub use module::{ModuleCache, Module, ModuleID};
 pub use errors::{RuntimeError, ExecResult};
 
 // Default Hasher

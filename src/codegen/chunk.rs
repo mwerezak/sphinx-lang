@@ -320,6 +320,10 @@ pub struct Program {
 }
 
 impl Program {
+    pub fn module_id(&self) -> ModuleID {
+        self.module_id
+    }
+    
     #[inline(always)]
     pub fn chunk(&self, chunk_id: ChunkID) -> &[u8] {
         let index = &self.chunk_index[usize::from(chunk_id)];

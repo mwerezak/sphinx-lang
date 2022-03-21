@@ -1,9 +1,10 @@
+use std::cell::{Ref, RefMut};
 use crate::language::{IntType, FloatType};
 use crate::codegen::{Program, ChunkID, ConstID, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::ops;
 use crate::runtime::strings::StringSymbol;
-use crate::runtime::module::{Module, Access, Namespace};
+use crate::runtime::module::{Module, ModuleCache, ModuleID, Access, Namespace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -42,7 +43,7 @@ macro_rules! cond_jump {
         {
             let mut offset = $offset;
             offset &= isize::from(!$cond).wrapping_sub(1);
-            $self.pc = $self.offset_pc(offset).expect("pc overflow/underflow");
+            $self.state.pc = $self.offset_pc(offset).expect("pc overflow/underflow");
         }
     }
 }
@@ -56,47 +57,66 @@ enum Control {
 
 pub type LocalIndex = u16;
 
+/// stores the previous active chunk information
+#[derive(Debug)]
+struct ActivationState<'m> {
+    module: &'m Module,
+    chunk: &'m [u8],
+    chunk_id: ChunkID,
+    pc: usize,
+    locals: LocalIndex,
+}
+
+impl<'m> ActivationState<'m> {
+    fn fresh(module: &'m Module, chunk_id: ChunkID) -> Self {
+        Self {
+            module, chunk_id,
+            chunk: module.program().chunk(chunk_id),
+            pc: 0,
+            locals: 0,
+        }
+    }
+}
+
 // Stack-based Virtual Machine
 #[derive(Debug)]
-pub struct VirtualMachine {
-    // module: Module,
-    pc: usize, // program counter
-    chunk: ChunkID,
-    program: Program,
-    globals: Namespace,
-    locals: LocalIndex,
+pub struct VirtualMachine<'m> {
+    module_cache: &'m ModuleCache,
+    activation: Vec<ActivationState<'m>>,
+    state: ActivationState<'m>,
     immediate: Vec<Variant>,
 }
 
-impl VirtualMachine {
-    pub fn new(program: Program) -> Self {
+impl<'m> VirtualMachine<'m> {
+    pub fn new(module_cache: &'m ModuleCache, module_id: &ModuleID) -> Self {
+        let module = module_cache.get(module_id).expect("invalid module id");
+        
         Self {
-            pc: 0,
-            chunk: 0,
-            globals: Namespace::new(),
-            locals: 0,
+            module_cache,
+            activation: Vec::new(),
+            state: ActivationState::fresh(module, 0),
             immediate: Vec::new(),
-            program,
         }
     }
     
-    pub fn reload_program(&mut self, program: Program) {
-        self.immediate.clear();
-        self.locals = 0;
-        self.program = program;
-        self.pc = 0;
+    pub fn module_cache(&self) -> &ModuleCache { self.module_cache }
+    
+    pub fn main_module(&self) -> &Module {
+        self.activation.first().unwrap_or(&self.state).module
     }
     
-    pub fn program(&self) -> &Program { &self.program }
-    pub fn take_program(self) -> Program { self.program }
+    #[inline(always)]
+    fn program(&self) -> &Program { self.state.module.program() }
     
-    fn current_chunk(&self) -> &[u8] {
-        self.program.chunk(self.chunk)
-    }
+    #[inline(always)] 
+    fn globals(&self) -> Ref<Namespace> { self.state.module.globals() }
+    
+    #[inline(always)] 
+    fn globals_mut(&mut self) -> RefMut<Namespace> { self.state.module.globals_mut() }
     
     pub fn run(&mut self) -> ExecResult<()> {
         loop {
-            let op_byte = self.current_chunk().get(self.pc).expect("pc out of bounds");
+            let op_byte = self.state.chunk.get(self.state.pc).expect("pc out of bounds");
             
             let opcode = OpCode::from_byte(*op_byte)
                 .unwrap_or_else(|| panic!("invalid instruction: {:x}", op_byte));
@@ -157,16 +177,16 @@ impl VirtualMachine {
     
     #[inline(always)]
     fn peek_many(&self, count: usize) -> &[Variant] {
-        let (_, peek) = self.immediate.as_slice().split_at(self.immediate.len()-count);
+        let (_, peek) = self.immediate.as_slice().split_at(self.immediate.len() - count);
         peek
     }
     
     #[inline(always)]
     fn offset_pc(&self, offset: isize) -> Option<usize> {
         if offset >= 0 {
-            usize::checked_add(self.pc, offset as usize)
+            usize::checked_add(self.state.pc, offset as usize)
         } else {
-            usize::checked_sub(self.pc, offset.unsigned_abs())
+            usize::checked_sub(self.state.pc, offset.unsigned_abs())
         }
     }
     
@@ -180,10 +200,10 @@ impl VirtualMachine {
     
     fn exec_instr(&mut self, opcode: OpCode) -> ExecResult<Control> {
         let len = opcode.instr_len();
-        let data_slice = (self.pc+1)..(self.pc+len);
-        self.pc += opcode.instr_len(); // pc points to next instruction
+        let data_slice = (self.state.pc + 1) .. (self.state.pc + len);
+        self.state.pc += opcode.instr_len(); // pc points to next instruction
         
-        let data = self.current_chunk().get(data_slice).expect("truncated instruction");
+        let data = self.state.chunk.get(data_slice).expect("truncated instruction");
         match opcode {
             OpCode::Nop => { },
             
@@ -202,43 +222,45 @@ impl VirtualMachine {
             
             OpCode::LoadConst => {
                 let cid = ConstID::from(data[0]);
-                let value = self.program.lookup_value(cid);
+                let value = self.program().lookup_value(cid);
                 self.push_stack(value);
             },
             OpCode::LoadConst16 => {
                 let cid = ConstID::from(read_le_bytes!(u16, data));
-                let value = self.program.lookup_value(cid);
+                let value = self.program().lookup_value(cid);
                 self.push_stack(value);
             },
             
             OpCode::InsertGlobal => {
                 let name = Self::into_name(&self.pop_stack());
                 let value = self.peek_stack().clone();
-                self.globals.create(name, Access::ReadOnly, value)?;
+                self.globals_mut().create(name, Access::ReadOnly, value)?;
             },
             OpCode::InsertGlobalMut => {
                 let name = Self::into_name(&self.pop_stack());
                 let value = self.peek_stack().clone();
-                self.globals.create(name, Access::ReadWrite, value)?;
+                self.globals_mut().create(name, Access::ReadWrite, value)?;
             },
             OpCode::StoreGlobal => {
                 let name = Self::into_name(&self.pop_stack());
                 let value = self.peek_stack().clone();
-                let store = self.globals.lookup_mut(&name)?;
+                
+                let mut globals = self.globals_mut();
+                let store = globals.lookup_mut(&name)?;
                 *store = value;
             },
             OpCode::LoadGlobal => {
                 let value = {
                     let name = Self::into_name(self.peek_stack());
-                    self.globals.lookup(&name)?.clone()
+                    self.globals().lookup(&name)?.clone()
                 };
                 self.replace_stack(value);
             },
             
             OpCode::InsertLocal => {
                 let value = self.peek_stack().clone();
-                self.immediate.insert(self.locals.into(), value);
-                self.locals += 1;
+                self.immediate.insert(self.state.locals.into(), value);
+                self.state.locals += 1;
             },
             OpCode::StoreLocal => {
                 let offset = usize::from(data[0]);
@@ -250,19 +272,19 @@ impl VirtualMachine {
             },
             OpCode::LoadLocal => {
                 let offset = usize::from(data[0]);
-                debug_assert!(offset < self.locals.into());
+                debug_assert!(offset < self.state.locals.into());
                 self.push_stack(self.peek_offset(offset).clone());
             },
             OpCode::LoadLocal16 => {
                 let offset = usize::from(read_le_bytes!(u16, data));
-                debug_assert!(offset < self.locals.into());
+                debug_assert!(offset < self.state.locals.into());
                 self.push_stack(self.peek_offset(offset).clone());
             },
             OpCode::DropLocals => {
-                debug_assert!(usize::from(self.locals) == self.stack_len(), "immediate values on stack");
+                debug_assert!(usize::from(self.state.locals) == self.stack_len(), "immediate values on stack");
                 let count = data[0];
                 self.discard_stack(count.into());
-                self.locals -= LocalIndex::from(count);
+                self.state.locals -= LocalIndex::from(count);
             },
             
             OpCode::Nil => self.push_stack(Variant::Nil),
@@ -325,11 +347,11 @@ impl VirtualMachine {
             
             OpCode::Jump => {
                 let offset = isize::from(read_le_bytes!(i16, data));
-                self.pc = self.offset_pc(offset).expect("pc overflow/underflow");
+                self.state.pc = self.offset_pc(offset).expect("pc overflow/underflow");
             }
             OpCode::LongJump => {
                 let offset = isize::try_from(read_le_bytes!(i32, data)).unwrap();
-                self.pc = self.offset_pc(offset).expect("pc overflow/underflow");
+                self.state.pc = self.offset_pc(offset).expect("pc overflow/underflow");
             }
             
             OpCode::JumpIfFalse    => cond_jump!(self, !self.peek_stack().truth_value(), isize::from(read_le_bytes!(i16, data))),
