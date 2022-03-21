@@ -82,7 +82,8 @@ fn main() {
     let symbol_table = module.resolve_symbols(symbols);
     
     let dasm = {
-        let dasm = Disassembler::new(&build.program);
+        let dasm = Disassembler::new(&build.program)
+            .with_symbols(&build.symbols);
         
         if let Ok(ref symbol_table) = symbol_table {
             dasm.with_symbol_table(&symbol_table)
