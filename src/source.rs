@@ -10,6 +10,7 @@ use crate::runtime::strings::StringInterner;
 
 type ReadFileChars = ReadChars<io::BufReader<fs::File>>;
 
+#[derive(Hash)]
 pub enum SourceType {
     String(String),
     File(PathBuf),
@@ -26,6 +27,7 @@ impl<S> From<S> for SourceText where S: ToString {
 }
 
 // Represents a "source" of source code, and provides the means to access the source text as a sequence of chars
+#[derive(Hash)]
 pub struct ModuleSource {
     name: String,
     source: SourceType,

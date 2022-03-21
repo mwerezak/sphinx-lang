@@ -6,9 +6,10 @@
 ///! Importing a Sphinx module simply means executing a Sphinx sub-program and binding the
 ///! resulting module to a name.
 
+use std::hash::{Hash, Hasher, BuildHasher};
 use std::collections::HashMap;
 use crate::source::ModuleSource;
-use crate::codegen::Constant;
+use crate::codegen::{Program, UnloadedProgram};
 use crate::runtime::{Variant, DefaultBuildHasher};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -70,16 +71,55 @@ impl Namespace {
 }
 
 
-pub type ModuleID = u64; // TODO probably a hash of some type
+pub type ModuleID = u64;
 
 pub struct Module {
-    id: ModuleID,
     source: ModuleSource,
     globals: Namespace,
-    consts: Box<[Constant]>,
-    strings: Box<[StringSymbol]>,
+    program: Program,
 }
 
 impl Module {
     
+}
+
+
+pub struct ModuleCache {
+    modules: HashMap<ModuleID, Module, DefaultBuildHasher>,
+    id_hasher: DefaultBuildHasher,
+}
+
+impl ModuleCache {
+    pub fn new() -> Self {
+        Self {
+            modules: HashMap::with_hasher(DefaultBuildHasher::default()),
+            id_hasher: DefaultBuildHasher::default(),
+        }
+    }
+    
+    /// Loads an `UnloadedProgram`, creating a new module for it
+    pub fn load(&mut self, program: UnloadedProgram, source: ModuleSource) -> &Module {
+        let module_id = self.new_module_id(&source);
+        let program = Program::load(program, module_id);
+        
+        let module = Module {
+            source, program,
+            globals: Namespace::new(),
+        };
+        
+        self.modules.insert(module_id, module);
+        self.modules.get(&module_id).unwrap()
+    }
+    
+    /// Get a new, unused module ID.
+    fn new_module_id(&mut self, source: &ModuleSource) -> ModuleID {
+        let mut state = self.id_hasher.build_hasher();
+        source.hash(&mut state);
+        let mut new_id = state.finish();
+        
+        while self.modules.contains_key(&new_id) {
+            new_id = new_id.wrapping_add(1);
+        }
+        new_id
+    }
 }

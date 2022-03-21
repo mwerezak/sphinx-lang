@@ -311,6 +311,7 @@ impl UnloadedProgram {
 
 #[derive(Debug)]
 pub struct Program {
+    module_id: ModuleID,
     chunks: Box<[u8]>,
     chunk_index: Box<[ChunkIndex]>,
     strings: Box<[StringSymbol]>,
@@ -334,11 +335,13 @@ impl Program {
             Constant::Integer(value) => Variant::from(*value),
             Constant::Float(bytes) => FloatType::from_le_bytes(*bytes).into(),
             Constant::String(idx) => Variant::from(self.strings[idx.to_usize()]),
-            Constant::Function(chunk_id, function_id) => unimplemented!(), // get or create function object
+            Constant::Function(chunk_id, function_id) => {
+                unimplemented!()
+            }
         }
     }
     
-    pub fn load(program: UnloadedProgram) -> Self {
+    pub fn load(program: UnloadedProgram, module_id: ModuleID) -> Self {
         let strings = STRING_TABLE.with(|string_table| {
             let mut string_table = string_table.borrow_mut();
             
@@ -352,6 +355,7 @@ impl Program {
         });
         
         Self {
+            module_id,
             chunks: program.chunks,
             chunk_index: program.chunk_index,
             consts: program.consts,

@@ -23,6 +23,7 @@ pub enum Variant {
     // TODO just GC tuples
     Tuple(Rc<[Variant]>),  //  will use COW semantics, so if we need to send to another thread we can just clone the underlying data
     Object(GCHandle),
+    // LoadedModule(ModuleID)
 }
 
 impl Variant {
