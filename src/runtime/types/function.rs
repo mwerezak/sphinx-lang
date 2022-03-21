@@ -45,15 +45,15 @@ impl Signature {
 pub struct Parameter {
     name: ConstID,
     decl: DeclType,
-    default: Option<ChunkID>,
 }
 
+// TODO don't create an entire chunk for each default argument
+
 impl Parameter {
-    pub fn new(name: ConstID, decl: DeclType, default: Option<ChunkID>) -> Self {
-        Self { name, decl, default }
+    pub fn new(name: ConstID, decl: DeclType) -> Self {
+        Self { name, decl }
     }
     
     pub fn name(&self) -> &ConstID { &self.name }
     pub fn decl(&self) -> &DeclType { &self.decl }
-    pub fn has_default(&self) -> bool { self.default.is_some() }
 }

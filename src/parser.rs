@@ -23,7 +23,7 @@ use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
 use primary::{Primary, Atom, AccessItem, Argument};
 use lvalue::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
-use fundefs::{FunctionDef, SignatureDef, RequiredDef, DefaultDef, VariadicDef};
+use fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
 use errors::{ErrorKind, ErrorContext, ContextTag};
 
 
@@ -999,25 +999,31 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             // possible default value
             let next = self.peek()?;
-            let default_value =
-                if matches!(next.token, Token::OpAssign) {
+            let default_value = match next.token {
+                Token::OpAssign if is_variadic => {
+                    return Err("variadic parameters can't have a default value".into())
+                },
+                
+                Token::OpAssign => {
                     ctx.set_end(&self.advance().unwrap());
                     
-                    Some(self.parse_expr(ctx)?)
-                } else {
-                    None
-                };
-            let default_value = default_value.map(|expr| Box::new(expr));
+                    Some(Box::new(self.parse_expr(ctx)?))
+                },
+                
+                _ => None,
+            };
             
             // expect either a comma "," or the closing ")"
             let next = self.peek()?;
             match next.token {
                 // variadic parameter
                 Token::Comma if is_variadic => {
-                    return Err("a variadic parameter must be the last one in the parameter list".into());
+                    return Err("a variadic parameter must appear last in the parameter list".into());
                 }
+                
                 Token::CloseParen if is_variadic => {
-                    variadic.replace(VariadicDef { name, decl, default: default_value });
+                    debug_assert!(default_value.is_none());
+                    variadic.replace(ParamDef { name, decl });
                 },
                 
                 // normal parameter
@@ -1028,7 +1034,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                         if !default.is_empty() {
                             return Err("cannot have a non-default parameter after a default parameter".into());
                         }
-                        required.push(RequiredDef { name, decl });
+                        required.push(ParamDef { name, decl });
                     }
                 },
                 

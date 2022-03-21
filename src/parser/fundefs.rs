@@ -25,13 +25,13 @@ impl FunctionDef {
 
 #[derive(Debug, Clone)]
 pub struct SignatureDef {
-    pub required: Box<[RequiredDef]>,
+    pub required: Box<[ParamDef]>,
     pub default: Box<[DefaultDef]>,
-    pub variadic: Option<VariadicDef>,
+    pub variadic: Option<ParamDef>,
 }
 
 impl SignatureDef {
-    pub fn new(required: Vec<RequiredDef>, default: Vec<DefaultDef>, variadic: Option<VariadicDef>) -> Self {
+    pub fn new(required: Vec<ParamDef>, default: Vec<DefaultDef>, variadic: Option<ParamDef>) -> Self {
         SignatureDef {
             required: required.into_boxed_slice(),
             default: default.into_boxed_slice(),
@@ -44,7 +44,7 @@ impl SignatureDef {
 
 
 #[derive(Debug, Clone)]
-pub struct RequiredDef {
+pub struct ParamDef {
     pub name: InternSymbol,
     pub decl: DeclType,
 }
@@ -54,11 +54,4 @@ pub struct DefaultDef {
     pub name: InternSymbol,
     pub decl: DeclType,
     pub default: Box<ExprMeta>,
-}
-
-#[derive(Debug, Clone)]
-pub struct VariadicDef {
-    pub name: InternSymbol,
-    pub decl: DeclType,
-    pub default: Option<Box<ExprMeta>>,
 }

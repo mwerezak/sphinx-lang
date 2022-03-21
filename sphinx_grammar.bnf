@@ -127,17 +127,15 @@ parameter_list ::= "(" ")" ;
 
 parameter_list ::= "(" ")" 
                  | "(" variadic_parameter ")"
-                 | "(" positional_params ( "," variadic_parameter | default_variadic )? ")"
-                 | "(" default_params ( "," default_variadic )? ")"
-                 | "(" positional_params default_params ( "," default_variadic )? ")" ;
+                 | "(" ( positional_params )? ( default_params )? ( "," variadic_parameter )? ")" ;
 
-positional_params ::= parameter ( "," parameter )* ;
-default_params ::= default_positional ( "," default_positional )* ;
+required_params ::= parameter ( "," parameter )* ;
+default_params ::= default_parameter ( "," default_parameter )* ;
 
 parameter ::= ( "var" )? IDENTIFIER ( ":" type_expression )? ;
+default_parameter ::= parameter ( "=" expression ) ;
+
 variadic_parameter ::= ( "var" )? IDENTIFIER "..." ( ":" type_expression )? ;
-default_positional ::= parameter ( "=" expression ) ;
-default_variadic ::= default_parameter ( "=" expression ) ;
 
 
 (*** Class Defs ***)
