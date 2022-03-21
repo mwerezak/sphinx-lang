@@ -305,9 +305,10 @@ impl<'m> VirtualMachine<'m> {
                 self.push_stack(self.peek_offset(offset).clone());
             },
             OpCode::DropLocals => {
-                debug_assert!(usize::from(self.state.locals) == self.stack_len(), "immediate values on stack");
                 let count = data[0];
-                self.discard_stack(count.into());
+                let locals_len = usize::from(self.state.locals);
+                let drop_range = (locals_len - usize::from(count))..locals_len;
+                self.immediate.splice(drop_range, std::iter::empty());
                 self.state.locals -= LocalIndex::from(count);
             },
             
