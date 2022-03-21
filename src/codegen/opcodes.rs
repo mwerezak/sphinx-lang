@@ -22,6 +22,9 @@ const OP_POP:           u8 = 0x08;  // [ _ ] => []
 const OP_DROP:          u8 = 0x09;  // (u8); [ ... ] => []
 const OP_CLONE:         u8 = 0x0A;  // [ value ] => [ value value ]
 
+const OP_TUPLE:         u8 = 0x0B;  // (u8); [ ... ] => [ tuple ]
+const OP_TUPLEN:        u8 = 0x0C;  // [ ... N ] => [ tuple ]
+
 const OP_LD_CONST:      u8 = 0x10;  // (u8); _ => [ value ]
 const OP_LD_CONST_16:   u8 = 0x11;  // (u16); _ => [ value ]
 // const OP_LD_CONST_32:   u8 = 0x12;  // (u32); _ => [ value ]
@@ -51,17 +54,15 @@ const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ ... ] => [] -- panics if there ar
 // const OP_IN_DYN         u8 = 0x30;  // [ value dyn_target bool ] => [] 
 // const OP_ST_DYN         u8 = 0x31;  // [ value dyn_target ] => []
 
-const OP_NIL:           u8 = 0x38;  // _ => [ nil ]
-const OP_FALSE:         u8 = 0x39;  // _ => [ false ]
-const OP_TRUE:          u8 = 0x3A;  // _ => [ true ]
-const OP_EMPTY:         u8 = 0x3B;  // _ => [ () ]
-const OP_TUPLE:         u8 = 0x3C;  // (u8); [ ... ] => [ tuple ]
-const OP_TUPLEN:        u8 = 0x3D;  // [ ... N ] => [ tuple ]
+const OP_LD_NIL:        u8 = 0x38;  // _ => [ nil ]
+const OP_LD_FALSE:      u8 = 0x39;  // _ => [ false ]
+const OP_LD_TRUE:       u8 = 0x3A;  // _ => [ true ]
+const OP_LD_EMPTY:      u8 = 0x3B;  // _ => [ () ]
 
 // small numbers
-const OP_U8:            u8 = 0x3E;  // (u8); _ => [ value ]
-const OP_I8:            u8 = 0x3F;  // (i8); _ => [ value ]
-const OP_F8:            u8 = 0x40;  // (i8); _ => [ value ]
+const OP_LD_U8:         u8 = 0x3C;  // (u8); _ => [ value ]
+const OP_LD_I8:         u8 = 0x3D;  // (i8); _ => [ value ]
+const OP_LD_F8:         u8 = 0x3E;  // (i8); _ => [ value ]
 
 // const OP_DYN_TARGET:    u8 = 0x48;  // (u8); [ ... ] => [ dyn_target ]
 
@@ -140,6 +141,9 @@ pub enum OpCode {
     Drop = OP_DROP,
     Clone = OP_CLONE,
     
+    Tuple = OP_TUPLE,
+    TupleN = OP_TUPLEN,
+    
     LoadConst  = OP_LD_CONST,
     LoadConst16 = OP_LD_CONST_16,
     InsertGlobal = OP_IN_GLOBAL_IM,
@@ -154,16 +158,14 @@ pub enum OpCode {
     LoadLocal16 = OP_LD_LOCAL_16,
     DropLocals = OP_DP_LOCALS,
     
-    Nil = OP_NIL,
-    True = OP_TRUE,
-    False = OP_FALSE,
-    Empty = OP_EMPTY,
-    Tuple = OP_TUPLE,
-    TupleN = OP_TUPLEN,
+    Nil = OP_LD_NIL,
+    True = OP_LD_TRUE,
+    False = OP_LD_FALSE,
+    Empty = OP_LD_EMPTY,
     
-    UInt8 = OP_U8,
-    Int8 = OP_I8,
-    Float8 = OP_F8,
+    UInt8 = OP_LD_U8,
+    Int8 = OP_LD_I8,
+    Float8 = OP_LD_F8,
     
     Neg = OP_NEG,
     Pos = OP_POS,
@@ -217,6 +219,9 @@ impl OpCode {
             OP_DROP => Self::Drop,
             OP_CLONE => Self::Clone,
             
+            OP_TUPLE => Self::Tuple,
+            OP_TUPLEN => Self::TupleN,
+            
             OP_LD_CONST => Self::LoadConst,
             OP_LD_CONST_16 => Self::LoadConst16,
             
@@ -232,15 +237,13 @@ impl OpCode {
             OP_LD_LOCAL_16 => Self::LoadLocal16,
             OP_DP_LOCALS => Self::DropLocals,
             
-            OP_NIL => Self::Nil,
-            OP_TRUE => Self::True,
-            OP_FALSE => Self::False,
-            OP_EMPTY => Self::Empty,
-            OP_TUPLE => Self::Tuple,
-            OP_TUPLEN => Self::TupleN,
-            OP_U8 => Self::UInt8,
-            OP_I8 => Self::Int8,
-            OP_F8 => Self::Float8,
+            OP_LD_NIL => Self::Nil,
+            OP_LD_TRUE => Self::True,
+            OP_LD_FALSE => Self::False,
+            OP_LD_EMPTY => Self::Empty,
+            OP_LD_U8 => Self::UInt8,
+            OP_LD_I8 => Self::Int8,
+            OP_LD_F8 => Self::Float8,
             
             OP_NEG => Self::Neg,
             OP_POS => Self::Pos,
@@ -339,6 +342,9 @@ impl std::fmt::Display for OpCode {
             Self::Drop => "OP_DROP",
             Self::Clone => "OP_CLONE",
             
+            Self::Tuple => "OP_TUPLE",
+            Self::TupleN => "OP_TUPLEN",
+            
             Self::LoadConst => "OP_LD_CONST",
             Self::LoadConst16 => "OP_LD_CONST_16",
             
@@ -354,15 +360,13 @@ impl std::fmt::Display for OpCode {
             Self::LoadLocal16 => "OP_LD_LOCAL_16",
             Self::DropLocals => "OP_DP_LOCALS",
             
-            Self::Nil => "OP_NIL",
-            Self::True => "OP_TRUE",
-            Self::False => "OP_FALSE",
-            Self::Empty => "OP_EMPTY",
-            Self::Tuple => "OP_TUPLE",
-            Self::TupleN => "OP_TUPLEN",
-            Self::UInt8 => "OP_U8",
-            Self::Int8 => "OP_I8",
-            Self::Float8 => "OP_F8",
+            Self::Nil => "OP_LD_NIL",
+            Self::True => "OP_LD_TRUE",
+            Self::False => "OP_LD_FALSE",
+            Self::Empty => "OP_LD_EMPTY",
+            Self::UInt8 => "OP_LD_U8",
+            Self::Int8 => "OP_LD_I8",
+            Self::Float8 => "OP_LD_F8",
             
             Self::Neg => "OP_NEG",
             Self::Pos => "OP_POS",
