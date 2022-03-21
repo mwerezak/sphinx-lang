@@ -744,7 +744,7 @@ impl CodeGenerator<'_> {
         let chunk_id = codegen.chunk_id();
         
         for stmt in fundef.body().iter() {
-            codegen.push_stmt(stmt);
+            codegen.push_stmt(stmt)?;
         }
         codegen.finish();
         

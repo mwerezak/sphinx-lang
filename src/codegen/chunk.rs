@@ -4,7 +4,8 @@ use std::ops::Range;
 use std::collections::HashMap;
 use string_interner::Symbol as _;
 use crate::language::{IntType, FloatType};
-use crate::runtime::{Variant, STRING_TABLE};
+use crate::runtime::{DefaultBuildHasher, Variant, STRING_TABLE};
+use crate::runtime::module::ModuleID;
 use crate::runtime::strings::{StringInterner, InternSymbol, StringSymbol};
 use crate::runtime::types::function::Signature;
 use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
@@ -110,19 +111,13 @@ pub struct ChunkBuilder {
     chunks: Vec<ChunkBuf>,
     consts: Vec<Constant>,
     functions: Vec<Signature>,
-    dedup: HashMap<Constant, ConstID>,
+    dedup: HashMap<Constant, ConstID, DefaultBuildHasher>,
     strings: StringInterner,
 }
 
 impl ChunkBuilder {
     pub fn new() -> Self {
-        Self {
-            consts: Vec::new(),
-            functions: Vec::new(),
-            chunks: Vec::new(),
-            dedup: HashMap::new(),
-            strings: StringInterner::new(),
-        }
+        Self::with_strings(StringInterner::new())
     }
     
     pub fn with_strings(strings: StringInterner) -> Self {
@@ -130,7 +125,7 @@ impl ChunkBuilder {
             chunks: Vec::new(),
             functions: Vec::new(),
             consts: Vec::new(),
-            dedup: HashMap::new(),
+            dedup: HashMap::with_hasher(DefaultBuildHasher::default()),
             strings,
         }
     }

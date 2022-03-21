@@ -14,7 +14,7 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 #[derive(Clone)] // add Copy?
 pub enum Variant {
     Nil,
-    EmptyTuple, // the empty tuple value
+    EmptyTuple,
     BoolTrue,
     BoolFalse,
     Integer(IntType),

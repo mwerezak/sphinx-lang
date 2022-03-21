@@ -1,5 +1,5 @@
 use crate::language::{IntType, FloatType};
-use crate::codegen::{Program, ConstID, OpCode};
+use crate::codegen::{Program, ChunkID, ConstID, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::ops;
 use crate::runtime::strings::StringSymbol;
@@ -61,6 +61,7 @@ pub type LocalIndex = u16;
 pub struct VirtualMachine {
     // module: Module,
     pc: usize, // program counter
+    chunk: ChunkID,
     program: Program,
     globals: Namespace,
     locals: LocalIndex,
@@ -71,6 +72,7 @@ impl VirtualMachine {
     pub fn new(program: Program) -> Self {
         Self {
             pc: 0,
+            chunk: 0,
             globals: Namespace::new(),
             locals: 0,
             immediate: Vec::new(),
@@ -80,6 +82,7 @@ impl VirtualMachine {
     
     pub fn reload_program(&mut self, program: Program) {
         self.immediate.clear();
+        self.locals = 0;
         self.program = program;
         self.pc = 0;
     }
@@ -88,7 +91,7 @@ impl VirtualMachine {
     pub fn take_program(self) -> Program { self.program }
     
     fn current_chunk(&self) -> &[u8] {
-        self.program.chunk(0)
+        self.program.chunk(self.chunk)
     }
     
     pub fn run(&mut self) -> ExecResult<()> {
