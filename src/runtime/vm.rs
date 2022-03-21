@@ -394,11 +394,6 @@ impl<'m> VirtualMachine<'m> {
             OpCode::PopLongJumpIfFalse => cond_jump!(self, !self.pop_stack().truth_value(),  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             OpCode::PopLongJumpIfTrue  => cond_jump!(self, self.pop_stack().truth_value(),   isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             
-            // OpCode::JumpIndirect => {
-            //     let offset = Self::into_indirect_offset(&self.pop_stack());
-            //     self.state.pc = self.offset_pc(offset).expect("pc overflow/underflow");
-            // }
-            
             OpCode::Inspect => println!("{:?}", self.peek_stack()),
             OpCode::Assert => {
                 if !self.peek_stack().truth_value() {

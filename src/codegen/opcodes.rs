@@ -108,12 +108,6 @@ const OP_LJUMP_TRUE:    u8 = 0x77;  // (i32); [ cond ] => [ cond ]
 const OP_PLJMP_FALSE:   u8 = 0x78;  // (i32); [ cond ] => []
 const OP_PLJMP_TRUE:    u8 = 0x79;  // (i32); [ cond ] => []
 
-// const OP_JUMPN:         u8 = 0x7A;  // [ offset ] => []  -- offset added to PC
-// const OP_JUMPN_TRUE:    u8 = 0x7B;  // [ cond offset ] => [ cond ]
-// const OP_JUMPN_FALSE:   u8 = 0x7C;  // [ cond offset ] => [ cond ]
-// const OP_PJMPN_TRUE:    u8 = 0x7D;  // [ cond offset ] => []
-// const OP_PJMPN_FALSE:   u8 = 0x7E;  // [ cond offset ] => []
-
 // 0x80-8F      Iteration
 
 // const OP_IT_INIT   // replace value with iterator state
@@ -201,8 +195,6 @@ pub enum OpCode {
     PopLongJumpIfFalse = OP_PLJMP_FALSE,
     PopLongJumpIfTrue = OP_PLJMP_TRUE,
     
-    // JumpIndirect = OP_JUMPN,
-    
     Inspect = DBG_INSPECT,
     Assert = DBG_ASSERT,
 }
@@ -278,8 +270,6 @@ impl OpCode {
             OP_LJUMP_TRUE => Self::LongJumpIfTrue,
             OP_PLJMP_FALSE => Self::PopLongJumpIfFalse,
             OP_PLJMP_TRUE => Self::PopLongJumpIfTrue,
-            
-            // OP_JUMPN => Self::JumpIndirect,
             
             DBG_INSPECT => Self::Inspect,
             DBG_ASSERT => Self::Assert,
@@ -401,8 +391,6 @@ impl std::fmt::Display for OpCode {
             Self::LongJumpIfTrue => "OP_LJUMP_TRUE",
             Self::PopLongJumpIfFalse => "OP_PLJMP_FALSE",
             Self::PopLongJumpIfTrue => "OP_PLJMP_TRUE",
-            
-            // Self::JumpIndirect => "OP_JUMPN",
             
             Self::Inspect => "DBG_INSPECT",
             Self::Assert => "DBG_ASSERT",
