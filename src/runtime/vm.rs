@@ -1,4 +1,3 @@
-use std::cell::{Ref, RefMut};
 use crate::language::{IntType, FloatType};
 use crate::codegen::{Program, ChunkID, ConstID, OpCode};
 use crate::runtime::Variant;
@@ -59,7 +58,7 @@ pub type LocalIndex = u16;
 
 /// stores the previous active chunk information
 #[derive(Debug)]
-struct ActivationState<'m> {
+struct VMState<'m> {
     module: &'m Module,
     chunk: &'m [u8],
     chunk_id: ChunkID,
@@ -67,7 +66,7 @@ struct ActivationState<'m> {
     locals: LocalIndex,
 }
 
-impl<'m> ActivationState<'m> {
+impl<'m> VMState<'m> {
     fn fresh(module: &'m Module, chunk_id: ChunkID) -> Self {
         Self {
             module, chunk_id,
@@ -82,8 +81,8 @@ impl<'m> ActivationState<'m> {
 #[derive(Debug)]
 pub struct VirtualMachine<'m> {
     module_cache: &'m ModuleCache,
-    activation: Vec<ActivationState<'m>>,
-    state: ActivationState<'m>,
+    call_stack: Vec<VMState<'m>>,
+    state: VMState<'m>,
     immediate: Vec<Variant>,
 }
 
@@ -93,8 +92,8 @@ impl<'m> VirtualMachine<'m> {
         
         Self {
             module_cache,
-            activation: Vec::new(),
-            state: ActivationState::fresh(module, 0),
+            call_stack: Vec::new(),
+            state: VMState::fresh(module, 0),
             immediate: Vec::new(),
         }
     }
@@ -102,17 +101,24 @@ impl<'m> VirtualMachine<'m> {
     pub fn module_cache(&self) -> &ModuleCache { self.module_cache }
     
     pub fn main_module(&self) -> &Module {
-        self.activation.first().unwrap_or(&self.state).module
+        let main = self.call_stack.first().unwrap_or(&self.state);
+        main.module
     }
     
     #[inline(always)]
-    fn program(&self) -> &Program { self.state.module.program() }
+    fn program(&self) -> &Program { 
+        self.state.module.program() 
+    }
     
     #[inline(always)] 
-    fn globals(&self) -> Ref<Namespace> { self.state.module.globals() }
+    fn globals(&self) -> impl std::ops::Deref<Target=Namespace> + 'm { 
+        self.state.module.globals() 
+    }
     
     #[inline(always)] 
-    fn globals_mut(&mut self) -> RefMut<Namespace> { self.state.module.globals_mut() }
+    fn globals_mut(&mut self) -> impl std::ops::DerefMut<Target=Namespace> + 'm { 
+        self.state.module.globals_mut() 
+    }
     
     pub fn run(&mut self) -> ExecResult<()> {
         loop {

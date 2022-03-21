@@ -7,6 +7,7 @@
 ///! resulting module to a name.
 
 use std::cell::{RefCell, Ref, RefMut};
+use std::ops::{Deref, DerefMut};
 use std::hash::{Hash, Hasher, BuildHasher};
 use std::collections::HashMap;
 use crate::source::ModuleSource;
@@ -88,8 +89,13 @@ impl Module {
     #[inline(always)]
     pub fn program(&self) -> &Program { &self.program }
     
-    pub fn globals(&self) -> Ref<Namespace> { self.globals.borrow() }
-    pub fn globals_mut(&self) -> RefMut<Namespace> { self.globals.borrow_mut() }
+    pub fn globals(&self) -> impl Deref<Target=Namespace> + '_ { 
+        self.globals.borrow() 
+    }
+    
+    pub fn globals_mut(&self) -> impl DerefMut<Target=Namespace> + '_ { 
+        self.globals.borrow_mut() 
+    }
 }
 
 
