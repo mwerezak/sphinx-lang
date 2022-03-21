@@ -944,7 +944,12 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let body = self.parse_stmt_list(ctx, |token| matches!(token, Token::End))?;
         ctx.set_end(&self.advance().unwrap()); // consume "end"
         
-        Ok(FunctionDef::new(signature, body))
+        let fundef = FunctionDef {
+            signature,
+            body: Box::new(ExprBlock::from(body)),
+        };
+        
+        Ok(fundef)
     }
     
     fn parse_function_param_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<SignatureDef> {

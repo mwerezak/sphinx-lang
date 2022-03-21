@@ -1117,18 +1117,23 @@ impl CodeGenerator<'_> {
         chunk.compile_function_preamble(symbol, fundef)?;
         
         // function body
-        for stmt in fundef.body().iter() {
+        for stmt in fundef.body.stmt_list().iter() {
             chunk.push_stmt(stmt)?;
+        }
+        
+        // function result
+        if let Some(expr) = fundef.body.result() {
+            chunk.compile_expr(Some(expr.debug_symbol()), expr.variant())?;
+        } else {
+            chunk.emit_instr(symbol, OpCode::Nil);
         }
         
         // end the function scope
         chunk.emit_end_scope();
-        
-        chunk.emit_instr(symbol, OpCode::Nil);  // implicit nil return
         chunk.finish();
         
         // compile the function signature
-        let signature = self.compile_function_signature(symbol, fundef.signature())?;
+        let signature = self.compile_function_signature(symbol, &fundef.signature)?;
         let function_id = self.builder_mut().push_function(signature);
         
         // load the function object as the expression result
@@ -1140,7 +1145,7 @@ impl CodeGenerator<'_> {
     fn compile_function_preamble(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
         
         // define locals
-        let signature = fundef.signature();
+        let signature = &fundef.signature;
         
         self.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
         self.emit_instr(None, OpCode::InsertLocal);
