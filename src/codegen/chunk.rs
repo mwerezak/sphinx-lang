@@ -25,9 +25,9 @@ pub type FunctionID = usize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Constant {
     Integer(IntType),
-    Float([u8; mem::size_of::<FloatType>()]),
+    Float([u8; mem::size_of::<FloatType>()]),  // we might store redundant floats, that's fine
     String(StringID),
-    Function(ChunkID, FunctionID),
+    Function(ChunkID, FunctionID),  // signatures are stored separately to save memory - referenced by "FunctionID"
 }
 
 impl From<IntType> for Constant {
