@@ -35,8 +35,8 @@ pub enum BuildErrors {
     Compile(Box<[CompileError]>),
 }
 
-pub fn build_module(module: &ModuleSource) -> Result<CompiledProgram, BuildErrors> {
-    let source_text = module.source_text();
+pub fn build_module(source: &ModuleSource) -> Result<CompiledProgram, BuildErrors> {
+    let source_text = source.read_text();
     if source_text.is_err() {
         return Err(BuildErrors::Source(source_text.unwrap_err()));
     }

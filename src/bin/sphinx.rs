@@ -5,7 +5,7 @@ use clap::{Command, Arg, ArgMatches};
 use sphinx_lang;
 use sphinx_lang::frontend;
 use sphinx_lang::BuildErrors;
-use sphinx_lang::source::{ModuleSource, SourceType, SourceText};
+use sphinx_lang::source::{ModuleSource, SourceText};
 use sphinx_lang::parser::stmt::{Stmt, StmtMeta};
 use sphinx_lang::codegen::{Program, CompiledProgram};
 use sphinx_lang::runtime::VirtualMachine;
@@ -51,16 +51,15 @@ fn main() {
     let version = app.get_version().unwrap();
     let args = app.get_matches();
     
-    let mut module = None;
+    let source;
+    let name;
     if let Some(s) = args.value_of("cmd") {
-        let source = SourceType::String(s.to_string());
-        module = Some(ModuleSource::new("<cmd>", source));
+        source = ModuleSource::String(s.to_string());
+        name = "<cmd>";
     } else if let Some(s) = args.value_of("file") {
-        let source = SourceType::File(PathBuf::from(s));
-        module = Some(ModuleSource::new(s, source));
-    }
-    
-    if module.is_none() {
+        source = ModuleSource::File(PathBuf::from(s));
+        name = s;
+    } else {
         let mut module_cache = ModuleCache::new();
         let repl_env = GlobalEnv::new();
         
@@ -69,20 +68,18 @@ fn main() {
         return;
     }
     
-    let module = module.unwrap();
-    
     if args.is_present("parse_only") {
-        parse_and_print_ast(&args, module);
+        parse_and_print_ast(&args, name, &source);
     }
     else if args.is_present("compile_only") {
         unimplemented!()
     }
     else if args.is_present("interactive") {
-        if let Some(build) = build_program(&args, &module) {
+        if let Some(build) = build_program(&args, name, &source) {
             let program = Program::load(build.program);
             
             let mut module_cache = ModuleCache::new();
-            let module_id = module_cache.insert(module, program.data);
+            let module_id = module_cache.insert(program.data, Some(name.to_string()), Some(source));
             
             let repl_env = GlobalEnv::new();
             
@@ -94,11 +91,11 @@ fn main() {
         }
     }
     else {
-        if let Some(build) = build_program(&args, &module) {
+        if let Some(build) = build_program(&args, name, &source) {
             let program = Program::load(build.program);
             
             let mut module_cache = ModuleCache::new();
-            let module_id = module_cache.insert(module, program.data);
+            let module_id = module_cache.insert(program.data, Some(name.to_string()), Some(source));
             
             let vm = VirtualMachine::new(&module_cache, module_id, &program.main);
             vm.run().expect("runtime error");
@@ -107,7 +104,7 @@ fn main() {
 }
 
 
-fn build_program<'m>(_args: &ArgMatches, source: &ModuleSource) -> Option<CompiledProgram> {
+fn build_program<'m>(_args: &ArgMatches, name: &str, source: &ModuleSource) -> Option<CompiledProgram> {
     // build module
     let build_result = sphinx_lang::build_module(source);
     if build_result.is_err() {
@@ -117,12 +114,12 @@ fn build_program<'m>(_args: &ArgMatches, source: &ModuleSource) -> Option<Compil
             }
             
             BuildErrors::Syntax(errors) => {
-                println!("Errors in file \"{}\":\n", source.name());
+                println!("Errors in file \"{}\":\n", name);
                 frontend::print_source_errors(source, &errors);
             }
             
             BuildErrors::Compile(errors) => {
-                println!("Errors in file \"{}\":\n", source.name());
+                println!("Errors in file \"{}\":\n", name);
                 frontend::print_source_errors(source, &errors);
             }
         }
@@ -133,8 +130,8 @@ fn build_program<'m>(_args: &ArgMatches, source: &ModuleSource) -> Option<Compil
 }
 
 
-fn parse_and_print_ast(_args: &ArgMatches, module: ModuleSource) {
-    let source_text = match module.source_text() {
+fn parse_and_print_ast(_args: &ArgMatches, name: &str, source: &ModuleSource) {
+    let source_text = match source.read_text() {
         Ok(source_text) => source_text,
         
         Err(error) => {
@@ -148,8 +145,8 @@ fn parse_and_print_ast(_args: &ArgMatches, module: ModuleSource) {
     
     match parse_result {
         Err(errors) => {
-            println!("Errors in file \"{}\":\n", module.name());
-            frontend::print_source_errors(&module, &errors);
+            println!("Errors in file \"{}\":\n", name);
+            frontend::print_source_errors(source, &errors);
         },
         Ok(ast) => println!("{:#?}", ast),
     }
@@ -283,8 +280,7 @@ impl<'m> Repl<'m> {
             
             let program = Program::load(build.program);
             
-            let module_source = ModuleSource::new("<repl>", SourceType::String(input));
-            let module_id = self.module_cache.insert(module_source, program.data);
+            let module_id = self.module_cache.insert(program.data, None, None);
             
             let vm = VirtualMachine::new_repl(self.module_cache, self.repl_env, module_id, &program.main);
             if let Err(error) = vm.run() {

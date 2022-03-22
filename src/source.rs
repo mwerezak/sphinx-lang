@@ -11,7 +11,7 @@ use crate::runtime::strings::StringInterner;
 type ReadFileChars = ReadChars<io::BufReader<fs::File>>;
 
 #[derive(Debug, Hash)]
-pub enum SourceType {
+pub enum ModuleSource {
     String(String),
     File(PathBuf),
 }
@@ -26,28 +26,12 @@ impl<S> From<S> for SourceText where S: ToString {
     fn from(text: S) -> Self { SourceText::String(text.to_string()) }
 }
 
-#[derive(Debug, Hash)]
-pub struct ModuleSource {
-    name: String,
-    source: SourceType,
-}
-
 impl ModuleSource {
-    pub fn new(name: impl ToString, source: SourceType) -> Self {
-        ModuleSource {
-            name: name.to_string(), 
-            source,
-        }
-    }
-    
-    pub fn name(&self) -> &str { self.name.as_str() }
-    pub fn source(&self) -> &SourceType { &self.source }
-    
     // Load the source text
-    pub fn source_text(&self) -> io::Result<SourceText> {
-        match &self.source {
-            SourceType::String(string) => Ok(SourceText::String(string.clone())),
-            SourceType::File(ref path) => Ok(SourceText::File(Self::read_source_file(path)?)),
+    pub fn read_text(&self) -> io::Result<SourceText> {
+        match self {
+            Self::String(string) => Ok(SourceText::String(string.clone())),
+            Self::File(ref path) => Ok(SourceText::File(Self::read_source_file(path)?)),
         }
     }
     

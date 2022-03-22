@@ -109,7 +109,7 @@ pub trait DebugSymbolResolver {
 
 impl DebugSymbolResolver for ModuleSource {
     fn resolve_symbols<'s, S>(&self, symbols: S) -> io::Result<ResolvedSymbolTable<'s>> where S: Iterator<Item=&'s DebugSymbol> {
-        match self.source_text()? {
+        match self.read_text()? {
             SourceText::String(text) => Ok(resolve_debug_symbols(text.chars().map(Ok), symbols)),
             SourceText::File(text) => Ok(resolve_debug_symbols(text, symbols))
         }

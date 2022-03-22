@@ -106,7 +106,8 @@ pub type ModuleID = u64;
 #[derive(Debug)]
 pub struct Module {
     id: ModuleID,
-    source: ModuleSource,
+    name: Option<String>,
+    source: Option<ModuleSource>,
     data: ProgramData,
     globals: GlobalEnv,
 }
@@ -114,7 +115,7 @@ pub struct Module {
 impl Module {
     pub fn module_id(&self) -> ModuleID { self.id }
     
-    pub fn source(&self) -> &ModuleSource { &self.source }
+    pub fn source(&self) -> Option<&ModuleSource> { self.source.as_ref() }
     
     pub fn data(&self) -> &ProgramData { &self.data }
     
@@ -155,12 +156,13 @@ impl ModuleCache {
     }
     
     /// Create a new module
-    pub fn insert(&mut self, source: ModuleSource, data: ProgramData) -> ModuleID {
-        let module_id = self.new_module_id(&source);
+    pub fn insert(&mut self, data: ProgramData, name: Option<String>, source: Option<ModuleSource>) -> ModuleID {
+        let module_id = self.new_module_id(name.as_ref().map(|s| s.as_str()), source.as_ref());
+        
         let module = Module {
             id: module_id,
+            name, source, data,
             globals: GlobalEnv::new(),
-            source, data,
         };
         
         self.modules.insert(module_id, module);
@@ -169,10 +171,20 @@ impl ModuleCache {
     }
     
     /// Get a new, unused module ID.
-    fn new_module_id(&self, source: &ModuleSource) -> ModuleID {
-        let mut state = self.id_hasher.build_hasher();
-        source.hash(&mut state);
-        let mut new_id = state.finish();
+    fn new_module_id(&self, name: Option<&str>, source: Option<&ModuleSource>) -> ModuleID {
+        
+        let mut new_id;
+        if let Some(name) = name {
+            let mut state = self.id_hasher.build_hasher();
+            name.hash(&mut state);
+            new_id = state.finish();
+        } else if let Some(source) = source {
+            let mut state = self.id_hasher.build_hasher();
+            source.hash(&mut state);
+            new_id = state.finish();
+        } else {
+            new_id = 0;
+        }
         
         while self.modules.contains_key(&new_id) {
             new_id = new_id.wrapping_add(1);

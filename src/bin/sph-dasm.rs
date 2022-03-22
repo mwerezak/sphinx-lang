@@ -3,7 +3,7 @@ use clap::{Command, Arg};
 
 use sphinx_lang::frontend;
 use sphinx_lang::{BuildErrors, build_module};
-use sphinx_lang::source::{ModuleSource, SourceType};
+use sphinx_lang::source::ModuleSource;
 use sphinx_lang::debug::symbol::DebugSymbolResolver;
 use sphinx_lang::debug::dasm::Disassembler;
 
@@ -36,19 +36,18 @@ fn main() {
     let version = app.get_version().unwrap();
     let args = app.get_matches();
     
-    let mut module = None;
+    let source;
+    let name;
     if let Some(s) = args.value_of("cmd") {
-        let source = SourceType::String(s.to_string());
-        module = Some(ModuleSource::new("<cmd>", source));
+        source = ModuleSource::String(s.to_string());
+        name = "<cmd>";
     } else if let Some(s) = args.value_of("source") {
-        let source = SourceType::File(PathBuf::from(s));
-        module = Some(ModuleSource::new(s, source));
+        source = ModuleSource::File(PathBuf::from(s));
+        name = s;
     } else if let Some(_s) = args.value_of("bytecode") {
         // TODO read compiled bytecode and go directly to disassembly
         unimplemented!()
-    }
-    
-    if module.is_none() {
+    } else {
         println!("No input.");
         return;
     }
@@ -56,8 +55,7 @@ fn main() {
     println!("\nSphinx Version {}\n", version);
     
     // build module
-    let module = module.unwrap();
-    let build_result = build_module(&module);
+    let build_result = build_module(&source);
     if build_result.is_err() {
         match build_result.unwrap_err() {
             BuildErrors::Source(error) => {
@@ -65,13 +63,13 @@ fn main() {
             }
             
             BuildErrors::Syntax(errors) => {
-                println!("Errors in file \"{}\":\n", module.name());
-                frontend::print_source_errors(&module, &errors);
+                println!("Errors in file \"{}\":\n", name);
+                frontend::print_source_errors(&source, &errors);
             }
             
             BuildErrors::Compile(errors) => {
-                println!("Errors in file \"{}\":\n", module.name());
-                frontend::print_source_errors(&module, &errors);
+                println!("Errors in file \"{}\":\n", name);
+                frontend::print_source_errors(&source, &errors);
             }
         }
         return;
@@ -79,7 +77,7 @@ fn main() {
     
     let build = build_result.unwrap();
     let symbols = build.symbols.values().flat_map(|rle| rle.iter().filter_map(|sym| sym));
-    let symbol_table = module.resolve_symbols(symbols);
+    let symbol_table = source.resolve_symbols(symbols);
     
     let dasm = {
         let dasm = Disassembler::new(&build.program)
@@ -92,6 +90,6 @@ fn main() {
         }
     };
     
-    println!("== \"{}\" ==", module.name());
+    println!("== \"{}\" ==", name);
     println!("{}", dasm);
 }
