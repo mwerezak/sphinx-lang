@@ -192,7 +192,7 @@ impl fmt::Debug for Variant {
                 write!(fmt, "{:?})", last)
             }
             
-            Self::Object(_handle) => unimplemented!(),
+            Self::Object(handle) => write!(fmt, "{:?}", handle),
         }
     }
 }
@@ -211,6 +211,8 @@ impl fmt::Display for Variant {
                 }
                 write!(fmt, "{})", last)
             }
+            
+            // Self::Object(handle) => // TODO invoke __tostring
             
             _ => write!(fmt, "{}", self)
         }

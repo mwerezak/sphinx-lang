@@ -51,6 +51,12 @@ impl GCHandle {
     }
 }
 
+impl std::fmt::Debug for GCHandle {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "GC(&{})", self.index)
+    }
+}
+
 
 struct GCBox {
     marked: bool,
