@@ -40,10 +40,14 @@ impl<'c, 's> Disassembler<'c, 's> {
     }
     
     pub fn write_disassembly(&self, fmt: &mut impl Write) -> fmt::Result {
+        writeln!(fmt, "\n\nmain:\n")?;
+        let symbols = self.symbols.map(|symbols| symbols.get(&None)).flatten();
+        self.decode_chunk(fmt, self.program.main(), symbols)?;
+        
         for (chunk_id, chunk) in self.program.iter_chunks() {
             writeln!(fmt, "\n\nchunk {}:\n", chunk_id)?;
             
-            let symbols = self.symbols.map(|symbols| symbols.get(&chunk_id)).flatten();
+            let symbols = self.symbols.map(|symbols| symbols.get(&Some(chunk_id))).flatten();
             self.decode_chunk(fmt, chunk, symbols)?;
         }
         
@@ -253,7 +257,7 @@ impl fmt::Display for Constant {
 }
 
 
-pub type ChunkSymbols = HashMap<ChunkID, DebugSymbolsRLE>;
+pub type ChunkSymbols = HashMap<Option<ChunkID>, DebugSymbolsRLE>;
 
 // Container for debug symbols generated for bytecode
 // Should contain a DebugSymbol for each opcode in the 

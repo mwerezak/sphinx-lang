@@ -7,8 +7,9 @@ use sphinx_lang::frontend;
 use sphinx_lang::BuildErrors;
 use sphinx_lang::source::{ModuleSource, SourceType, SourceText};
 use sphinx_lang::parser::stmt::{Stmt, StmtMeta};
-use sphinx_lang::codegen::Program;
-use sphinx_lang::runtime::{VirtualMachine, ModuleCache, Module, ModuleID};
+use sphinx_lang::codegen::{Program, CompiledProgram};
+use sphinx_lang::runtime::VirtualMachine;
+use sphinx_lang::runtime::module::{ModuleCache, GlobalEnv};
 use sphinx_lang::runtime::strings::StringInterner;
 use sphinx_lang::debug::symbol::BufferedResolver;
 
@@ -60,7 +61,11 @@ fn main() {
     }
     
     if module.is_none() {
-        start_repl(&args, version, None);
+        let mut module_cache = ModuleCache::new();
+        let repl_env = GlobalEnv::new();
+        
+        println!("\nSphinx Version {}\n", version);
+        Repl::new(&mut module_cache, &repl_env).run();
         return;
     }
     
@@ -72,36 +77,39 @@ fn main() {
     else if args.is_present("compile_only") {
         unimplemented!()
     }
+    else if args.is_present("interactive") {
+        if let Some(build) = build_program(&args, &module) {
+            let program = Program::load(build.program);
+            
+            let mut module_cache = ModuleCache::new();
+            let module_id = module_cache.insert(module, program.data);
+            
+            let repl_env = GlobalEnv::new();
+            
+            let mut vm = VirtualMachine::new_repl(&module_cache, &repl_env, module_id, &program.main);
+            vm.run().expect("runtime error");
+            
+            println!("\nSphinx Version {}\n", version);
+            Repl::new(&mut module_cache, &repl_env).run()
+        }
+    }
     else {
-        let mut module_cache = ModuleCache::new();
-        let exec_result = build_and_execute(&args, &mut module_cache, module);
-        
-        if let Ok(vm) = exec_result {
-            if args.is_present("interactive") {
-                start_repl(&args, version, Some(vm));
-            }
+        if let Some(build) = build_program(&args, &module) {
+            let program = Program::load(build.program);
+            
+            let mut module_cache = ModuleCache::new();
+            let module_id = module_cache.insert(module, program.data);
+            
+            let mut vm = VirtualMachine::new(&module_cache, module_id, &program.main);
+            vm.run().expect("runtime error");
         }
     }
 }
 
-fn start_repl(_args: &ArgMatches, version: &str, vm: Option<VirtualMachine>) {
-    println!("\nSphinx Version {}\n", version);
-    
-    let mut repl;
-    if let Some(vm) = vm {
-        repl = Repl::with_vm(vm);
-        repl.run();
-    } else {
-        let module_cache = ModuleCache::new();
-        repl = Repl::new(&module_cache);
-        repl.run();
-    }
-    
-}
 
-fn build_and_execute<'m>(_args: &ArgMatches, module_cache: &'m mut ModuleCache, source: ModuleSource) {
+fn build_program<'m>(_args: &ArgMatches, source: &ModuleSource) -> Option<CompiledProgram> {
     // build module
-    let build_result = sphinx_lang::build_module(&source);
+    let build_result = sphinx_lang::build_module(source);
     if build_result.is_err() {
         match build_result.unwrap_err() {
             BuildErrors::Source(error) => {
@@ -110,23 +118,18 @@ fn build_and_execute<'m>(_args: &ArgMatches, module_cache: &'m mut ModuleCache, 
             
             BuildErrors::Syntax(errors) => {
                 println!("Errors in file \"{}\":\n", source.name());
-                frontend::print_source_errors(&source, &errors);
+                frontend::print_source_errors(source, &errors);
             }
             
             BuildErrors::Compile(errors) => {
                 println!("Errors in file \"{}\":\n", source.name());
-                frontend::print_source_errors(&source, &errors);
+                frontend::print_source_errors(source, &errors);
             }
         }
-        return;
+        return None;
     }
     
-    let build = build_result.unwrap();
-    let program = Program::load(build.program);
-    let module_id = module_cache.insert(source, program.data);
-    let mut vm = VirtualMachine::new(module_cache, module_id, &program.main);
-    
-    vm.run().expect("runtime error");
+    return Some(build_result.unwrap())
 }
 
 
@@ -160,7 +163,8 @@ const PROMT_START: &str = ">>> ";
 const PROMT_CONTINUE: &str = "... ";
 
 struct Repl<'m> {
-    vm: Option<VirtualMachine<'m>>,
+    module_cache: &'m mut ModuleCache,
+    repl_env: &'m GlobalEnv,
 }
 
 enum ReadLine {
@@ -171,15 +175,9 @@ enum ReadLine {
 }
 
 impl<'m> Repl<'m> {
-    pub fn new(module_cache: &'m ModuleCache) -> Self {
+    pub fn new(module_cache: &'m mut ModuleCache, repl_env: &'m GlobalEnv) -> Self {
         Self {
-            vm: None
-        }
-    }
-    
-    pub fn with_vm(vm: VirtualMachine<'m>) -> Self {
-        Self { 
-            vm: Some(vm) 
+            module_cache, repl_env,
         }
     }
     
@@ -283,40 +281,15 @@ impl<'m> Repl<'m> {
                 }
             };
             
-            // match self.vm {
-            //     Some(ref mut vm) => vm.reload_program(program),
-            //     None => { 
-            //         let module = self.module_cache.unwrap().load(build.program, )
-            //         self.vm.replace(VirtualMachine::new(program)); 
-            //     },
-            // }
+            let program = Program::load(build.program);
             
-            if let Err(error) = self.vm.as_mut().unwrap().run() {
+            let module_source = ModuleSource::new("<repl>", SourceType::String(input));
+            let module_id = self.module_cache.insert(module_source, program.data);
+            
+            let mut vm = VirtualMachine::new_repl(self.module_cache, self.repl_env, module_id, &program.main);
+            if let Err(error) = vm.run() {
                 println!("Runtime error: {:?}", error);
             }
-            
-            // for stmt in stmts.iter() {
-            //     match stmt.variant() {
-            //         Stmt::Expression(expr) => {
-            //             let eval_ctx = EvalContext::new(&self.root_env);
-            //             let eval_result = eval_ctx.eval_expr(&expr);
-            //             log::debug!("{:?}", eval_result);
-            //             match eval_result {
-            //                 Ok(value) => {
-            //                     println!("{}", value.unwrap_value());
-            //                 },
-            //                 Err(error) => {
-            //                     println!("{:?}", error)
-            //                 },
-            //             }
-            //         },
-            //         _ => {
-            //             let exec_ctx = ExecContext::new(&self.root_env);
-            //             let exec_result = exec_ctx.exec(&stmt);
-            //             log::debug!("{:?}", exec_result);
-            //         },
-            //     }
-            // }
             
         }
         

@@ -143,12 +143,20 @@ impl ChunkBuilder {
         Ok(chunk_id)
     }
 
-    pub fn chunk(&self, chunk_id: ChunkID) -> &ChunkBuf { 
-        &self.chunks[usize::from(chunk_id)]
+    pub fn chunk(&self, chunk_id: Option<ChunkID>) -> &ChunkBuf { 
+        if let Some(chunk_id) = chunk_id {
+            &self.chunks[usize::from(chunk_id)]
+        } else {
+            &self.main
+        }
     }
     
-    pub fn chunk_mut(&mut self, chunk_id: ChunkID) -> &mut ChunkBuf { 
-        &mut self.chunks[usize::from(chunk_id)]
+    pub fn chunk_mut(&mut self, chunk_id: Option<ChunkID>) -> &mut ChunkBuf { 
+        if let Some(chunk_id) = chunk_id {
+            &mut self.chunks[usize::from(chunk_id)]
+        } else {
+            &mut self.main
+        }
     }
     
     // Constants
@@ -276,6 +284,10 @@ pub struct UnloadedProgram {
 }
 
 impl UnloadedProgram {
+    pub fn main(&self) -> &[u8] {
+        &self.main
+    }
+    
     pub fn get_chunk(&self, chunk_id: ChunkID) -> &[u8] {
         let chunk_idx = &self.chunk_index[usize::from(chunk_id)];
         &self.chunks[chunk_idx.as_range()]

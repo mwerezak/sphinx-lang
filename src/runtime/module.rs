@@ -7,11 +7,11 @@
 ///! resulting module to a name.
 
 use std::cell::{RefCell, Ref, RefMut};
-use std::ops::{Deref, DerefMut};
 use std::hash::{Hash, Hasher, BuildHasher};
 use std::collections::HashMap;
 use crate::source::ModuleSource;
-use crate::codegen::{ProgramData};
+use crate::language::FloatType;
+use crate::codegen::{ProgramData, Constant, ConstID};
 use crate::runtime::{Variant, DefaultBuildHasher};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -73,6 +73,32 @@ impl Namespace {
 }
 
 
+#[derive(Debug)]
+pub struct GlobalEnv {
+    namespace: RefCell<Namespace>,
+}
+
+impl From<Namespace> for GlobalEnv {
+    fn from(namespace: Namespace) -> Self {
+        Self { namespace: RefCell::new(namespace) }
+    }
+}
+
+impl GlobalEnv {
+    pub fn new() -> Self {
+        Self::from(Namespace::new())
+    }
+    
+    pub fn borrow(&self) -> Ref<Namespace> {
+        self.namespace.borrow()
+    }
+    
+    pub fn borrow_mut(&self) -> RefMut<Namespace> {
+        self.namespace.borrow_mut()
+    }
+}
+
+
 pub type ModuleID = u64;
 
 #[derive(Debug)]
@@ -80,7 +106,7 @@ pub struct Module {
     id: ModuleID,
     source: ModuleSource,
     data: ProgramData,
-    namespace: RefCell<Namespace>,
+    globals: GlobalEnv,
 }
 
 impl Module {
@@ -88,18 +114,22 @@ impl Module {
     
     pub fn source(&self) -> &ModuleSource { &self.source }
     
-    #[inline(always)]
     pub fn data(&self) -> &ProgramData { &self.data }
     
-    pub fn namespace(&self) -> impl Deref<Target=Namespace> + '_ { 
-        self.namespace.borrow() 
-    }
+    pub fn globals(&self) -> &GlobalEnv { &self.globals }
     
-    pub fn namespace_mut(&self) -> impl DerefMut<Target=Namespace> + '_ { 
-        self.namespace.borrow_mut() 
+    #[inline]
+    pub fn get_const(&self, cid: ConstID) -> Variant {
+        match *self.data.get_const(cid) {
+            Constant::Integer(value) => Variant::from(value),
+            Constant::Float(bytes) => FloatType::from_le_bytes(bytes).into(),
+            Constant::String(idx) => Variant::from(*self.data.get_string(idx)),
+            Constant::Function(chunk_id, function_id) => {
+                unimplemented!()
+            }
+        }
     }
 }
-
 
 #[derive(Debug)]
 pub struct ModuleCache {
@@ -124,7 +154,7 @@ impl ModuleCache {
         let module_id = self.new_module_id(&source);
         let module = Module {
             id: module_id,
-            namespace: RefCell::new(Namespace::new()),
+            globals: GlobalEnv::new(),
             source, data,
         };
         

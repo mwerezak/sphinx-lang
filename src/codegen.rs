@@ -290,8 +290,6 @@ pub struct CompiledProgram {
 
 // Code Generator
 
-const CHUNK_MAIN: ChunkID = 0;
-
 pub struct Compiler {
     builder: ChunkBuilder,
     scope: ScopeTracker,
@@ -301,33 +299,27 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(strings: StringInterner) -> Self {
-        let mut compiler = Compiler {
+        // insert RLE container for main chunk
+        let mut symbols = ChunkSymbols::new();
+        symbols.insert(None, DebugSymbolsRLE::new());
+        
+        Self {
             builder: ChunkBuilder::with_strings(strings),
             scope: ScopeTracker::new(),
             errors: Vec::new(),
-            symbols: ChunkSymbols::new(),
-        };
-        
-        // create main chunk
-        let info = ChunkInfo {
-            symbol: None,
-        };
-        
-        let chunk_id = compiler.new_chunk(info).unwrap();
-        debug_assert!(chunk_id == CHUNK_MAIN);
-        
-        compiler
+            symbols,
+        }
     }
     
     fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<ChunkID> {
         let chunk_id = self.builder.new_chunk(info)?;
-        if !self.symbols.contains_key(&chunk_id) {
-            self.symbols.insert(chunk_id, DebugSymbolsRLE::new());
+        if !self.symbols.contains_key(&Some(chunk_id)) {
+            self.symbols.insert(Some(chunk_id), DebugSymbolsRLE::new());
         }
         Ok(chunk_id)
     }
     
-    fn get_chunk(&mut self, chunk_id: ChunkID) -> CodeGenerator {
+    fn get_chunk(&mut self, chunk_id: Option<ChunkID>) -> CodeGenerator {
         CodeGenerator {
             compiler: self,
             chunk_id,
@@ -335,7 +327,7 @@ impl Compiler {
     }
     
     fn main_chunk(&mut self) -> CodeGenerator {
-        self.get_chunk(CHUNK_MAIN)
+        self.get_chunk(None)
     }
     
     pub fn compile_program<'a>(mut self, program: impl Iterator<Item=&'a StmtMeta>) -> Result<CompiledProgram, Vec<CompileError>> {
@@ -370,7 +362,7 @@ impl Compiler {
 
 struct CodeGenerator<'c> {
     compiler: &'c mut Compiler,
-    chunk_id: ChunkID,
+    chunk_id: Option<ChunkID>,
 }
 
 impl CodeGenerator<'_> {
@@ -390,7 +382,7 @@ impl CodeGenerator<'_> {
         self.emit_instr(None, OpCode::Return);
     }
     
-    fn chunk_id(&self) -> ChunkID { self.chunk_id }
+    fn chunk_id(&self) -> Option<ChunkID> { self.chunk_id }
     
     fn builder(&self) -> &ChunkBuilder { &self.compiler.builder }
     fn builder_mut(&mut self) -> &mut ChunkBuilder { &mut self.compiler.builder }
@@ -426,7 +418,7 @@ impl CodeGenerator<'_> {
             symbol: symbol.map(|symbol| *symbol),
         };
         let chunk_id = self.compiler.new_chunk(info)?;
-        Ok(self.compiler.get_chunk(chunk_id))
+        Ok(self.compiler.get_chunk(Some(chunk_id)))
     }
     
     ///////// Emitting Bytecode /////////
@@ -1109,7 +1101,7 @@ impl CodeGenerator<'_> {
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
         // create a new chunk for the function
         let mut chunk = self.create_chunk(symbol)?;
-        let chunk_id = chunk.chunk_id();
+        let chunk_id = chunk.chunk_id().unwrap();
         
         // and a new local scope
         chunk.emit_begin_scope(ScopeTag::Function, symbol);
