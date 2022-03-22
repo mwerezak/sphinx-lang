@@ -1,6 +1,7 @@
 use crate::parser::lvalue::DeclType;
 use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::module::{ModuleID, Access};
+use crate::runtime::gc::GCObject;
 
 
 pub struct Function {
@@ -8,6 +9,19 @@ pub struct Function {
     module_id: ModuleID,
     chunk_id: ChunkID,
 }
+
+impl Function {
+    pub fn new(signature: Signature, module_id: ModuleID, chunk_id :ChunkID) -> Self {
+        Self { signature, module_id, chunk_id }
+    }
+}
+
+impl From<Function> for GCObject {
+    fn from(function: Function) -> Self {
+        Self::Function(Box::new(function))
+    }
+}
+
 
 #[derive(Clone, Debug)]
 pub struct Signature {

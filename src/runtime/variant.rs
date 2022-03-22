@@ -84,15 +84,15 @@ impl From<bool> for Variant {
 }
 
 impl From<IntType> for Variant {
-    fn from(value: IntType) -> Self { Variant::Integer(value) }
+    fn from(value: IntType) -> Self { Self::Integer(value) }
 }
 
 impl From<FloatType> for Variant {
-    fn from(value: FloatType) -> Self { Variant::Float(value) }
+    fn from(value: FloatType) -> Self { Self::Float(value) }
 }
 
 impl From<StringSymbol> for Variant {
-    fn from(value: StringSymbol) -> Self { Variant::String(value) }
+    fn from(value: StringSymbol) -> Self { Self::String(value) }
 }
 
 impl From<&str> for Variant {
@@ -100,6 +100,10 @@ impl From<&str> for Variant {
         let symbol = STRING_TABLE.with(|string_table| string_table.borrow_mut().get_or_intern(value));
         symbol.into()
     }
+}
+
+impl From<GCHandle> for Variant {
+    fn from(handle: GCHandle) -> Self { Self::Object(handle) }
 }
 
 

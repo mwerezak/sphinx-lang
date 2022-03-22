@@ -13,7 +13,9 @@ use crate::source::ModuleSource;
 use crate::language::FloatType;
 use crate::codegen::{ProgramData, Constant, ConstID};
 use crate::runtime::{Variant, DefaultBuildHasher};
+use crate::runtime::gc::GCObject;
 use crate::runtime::strings::StringSymbol;
+use crate::runtime::types::function::Function;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -125,7 +127,10 @@ impl Module {
             Constant::Float(bytes) => FloatType::from_le_bytes(bytes).into(),
             Constant::String(idx) => Variant::from(*self.data.get_string(idx)),
             Constant::Function(chunk_id, function_id) => {
-                unimplemented!()
+                let signature = self.data.get_signature(function_id);
+                let function = Function::new(signature.clone(), self.id, chunk_id);
+                let obj = GCObject::from(function);
+                Variant::from(obj.allocate())
             }
         }
     }
