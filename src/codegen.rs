@@ -462,12 +462,12 @@ impl CodeGenerator<'_> {
     
     ///////// Constants /////////
     
-    fn get_or_make_const(&mut self, symbol: Option<&DebugSymbol>, value: Constant) -> CompileResult<ConstID> {
+    fn get_or_make_const(&mut self, value: Constant) -> CompileResult<ConstID> {
         self.builder_mut().get_or_insert_const(value)
     }
     
     fn emit_load_const(&mut self, symbol: Option<&DebugSymbol>, value: Constant) -> CompileResult<()> {
-        let cid = self.get_or_make_const(symbol, value)?;
+        let cid = self.get_or_make_const(value)?;
         
         if cid <= u8::MAX.into() {
             self.emit_instr_byte(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap());
@@ -1272,26 +1272,30 @@ impl CodeGenerator<'_> {
     }
     
     fn compile_function_signature(&mut self, symbol: Option<&DebugSymbol>, signature: &SignatureDef) -> CompileResult<Signature> {
+        let name = 
+            if let Some(name) = signature.name {
+                Some(self.get_or_make_const(Constant::from(name))?)
+            } else { None };
+        
         let mut required = Vec::new();
         for param in signature.required.iter() {
-            let name = self.get_or_make_const(symbol, Constant::from(param.name))?;
+            let name = self.get_or_make_const(Constant::from(param.name))?;
             required.push(Parameter::new(name, param.decl));
         }
         
         let mut default = Vec::new();
         for param in signature.default.iter() {
-            let name = self.get_or_make_const(symbol, Constant::from(param.name))?;
+            let name = self.get_or_make_const(Constant::from(param.name))?;
             default.push(Parameter::new(name, param.decl));
         }
         
         let mut variadic = None;
         if let Some(param) = &signature.variadic {
-            let name = self.get_or_make_const(symbol, Constant::from(param.name))?;
+            let name = self.get_or_make_const(Constant::from(param.name))?;
             variadic.replace(Parameter::new(name, param.decl));
         }
         
-        Ok(Signature::new(required, default, variadic))
+        Ok(Signature::new(name, required, default, variadic))
     }
     
-
 }

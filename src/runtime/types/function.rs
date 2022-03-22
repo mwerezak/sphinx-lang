@@ -1,7 +1,6 @@
 use crate::parser::lvalue::DeclType;
 use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::module::{ModuleID, Access};
-use crate::runtime::strings::StringSymbol;
 
 
 pub struct Function {
@@ -12,19 +11,24 @@ pub struct Function {
 
 #[derive(Clone, Debug)]
 pub struct Signature {
-    // all parameters are positional
+    name: Option<ConstID>,
     required: Box<[Parameter]>,
     default: Box<[Parameter]>,
     variadic: Option<Parameter>,
 }
 
 impl Signature {
-    pub fn new(required: Vec<Parameter>, default: Vec<Parameter>, variadic: Option<Parameter>) -> Self {
+    pub fn new(name: Option<ConstID>, required: Vec<Parameter>, default: Vec<Parameter>, variadic: Option<Parameter>) -> Self {
         Self {
+            name,
             required: required.into_boxed_slice(),
             default: default.into_boxed_slice(),
             variadic,
         }
+    }
+    
+    pub fn name(&self) -> Option<ConstID> {
+        self.name
     }
     
     pub fn is_variadic(&self) -> bool {

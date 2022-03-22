@@ -873,10 +873,15 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             } else { None };
         
         
-        let function_def = self.parse_function_def(ctx)?;
+        let mut function_def = self.parse_function_def(ctx)?;
         
         // SYNTACTIC SUGAR: fun name(..) => let name = fun(..)
         if let Some(lvalue) = name_lvalue {
+            // record name in function signature
+            if let LValue::Identifier(name) = &lvalue {
+                function_def.signature.name.replace(*name);
+            }
+            
             let function_decl = Declaration {
                 decl: DeclType::Immutable,
                 lhs: lvalue,
@@ -1053,7 +1058,14 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.pop_extend();
         }
         
-        Ok(SignatureDef::new(required, default, variadic))
+        let signature = SignatureDef {
+            name: None,
+            required: required.into_boxed_slice(),
+            default: default.into_boxed_slice(),
+            variadic,
+        };
+        
+        Ok(signature)
     }
     
     /*
