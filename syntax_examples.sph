@@ -19,7 +19,7 @@ echo "Hello, world!"  # print() function will be available later once there is a
 # needing to be whitespace-sensitive.
 
 # The language will support type annotations and have structural type inference built in
-# Any expression can be annotated.
+# Any expression can be annotated, though outside of certain positions you may need parentheses
 # This is still WIP
 ("Type Annotations" : String) 
 
@@ -54,13 +54,14 @@ nil
 ("solo",)  # tuple with one element
 
 # Objects
-{ name = "Bob", age = 13 }  # anonymous object
 
-Person { name = "Bob", age = 13 }
+{ value = 0xA }  # anonymous object
 
-get_person_type() { name = "Bob", age = 13 }  # type can be an expression
+Person { value = 0xC }  # classy object
 
-{ name: String = "Bob", age: Int = 13 }  # with annotations
+get_person_type() { name = "Bob", age = 23 }  # type can be an expression
+
+{ name: String = "Bob", age: Int = 23 }  # with annotations
 
 # Arithmetic expressions
 add + me

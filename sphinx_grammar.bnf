@@ -15,7 +15,7 @@ type_expression ::= (* TODO *) ;
 (*** Expressions ***)
 
 (* 
-    This expression production is left_recursive, and as such, the actual recursive descent parser implementation differs somewhat (see the bottom of this file)
+    This expression production is left recursive, and as such, the actual recursive descent parser implementation differs somewhat (see the bottom of this file)
 *)
 expression ::= primary
              | anon_function
