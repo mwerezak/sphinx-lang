@@ -1,10 +1,8 @@
 An intepreter for a dynamic language inspired by Lua and Python, see ``syntax_examples.sph``.
 
-Mainly a learning project, this is heavily WIP.
-
 # Sphinx
 
-Welcome to the Sphinx programming language! Sphinx is (or will be) a dynamically typed programming language that is heavily inspired by Lua and Python, and implemented entirely in Rust!
+Welcome to the Sphinx programming language! Sphinx is (or will be) a dynamically typed programming language that is inspired by Lua and Python, and implemented entirely in Rust!
 
 The goal is to eventually have a (dynamic) structurally typed programming language that also includes static type checking using type annotations and inference (in the same vein as PyType).
 However, for the time being the main focus is on just getting the language up and running. 
@@ -13,6 +11,12 @@ The plan is first - an interpreter, then compilation to bytecode and a VM - then
 
 # Safe Rust FFI
 
-Because Sphinx is implemented entirely in Safe Rust, it should be possible to provide a completely safe FFI with Rust code. This would allow a host Rust application to gain the capabilities of an embedded dynamic scripting language.
+Because Sphinx is (mostly) implemented in Safe Rust, it should be possible to provide a completely safe FFI with Rust code. This would allow a host Rust application to gain the capabilities of an embedded dynamic scripting language.
 
 As a long term goal I would like to also leverage the rlua bindings to provide a Lua FFI in Sphinx, as well.
+
+# Syntax
+
+Sphinx is not a Lua or Python clone, though it's syntax draws inspiration from both of these languages (much more so from Lua than from Python). My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be fast, and the design of the language has centered around balancing these goals.
+
+At the present moment, nearly complete syntax highlighting is available for users of Sublime Text - just copy `sphinx.sublime-syntax` into your user packages directory. If you use a different text editor and want syntax highlighting for Sphinx, feel free to drop a request on GitHub. Getting the language working is my first priority, but I don't mind taking a look at it.
