@@ -7,7 +7,7 @@ use std::mem;
 use crate::language::FloatType;
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
-use crate::parser::primary::{Atom, Primary, AccessItem, Argument};
+use crate::parser::primary::{Atom, Primary, AccessItem};
 use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
 use crate::parser::fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
 use crate::runtime::vm::LocalIndex;
@@ -782,6 +782,13 @@ impl CodeGenerator<'_> {
         unimplemented!()
     }
     
+    fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, args: &[ExprMeta], unpack: Option<&ExprMeta>) -> CompileResult<()> {
+        // prepare argument list:
+        // [ callobj arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
+
+        unimplemented!()
+    }
+    
     fn emit_unary_op(&mut self, symbol: Option<&DebugSymbol>, op: &UnaryOp) {
         match op {
             UnaryOp::Neg => self.emit_instr(symbol, OpCode::Neg),
@@ -1096,11 +1103,6 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    ///////// Invocations /////////
-    
-    fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, arg_list: &[Argument]) -> CompileResult<()> {
-        unimplemented!()
-    }
     
     ///////// Function Definitions /////////
     
@@ -1111,9 +1113,12 @@ impl CodeGenerator<'_> {
         
         // and a new local scope
         chunk.emit_begin_scope(ScopeTag::Function, symbol);
+        
+        // don't need to generate IN_LOCAL instructions for these, the VM should include them automatically
         chunk.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
         chunk.scope_mut().insert_local(DeclType::Immutable, LocalName::NArgs)?;
         
+        // prepare argument list
         chunk.compile_function_preamble(symbol, fundef)?;
         
         // function body

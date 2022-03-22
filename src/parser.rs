@@ -20,7 +20,7 @@ pub use errors::{ParserError, ParseResult};
 
 use expr::{ExprMeta, Expr, ExprBlock, ConditionalBranch};
 use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
-use primary::{Primary, Atom, AccessItem, Argument};
+use primary::{Primary, Atom, AccessItem};
 use lvalue::{Assignment, LValue, Declaration, DeclType};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
@@ -1212,6 +1212,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         debug_assert!(matches!(next.token, Token::OpenParen));
         
         let mut args = Vec::new();
+        let mut unpack = None;
         
         loop {
             if matches!(self.peek()?.token, Token::CloseParen) {
@@ -1219,23 +1220,37 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             }
             
             let arg_expr = self.parse_expr(ctx)?;
+            
             if let Token::Ellipsis = self.peek()?.token {
                 ctx.set_end(&self.advance().unwrap());
                 
-                args.push(Argument::unpack(arg_expr));
-            } else { 
-                args.push(Argument::new(arg_expr));
+                unpack.replace(arg_expr);
+                
+                let next = self.advance()?;
+                ctx.set_end(&next);
+                if !matches!(next.token, Token::CloseParen) {
+                    return Err("only the last argument can be unpacked using \"...\"".into());
+                }
+                break;
             }
+            args.push(arg_expr);
             
-            match self.peek()?.token {
-                Token::Comma => ctx.set_end(&self.advance().unwrap()),
+            let next = self.advance()?;
+            ctx.set_end(&next);
+            match next.token {
+                Token::Comma => {},
                 Token::CloseParen => break,
                 _ => return Err("missing \",\" between invocation arguments".into()),
             }
         }
         
+        let invocation = AccessItem::Invoke {
+            args: args.into_boxed_slice(),
+            unpack,
+        };
+        
         ctx.pop_extend();
-        Ok(AccessItem::Invoke(args.into_boxed_slice()))
+        Ok(invocation)
     }
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
