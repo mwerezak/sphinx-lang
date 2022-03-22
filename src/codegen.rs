@@ -7,7 +7,7 @@ use std::mem;
 use crate::language::FloatType;
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
-use crate::parser::primary::{Atom, Primary};
+use crate::parser::primary::{Atom, Primary, AccessItem, Argument};
 use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
 use crate::parser::fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
 use crate::runtime::vm::LocalIndex;
@@ -1096,6 +1096,12 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
+    ///////// Invocations /////////
+    
+    fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, arg_list: &[Argument]) -> CompileResult<()> {
+        unimplemented!()
+    }
+    
     ///////// Function Definitions /////////
     
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
@@ -1105,6 +1111,8 @@ impl CodeGenerator<'_> {
         
         // and a new local scope
         chunk.emit_begin_scope(ScopeTag::Function, symbol);
+        chunk.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
+        chunk.scope_mut().insert_local(DeclType::Immutable, LocalName::NArgs)?;
         
         chunk.compile_function_preamble(symbol, fundef)?;
         
@@ -1138,12 +1146,6 @@ impl CodeGenerator<'_> {
         
         // define locals
         let signature = &fundef.signature;
-        
-        self.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
-        self.emit_instr(None, OpCode::InsertLocal);
-        
-        self.scope_mut().insert_local(DeclType::Immutable, LocalName::NArgs)?;
-        self.emit_instr(None, OpCode::InsertLocal);
         
         for param in signature.required.iter() {
             self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;

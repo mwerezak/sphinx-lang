@@ -30,6 +30,7 @@ impl StringSymbol {
         self.0.to_usize()
     }
     
+    /// Interns a string slice, creating a `StringSymbol`
     pub fn intern(string: &str) -> Self {
         STRING_TABLE.with(|string_table| string_table.borrow_mut().get_or_intern(string))
     }

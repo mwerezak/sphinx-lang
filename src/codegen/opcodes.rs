@@ -12,9 +12,10 @@ use std::mem::size_of;
 const OP_NOP:           u8 = 0x00;
 const OP_RETURN:        u8 = 0x01;  // return from current function?
 
-// yes, Nargs is both in the immediate stack and encoded in the call instruction
-// this bit of redundancy helps us deal with default and variadic arguments efficiently
-const OP_CALL:          u8 = 0x02;  // (u8); [ callobj Nargs arg_0 ... arg_n ] => [ ret_value ] 
+// The odd argument order is because the VM will swap "nargs" with "arg[n]" after reading "nargs".
+// This allows the full argument list (including default and variadic arguments) to be prepared
+// in a way that can be reasoned about at compile-time.
+const OP_CALL:          u8 = 0x02;  // [ callobj arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
 
 // 0x08-40        Immediate Values
 

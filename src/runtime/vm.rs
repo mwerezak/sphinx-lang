@@ -343,8 +343,12 @@ impl<'m> VMState<'m> {
             },
             OpCode::DropLocals => {
                 let count = LocalIndex::from(data[0]);
-                let index = usize::from(self.locals) - usize::from(count);
-                stack.discard_at(index, usize::from(count));
+                if stack.len() == self.locals.into() {
+                    stack.discard(usize::from(count));
+                } else {
+                    let index = usize::from(self.locals) - usize::from(count);
+                    stack.discard_at(index, usize::from(count));
+                }
                 self.locals -= count;
             },
             

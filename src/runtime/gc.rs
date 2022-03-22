@@ -23,6 +23,8 @@ impl GCObject {
     pub fn allocate(self) -> GCHandle {
         GC_STATE.with(|gc| gc.borrow_mut().insert(self))
     }
+    
+    // metatable
 }
 
 type PhantomUnsend = PhantomData<*mut ()>;
