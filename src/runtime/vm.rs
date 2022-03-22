@@ -47,11 +47,7 @@ impl<'m> VirtualMachine<'m> {
         }
     }
     
-    pub fn run(&mut self) -> ExecResult<()> {
-        if self.states.is_empty() {
-            panic!("uninitialized vm")
-        }
-        
+    pub fn run(mut self) -> ExecResult<()> {
         while let Some(state) = self.states.last_mut() {
             match state.exec_next(&mut self.values)? {
                 Control::Continue => { }
