@@ -1,5 +1,6 @@
+use std::ops::{Deref, DerefMut};
 use crate::language::{IntType, FloatType};
-use crate::codegen::{Program, ChunkID, ConstID, OpCode};
+use crate::codegen::{Program, ProgramData, ChunkID, ConstID, Constant, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::ops;
 use crate::runtime::strings::StringSymbol;
@@ -61,16 +62,15 @@ pub type LocalIndex = u16;
 struct VMState<'m> {
     module: &'m Module,
     chunk: &'m [u8],
-    chunk_id: ChunkID,
     pc: usize,
     locals: LocalIndex,
 }
 
 impl<'m> VMState<'m> {
-    fn fresh(module: &'m Module, chunk_id: ChunkID) -> Self {
+    fn new(module: &'m Module, chunk: &'m [u8]) -> Self {
         Self {
-            module, chunk_id,
-            chunk: module.program().chunk(chunk_id),
+            module,
+            chunk,
             pc: 0,
             locals: 0,
         }
@@ -87,37 +87,35 @@ pub struct VirtualMachine<'m> {
 }
 
 impl<'m> VirtualMachine<'m> {
-    pub fn new(module_cache: &'m ModuleCache, module_id: &ModuleID) -> Self {
-        let module = module_cache.get(module_id).expect("invalid module id");
+    /// Create a new VM with the specified root module and an empty main chunk
+    pub fn new(module_cache: &'m ModuleCache, module_id: ModuleID, main_chunk: &'m [u8]) -> Self {
+        let module = module_cache.get(&module_id).expect("invalid module id");
         
         Self {
             module_cache,
             call_stack: Vec::new(),
-            state: VMState::fresh(module, 0),
+            state: VMState::new(&module, main_chunk),
             immediate: Vec::new(),
         }
     }
     
-    pub fn module_cache(&self) -> &ModuleCache { self.module_cache }
-    
-    pub fn main_module(&self) -> &Module {
-        let main = self.call_stack.first().unwrap_or(&self.state);
-        main.module
+    /// Loads a new main chunk. This will reset the VM
+    pub fn reload(&mut self, module_id: ModuleID, main_chunk: &'m [u8]) {
+        self.reset();
+        
+        self.state.chunk = main_chunk;
+        if module_id != self.main_module().module_id() {
+            let module = self.module_cache.get(&module_id).expect("invalid module id");
+            self.state.module = module;
+        }
     }
     
-    #[inline(always)]
-    fn program(&self) -> &Program { 
-        self.state.module.program() 
-    }
-    
-    #[inline(always)] 
-    fn globals(&self) -> impl std::ops::Deref<Target=Namespace> + 'm { 
-        self.state.module.globals() 
-    }
-    
-    #[inline(always)] 
-    fn globals_mut(&mut self) -> impl std::ops::DerefMut<Target=Namespace> + 'm { 
-        self.state.module.globals_mut() 
+    /// Reset the execution state of the VM. Note that the module state is unaffected
+    pub fn reset(&mut self) {
+        self.call_stack.clear();
+        self.immediate.clear();
+        self.state.pc = 0;
+        self.state.locals = 0;
     }
     
     pub fn run(&mut self) -> ExecResult<()> {
@@ -133,6 +131,45 @@ impl<'m> VirtualMachine<'m> {
             }
         }
     }
+    
+    fn main_module(&self) -> &Module {
+        self.call_stack.first().map_or(self.current_module(), |state| state.module)
+    }
+    
+    #[inline(always)]
+    fn current_module(&self) -> &Module {
+        self.state.module
+    }
+    
+    // Globals
+    
+    #[inline(always)]
+    fn globals(&self) -> impl Deref<Target=Namespace> + 'm {
+        self.state.module.namespace()
+    }
+    
+    #[inline(always)] 
+    fn globals_mut(&mut self) -> impl DerefMut<Target=Namespace> + 'm {
+        self.state.module.namespace_mut()
+    }
+    
+    // Constants
+    
+    fn get_const(&self, cid: ConstID) -> Variant {
+        let data = self.current_module().data();
+        
+        match *data.get_const(cid) {
+            Constant::Integer(value) => Variant::from(value),
+            Constant::Float(bytes) => FloatType::from_le_bytes(bytes).into(),
+            Constant::String(idx) => Variant::from(*data.get_string(idx)),
+            Constant::Function(chunk_id, function_id) => {
+                let module_id = self.current_module().module_id();
+                unimplemented!()
+            }
+        }
+    }
+    
+    // Stack Manipulation
     
     // Note: when moving values off the stack, make sure to copy *before* popping
     // This ensures that the GC sees the values as rooted
@@ -246,12 +283,12 @@ impl<'m> VirtualMachine<'m> {
             
             OpCode::LoadConst => {
                 let cid = ConstID::from(data[0]);
-                let value = self.program().lookup_value(cid);
+                let value = self.get_const(cid);
                 self.push_stack(value);
             },
             OpCode::LoadConst16 => {
                 let cid = ConstID::from(read_le_bytes!(u16, data));
-                let value = self.program().lookup_value(cid);
+                let value = self.get_const(cid);
                 self.push_stack(value);
             },
             

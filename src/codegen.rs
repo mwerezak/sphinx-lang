@@ -22,7 +22,7 @@ pub mod opcodes;
 pub mod errors;
 
 pub use opcodes::OpCode;
-pub use chunk::{UnloadedProgram, Program, ChunkID, ConstID, Constant};
+pub use chunk::{UnloadedProgram, Program, ProgramData, ChunkID, ConstID, Constant};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
 use opcodes::*;

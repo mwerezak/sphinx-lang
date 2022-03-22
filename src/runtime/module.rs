@@ -11,7 +11,7 @@ use std::ops::{Deref, DerefMut};
 use std::hash::{Hash, Hasher, BuildHasher};
 use std::collections::HashMap;
 use crate::source::ModuleSource;
-use crate::codegen::{Program, UnloadedProgram};
+use crate::codegen::{ProgramData};
 use crate::runtime::{Variant, DefaultBuildHasher};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -77,24 +77,26 @@ pub type ModuleID = u64;
 
 #[derive(Debug)]
 pub struct Module {
+    id: ModuleID,
     source: ModuleSource,
-    program: Program,
-    globals: RefCell<Namespace>,
+    data: ProgramData,
+    namespace: RefCell<Namespace>,
 }
 
 impl Module {
-    pub fn module_id(&self) -> ModuleID { self.program.module_id() }
+    pub fn module_id(&self) -> ModuleID { self.id }
+    
     pub fn source(&self) -> &ModuleSource { &self.source }
     
     #[inline(always)]
-    pub fn program(&self) -> &Program { &self.program }
+    pub fn data(&self) -> &ProgramData { &self.data }
     
-    pub fn globals(&self) -> impl Deref<Target=Namespace> + '_ { 
-        self.globals.borrow() 
+    pub fn namespace(&self) -> impl Deref<Target=Namespace> + '_ { 
+        self.namespace.borrow() 
     }
     
-    pub fn globals_mut(&self) -> impl DerefMut<Target=Namespace> + '_ { 
-        self.globals.borrow_mut() 
+    pub fn namespace_mut(&self) -> impl DerefMut<Target=Namespace> + '_ { 
+        self.namespace.borrow_mut() 
     }
 }
 
@@ -113,22 +115,26 @@ impl ModuleCache {
         }
     }
     
-    /// Loads an `UnloadedProgram`, creating a new module for it
-    pub fn load(&mut self, program: UnloadedProgram, source: ModuleSource) -> &Module {
+    pub fn get(&self, module_id: &ModuleID) -> Option<&Module> {
+        self.modules.get(module_id)
+    }
+    
+    /// Create a new module
+    pub fn insert(&mut self, source: ModuleSource, data: ProgramData) -> ModuleID {
         let module_id = self.new_module_id(&source);
-        let program = Program::load(program, module_id);
-        
         let module = Module {
-            source, program,
-            globals: RefCell::new(Namespace::new()),
+            id: module_id,
+            namespace: RefCell::new(Namespace::new()),
+            source, data,
         };
         
         self.modules.insert(module_id, module);
-        self.modules.get(&module_id).unwrap()
+        
+        module_id
     }
     
     /// Get a new, unused module ID.
-    fn new_module_id(&mut self, source: &ModuleSource) -> ModuleID {
+    fn new_module_id(&self, source: &ModuleSource) -> ModuleID {
         let mut state = self.id_hasher.build_hasher();
         source.hash(&mut state);
         let mut new_id = state.finish();
@@ -137,9 +143,5 @@ impl ModuleCache {
             new_id = new_id.wrapping_add(1);
         }
         new_id
-    }
-    
-    pub fn get(&self, module_id: &ModuleID) -> Option<&Module> {
-        self.modules.get(module_id)
     }
 }

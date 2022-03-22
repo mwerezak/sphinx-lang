@@ -223,7 +223,7 @@ impl<'c, 's> Disassembler<'c, 's> {
     
     fn write_const(&self, fmt: &mut impl fmt::Write, value: &Constant) -> fmt::Result {
         if let Constant::String(index) = value {
-            let string = self.program.string(*index);
+            let string = self.program.get_string(*index);
             if string.len() > 16 {
                 return write!(fmt, "\"{}...\"", &string[..13]);
             }

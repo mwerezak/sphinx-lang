@@ -55,7 +55,7 @@ pub struct ChunkInfo {
 }
 
 /// A buffer used by ChunkBuilder
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct ChunkBuf {
     info: ChunkInfo,
     bytes: Vec<u8>,
@@ -108,6 +108,7 @@ impl ChunkBuf {
 
 
 pub struct ChunkBuilder {
+    main: ChunkBuf,
     chunks: Vec<ChunkBuf>,
     consts: Vec<Constant>,
     functions: Vec<Signature>,
@@ -122,6 +123,7 @@ impl ChunkBuilder {
     
     pub fn with_strings(strings: StringInterner) -> Self {
         Self {
+            main: ChunkBuf::new(ChunkInfo::default()),
             chunks: Vec::new(),
             functions: Vec::new(),
             consts: Vec::new(),
@@ -214,6 +216,7 @@ impl ChunkBuilder {
         }
         
         UnloadedProgram {
+            main: self.main.bytes.into_boxed_slice(),
             chunks: chunks.into_boxed_slice(),
             chunk_index: chunk_index.into_boxed_slice(),
             strings: strings.into_boxed_slice(),
@@ -263,6 +266,7 @@ impl StringIndex {
 /// between threads.
 #[derive(Debug, Clone)]
 pub struct UnloadedProgram {
+    main: Box<[u8]>,
     chunks: Box<[u8]>,
     chunk_index: Box<[ChunkIndex]>,
     strings: Box<[u8]>,
@@ -272,7 +276,7 @@ pub struct UnloadedProgram {
 }
 
 impl UnloadedProgram {
-    pub fn chunk(&self, chunk_id: ChunkID) -> &[u8] {
+    pub fn get_chunk(&self, chunk_id: ChunkID) -> &[u8] {
         let chunk_idx = &self.chunk_index[usize::from(chunk_id)];
         &self.chunks[chunk_idx.as_range()]
     }
@@ -289,7 +293,7 @@ impl UnloadedProgram {
             .map(|(chunk_id, chunk)| (ChunkID::try_from(chunk_id).unwrap(), chunk))
     }
     
-    pub fn string(&self, string_id: StringID) -> &str {
+    pub fn get_string(&self, string_id: StringID) -> &str {
         let string_idx = &self.string_index[usize::from(string_id)];
         str::from_utf8(&self.strings[string_idx.as_range()]).expect("invalid string")
     }
@@ -308,10 +312,8 @@ impl UnloadedProgram {
 
 
 /// Unlike `UnloadedProgram`, this is not `Send` (mainly because `StringSymbol` is not Send)
-
 #[derive(Debug)]
-pub struct Program {
-    module_id: ModuleID,
+pub struct ProgramData {
     chunks: Box<[u8]>,
     chunk_index: Box<[ChunkIndex]>,
     strings: Box<[StringSymbol]>,
@@ -319,33 +321,37 @@ pub struct Program {
     functions: Box<[Signature]>,
 }
 
-impl Program {
-    pub fn module_id(&self) -> ModuleID {
-        self.module_id
-    }
-    
+impl ProgramData {
+
     #[inline(always)]
-    pub fn chunk(&self, chunk_id: ChunkID) -> &[u8] {
+    pub fn get_chunk(&self, chunk_id: ChunkID) -> &[u8] {
         let index = &self.chunk_index[usize::from(chunk_id)];
         &self.chunks[index.as_range()]
     }
     
-    pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {
-        &self.consts[usize::from(index.into())]
+    pub fn get_const(&self, index: ConstID) -> &Constant {
+        &self.consts[usize::from(index)]
     }
     
-    pub fn lookup_value(&self, index: impl Into<ConstID>) -> Variant {
-        match self.lookup_const(index) {
-            Constant::Integer(value) => Variant::from(*value),
-            Constant::Float(bytes) => FloatType::from_le_bytes(*bytes).into(),
-            Constant::String(idx) => Variant::from(self.strings[idx.to_usize()]),
-            Constant::Function(chunk_id, function_id) => {
-                unimplemented!()
-            }
-        }
+    pub fn get_string(&self, index: StringID) -> &StringSymbol {
+        &self.strings[usize::from(index)]
     }
     
-    pub fn load(program: UnloadedProgram, module_id: ModuleID) -> Self {
+    pub fn get_signature(&self, index: FunctionID) -> &Signature {
+        &self.functions[usize::from(index)]
+    }
+    
+}
+
+
+#[derive(Debug)]
+pub struct Program {
+    pub main: Box<[u8]>,
+    pub data: ProgramData,
+}
+
+impl Program {
+    pub fn load(program: UnloadedProgram) -> Self {
         let strings = STRING_TABLE.with(|string_table| {
             let mut string_table = string_table.borrow_mut();
             
@@ -359,24 +365,26 @@ impl Program {
         });
         
         Self {
-            module_id,
-            chunks: program.chunks,
-            chunk_index: program.chunk_index,
-            consts: program.consts,
-            functions: program.functions,
-            strings
+            main: program.main,
+            data: ProgramData {
+                chunks: program.chunks,
+                chunk_index: program.chunk_index,
+                consts: program.consts,
+                functions: program.functions,
+                strings
+            },
         }
     }
     
     /// prepares an `UnloadedProgram` for exporting to a file
     pub fn unload(self) -> UnloadedProgram {
         let mut strings = Vec::new();
-        let mut string_index = Vec::with_capacity(self.strings.len());
+        let mut string_index = Vec::with_capacity(self.data.strings.len());
         
         STRING_TABLE.with(|string_table| {
             let string_table = string_table.borrow();
             
-            for symbol in self.strings.into_iter() {
+            for symbol in self.data.strings.into_iter() {
                 let bytes = string_table.resolve(symbol).as_bytes();
                 
                 let offset = strings.len();
@@ -392,12 +400,15 @@ impl Program {
         });
         
         UnloadedProgram {
-            chunks: self.chunks,
-            chunk_index: self.chunk_index,
+            main: self.main,
+            chunks: self.data.chunks,
+            chunk_index: self.data.chunk_index,
             strings: strings.into_boxed_slice(),
             string_index: string_index.into_boxed_slice(),
-            consts: self.consts,
-            functions: self.functions,
+            consts: self.data.consts,
+            functions: self.data.functions,
         }
     }
 }
+
+

@@ -99,7 +99,7 @@ fn start_repl(_args: &ArgMatches, version: &str, vm: Option<VirtualMachine>) {
     
 }
 
-fn build_and_execute<'m>(_args: &ArgMatches, module_cache: &'m mut ModuleCache, source: ModuleSource) -> Result<VirtualMachine<'m>, ()> {
+fn build_and_execute<'m>(_args: &ArgMatches, module_cache: &'m mut ModuleCache, source: ModuleSource) {
     // build module
     let build_result = sphinx_lang::build_module(&source);
     if build_result.is_err() {
@@ -118,17 +118,15 @@ fn build_and_execute<'m>(_args: &ArgMatches, module_cache: &'m mut ModuleCache, 
                 frontend::print_source_errors(&source, &errors);
             }
         }
-        return Err(());
+        return;
     }
     
     let build = build_result.unwrap();
-    let module = module_cache.load(build.program, source);
-    let module_id = module.module_id();
-    let mut vm = VirtualMachine::new(module_cache, &module_id);
+    let program = Program::load(build.program);
+    let module_id = module_cache.insert(source, program.data);
+    let mut vm = VirtualMachine::new(module_cache, module_id, &program.main);
     
     vm.run().expect("runtime error");
-    
-    Ok(vm)
 }
 
 
