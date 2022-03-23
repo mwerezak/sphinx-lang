@@ -75,15 +75,17 @@ impl TryFrom<Atom> for LValue {
 
 impl TryFrom<Primary> for LValue {
     type Error = ();
-    fn try_from(mut primary: Primary) -> Result<Self, Self::Error> {
+    fn try_from(primary: Primary) -> Result<Self, Self::Error> {
         // remove the last item so that primary will eval to the reciever
-        let tail = primary.path_mut().pop();
+        let (atom, mut path) = primary.take();
+        let tail = path.pop();
+        let receiver = Primary::new(atom, path);
         
         let lvalue = match tail {
             Some(AccessItem::Attribute(name)) 
-                => LValue::Attribute(Box::new(AttributeTarget { receiver: primary, name })),
+                => LValue::Attribute(Box::new(AttributeTarget { receiver, name })),
             Some(AccessItem::Index(index)) 
-                => LValue::Index(Box::new(IndexTarget { receiver: primary, index })),
+                => LValue::Index(Box::new(IndexTarget { receiver, index })),
             _ => return Err(()),
         };
         

@@ -37,19 +37,21 @@ pub enum AccessItem {
 #[derive(Debug, Clone)]
 pub struct Primary {
     atom: Atom,
-    path: Vec<AccessItem>,
+    path: Box<[AccessItem]>,
 }
 
 impl Primary {
     pub fn new(atom: Atom, path: Vec<AccessItem>) -> Self {
-        debug_assert!(!path.is_empty());
-        Primary { atom, path }
+        Primary { atom, path: path.into_boxed_slice() }
+    }
+    
+    pub fn take(self) -> (Atom, Vec<AccessItem>) {
+        (self.atom, self.path.into_vec())
     }
     
     pub fn atom(&self) -> &Atom { &self.atom }
-    pub fn take_atom(self) -> Atom { self.atom }
     
-    pub fn path(&self) -> &Vec<AccessItem> { &self.path }
-    pub fn path_mut(&mut self) -> &mut Vec<AccessItem> { &mut self.path }
+    pub fn path(&self) -> &[AccessItem] { &self.path }
+    pub fn path_mut(&mut self) -> &mut [AccessItem] { &mut self.path }
 }
 

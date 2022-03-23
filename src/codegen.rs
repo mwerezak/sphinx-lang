@@ -800,7 +800,17 @@ impl CodeGenerator<'_> {
     }
     
     fn compile_primary(&mut self, symbol: Option<&DebugSymbol>, primary: &Primary) -> CompileResult<()> {
-        unimplemented!()
+        self.compile_atom(symbol, primary.atom())?;
+        
+        for item in primary.path().iter() {
+            match item {
+                AccessItem::Attribute(name) => unimplemented!(),
+                AccessItem::Index(index) => unimplemented!(),
+                AccessItem::Invoke { args, unpack } => self.compile_invocation(symbol, args, unpack.as_ref())?,
+            }
+        }
+        
+        Ok(())
     }
     
     fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, args: &[ExprMeta], unpack: Option<&ExprMeta>) -> CompileResult<()> {
