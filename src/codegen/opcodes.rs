@@ -13,8 +13,10 @@ const OP_NOP:           u8 = 0x00;
 const OP_RETURN:        u8 = 0x01;  // return from current function?
 
 // The odd argument order is because the VM will swap "nargs" with "arg[n]" after reading "nargs".
-// This allows the full argument list (including default and variadic arguments) to be prepared
-// in a way that can be reasoned about at compile-time.
+// This is because the function preamble will fill in any missing default arguments such that the
+// full argument list is always the same, and can be reasoned about at compile-time from the static signature.
+// This wouldn't be possible if nargs was in some arbitrary location in the middle of the argument list,
+// so swapping it to the beginning is the most efficient way to handle this.
 
 // [ callobj arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
 const OP_CALL:          u8 = 0x02;
