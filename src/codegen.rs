@@ -121,7 +121,7 @@ enum LocalName {
 struct Local {
     decl: DeclType,
     name: LocalName,
-    offset: LocalIndex,
+    index: LocalIndex,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,7 +138,7 @@ enum ScopeTag {
 struct Scope {
     tag: ScopeTag,
     depth: usize,
-    offset: Option<LocalIndex>,
+    frame: Option<LocalIndex>,
     locals: Vec<Local>,
     symbol: Option<DebugSymbol>,
 }
@@ -148,8 +148,8 @@ impl Scope {
         self.symbol.as_ref()
     }
     
-    fn last_offset(&self) -> Option<LocalIndex> {
-        self.locals.last().map_or(self.offset, |local| Some(local.offset))
+    fn last_index(&self) -> Option<LocalIndex> {
+        self.locals.last().map_or(self.frame, |local| Some(local.index))
     }
     
     fn find_local(&self, name: &LocalName) -> Option<&Local> {
@@ -161,14 +161,14 @@ impl Scope {
     }
     
     fn push_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<&Local> {
-        let offset = self.last_offset().map_or(
+        let index = self.last_index().map_or(
             Ok(0),
-            |offset| offset.checked_add(1)
+            |index| index.checked_add(1)
                 .ok_or_else(|| CompileError::from(ErrorKind::LocalVariableLimit))
         )?;
         
         let local = Local {
-            decl, name, offset,
+            decl, name, index,
         };
         self.locals.push(local);
         Ok(self.locals.last().unwrap())
