@@ -65,15 +65,16 @@ struct GCBox {
     object: RefCell<GCObject>,
 }
 
-impl GCBox {
-    fn new(object: GCObject) -> Box<Self> {
-        let item = Self {
+impl From<GCObject> for GCBox {
+    fn from(object: GCObject) -> Self {
+        Self {
             marked: false,
             object: RefCell::new(object),
-        };
-        Box::new(item)
+        }
     }
-    
+}
+
+impl GCBox {
     fn borrow(&self) -> Ref<GCObject> {
         self.object.borrow()
     }
@@ -87,7 +88,7 @@ impl GCBox {
 pub struct GCState {
     // stats: 
     // config: 
-    boxes: Vec<Box<GCBox>>,
+    boxes: Vec<GCBox>,
 }
 
 impl GCState {
@@ -99,7 +100,7 @@ impl GCState {
     
     pub fn insert(&mut self, object: GCObject) -> GCHandle {
         let index = self.boxes.len();
-        self.boxes.push(GCBox::new(object));
+        self.boxes.push(object.into());
         GCHandle::from(index)
     }
     

@@ -36,11 +36,17 @@ pub struct Namespace {
     store: HashMap<StringSymbol, Variable, DefaultBuildHasher>,
 }
 
-impl Namespace {
-    pub fn new() -> Self {
+impl Default for Namespace {
+    fn default() -> Self {
         Self { 
             store: HashMap::with_hasher(DefaultBuildHasher::default()),
         }
+    }
+}
+
+impl Namespace {
+    pub fn new() -> Self {
+        Self::default()
     }
     
     // if the variable already exists, it is overwritten
@@ -50,20 +56,20 @@ impl Namespace {
     }
     
     pub fn delete(&mut self, name: &StringSymbol) -> ExecResult<()> {
-        if self.store.remove(&name).is_none() {
+        if self.store.remove(name).is_none() {
             return Err(ErrorKind::NameNotDefined(name.to_string()).into())
         }
         Ok(())
     }
     
     pub fn lookup<'a>(&'a self, name: &StringSymbol) -> ExecResult<&'a Variant> {
-        self.store.get(&name)
+        self.store.get(name)
             .map(|var| &var.value)
             .ok_or_else(|| ErrorKind::NameNotDefined(name.to_string()).into())
     }
     
     pub fn lookup_mut<'a>(&'a mut self, name: &StringSymbol) -> ExecResult<&'a mut Variant> {
-        let variable = self.store.get_mut(&name)
+        let variable = self.store.get_mut(name)
             .ok_or_else(|| RuntimeError::from(ErrorKind::NameNotDefined(name.to_string())))?;
             
         if variable.access != Access::ReadWrite {
@@ -75,7 +81,7 @@ impl Namespace {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GlobalEnv {
     namespace: RefCell<Namespace>,
 }
@@ -88,7 +94,7 @@ impl From<Namespace> for GlobalEnv {
 
 impl GlobalEnv {
     pub fn new() -> Self {
-        Self::from(Namespace::new())
+        Self::default()
     }
     
     pub fn borrow(&self) -> Ref<Namespace> {
@@ -143,13 +149,17 @@ pub struct ModuleCache {
     id_hasher: DefaultBuildHasher,
 }
 
-impl ModuleCache {
-    pub fn new() -> Self {
+impl Default for ModuleCache {
+    fn default() -> Self {
         Self {
             modules: HashMap::with_hasher(DefaultBuildHasher::default()),
             id_hasher: DefaultBuildHasher::default(),
         }
     }
+}
+
+impl ModuleCache {
+    pub fn new() -> Self { Self::default() }
     
     pub fn get(&self, module_id: &ModuleID) -> Option<&Module> {
         self.modules.get(module_id)
@@ -157,7 +167,7 @@ impl ModuleCache {
     
     /// Create a new module
     pub fn insert(&mut self, data: ProgramData, name: Option<String>, source: Option<ModuleSource>) -> ModuleID {
-        let module_id = self.new_module_id(name.as_ref().map(|s| s.as_str()), source.as_ref());
+        let module_id = self.new_module_id(name.as_deref(), source.as_ref());
         
         let module = Module {
             id: module_id,

@@ -213,30 +213,33 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
         current_line.push(c);
         
         // if we are at the start of a new symbol, open it
-        while matches!(next_symbols.peek(), Some(&cmp::Reverse(IndexSort(ref sym,..))) if index == sym.start) {
+        while matches!(next_symbols.peek(), Some(&cmp::Reverse(IndexSort(sym,..))) if index == sym.start) {
             let symbol = next_symbols.pop().unwrap().0.0;
-            if !active_symbols.contains_key(&symbol) {
+            
+            active_symbols.entry(symbol).or_insert_with(|| {
                 open_symbols.push(cmp::Reverse(IndexSort(symbol, SortIndex::End)));
                 
                 let start_index = current_line.len() - 1;
-                active_symbols.insert(symbol, (Vec::new(), lineno, start_index));
-            }
+                (Vec::new(), lineno, start_index)
+            });
         }
         
         // if we are at the end of an open symbol, mark it as closing
-        while matches!(open_symbols.peek(), Some(&cmp::Reverse(IndexSort(ref sym,..))) if index == sym.end) {
+        while matches!(open_symbols.peek(), Some(&cmp::Reverse(IndexSort(sym,..))) if index == sym.end) {
             let symbol = open_symbols.pop().unwrap().0.0;
             if let Some((lines, lineno, start_index)) = active_symbols.remove(&symbol) {
-                if !closing_symbols.contains_key(&symbol) {
+                closing_symbols.entry(symbol).or_insert_with(|| {
                     
+                    // calculate end_index
                     let total_len = lines.iter()
                         .map(|line| line.len())
                         .reduce(|acc, n| acc+n)
                         .unwrap_or(0);
                     
                     let end_index = total_len + current_line.len() - 1;
-                    closing_symbols.insert(symbol, (lines, lineno, start_index, end_index));
-                }
+                    
+                    (lines, lineno, start_index, end_index)
+                });
             }
         }
         
@@ -320,7 +323,7 @@ impl Eq for IndexSort<'_> { }
 
 impl PartialOrd for IndexSort<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(TokenIndex::cmp(&self.sort_value(), &other.sort_value()))
+        Some(TokenIndex::cmp(self.sort_value(), other.sort_value()))
     }
 }
 

@@ -50,6 +50,7 @@ impl Error for RuntimeError {
     }
 }
 
+#[allow(clippy::useless_format)]
 impl fmt::Display for RuntimeError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let message = match self.kind() {

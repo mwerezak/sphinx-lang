@@ -179,10 +179,7 @@ impl Scope {
     // i.e., without the "nonlocal" keyword
     // this returns true if we can assign into the enclosing scope
     fn allow_enclosing_assignment(&self) -> bool {
-        match self.tag {
-            ScopeTag::Loop | ScopeTag::Branch => true,
-            _ => false,
-        }
+        matches!(self.tag, ScopeTag::Loop | ScopeTag::Branch)
     }
 }
 
@@ -316,9 +313,9 @@ impl Compiler {
     
     fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<ChunkID> {
         let chunk_id = self.builder.new_chunk(info)?;
-        if !self.symbols.contains_key(&Some(chunk_id)) {
-            self.symbols.insert(Some(chunk_id), DebugSymbolsRLE::new());
-        }
+        self.symbols.entry(Some(chunk_id))
+            .or_insert_with(DebugSymbolsRLE::new);
+        
         Ok(chunk_id)
     }
     
@@ -413,12 +410,12 @@ impl CodeGenerator<'_> {
         let chunk_id = self.chunk_id;
         self.symbols_mut()
             .get_mut(&chunk_id).unwrap()
-            .push(symbol.map(|symbol| *symbol))
+            .push(symbol.copied())
     }
     
     fn create_chunk(&mut self, symbol: Option<&DebugSymbol>) -> CompileResult<CodeGenerator> {
         let info = ChunkInfo {
-            symbol: symbol.map(|symbol| *symbol),
+            symbol: symbol.copied(),
         };
         let chunk_id = self.compiler.new_chunk(info)?;
         Ok(self.compiler.get_chunk(Some(chunk_id)))
@@ -443,7 +440,7 @@ impl CodeGenerator<'_> {
         debug_assert!(opcode.instr_len() == 1 + bytes.len());
         self.push_symbol(symbol);
         self.chunk_mut().push_byte(opcode);
-        self.chunk_mut().extend_bytes(&bytes);
+        self.chunk_mut().extend_bytes(bytes);
     }
     
     ///////// Patching Bytecode /////////
@@ -899,9 +896,9 @@ impl CodeGenerator<'_> {
     fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclarationRef) -> CompileResult<()> {
         match &decl.lhs {
             LValue::Identifier(name) => if self.scope().is_global_scope() {
-                self.compile_decl_global_name(symbol, decl.decl, *name, &decl.init)
+                self.compile_decl_global_name(symbol, decl.decl, *name, decl.init)
             } else {
-                self.compile_decl_local_name(symbol, decl.decl, *name, &decl.init)
+                self.compile_decl_local_name(symbol, decl.decl, *name, decl.init)
             },
             
             LValue::Attribute(target) => unimplemented!(),
@@ -971,7 +968,7 @@ impl CodeGenerator<'_> {
             LValue::Index(target) => unimplemented!(),
             
             LValue::Tuple(..) if assign.op.is_some() => {
-                return Err(CompileError::new("can't use update-assigment when assigning to a tuple"))
+                Err(CompileError::new("can't use update-assigment when assigning to a tuple"))
             },
             
             LValue::Tuple(target_list) => match assign.rhs {
@@ -1017,12 +1014,12 @@ impl CodeGenerator<'_> {
         if let Some(op) = assign.op {
             // update assignment
             self.compile_name_lookup(symbol, name)?;
-            self.compile_expr(symbol, &assign.rhs)?;
+            self.compile_expr(symbol, assign.rhs)?;
             self.emit_binary_op(symbol, &op);
             
         } else {
             // normal assignment
-            self.compile_expr(symbol, &assign.rhs)?;
+            self.compile_expr(symbol, assign.rhs)?;
             
         }
         

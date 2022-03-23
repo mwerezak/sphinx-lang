@@ -26,7 +26,7 @@ pub struct StringSymbol(InternSymbol, PhantomUnsend);
 // impl !Send for StringSymbol { }
 
 impl StringSymbol {
-    fn to_usize(&self) -> usize {
+    fn as_usize(&self) -> usize {
         self.0.to_usize()
     }
     

@@ -118,7 +118,7 @@ fn fmt_source_line_single(fmt: &mut Formatter<'_>, symbol: &ResolvedSymbol) -> f
 }
 
 
-fn render_symbol_lines<'a>(symbol: &'a ResolvedSymbol) -> impl fmt::Display + 'a {
+fn render_symbol_lines(symbol: &ResolvedSymbol) -> impl fmt::Display + '_ {
     utils::delegate_fmt(|fmt| fmt_symbol_lines(fmt, symbol))
 }
 
@@ -133,12 +133,12 @@ fn fmt_symbol_lines(fmt: &mut Formatter<'_>, symbol: &ResolvedSymbol) -> fmt::Re
 
 // if the symbol isn't multiline, this produces the same output as render_symbol_lines()
 // if it is multiline, this renders the first line of the symbol followed by "..."
-fn render_symbol_single_line<'a>(symbol: &'a ResolvedSymbol) -> impl fmt::Display + 'a {
+fn render_symbol_single_line(symbol: &ResolvedSymbol) -> impl fmt::Display + '_ {
     utils::delegate_fmt(|fmt| fmt_symbol_single_line(fmt, symbol))
 }
 
 fn fmt_symbol_single_line(fmt: &mut fmt::Formatter<'_>, symbol: &ResolvedSymbol) -> fmt::Result { 
-    if let Some(first_line) = symbol.iter_whole_lines().nth(0) {
+    if let Some(first_line) = symbol.iter_whole_lines().next() {
         if symbol.is_multiline() {
             write!(fmt, "{}...", first_line.trim_end())?;
         } else {

@@ -36,12 +36,10 @@ pub enum BuildErrors {
 }
 
 pub fn build_module(source: &ModuleSource) -> Result<CompiledProgram, BuildErrors> {
-    let source_text = source.read_text();
-    if source_text.is_err() {
-        return Err(BuildErrors::Source(source_text.unwrap_err()));
-    }
+    let source_text = source.read_text()
+        .map_err(BuildErrors::Source)?;
     
-    build_source(source_text.unwrap())
+    build_source(source_text)
 }
 
 pub fn build_source(source_text: SourceText) -> Result<CompiledProgram, BuildErrors> {
@@ -49,17 +47,16 @@ pub fn build_source(source_text: SourceText) -> Result<CompiledProgram, BuildErr
     
     // parsing
     let parse_result = parse_source(&mut interner, source_text);
-    if parse_result.is_err() {
-        let errors = parse_result.unwrap_err().into_boxed_slice();
-        return Err(BuildErrors::Syntax(errors));
+    
+    if let Err(errors) = parse_result {
+        return Err(BuildErrors::Syntax(errors.into_boxed_slice()));
     }
     
     // compilation
     let compile_result = compile_ast(interner, parse_result.unwrap());
     
-    if compile_result.is_err() {
-        let errors = compile_result.unwrap_err().into_boxed_slice();
-        return Err(BuildErrors::Compile(errors));
+    if let Err(errors) = compile_result {
+        return Err(BuildErrors::Compile(errors.into_boxed_slice()));
     }
     
     Ok(compile_result.unwrap())

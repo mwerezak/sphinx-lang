@@ -116,9 +116,15 @@ pub struct ChunkBuilder {
     strings: StringInterner,
 }
 
+impl Default for ChunkBuilder {
+    fn default() -> Self {
+        Self::with_strings(StringInterner::new())
+    }
+}
+
 impl ChunkBuilder {
     pub fn new() -> Self {
-        Self::with_strings(StringInterner::new())
+        Self::default()
     }
     
     pub fn with_strings(strings: StringInterner) -> Self {
@@ -396,7 +402,7 @@ impl Program {
         STRING_TABLE.with(|string_table| {
             let string_table = string_table.borrow();
             
-            for symbol in self.data.strings.into_iter() {
+            for symbol in self.data.strings.iter() {
                 let bytes = string_table.resolve(symbol).as_bytes();
                 
                 let offset = strings.len();

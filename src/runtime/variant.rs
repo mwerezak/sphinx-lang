@@ -118,7 +118,7 @@ impl<'a> TryFrom<&'a Variant> for VariantKey<'a> {
         if !value.can_hash() {
             return Err(ErrorKind::UnhashableValue(value.clone()).into());
         }
-        Ok(Self(&value))
+        Ok(Self(value))
     }
 }
 

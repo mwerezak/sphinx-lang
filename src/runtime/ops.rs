@@ -112,7 +112,7 @@ pub fn eval_inv(operand: &Variant) -> ExecResult<Variant> {
 
 #[inline]
 pub fn eval_not(operand: &Variant) -> ExecResult<Variant> {
-    return Ok(Variant::from(!operand.truth_value()))
+    Ok(Variant::from(!operand.truth_value()))
 }
 
 
@@ -140,7 +140,7 @@ pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> ExecResult<bool> {
         
         // numeric equality
         (Variant::Integer(a), Variant::Integer(b)) => *a == *b,
-        (a, b) if is_arithmetic_primitive(&a) && is_arithmetic_primitive(&b) 
+        (a, b) if is_arithmetic_primitive(a) && is_arithmetic_primitive(b) 
             => a.float_value().unwrap() == b.float_value().unwrap(),
 
         // tuple equality

@@ -63,7 +63,7 @@ impl<'c, 's> Disassembler<'c, 's> {
             let (_, bytes) = chunk.split_at(offset);
             
             // get the next unresolved symbol if there are any
-            let unresolved = symbols.as_mut().map_or(None, |iter| iter.next().flatten());
+            let unresolved = symbols.as_mut().and_then(|iter| iter.next()).flatten();
             let symbol = self.try_resolve_symbol(unresolved, last_symbol);
             last_symbol = unresolved;
             
@@ -74,8 +74,7 @@ impl<'c, 's> Disassembler<'c, 's> {
     
     // handles all the logic around whether we have a symbol table, if there was a symbol resolution error, repeats...
     fn try_resolve_symbol<'a>(&self, unresolved: Option<&'a DebugSymbol>, last_symbol: Option<&DebugSymbol>) -> Option<Symbol<'a>> where 's: 'a {
-        let resolved = unresolved.and_then(|symbol| self.symbol_table.map_or(
-            None,
+        let resolved = unresolved.and_then(|symbol| self.symbol_table.and_then(
             |symbol_table| symbol_table.get(&symbol)
         ));
         
@@ -203,7 +202,7 @@ impl<'c, 's> Disassembler<'c, 's> {
             Some(Ok(symbol)) => {
                 write!(fmt, "{: >4}| ", symbol.lineno())?;
                 
-                let line = symbol.iter_whole_lines().nth(0).unwrap_or("").trim_end();
+                let line = symbol.iter_whole_lines().next().unwrap_or("").trim_end();
                 if symbol.is_multiline() {
                     let (before, sym_text) = line.split_at(symbol.start());
                     write!(fmt, "{}`{}...`", before, sym_text)

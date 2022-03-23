@@ -370,9 +370,8 @@ impl<'m> VMState<'m> {
                 let tuple_len = usize::from(data[0]);
                 
                 // peek and clone to ensure items stay rooted for GC
-                let items = stack.peek_many(tuple_len).iter()
-                    .cloned().collect::<Vec<Variant>>()
-                    .into_boxed_slice();
+                let items = stack.peek_many(tuple_len)
+                    .to_vec().into_boxed_slice();
                 
                 let tuple = Variant::make_tuple(items);
                 stack.replace_many(tuple_len, tuple);
@@ -381,9 +380,8 @@ impl<'m> VMState<'m> {
                 let tuple_len = Self::into_usize(stack.pop());
                 
                 // peek and clone to ensure items stay rooted for GC
-                let items = stack.peek_many(tuple_len).iter()
-                    .cloned().collect::<Vec<Variant>>()
-                    .into_boxed_slice();
+                let items = stack.peek_many(tuple_len)
+                    .to_vec().into_boxed_slice();
                 
                 let tuple = Variant::make_tuple(items);
                 stack.replace_many(tuple_len, tuple);
