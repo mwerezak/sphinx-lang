@@ -27,11 +27,11 @@ const OP_CALL_UNPACK:   u8 = 0x03;
 // 0x08-40        Immediate Values
 
 const OP_POP:           u8 = 0x08;  // [ _ ] => []
-const OP_DROP:          u8 = 0x09;  // (u8); [ ... ] => []
+const OP_DROP:          u8 = 0x09;  // (u8); [ value[0] ... value[N] ] => []
 const OP_CLONE:         u8 = 0x0A;  // [ value ] => [ value value ]
 
-const OP_TUPLE:         u8 = 0x0B;  // (u8); [ ... ] => [ tuple ]
-const OP_TUPLEN:        u8 = 0x0C;  // [ ... N ] => [ tuple ]
+const OP_TUPLE:         u8 = 0x0B;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
+const OP_TUPLEN:        u8 = 0x0C;  // [ item[0] ... item[N] N ] => [ tuple ]
 
 const OP_LD_CONST:      u8 = 0x10;  // (u8); _ => [ value ]
 const OP_LD_CONST_16:   u8 = 0x11;  // (u16); _ => [ value ]
@@ -43,14 +43,14 @@ const OP_ST_GLOBAL:     u8 = 0x1A;  // [ value name ] => [ value ]
 const OP_LD_GLOBAL:     u8 = 0x1B;  // [ name ] => [ value ]
 const OP_DP_GLOBAL:     u8 = 0x1C;  // [ name ] => []
 
-const OP_IN_LOCAL:      u8 = 0x20;  // [ value ] => [ value ... value ]; vm.locals += 1
+const OP_IN_LOCAL:      u8 = 0x20;  // [ value ] => [ value ]; vm.locals += 1
 const OP_ST_LOCAL:      u8 = 0x21;  // (u8);  [ value ] => [ value ]
 const OP_ST_LOCAL_16:   u8 = 0x22;  // (u16); [ value ] => [ value ]
 // const OP_LD_LOCAL_32:   u8 = 0x23;  // (u32); _ => [ value ]
 const OP_LD_LOCAL:      u8 = 0x24;  // (u8);  _ => [ value ]
 const OP_LD_LOCAL_16:   u8 = 0x25;  // (u16); _ => [ value ]
 // const OP_LD_LOCAL_32:   u8 = 0x27;  // (u32); _ => [ value ]
-const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ ... ] => [] -- panics if there are any immediate values
+const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ local[N] ... local[0] temporaries... ] => [ temporaries... ]; vm.locals -= N
 
 // const OP_LD_NAME:       u8 = 0x28;
 // const OP_LD_INDEX:      u8 = 0x29;
