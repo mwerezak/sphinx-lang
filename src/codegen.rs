@@ -1289,8 +1289,8 @@ impl CodeGenerator<'_> {
             self.compile_expr(symbol, expr)?;
         }
         
-        self.emit_instr(None, OpCode::Pop);  // drop "defaults passed"
         jump_targets.insert(default_count.into(), self.current_offset());
+        self.emit_instr(None, OpCode::Pop);  // drop "defaults passed"
         
         // patch all jumps
         for idx in 0..=default_count.into() {
