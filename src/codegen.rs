@@ -1158,7 +1158,8 @@ impl CodeGenerator<'_> {
         let chunk_id = chunk.chunk_id().unwrap();
         
         // and a new local scope
-        chunk.emit_begin_scope(ScopeTag::Function, symbol);
+        // don't need to emit new scope instructions, should handled by function call
+        chunk.scope_mut().push_scope(ScopeTag::Function, symbol);
         
         // don't need to generate IN_LOCAL instructions for these, the VM should include them automatically
         chunk.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
@@ -1180,7 +1181,8 @@ impl CodeGenerator<'_> {
         }
         
         // end the function scope
-        chunk.emit_end_scope();
+        // don't need to emit end scope instructions, should be handled by return
+        chunk.scope_mut().pop_scope();
         chunk.finish();
         
         // compile the function signature
