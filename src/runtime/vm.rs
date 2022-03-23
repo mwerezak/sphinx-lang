@@ -269,6 +269,7 @@ impl<'m> VMState<'m> {
             OpCode::Return => return Ok(Control::Return),
             
             OpCode::Call => unimplemented!(),
+            OpCode::CallUnpack => unimplemented!(),
             
             OpCode::Pop => { 
                 stack.pop(); 

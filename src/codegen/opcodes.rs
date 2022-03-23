@@ -15,7 +15,12 @@ const OP_RETURN:        u8 = 0x01;  // return from current function?
 // The odd argument order is because the VM will swap "nargs" with "arg[n]" after reading "nargs".
 // This allows the full argument list (including default and variadic arguments) to be prepared
 // in a way that can be reasoned about at compile-time.
-const OP_CALL:          u8 = 0x02;  // [ callobj arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
+
+// [ callobj arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
+const OP_CALL:          u8 = 0x02;
+
+// [ callobj arg[n] arg[0] ... arg[n-1] arg_seq nargs ] => [ ret_value ]  -- nargs does not include arg_seq! 
+const OP_CALL_UNPACK:   u8 = 0x03;
 
 // 0x08-40        Immediate Values
 
@@ -131,6 +136,7 @@ pub enum OpCode {
     Nop = OP_NOP,
     Return = OP_RETURN, 
     Call = OP_CALL,
+    CallUnpack = OP_CALL_UNPACK,
     
     Pop = OP_POP,
     Drop = OP_DROP,
@@ -207,6 +213,7 @@ impl OpCode {
             OP_NOP => Self::Nop,
             OP_RETURN => Self::Return,
             OP_CALL => Self::Call,
+            OP_CALL_UNPACK => Self::CallUnpack,
             
             OP_POP => Self::Pop,
             OP_DROP => Self::Drop,
@@ -328,6 +335,7 @@ impl std::fmt::Display for OpCode {
             Self::Nop => "OP_NOP",
             Self::Return => "OP_RETURN",
             Self::Call => "OP_CALL",
+            Self::CallUnpack => "OP_CALL_UNPACK",
             
             Self::Pop => "OP_POP",
             Self::Drop => "OP_DROP",

@@ -4,7 +4,7 @@ use log;
 use std::iter;
 use std::mem;
 
-use crate::language::FloatType;
+use crate::language::{IntType, FloatType};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary, AccessItem};
@@ -591,6 +591,12 @@ impl CodeGenerator<'_> {
     
     ///////// Statements /////////
     
+    fn compile_stmt_with_symbol(&mut self, stmt: &StmtMeta) -> CompileResult<()> {
+        let symbol = stmt.debug_symbol();
+        self.compile_stmt(Some(symbol), stmt.variant())
+            .map_err(|err| err.with_symbol(*symbol))
+    }
+    
     fn compile_stmt(&mut self, symbol: Option<&DebugSymbol>, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
             Stmt::Loop { label, body } => self.compile_loop(symbol, label.as_ref(), body)?,
@@ -621,9 +627,7 @@ impl CodeGenerator<'_> {
     fn compile_stmt_list(&mut self, stmt_list: &StmtList) -> CompileResult<()> {
         // compile stmt suite
         for stmt in stmt_list.iter() {
-            let inner_symbol = stmt.debug_symbol();
-            self.compile_stmt(Some(inner_symbol), stmt.variant())
-                .map_err(|err| err.with_symbol(*inner_symbol))?;
+            self.compile_stmt_with_symbol(stmt)?;
         }
         
         // handle control flow
@@ -683,6 +687,12 @@ impl CodeGenerator<'_> {
     
     ///////// Expressions /////////
     
+    fn compile_expr_with_symbol(&mut self, expr: &ExprMeta) -> CompileResult<()> {
+        let symbol = expr.debug_symbol();
+        self.compile_expr(Some(symbol), expr.variant())
+            .map_err(|err| err.with_symbol(*symbol))
+    }
+    
     fn compile_expr(&mut self, symbol: Option<&DebugSymbol>, expr: &Expr) -> CompileResult<()> {
         match expr {
             Expr::Atom(atom) => self.compile_atom(symbol, atom)?,
@@ -719,9 +729,7 @@ impl CodeGenerator<'_> {
             .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
         
         for expr in expr_list.iter() {
-            let inner_symbol = expr.debug_symbol();
-            self.compile_expr(Some(inner_symbol), expr.variant())
-                .map_err(|err| err.with_symbol(*inner_symbol))?;
+            self.compile_expr_with_symbol(expr)?;
         }
         
         self.emit_instr_byte(symbol, OpCode::Tuple, len);
@@ -735,15 +743,7 @@ impl CodeGenerator<'_> {
             Atom::BooleanLiteral(true) => self.emit_instr(symbol, OpCode::True),
             Atom::BooleanLiteral(false) => self.emit_instr(symbol, OpCode::False),
             
-            Atom::IntegerLiteral(value) => {
-                if let Ok(value) = u8::try_from(*value) {
-                    self.emit_instr_byte(symbol, OpCode::UInt8, value);
-                } else if let Ok(value) = i8::try_from(*value) {
-                    self.emit_instr_byte(symbol, OpCode::Int8, value.to_le_bytes()[0]);
-                } else {
-                    self.emit_load_const(symbol, Constant::from(*value))?;
-                }
-            },
+            Atom::IntegerLiteral(value) => self.compile_integer(symbol, *value)?,
             
             Atom::FloatLiteral(value) => {
                 if FloatType::from(i8::MIN) <= *value && *value <= FloatType::from(i8::MAX) {
@@ -761,6 +761,27 @@ impl CodeGenerator<'_> {
             // Atom::Super => unimplemented!(),
             
             Atom::Group(expr) => self.compile_expr(symbol, expr)?,
+        }
+        Ok(())
+    }
+    
+    fn compile_integer(&mut self, symbol: Option<&DebugSymbol>, value: IntType) -> CompileResult<()> {
+        if let Ok(value) = u8::try_from(value) {
+            self.emit_instr_byte(symbol, OpCode::UInt8, value);
+        } else if let Ok(value) = i8::try_from(value) {
+            self.emit_instr_byte(symbol, OpCode::Int8, value.to_le_bytes()[0]);
+        } else {
+            self.emit_load_const(symbol, Constant::from(value))?;
+        }
+        Ok(())
+    }
+    
+    fn compile_float(&mut self, symbol: Option<&DebugSymbol>, value: FloatType) -> CompileResult<()> {
+        if FloatType::from(i8::MIN) <= value && value <= FloatType::from(i8::MAX) {
+            let value = value as i8;
+            self.emit_instr_byte(symbol, OpCode::Float8, value.to_le_bytes()[0]);
+        } else {
+            self.emit_load_const(symbol, Constant::from(value))?;
         }
         Ok(())
     }
@@ -786,7 +807,34 @@ impl CodeGenerator<'_> {
         // prepare argument list:
         // [ callobj arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
 
-        unimplemented!()
+        let arg_len;
+        
+        if let Some((arg_last, args)) = args.split_last() {
+            
+            self.compile_expr_with_symbol(arg_last)?;
+            
+            for arg_expr in args.iter() {
+                self.compile_expr_with_symbol(arg_expr)?;
+            }
+            
+            arg_len = u8::try_from(args.len() + 1)
+                .map_err(|_| CompileError::from(ErrorKind::ArgCountLimit))?;
+            
+        } else {
+            
+            arg_len = 0;
+        }
+        
+        if let Some(seq_expr) = unpack {
+            self.compile_expr_with_symbol(seq_expr)?;
+            self.emit_instr_byte(symbol, OpCode::UInt8, arg_len);
+            self.emit_instr(symbol, OpCode::CallUnpack);
+        } else {
+            self.emit_instr_byte(symbol, OpCode::UInt8, arg_len);
+            self.emit_instr(symbol, OpCode::Call);
+        }
+
+        Ok(())
     }
     
     fn emit_unary_op(&mut self, symbol: Option<&DebugSymbol>, op: &UnaryOp) {
@@ -1027,9 +1075,7 @@ impl CodeGenerator<'_> {
         
         // result expression
         if let Some(expr) = suite.result() {
-            let inner_symbol = expr.debug_symbol();
-            self.compile_expr(Some(inner_symbol), expr.variant())
-                .map_err(|err| err.with_symbol(*inner_symbol))?;
+            self.compile_expr_with_symbol(expr)?;
         } else {
             self.emit_instr(symbol, OpCode::Nil); // implicit nil
         }
@@ -1128,7 +1174,7 @@ impl CodeGenerator<'_> {
         
         // function result
         if let Some(expr) = fundef.body.result() {
-            chunk.compile_expr(Some(expr.debug_symbol()), expr.variant())?;
+            chunk.compile_expr_with_symbol(expr)?;
         } else {
             chunk.emit_instr(symbol, OpCode::Nil);
         }

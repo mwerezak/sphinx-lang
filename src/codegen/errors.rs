@@ -12,6 +12,7 @@ pub enum ErrorKind {
     ChunkCountLimit,
     ConstPoolLimit,
     ParamCountLimit,
+    ArgCountLimit,
     TupleLengthLimit,
     LocalVariableLimit,
     CalcJumpOffsetFailed,
@@ -69,12 +70,16 @@ impl fmt::Display for CompileError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         
         let message = match self.kind() {
+            // Limit exceeded errors
             ErrorKind::ChunkCountLimit => "chunk count limit reached",
             ErrorKind::ConstPoolLimit => "constant pool limit reached",
-            ErrorKind::ParamCountLimit => "parameter count limit exceeded",
+            ErrorKind::ParamCountLimit => "parameter limit exceeded",
+            ErrorKind::ArgCountLimit => "argument limit exceeded",
             ErrorKind::TupleLengthLimit => "tuple length limit exceeded",
             ErrorKind::LocalVariableLimit => "local variable limit reached",
             ErrorKind::CalcJumpOffsetFailed => "could not calculate jump offset",
+            
+            // Actual user errors
             ErrorKind::CantAssignImmutable => "can't assign to immutable local variable",
             ErrorKind::CantAssignNonLocal => "can't assign to a non-local variable without the \"nonlocal\" keyword",
             ErrorKind::Other(message) => message,
