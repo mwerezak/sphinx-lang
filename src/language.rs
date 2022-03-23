@@ -55,16 +55,17 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(SingleCharRule::new(Token::OpAccess,        '.'))
     
     // Arithmetic and comparison operators
+    .add_rule(MultiCharRule::new(Token::OpExp,            "**"))
+    
     .add_rule(SingleCharRule::new(Token::OpAdd,           '+'))
     .add_rule(SingleCharRule::new(Token::OpSub,           '-'))
     .add_rule(SingleCharRule::new(Token::OpMul,           '*'))
     .add_rule(SingleCharRule::new(Token::OpDiv,           '/'))
     .add_rule(SingleCharRule::new(Token::OpMod,           '%'))
-    .add_rule(SingleCharRule::new(Token::OpExp,           '^'))
     .add_rule(SingleCharRule::new(Token::OpInv,           '~'))
     .add_rule(SingleCharRule::new(Token::OpAnd,           '&'))
     .add_rule(SingleCharRule::new(Token::OpOr,            '|'))
-    .add_rule(SingleCharRule::new(Token::OpXor,           '~'))
+    .add_rule(SingleCharRule::new(Token::OpXor,           '^'))
     
     .add_rule(SingleCharRule::new(Token::OpLT,            '<'))
     .add_rule(SingleCharRule::new(Token::OpGT,            '>'))

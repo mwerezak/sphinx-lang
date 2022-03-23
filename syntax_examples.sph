@@ -73,8 +73,8 @@ modulo % me
 # (x^2) + (y^2)  # TODO exponentiation?
 
 # Bitwise and shifts
-(17 ~ 73) << 3
-2412 & 0xff | 0xcc00
+(17 ^ 73) << 3
+2412 & 0xff | ~0xcc00
 
 # unary
 
