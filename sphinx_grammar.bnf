@@ -78,7 +78,7 @@ decorator_expression ::= "@" expression ( assignment_expression | declaration_ex
 
 (*** Function/Method Calls ***)
 
-invocation ::= "(" ")" | "(" expression ( "," expression )* ( "..." )? ")" ; 
+invocation ::= "(" ")" | "(" expression_list ( "..." )? ")" ; 
 
 (*** Constructors ***)
 

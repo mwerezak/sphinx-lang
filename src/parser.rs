@@ -1214,33 +1214,37 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let mut args = Vec::new();
         let mut unpack = None;
         
-        loop {
-            if matches!(self.peek()?.token, Token::CloseParen) {
-                break;
+        // check for empty argument list
+        if !matches!(self.peek()?.token, Token::CloseParen) {
+        
+            // we use the fact that argument lists parse very similarly to tuples
+            // parse a single ExprMeta. If the variant is a Tuple (not a group containing a tuple!),
+            // that tuple's contents becomes the argument list.
+            
+            let (expr, symbol) = self.parse_expr(ctx)?.take();
+            
+            if let Expr::Tuple(arg_list) = expr {
+                args.extend(arg_list.into_vec().into_iter());
+            } else {
+                args.push(ExprMeta::new(expr, symbol));
             }
             
-            let arg_expr = self.parse_expr(ctx)?;
-            
-            if let Token::Ellipsis = self.peek()?.token {
+            // check for unpack syntax
+            if matches!(self.peek()?.token, Token::Ellipsis) {
                 ctx.set_end(&self.advance().unwrap());
                 
-                unpack.replace(arg_expr);
-                
-                let next = self.advance()?;
-                ctx.set_end(&next);
-                if !matches!(next.token, Token::CloseParen) {
-                    return Err("only the last argument can be unpacked using \"...\"".into());
+                if let Some(expr) = args.pop() {
+                    unpack.replace(expr);
+                } else {
+                    return Err("no argument to unpack".into());
                 }
-                break;
             }
-            args.push(arg_expr);
             
+            // check for close paren
             let next = self.advance()?;
             ctx.set_end(&next);
-            match next.token {
-                Token::Comma => {},
-                Token::CloseParen => break,
-                _ => return Err("missing \",\" between invocation arguments".into()),
+            if !matches!(next.token, Token::CloseParen) {
+                return Err("missing closing \")\" after argument list".into());
             }
         }
         

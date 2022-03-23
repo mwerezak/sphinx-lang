@@ -81,6 +81,7 @@ impl ValueStack {
         self.stack.len()
     }
     
+    #[inline(always)]
     fn clear(&mut self) {
         self.stack.clear()
     }
@@ -254,6 +255,7 @@ impl<'m> VMState<'m> {
         panic!("invalid operand")
     }
 
+    #[inline(always)]
     fn exec_next(&mut self, stack: &mut ValueStack) -> ExecResult<Control> {
         let op_byte = self.chunk.get(self.pc).expect("pc out of bounds");
         let opcode = OpCode::from_byte(*op_byte)

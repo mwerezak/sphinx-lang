@@ -99,11 +99,6 @@ impl<'c, 's> Disassembler<'c, 's> {
         match opcode {
             Some(opcode) => match opcode {
                 
-                OpCode::Call => {
-                    let nargs = instr[1];
-                    write!(line, "{:16} {: >4}    ", opcode, nargs)?;
-                },
-                
                 OpCode::Drop | OpCode::DropLocals => {
                     let len = instr[1];
                     write!(line, "{:16} {: >4}    ", opcode, len)?;
