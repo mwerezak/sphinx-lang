@@ -138,9 +138,11 @@ enum ScopeTag {
 struct Scope {
     tag: ScopeTag,
     depth: usize,
+    chunk: Option<ChunkID>,
+    symbol: Option<DebugSymbol>,
+    
     frame: Option<LocalIndex>,
     locals: Vec<Local>,
-    symbol: Option<DebugSymbol>,
 }
 
 impl Scope {
@@ -206,14 +208,15 @@ impl ScopeTracker {
         self.scopes.last_mut()
     }
     
-    fn push_scope(&mut self, tag: ScopeTag, symbol: Option<&DebugSymbol>) {
-        let offset = self.local_scope().and_then(|scope| scope.last_offset());
+    fn push_scope(&mut self, tag: ScopeTag, chunk: Option<ChunkID>, symbol: Option<&DebugSymbol>) {
+        let frame = self.local_scope().and_then(|scope| scope.last_index());
         
         let scope = Scope {
             tag, 
+            chunk,
             symbol: symbol.map(|sym| *sym),
             depth: self.scopes.len(),
-            offset,
+            frame,
             locals: Vec::new(),
         };
         self.scopes.push(scope);
@@ -555,7 +558,8 @@ impl CodeGenerator<'_> {
     ///////// Scopes /////////
     
     fn emit_begin_scope(&mut self, tag: ScopeTag, symbol: Option<&DebugSymbol>) {
-        self.scope_mut().push_scope(tag, symbol);
+        let chunk_id = self.chunk_id;
+        self.scope_mut().push_scope(tag, chunk_id, symbol);
     }
     
     fn emit_end_scope(&mut self) {
@@ -576,14 +580,14 @@ impl CodeGenerator<'_> {
     
     // If the local name cannot be found, no instructions are emitted and None is returned
     fn try_emit_load_local(&mut self, symbol: Option<&DebugSymbol>, name: &LocalName) -> Option<u16> {
-        if let Some(offset) = self.scope().resolve_local(name).map(|local| local.offset) {
-            if let Ok(offset) = u8::try_from(offset) {
-                self.emit_instr_byte(symbol, OpCode::LoadLocal, offset);
+        if let Some(index) = self.scope().resolve_local(name).map(|local| local.index) {
+            if let Ok(index) = u8::try_from(index) {
+                self.emit_instr_byte(symbol, OpCode::LoadLocal, index);
             } else {
-                self.emit_instr_data(symbol, OpCode::LoadLocal16, &offset.to_le_bytes());
+                self.emit_instr_data(symbol, OpCode::LoadLocal16, &index.to_le_bytes());
             }
             
-            Some(offset)
+            Some(index)
         } else{
             None
         }
@@ -1028,29 +1032,29 @@ impl CodeGenerator<'_> {
             let local = LocalName::Symbol(*name);
             
             // check if the name is found in the local scope...
-            let result = self.scope().resolve_local_strict(&local).map(|local| (local.decl, local.offset));
+            let result = self.scope().resolve_local_strict(&local).map(|local| (local.decl, local.index));
             
-            if let Some((decl, offset)) = result {
+            if let Some((decl, index)) = result {
                 if decl != DeclType::Mutable {
                     return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                 }
-                self.emit_assign_local(symbol, offset);
+                self.emit_assign_local(symbol, index);
                 
                 return Ok(());
             }
             
             // otherwise search enclosing scopes...
             
-            let result = self.scope().resolve_nonlocal(&local).map(|local| (local.decl, local.offset));
+            let result = self.scope().resolve_nonlocal(&local).map(|local| (local.decl, local.index));
             
-            if let Some((decl, offset)) = result {
+            if let Some((decl, index)) = result {
                 if !assign.nonlocal {
                     return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
                 }
                 if decl != DeclType::Mutable {
                     return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                 }
-                self.emit_assign_local(symbol, offset);
+                self.emit_assign_local(symbol, index);
                 
                 return Ok(());
             }
@@ -1169,7 +1173,7 @@ impl CodeGenerator<'_> {
         
         // and a new local scope
         // don't need to emit new scope instructions, should handled by function call
-        chunk.scope_mut().push_scope(ScopeTag::Function, symbol);
+        chunk.scope_mut().push_scope(ScopeTag::Function, Some(chunk_id), symbol);
         
         // don't need to generate IN_LOCAL instructions for these, the VM should include them automatically
         chunk.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
