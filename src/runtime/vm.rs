@@ -123,6 +123,19 @@ impl ValueStack {
     }
     
     #[inline(always)]
+    fn replace_many(&mut self, count: usize, value: Variant) {
+        let replace_range = (self.stack.len()-count).. ;
+        self.stack.splice(replace_range, std::iter::once(value));
+    }
+    
+    #[inline(always)]
+    fn replace_at(&mut self, index: usize, value: Variant) {
+        let item = self.stack.get_mut(index)
+            .expect("value index out of bounds");
+        *item = value;
+    }
+    
+    #[inline(always)]
     fn peek(&self) -> &Variant {
         self.stack.last().expect("empty stack")
     }
@@ -139,13 +152,6 @@ impl ValueStack {
         peek
     }
     
-    #[inline(always)]
-    fn replace_at(&mut self, index: usize, value: Variant) {
-        let item = self.stack.get_mut(index)
-            .expect("value index out of bounds");
-        
-        *item = value;
-    }
 }
 
 
@@ -362,14 +368,27 @@ impl<'m> VMState<'m> {
 
             OpCode::Tuple => {
                 let tuple_len = usize::from(data[0]);
-                let items = stack.pop_many(tuple_len).into_boxed_slice();
-                stack.push(Variant::make_tuple(items));
+                
+                // peek and clone to ensure items stay rooted for GC
+                let items = stack.peek_many(tuple_len).iter()
+                    .cloned().collect::<Vec<Variant>>()
+                    .into_boxed_slice();
+                
+                let tuple = Variant::make_tuple(items);
+                stack.replace_many(tuple_len, tuple);
             },
             OpCode::TupleN => {
                 let tuple_len = Self::into_usize(stack.pop());
-                let items = stack.pop_many(tuple_len).into_boxed_slice();
-                stack.push(Variant::make_tuple(items));
+                
+                // peek and clone to ensure items stay rooted for GC
+                let items = stack.peek_many(tuple_len).iter()
+                    .cloned().collect::<Vec<Variant>>()
+                    .into_boxed_slice();
+                
+                let tuple = Variant::make_tuple(items);
+                stack.replace_many(tuple_len, tuple);
             },
+            
             OpCode::UInt8 => {
                 let value = IntType::from(data[0]);
                 stack.push(Variant::Integer(value))
