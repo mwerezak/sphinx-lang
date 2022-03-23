@@ -697,7 +697,7 @@ impl CodeGenerator<'_> {
         match expr {
             Expr::Atom(atom) => self.compile_atom(symbol, atom)?,
             
-            Expr::Primary(primary) => unimplemented!(),
+            Expr::Primary(primary) => self.compile_primary(symbol, primary)?,
             
             Expr::UnaryOp(op, expr) => {
                 self.compile_expr(symbol, expr)?;
