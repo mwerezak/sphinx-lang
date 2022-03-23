@@ -19,7 +19,10 @@ As a long term goal I would like to also leverage the rlua bindings to provide a
 
 # Goals
 
-Sphinx is not a Lua or Python clone, though it's syntax draws inspiration from both of these languages (more so from Lua than from Python, especially the excellent paper on the implementation of Lua 5.0). My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be fast, and the design of the language has centered around balancing these goals.
+Sphinx is not a Lua or Python clone, though it's syntax draws inspiration from both of these languages (more so from Lua than from Python). 
+One difference from both of these languages is that Sphinx is highly expression-oriented. With the exception of loops, most language constructs are expressions.
+
+My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be fast, and the design of the language has centered around balancing these goals.
 
 For example, while module-level variables do end up in a HashMap, all local variables are stored in a stack and referred to by index - which is all sorted out at (bytecode) compile time. Similarly, function calls are fairly low overhead.
 

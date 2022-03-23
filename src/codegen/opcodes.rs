@@ -50,7 +50,7 @@ const OP_ST_LOCAL_16:   u8 = 0x22;  // (u16); [ value ] => [ value ]
 const OP_LD_LOCAL:      u8 = 0x24;  // (u8);  _ => [ value ]
 const OP_LD_LOCAL_16:   u8 = 0x25;  // (u16); _ => [ value ]
 // const OP_LD_LOCAL_32:   u8 = 0x27;  // (u32); _ => [ value ]
-const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ local[N] ... local[0] temporaries... ] => [ temporaries... ]; vm.locals -= N
+const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ ... local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
 
 // const OP_LD_NAME:       u8 = 0x28;
 // const OP_LD_INDEX:      u8 = 0x29;
