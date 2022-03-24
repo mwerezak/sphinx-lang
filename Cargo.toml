@@ -15,7 +15,7 @@ crate-type = ["lib"]
 name = "sphinx"
 
 [[bin]]
-name = "sph-dasm"
+name = "sphinx-dasm"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/maniefrust.html
 
