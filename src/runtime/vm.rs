@@ -8,11 +8,15 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 use crate::debug::DebugSymbol;
 
 
-// store traceback information
-struct FrameInfo {
-    symbol: Option<DebugSymbol>,
-    module_id: Option<ModuleID>,
-    chunk_id: Option<ChunkID>,
+/// Traceback information
+#[derive(Debug)]
+enum CallSite {
+    Chunk {
+        offset: usize,
+        module_id: ModuleID,
+        chunk_id: Option<ChunkID>,
+    },
+    Native,
 }
 
 enum Control {
@@ -25,9 +29,9 @@ enum Control {
 #[derive(Debug)]
 pub struct VirtualMachine<'m> {
     module_cache: &'m ModuleCache,
-    repl_env: Option<&'m GlobalEnv>,
+    traceback: Vec<CallSite>,
     
-    states: Vec<VMState<'m>>,
+    calls: Vec<VMState<'m>>,
     values: ValueStack,
 }
 
@@ -38,9 +42,9 @@ impl<'m> VirtualMachine<'m> {
         
         Self {
             module_cache,
-            repl_env: None,
+            traceback: Vec::new(),
+            calls: vec![ VMState::new(module, main_chunk, 0) ],
             values: ValueStack::new(),
-            states: vec![ VMState::new(module, main_chunk, 0) ],
         }
     }
     
@@ -49,14 +53,14 @@ impl<'m> VirtualMachine<'m> {
         
         Self {
             module_cache,
-            repl_env: Some(repl_env),
+            traceback: Vec::new(),
+            calls: vec![ VMState::with_globals(module, repl_env, main_chunk, 0) ],
             values: ValueStack::new(),
-            states: vec![ VMState::with_globals(module, repl_env, main_chunk, 0) ],
         }
     }
     
     pub fn run(mut self) -> ExecResult<()> {
-        while let Some(state) = self.states.last_mut() {
+        while let Some(state) = self.calls.last_mut() {
             match state.exec_next(&mut self.values)? {
                 Control::Continue => { }
                 Control::Return | Control::Exit => break,
@@ -65,103 +69,6 @@ impl<'m> VirtualMachine<'m> {
         Ok(())
     }
 }
-
-// Stack Manipulation
-#[derive(Debug)]
-struct ValueStack {
-    stack: Vec<Variant>,
-}
-
-impl ValueStack {
-    fn new() -> Self {
-        Self { stack: Vec::new() }
-    }
-    
-    fn take(self) -> Vec<Variant> {
-        self.stack
-    }
-    
-    // Note: when moving values off the stack, make sure to copy *before* popping
-    // This ensures that the GC sees the values as rooted
-    
-    #[inline(always)]
-    fn len(&self) -> usize {
-        self.stack.len()
-    }
-    
-    #[inline(always)]
-    fn clear(&mut self) {
-        self.stack.clear()
-    }
-    
-    #[inline(always)]
-    fn pop(&mut self) -> Variant {
-        self.stack.pop().expect("empty stack")
-    }
-    
-    #[inline(always)]
-    fn pop_many(&mut self, count: usize) -> Vec<Variant> {
-        self.stack.split_off(self.stack.len() - count)
-    }
-    
-    #[inline(always)]
-    fn discard(&mut self, count: usize) {
-        self.stack.truncate(self.stack.len() - count)
-    }
-    
-    #[inline(always)]
-    fn discard_at(&mut self, index: usize, count: usize) {
-        let discard_range = index..(index + count);
-        self.stack.splice(discard_range, std::iter::empty());
-    }
-    
-    #[inline(always)]
-    fn push(&mut self, value: Variant) {
-        self.stack.push(value)
-    }
-    
-    #[inline(always)]
-    fn insert(&mut self, index: usize, value: Variant) {
-        self.stack.insert(index, value);
-    }
-    
-    #[inline(always)]
-    fn replace(&mut self, value: Variant) {
-        *self.stack.last_mut().expect("empty stack") = value;
-    }
-    
-    #[inline(always)]
-    fn replace_many(&mut self, count: usize, value: Variant) {
-        let replace_range = (self.stack.len()-count).. ;
-        self.stack.splice(replace_range, std::iter::once(value));
-    }
-    
-    #[inline(always)]
-    fn replace_at(&mut self, index: usize, value: Variant) {
-        let item = self.stack.get_mut(index)
-            .expect("value index out of bounds");
-        *item = value;
-    }
-    
-    #[inline(always)]
-    fn peek(&self) -> &Variant {
-        self.stack.last().expect("empty stack")
-    }
-    
-    #[inline(always)]
-    fn peek_at(&self, index: usize) -> &Variant {
-        self.stack.get(index)
-            .expect("value index out of bounds")
-    }
-    
-    #[inline(always)]
-    fn peek_many(&self, count: usize) -> &[Variant] {
-        let (_, peek) = self.stack.as_slice().split_at(self.stack.len() - count);
-        peek
-    }
-    
-}
-
 
 // Helper macros
 macro_rules! read_le_bytes {
@@ -461,3 +368,106 @@ impl<'m> VMState<'m> {
         Ok(Control::Continue)
     }
 }
+
+
+// Stack Manipulation
+#[derive(Debug)]
+struct ValueStack {
+    stack: Vec<Variant>,
+}
+
+impl ValueStack {
+    fn new() -> Self {
+        Self { stack: Vec::new() }
+    }
+    
+    fn take(self) -> Vec<Variant> {
+        self.stack
+    }
+    
+    // Note: when moving values off the stack, make sure to copy *before* popping
+    // This ensures that the GC sees the values as rooted
+    
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.stack.len()
+    }
+    
+    #[inline(always)]
+    fn clear(&mut self) {
+        self.stack.clear()
+    }
+    
+    #[inline(always)]
+    fn pop(&mut self) -> Variant {
+        self.stack.pop().expect("empty stack")
+    }
+    
+    #[inline(always)]
+    fn pop_many(&mut self, count: usize) -> Vec<Variant> {
+        self.stack.split_off(self.stack.len() - count)
+    }
+    
+    #[inline(always)]
+    fn discard(&mut self, count: usize) {
+        self.stack.truncate(self.stack.len() - count)
+    }
+    
+    #[inline(always)]
+    fn discard_at(&mut self, index: usize, count: usize) {
+        let discard_range = index..(index + count);
+        self.stack.splice(discard_range, std::iter::empty());
+    }
+    
+    #[inline(always)]
+    fn push(&mut self, value: Variant) {
+        self.stack.push(value)
+    }
+    
+    #[inline(always)]
+    fn insert(&mut self, index: usize, value: Variant) {
+        self.stack.insert(index, value);
+    }
+    
+    #[inline(always)]
+    fn replace(&mut self, value: Variant) {
+        *self.stack.last_mut().expect("empty stack") = value;
+    }
+    
+    #[inline(always)]
+    fn replace_many(&mut self, count: usize, value: Variant) {
+        let replace_range = (self.stack.len()-count).. ;
+        self.stack.splice(replace_range, std::iter::once(value));
+    }
+    
+    #[inline(always)]
+    fn replace_at(&mut self, index: usize, value: Variant) {
+        let item = self.stack.get_mut(index)
+            .expect("value index out of bounds");
+        *item = value;
+    }
+    
+    #[inline(always)]
+    fn swap(&mut self, index_a: usize, index_b: usize) {
+        self.stack.swap(index_a, index_b)
+    }
+    
+    #[inline(always)]
+    fn peek(&self) -> &Variant {
+        self.stack.last().expect("empty stack")
+    }
+    
+    #[inline(always)]
+    fn peek_at(&self, index: usize) -> &Variant {
+        self.stack.get(index)
+            .expect("value index out of bounds")
+    }
+    
+    #[inline(always)]
+    fn peek_many(&self, count: usize) -> &[Variant] {
+        let (_, peek) = self.stack.as_slice().split_at(self.stack.len() - count);
+        peek
+    }
+    
+}
+

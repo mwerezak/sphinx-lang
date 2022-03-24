@@ -254,6 +254,8 @@ impl fmt::Display for Constant {
 
 pub type ChunkSymbols = HashMap<Option<ChunkID>, DebugSymbolsRLE>;
 
+// TODO replace with offset -> symbol mapping
+
 // Container for debug symbols generated for bytecode
 // Should contain a DebugSymbol for each opcode in the 
 // associated Chunk, and in the same order.
