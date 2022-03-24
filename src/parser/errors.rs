@@ -265,8 +265,8 @@ impl ContextFrame {
         let end = spans.iter().filter_map(|s| s.as_ref())
             .max_by(|a, b| a.end_index().cmp(&b.end_index()));
         
-        self.start = start.map(|s| s.clone());
-        self.end = end.map(|s| s.clone());
+        self.start = start.copied();
+        self.end = end.copied();
     }
     
     pub fn as_debug_symbol(&self) -> Option<DebugSymbol> {

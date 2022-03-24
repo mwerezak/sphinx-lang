@@ -13,6 +13,10 @@ pub struct IdentifierRule {
     buf: String,
 }
 
+impl Default for IdentifierRule {
+    fn default() -> Self { Self::new() }
+}
+
 impl IdentifierRule {
     pub fn new() -> Self {
         IdentifierRule { buf: String::new() }
@@ -129,6 +133,10 @@ pub struct IntegerLiteralRule {
     buf: String,
 }
 
+impl Default for IntegerLiteralRule {
+    fn default() -> Self { Self::new() }
+}
+
 impl IntegerLiteralRule {
     pub fn new() -> Self {
         IntegerLiteralRule { buf: String::new() }
@@ -180,6 +188,10 @@ impl LexerRule for IntegerLiteralRule {
 pub struct HexIntegerLiteralRule {
     buf: String,
     prefix: StrMatcher<'static>,
+}
+
+impl Default for HexIntegerLiteralRule {
+    fn default() -> Self { Self::new() }
 }
 
 impl HexIntegerLiteralRule {
@@ -247,9 +259,13 @@ pub struct FloatLiteralRule {
     last: Option<char>,
 }
 
+impl Default for FloatLiteralRule {
+    fn default() -> Self { Self::new() }
+}
+
 impl FloatLiteralRule {
     pub fn new() -> Self {
-        FloatLiteralRule { 
+        Self { 
             buf: String::new(), 
             point: false,
             exp: false,
@@ -267,20 +283,16 @@ impl LexerRule for FloatLiteralRule {
     }
     
     fn current_state(&self) -> MatchResult {
-        if self.buf.is_empty() {
-            MatchResult::IncompleteMatch
-        } else if let Some('e' | 'E') = self.last {
+        if self.buf.is_empty() || matches!(self.last, Some('e' | 'E')) {
             MatchResult::IncompleteMatch
         } else {
-            return MatchResult::CompleteMatch;
+            MatchResult::CompleteMatch
         }
     }
     
     fn try_match(&mut self, prev: Option<char>, next: char) -> MatchResult {
-        if self.buf.is_empty() {
-            if matches!(prev, Some(c) if c.is_ascii_digit()) || matches!(prev, Some('e' | 'E' | '.')) {
-                return MatchResult::NoMatch;
-            }
+        if self.buf.is_empty() && (matches!(prev, Some(c) if c.is_ascii_digit()) || matches!(prev, Some('e' | 'E' | '.'))) {
+            return MatchResult::NoMatch;
         }
         
         if next == '.' {

@@ -33,6 +33,7 @@ pub struct VirtualMachine<'m> {
     
     calls: Vec<VMState<'m>>,
     values: ValueStack,
+    state: VMState<'m>,
 }
 
 impl<'m> VirtualMachine<'m> {
@@ -43,8 +44,9 @@ impl<'m> VirtualMachine<'m> {
         Self {
             module_cache,
             traceback: Vec::new(),
-            calls: vec![ VMState::new(module, main_chunk, 0) ],
+            calls: Vec::new(),
             values: ValueStack::new(),
+            state: VMState::new(module, main_chunk, 0),
         }
     }
     
@@ -54,8 +56,9 @@ impl<'m> VirtualMachine<'m> {
         Self {
             module_cache,
             traceback: Vec::new(),
-            calls: vec![ VMState::with_globals(module, repl_env, main_chunk, 0) ],
+            calls: Vec::new(),
             values: ValueStack::new(),
+            state: VMState::with_globals(module, repl_env, main_chunk, 0),
         }
     }
     
@@ -280,7 +283,7 @@ impl<'m> VMState<'m> {
             OpCode::True => stack.push(Variant::BoolTrue),
             OpCode::False => stack.push(Variant::BoolFalse),
             OpCode::Empty => stack.push(Variant::EmptyTuple),
-
+            
             OpCode::Tuple => {
                 let tuple_len = usize::from(data[0]);
                 

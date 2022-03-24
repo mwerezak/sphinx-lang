@@ -2,7 +2,6 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use clap::{Command, Arg, ArgMatches};
 
-use sphinx_lang;
 use sphinx_lang::frontend;
 use sphinx_lang::BuildErrors;
 use sphinx_lang::source::{ModuleSource, SourceText};
@@ -90,43 +89,43 @@ fn main() {
             Repl::new(&mut module_cache, &repl_env).run()
         }
     }
-    else {
-        if let Some(build) = build_program(&args, name, &source) {
-            let program = Program::load(build.program);
-            
-            let mut module_cache = ModuleCache::new();
-            let module_id = module_cache.insert(program.data, Some(name.to_string()), Some(source));
-            
-            let vm = VirtualMachine::new(&module_cache, module_id, &program.main);
-            vm.run().expect("runtime error");
-        }
+    else if let Some(build) = build_program(&args, name, &source) {
+        let program = Program::load(build.program);
+        
+        let mut module_cache = ModuleCache::new();
+        let module_id = module_cache.insert(program.data, Some(name.to_string()), Some(source));
+        
+        let vm = VirtualMachine::new(&module_cache, module_id, &program.main);
+        vm.run().expect("runtime error");
     }
 }
 
 
-fn build_program<'m>(_args: &ArgMatches, name: &str, source: &ModuleSource) -> Option<CompiledProgram> {
+fn build_program(_args: &ArgMatches, name: &str, source: &ModuleSource) -> Option<CompiledProgram> {
     // build module
-    let build_result = sphinx_lang::build_module(source);
-    if build_result.is_err() {
-        match build_result.unwrap_err() {
-            BuildErrors::Source(error) => {
-                println!("Error reading source: {}.", error);
+    match sphinx_lang::build_module(source) {
+        Err(error) => {
+            match error {
+                BuildErrors::Source(error) => {
+                    println!("Error reading source: {}.", error);
+                }
+                
+                BuildErrors::Syntax(errors) => {
+                    println!("Errors in file \"{}\":\n", name);
+                    frontend::print_source_errors(source, &errors);
+                }
+                
+                BuildErrors::Compile(errors) => {
+                    println!("Errors in file \"{}\":\n", name);
+                    frontend::print_source_errors(source, &errors);
+                }
             }
             
-            BuildErrors::Syntax(errors) => {
-                println!("Errors in file \"{}\":\n", name);
-                frontend::print_source_errors(source, &errors);
-            }
-            
-            BuildErrors::Compile(errors) => {
-                println!("Errors in file \"{}\":\n", name);
-                frontend::print_source_errors(source, &errors);
-            }
-        }
-        return None;
+            None
+        },
+        
+        Ok(program) => Some(program)
     }
-    
-    return Some(build_result.unwrap())
 }
 
 
@@ -179,7 +178,7 @@ impl<'m> Repl<'m> {
     }
     
     fn read_line(&self, prompt: &'static str) -> ReadLine {
-        io::stdout().write(prompt.as_bytes()).unwrap();
+        io::stdout().write_all(prompt.as_bytes()).unwrap();
         io::stdout().flush().unwrap();
         
         let mut input = String::new();
@@ -195,7 +194,7 @@ impl<'m> Repl<'m> {
             return ReadLine::Empty;
         }
         
-        if input == "quit" || input.chars().find(|c| *c == '\x04').is_some() {
+        if input == "quit" || input.chars().any(|c| c == '\x04') {
             return ReadLine::Quit;
         }
         

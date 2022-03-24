@@ -94,7 +94,7 @@ fn format_signature(name: Option<&StringSymbol>, required: &[Parameter], default
         let string_table = string_table.borrow();
         
         let name = name
-            .map(|name| string_table.resolve(&name));
+            .map(|name| string_table.resolve(name));
         
         let required_names = required.iter()
             .map(|param| string_table.resolve(&param.name))

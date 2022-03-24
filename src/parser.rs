@@ -155,7 +155,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                     return Some(Err(error));
                 }
                 
-                self.errors.push_back(error.with_symbol_from_ctx(&ctx));
+                self.errors.push_back(error.with_symbol_from_ctx(ctx));
                 self.synchronize_stmt(inside_block);
                 
                 // if the next token is EOF there is no point catching an error
@@ -278,7 +278,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             Token::While => self.parse_while_loop(ctx, Some(label)),
             Token::For => unimplemented!(),
             
-            _ => return Err("labels must be followed by either a block or a loop".into()),
+            _ => Err("labels must be followed by either a block or a loop".into()),
         }
     }
     
@@ -364,8 +364,8 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                     };
                     
                     let message = format!("\"{}\" must be the last statement in a block", name);
-                    let error = ParserError::from(ErrorKind::SyntaxError(message.into()))
-                        .with_symbol_from_ctx(&ctx);
+                    let error = ParserError::from(ErrorKind::SyntaxError(message))
+                        .with_symbol_from_ctx(ctx);
                     
                     self.errors.push_back(error);
                 }
@@ -567,7 +567,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         ctx.pop_extend();
         
         let decl = Box::new(Declaration { decl, lhs, init });
-        return Ok(Expr::Declaration(decl));
+        Ok(Expr::Declaration(decl))
     }
     
     fn is_lvalue_valid_for_decl(lvalue: &LValue) -> bool {
@@ -854,7 +854,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         let if_expr = Expr::IfExpr { 
             branches: branches.into_boxed_slice(),
-            else_clause: else_clause.map(|expr| Box::new(expr)),
+            else_clause: else_clause.map(Box::new),
         };
         Ok(if_expr)
     }
@@ -972,7 +972,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             }
             
             ctx.push(ContextTag::FunParam);
-            ctx.set_start(&next);
+            ctx.set_start(next);
             
             // mutability modifier
             
@@ -1039,8 +1039,8 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 
                 // normal parameter
                 Token::Comma | Token::CloseParen if !is_variadic => {
-                    if default_value.is_some() {
-                        default.push(DefaultDef { name, decl, default: default_value.unwrap() });
+                    if let Some(default_expr) = default_value {
+                        default.push(DefaultDef { name, decl, default: default_expr });
                     } else {
                         if !default.is_empty() {
                             return Err("cannot have a non-default parameter after a default parameter".into());

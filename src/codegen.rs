@@ -215,7 +215,7 @@ impl ScopeTracker {
         let scope = Scope {
             tag, 
             chunk,
-            symbol: symbol.map(|sym| *sym),
+            symbol: symbol.copied(),
             depth: self.scopes.len(),
             frame,
             locals: Vec::new(),

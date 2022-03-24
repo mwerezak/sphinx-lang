@@ -56,8 +56,8 @@ fn main() {
     
     // build module
     let build_result = build_module(&source);
-    if build_result.is_err() {
-        match build_result.unwrap_err() {
+    if let Err(error) = build_result {
+        match error {
             BuildErrors::Source(error) => {
                 println!("Error reading source: {}.", error);
             }
@@ -84,7 +84,7 @@ fn main() {
             .with_symbols(&build.symbols);
         
         if let Ok(ref symbol_table) = symbol_table {
-            dasm.with_symbol_table(&symbol_table)
+            dasm.with_symbol_table(symbol_table)
         } else {
             dasm
         }

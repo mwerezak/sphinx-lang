@@ -28,6 +28,10 @@ pub struct LexerBuilder {
     options: LexerOptions,
 }
 
+impl Default for LexerBuilder {
+    fn default() -> Self { Self::new() }
+}
+
 impl LexerBuilder {
     pub fn new() -> Self {
         LexerBuilder {

@@ -33,6 +33,10 @@ impl EscapeSequence for CharMapEscape {
 // \x00 \xFF
 pub struct HexByteEscape {}
 
+impl Default for HexByteEscape {
+    fn default() -> Self { Self::new() }
+}
+
 impl HexByteEscape {
     pub fn new() -> Self { HexByteEscape { } }
 }

@@ -61,7 +61,7 @@ impl<'f, 's> ParseContext<'f, 's> {
     }
     
     // Returns a Vec of parsed Stmts (if no error occurred) or a Vec or errors
-    pub fn parse_ast<'m>(&mut self, source: SourceText) -> Result<Vec<StmtMeta>, Vec<ParserError>> {
+    pub fn parse_ast(&mut self, source: SourceText) -> Result<Vec<StmtMeta>, Vec<ParserError>> {
         
         let output = self.collect_parser_output(source);
         
@@ -73,7 +73,7 @@ impl<'f, 's> ParseContext<'f, 's> {
     }
 
     // Helper to deal with the separate branches for parsing SourceText
-    fn collect_parser_output<'m>(&mut self, source: SourceText) -> Vec<Result<StmtMeta, ParserError>> {
+    fn collect_parser_output(&mut self, source: SourceText) -> Vec<Result<StmtMeta, ParserError>> {
         match source {
             SourceText::String(text) => {
                 let mut chars = Vec::with_capacity(text.len());

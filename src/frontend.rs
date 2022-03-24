@@ -18,7 +18,7 @@ pub fn print_source_errors<E>(resolver: &impl DebugSymbolResolver, errors: &[E])
         |error| match error.debug_symbol() {
             None => Some(RenderError(error, None)),
             Some(symbol) => {
-                let resolved = resolved_table.lookup(&symbol).unwrap();
+                let resolved = resolved_table.lookup(symbol).unwrap();
                 match resolved {
                     Ok(resolved) => Some(RenderError(error, Some(resolved))),
                     Err(resolve_error) => {

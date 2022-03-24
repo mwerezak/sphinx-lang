@@ -19,17 +19,18 @@ pub static NESTED_COMMENT_END:   &str = "}#";
 // string literal escape sequences - lazy initialized
 lazy_static! {
     pub static ref ESCAPE_SEQUENCES: Vec<Box<dyn EscapeSequence>> = { 
-        let mut escapes = Vec::<Box<dyn EscapeSequence>>::new();
-        
-        escapes.push(Box::new(CharMapEscape::new('0', "\x00")));
-        escapes.push(Box::new(CharMapEscape::new('\\', "\\")));
-        escapes.push(Box::new(CharMapEscape::new('\'', "\'")));
-        escapes.push(Box::new(CharMapEscape::new('\"', "\"")));
-        
-        escapes.push(Box::new(CharMapEscape::new('t', "\t")));
-        escapes.push(Box::new(CharMapEscape::new('n', "\n")));
-        escapes.push(Box::new(CharMapEscape::new('r', "\r")));
-        escapes.push(Box::new(HexByteEscape::new()));
+        let escapes: Vec<Box<dyn EscapeSequence>> = vec![
+            
+            Box::new(CharMapEscape::new('0', "\x00")),
+            Box::new(CharMapEscape::new('\\', "\\")),
+            Box::new(CharMapEscape::new('\'', "\'")),
+            Box::new(CharMapEscape::new('\"', "\"")),
+            
+            Box::new(CharMapEscape::new('t', "\t")),
+            Box::new(CharMapEscape::new('n', "\n")),
+            Box::new(CharMapEscape::new('r', "\r")),
+            Box::new(HexByteEscape::new()),
+        ];
         
         escapes
     };
