@@ -95,14 +95,16 @@ const fn get_jump_opcode(jump: Jump, offset: JumpOffset) -> OpCode {
         (Jump::Uncond,  JumpOffset::Short(..)) => OpCode::Jump,
         (Jump::IfFalse, JumpOffset::Short(..)) => OpCode::JumpIfFalse,
         (Jump::IfTrue,  JumpOffset::Short(..)) => OpCode::JumpIfTrue,
-        (Jump::Uncond,  JumpOffset::Long(..))  => unimplemented!(),
-        (Jump::IfFalse, JumpOffset::Long(..))  => unimplemented!(),
-        (Jump::IfTrue,  JumpOffset::Long(..))  => unimplemented!(),
+        
+        (Jump::Uncond,  JumpOffset::Long(..))  => OpCode::LongJump,
+        (Jump::IfFalse, JumpOffset::Long(..))  => OpCode::LongJumpIfFalse,
+        (Jump::IfTrue,  JumpOffset::Long(..))  => OpCode::LongJumpIfTrue,
         
         (Jump::PopIfFalse, JumpOffset::Short(..))  => OpCode::PopJumpIfFalse,
         (Jump::PopIfTrue,  JumpOffset::Short(..))  => OpCode::PopJumpIfTrue,
-        (Jump::PopIfFalse, JumpOffset::Long(..))   => unimplemented!(),
-        (Jump::PopIfTrue,  JumpOffset::Long(..))   => unimplemented!(),
+        
+        (Jump::PopIfFalse, JumpOffset::Long(..))   => OpCode::PopLongJumpIfFalse,
+        (Jump::PopIfTrue,  JumpOffset::Long(..))   => OpCode::PopLongJumpIfTrue,
     }
 }
 
