@@ -14,8 +14,7 @@ use crate::runtime::vm::LocalIndex;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::types::function::Function;
 use crate::runtime::strings::{StringInterner};
-use crate::debug::DebugSymbol;
-use crate::debug::dasm::{ChunkSymbols, DebugSymbolsRLE};
+use crate::debug::symbol::{DebugSymbol, ChunkSymbols, DebugSymbolTable};
 
 pub mod chunk;
 pub mod consts;
@@ -306,7 +305,7 @@ impl Compiler {
     pub fn new(strings: StringInterner) -> Self {
         // insert RLE container for main chunk
         let mut symbols = ChunkSymbols::new();
-        symbols.insert(None, DebugSymbolsRLE::new());
+        symbols.insert(None, DebugSymbolTable::new());
         
         Self {
             builder: ChunkBuilder::with_strings(strings),
@@ -319,7 +318,7 @@ impl Compiler {
     fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<ChunkID> {
         let chunk_id = self.builder.new_chunk(info)?;
         self.symbols.entry(Some(chunk_id))
-            .or_insert_with(DebugSymbolsRLE::new);
+            .or_insert_with(DebugSymbolTable::new);
         
         Ok(chunk_id)
     }
@@ -413,9 +412,10 @@ impl CodeGenerator<'_> {
     
     fn push_symbol(&mut self, symbol: Option<&DebugSymbol>) {
         let chunk_id = self.chunk_id;
+        let offset = self.current_offset();
         self.symbols_mut()
             .get_mut(&chunk_id).unwrap()
-            .push(symbol.copied())
+            .insert(offset, symbol.copied())
     }
     
     fn create_chunk(&mut self, symbol: Option<&DebugSymbol>) -> CompileResult<CodeGenerator> {

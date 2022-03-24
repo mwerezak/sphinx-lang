@@ -3,16 +3,15 @@ use crate::lexer::Span;
 
 pub use crate::lexer::{TokenIndex, TokenLength};
 
+pub mod table;
 pub mod resolver;
 pub mod errors;
 
+pub use table::{ChunkSymbols, DebugSymbolTable};
 pub use resolver::{DebugSymbolResolver, ResolvedSymbolTable};
 
 
-// metadata attached to parser output for error handling and debug output
-// will probably be attached to the statement level
-
-
+/// When provided along with the source text, identifies a span of source code
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DebugSymbol {
     pub start: TokenIndex,
@@ -33,6 +32,8 @@ impl From<&Span> for DebugSymbol {
         DebugSymbol { start, end }
     }
 }
+
+
 
 // Resolved Symbols
 

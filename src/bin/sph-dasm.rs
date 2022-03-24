@@ -76,7 +76,7 @@ fn main() {
     }
     
     let build = build_result.unwrap();
-    let symbols = build.symbols.values().flat_map(|rle| rle.iter().filter_map(|sym| sym));
+    let symbols = build.symbols.values().flat_map(|table| table.symbols());
     let symbol_table = source.resolve_symbols(symbols);
     
     let dasm = {

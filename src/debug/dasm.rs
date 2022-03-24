@@ -8,7 +8,7 @@ use crate::language::FloatType;
 use crate::codegen::OpCode;
 use crate::codegen::chunk::{UnloadedProgram, ChunkID};
 use crate::codegen::consts::{Constant, ConstID};
-use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable};
+use crate::debug::symbol::{DebugSymbol, DebugSymbolTable, ResolvedSymbol, ResolvedSymbolTable, ChunkSymbols};
 use crate::debug::symbol::errors::SymbolResolutionError;
 
 
@@ -56,8 +56,8 @@ impl<'c, 's> Disassembler<'c, 's> {
         Ok(())
     }
     
-    fn decode_chunk(&self, fmt: &mut impl Write, chunk: &[u8], symbols: Option<&DebugSymbolsRLE>) -> fmt::Result {
-        let mut symbols = symbols.map(|symbols| symbols.iter());
+    fn decode_chunk(&self, fmt: &mut impl Write, chunk: &[u8], symbols: Option<&'s DebugSymbolTable>) -> fmt::Result {
+        let mut symbols = symbols.map(|symbols| symbols.iter().peekable());
         let mut last_symbol = None;
         
         let mut offset = 0;
@@ -65,13 +65,24 @@ impl<'c, 's> Disassembler<'c, 's> {
             let (_, bytes) = chunk.split_at(offset);
             
             // get the next unresolved symbol if there are any
-            let unresolved = symbols.as_mut().and_then(|iter| iter.next()).flatten();
+            let unresolved = symbols.as_mut().and_then(|iter| Self::seek_next_symbol(offset, iter));
             let symbol = self.try_resolve_symbol(unresolved, last_symbol);
             last_symbol = unresolved;
             
             offset = self.decode_instr(fmt, &offset, bytes, symbol)?;
         }
         Ok(())
+    }
+    
+    fn seek_next_symbol(offset: usize, symbols: &mut iter::Peekable<impl Iterator<Item=(usize, Option<&'s DebugSymbol>)>>) -> Option<&'s DebugSymbol> {
+        while matches!(symbols.peek(), Some((next_offset, _)) if *next_offset < offset) {
+            symbols.next();
+        }
+        
+        match symbols.next() {
+            Some((next_offset, symbol)) if next_offset == offset => symbol,
+            _ => None,
+        }
     }
     
     // handles all the logic around whether we have a symbol table, if there was a symbol resolution error, repeats...
@@ -252,78 +263,3 @@ impl fmt::Display for Constant {
     }
 }
 
-
-pub type ChunkSymbols = HashMap<Option<ChunkID>, DebugSymbolsRLE>;
-
-// TODO replace with offset -> symbol mapping
-
-// Container for debug symbols generated for bytecode
-// Should contain a DebugSymbol for each opcode in the 
-// associated Chunk, and in the same order.
-#[derive(Debug, Default, Clone)]
-pub struct DebugSymbolsRLE {
-    symbols: Vec<(Option<DebugSymbol>, u8)>,  // run length encoding
-}
-
-impl DebugSymbolsRLE {
-    pub fn new() -> Self {
-        Self {
-            symbols: Vec::default(),
-        }
-    }
-    
-    pub fn push(&mut self, symbol: Option<DebugSymbol>) {
-        match self.symbols.last_mut() {
-            Some((last, ref mut count)) if *last == symbol && *count < u8::MAX => { 
-                *count += 1 
-            },
-            _ => { self.symbols.push((symbol, 0)) }
-        }
-    }
-    
-    pub fn iter(&self) -> impl Iterator<Item=Option<&DebugSymbol>> { 
-        self.symbols.iter().flat_map(
-            |(sym, count)| std::iter::repeat(sym.as_ref()).take(usize::from(*count) + 1)
-        )
-    }
-}
-
-
-#[derive(Debug, Default, Clone)]
-struct OffsetSpan {
-    offset: usize,
-    length: usize,
-}
-
-impl OffsetSpan {
-    pub fn start_offset(&self) -> usize { self.offset }
-    pub fn end_offset(&self) -> usize { self.offset + self.length }
-}
-
-
-#[derive(Debug, Default, Clone)]
-pub struct DebugSymbolOffsets {
-    symbols: Vec<(DebugSymbol, OffsetSpan)>,  // (symbol, offset) pairs
-}
-
-impl DebugSymbolOffsets {
-    pub fn new() -> Self {
-        Self {
-            symbols: Vec::default(),
-        }
-    }
-    
-    pub fn push(&mut self, symbol: DebugSymbol, offset: usize, length: usize) {
-        match self.symbols.last_mut() {
-            Some((_, ref mut span)) if span.end_offset() > offset => {
-                panic!("symbol inserted out of order");
-            }
-            
-            Some((last, ref mut span)) if *last == symbol && span.end_offset() == offset => { 
-                (*span).length += length
-            },
-            
-            _ => { self.symbols.push((symbol, OffsetSpan { offset, length })) }
-        }
-    }
-}
