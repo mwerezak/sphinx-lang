@@ -6,7 +6,8 @@ use string_interner::Symbol as _;
 
 use crate::language::FloatType;
 use crate::codegen::OpCode;
-use crate::codegen::chunk::{UnloadedProgram, Constant, ConstID, ChunkID};
+use crate::codegen::chunk::{UnloadedProgram, ChunkID};
+use crate::codegen::consts::{Constant, ConstID};
 use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, SymbolResolutionError};
 
 
@@ -106,13 +107,13 @@ impl<'c, 's> Disassembler<'c, 's> {
                 OpCode::LoadConst => {
                     let cid = instr[1];
                     write!(line, "{:16} {: >4}    ", opcode, cid)?;
-                    self.write_const(&mut line, self.program.lookup_const(cid))?;
+                    self.write_const(&mut line, self.program.get_const(cid))?;
                 },
                 
                 OpCode::LoadConst16 => {
                     let cid =  ConstID::from_le_bytes(instr[1..=2].try_into().unwrap());
                     write!(line, "{:16} {: >4}    ", opcode, cid)?;
-                    self.write_const(&mut line, self.program.lookup_const(cid))?;
+                    self.write_const(&mut line, self.program.get_const(cid))?;
                 },
                 
                 OpCode::StoreLocal | OpCode::LoadLocal => {

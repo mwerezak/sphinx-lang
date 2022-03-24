@@ -1,5 +1,5 @@
 
-use crate::runtime::strings::InternSymbol;
+use crate::language::InternSymbol;
 use crate::parser::primary::{Primary, AccessItem, Atom};
 use crate::runtime::types::operator::BinaryOp;
 use crate::parser::expr::{Expr, ExprMeta};

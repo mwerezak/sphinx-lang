@@ -1,46 +1,19 @@
-use std::mem;
 use std::str;
 use std::ops::Range;
 use std::collections::HashMap;
 use string_interner::Symbol as _;
-use crate::language::{IntType, FloatType};
+use crate::language::{IntType, FloatType, InternSymbol};
 use crate::runtime::{DefaultBuildHasher, Variant, STRING_TABLE};
 use crate::runtime::module::ModuleID;
-use crate::runtime::strings::{StringInterner, InternSymbol, StringSymbol};
-use crate::runtime::types::function::Signature;
+use crate::runtime::strings::{StringInterner, StringSymbol};
+use crate::runtime::types::function::{Signature, Parameter};
+use crate::codegen::consts::{Constant, ConstID, StringID, FunctionID, UnloadedSignature, UnloadedParam};
 use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
 use crate::debug::DebugSymbol;
 
 
 // these are limited to u16 right now because they are loaded by opcodes
-pub type ConstID = u16;
 pub type ChunkID = u16;
-
-pub type StringID = usize;
-pub type FunctionID = usize;
-
-
-// Constants
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Constant {
-    Integer(IntType),
-    Float([u8; mem::size_of::<FloatType>()]),  // we might store redundant floats, that's fine
-    String(StringID),
-    Function(ChunkID, FunctionID),  // signatures are stored separately to save memory - referenced by "FunctionID"
-}
-
-impl From<IntType> for Constant {
-    fn from(value: IntType) -> Self { Self::Integer(value) }
-}
-
-impl From<FloatType> for Constant {
-    fn from(value: FloatType) -> Self { Self::Float(value.to_le_bytes()) }
-}
-
-impl From<InternSymbol> for Constant {
-    fn from(symbol: InternSymbol) -> Self { Self::String(symbol.to_usize()) }
-}
 
 
 // pub enum ChunkTag {
@@ -111,7 +84,7 @@ pub struct ChunkBuilder {
     main: ChunkBuf,
     chunks: Vec<ChunkBuf>,
     consts: Vec<Constant>,
-    functions: Vec<Signature>,
+    functions: Vec<UnloadedSignature>,
     dedup: HashMap<Constant, ConstID, DefaultBuildHasher>,
     strings: StringInterner,
 }
@@ -189,7 +162,7 @@ impl ChunkBuilder {
         self.get_or_insert_const(Constant::String(symbol.to_usize()))
     }
     
-    pub fn push_function(&mut self, signature: Signature) -> FunctionID {
+    pub fn push_function(&mut self, signature: UnloadedSignature) -> FunctionID {
         let function_id = FunctionID::from(self.functions.len());
         self.functions.push(signature);
         function_id
@@ -286,7 +259,7 @@ pub struct UnloadedProgram {
     strings: Box<[u8]>,
     string_index: Box<[StringIndex]>,
     consts: Box<[Constant]>,
-    functions: Box<[Signature]>,
+    functions: Box<[UnloadedSignature]>,
 }
 
 impl UnloadedProgram {
@@ -323,7 +296,7 @@ impl UnloadedProgram {
             .enumerate()
     }
     
-    pub fn lookup_const(&self, index: impl Into<ConstID>) -> &Constant {
+    pub fn get_const(&self, index: impl Into<ConstID>) -> &Constant {
         &self.consts[usize::from(index.into())]
     }
 }
@@ -370,6 +343,8 @@ pub struct Program {
 
 impl Program {
     pub fn load(program: UnloadedProgram) -> Self {
+        
+        // Convert strings to StringSymbols
         let strings = STRING_TABLE.with(|string_table| {
             let mut string_table = string_table.borrow_mut();
             
@@ -378,9 +353,12 @@ impl Program {
                 let symbol = string_table.get_or_intern(string);
                 strings.push(symbol);
             }
-            
-            strings.into_boxed_slice()
+            strings
         });
+        
+        let functions: Vec<Signature> = program.functions.into_vec().into_iter()
+            .map(|signature| Self::load_signature(signature, &program.consts, &strings))
+            .collect();
         
         Self {
             main: program.main,
@@ -388,44 +366,34 @@ impl Program {
                 chunks: program.chunks,
                 chunk_index: program.chunk_index,
                 consts: program.consts,
-                functions: program.functions,
-                strings
+                functions: functions.into_boxed_slice(),
+                strings: strings.into_boxed_slice(),
             },
         }
     }
     
-    /// prepares an `UnloadedProgram` for exporting to a file
-    pub fn unload(self) -> UnloadedProgram {
-        let mut strings = Vec::new();
-        let mut string_index = Vec::with_capacity(self.data.strings.len());
-        
-        STRING_TABLE.with(|string_table| {
-            let string_table = string_table.borrow();
-            
-            for symbol in self.data.strings.iter() {
-                let bytes = string_table.resolve(symbol).as_bytes();
-                
-                let offset = strings.len();
-                let length = bytes.len();
-                let index = StringIndex {
-                    offset, length,
-                };
-                
-                strings.extend(bytes);
-                string_index.push(index);
-            }
-            
+    fn load_parameter(param: UnloadedParam, consts: &[Constant], strings: &[StringSymbol]) -> Parameter {
+        let string_id = consts[usize::from(param.name)].try_into_string_id().unwrap();
+        let name = strings[usize::from(string_id)];
+        Parameter::new(name, param.decl)
+    }
+    
+    fn load_signature(signature: UnloadedSignature, consts: &[Constant], strings: &[StringSymbol]) -> Signature {
+        let name = signature.name.map(|const_id| {
+            let string_id = consts[usize::from(const_id)].try_into_string_id().unwrap();
+            strings[usize::from(string_id)]
         });
         
-        UnloadedProgram {
-            main: self.main,
-            chunks: self.data.chunks,
-            chunk_index: self.data.chunk_index,
-            strings: strings.into_boxed_slice(),
-            string_index: string_index.into_boxed_slice(),
-            consts: self.data.consts,
-            functions: self.data.functions,
-        }
+        let required = signature.required.into_vec().into_iter()
+            .map(|param| Self::load_parameter(param, consts, strings)).collect();
+            
+        let default = signature.default.into_vec().into_iter()
+            .map(|param| Self::load_parameter(param, consts, strings)).collect();
+        
+        let variadic = signature.variadic
+            .map(|param| Self::load_parameter(param, consts, strings));
+        
+        Signature::new(name, required, default, variadic)
     }
 }
 

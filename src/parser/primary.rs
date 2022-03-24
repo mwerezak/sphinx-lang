@@ -1,5 +1,4 @@
-use crate::language;
-use crate::runtime::strings::InternSymbol;
+use crate::language::{IntType, FloatType, InternSymbol};
 use crate::parser::expr::{ExprMeta, Expr};
 
 
@@ -13,8 +12,8 @@ pub enum Atom {
     // Super,
     Identifier(InternSymbol),
     BooleanLiteral(bool),
-    IntegerLiteral(language::IntType),
-    FloatLiteral(language::FloatType),
+    IntegerLiteral(IntType),
+    FloatLiteral(FloatType),
     StringLiteral(InternSymbol),
     Group(Box<Expr>), // type annotation
 }

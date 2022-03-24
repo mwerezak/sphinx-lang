@@ -4,7 +4,7 @@ use log;
 use std::iter;
 use std::mem;
 
-use crate::language::{IntType, FloatType};
+use crate::language::{IntType, FloatType, InternSymbol};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary, AccessItem};
@@ -12,21 +12,24 @@ use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
 use crate::parser::fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
 use crate::runtime::vm::LocalIndex;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
-use crate::runtime::types::function::{Function, Signature, Parameter};
-use crate::runtime::strings::{StringInterner, InternSymbol};
+use crate::runtime::types::function::Function;
+use crate::runtime::strings::{StringInterner};
 use crate::debug::DebugSymbol;
 use crate::debug::dasm::{ChunkSymbols, DebugSymbolsRLE};
 
 pub mod chunk;
+pub mod consts;
 pub mod opcodes;
 pub mod errors;
 
 pub use opcodes::OpCode;
-pub use chunk::{UnloadedProgram, Program, ProgramData, ChunkID, ConstID, Constant};
+pub use chunk::{UnloadedProgram, Program, ProgramData, ChunkID};
+pub use consts::{ConstID, Constant};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
 use opcodes::*;
 use chunk::{ChunkBuilder, ChunkInfo, ChunkBuf};
+use consts::{UnloadedSignature, UnloadedParam};
 
 
 // Helpers
@@ -1337,7 +1340,7 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_function_signature(&mut self, symbol: Option<&DebugSymbol>, signature: &SignatureDef) -> CompileResult<Signature> {
+    fn compile_function_signature(&mut self, symbol: Option<&DebugSymbol>, signature: &SignatureDef) -> CompileResult<UnloadedSignature> {
         let name = 
             if let Some(name) = signature.name {
                 Some(self.get_or_make_const(Constant::from(name))?)
@@ -1346,22 +1349,29 @@ impl CodeGenerator<'_> {
         let mut required = Vec::new();
         for param in signature.required.iter() {
             let name = self.get_or_make_const(Constant::from(param.name))?;
-            required.push(Parameter::new(name, param.decl));
+            required.push(UnloadedParam { name, decl: param.decl });
         }
         
         let mut default = Vec::new();
         for param in signature.default.iter() {
             let name = self.get_or_make_const(Constant::from(param.name))?;
-            default.push(Parameter::new(name, param.decl));
+            default.push(UnloadedParam { name, decl: param.decl });
         }
         
         let mut variadic = None;
         if let Some(param) = &signature.variadic {
             let name = self.get_or_make_const(Constant::from(param.name))?;
-            variadic.replace(Parameter::new(name, param.decl));
+            variadic.replace(UnloadedParam { name, decl: param.decl });
         }
         
-        Ok(Signature::new(name, required, default, variadic))
+        let signature = UnloadedSignature {
+            name,
+            required: required.into_boxed_slice(),
+            default: default.into_boxed_slice(),
+            variadic,
+        };
+        
+        Ok(signature)
     }
     
 }

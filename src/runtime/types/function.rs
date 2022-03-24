@@ -1,6 +1,7 @@
 use crate::parser::lvalue::DeclType;
 use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::module::{ModuleID, Access};
+use crate::runtime::strings::StringSymbol;
 use crate::runtime::gc::GCObject;
 
 
@@ -25,14 +26,14 @@ impl From<Function> for GCObject {
 
 #[derive(Clone, Debug)]
 pub struct Signature {
-    name: Option<ConstID>,
+    name: Option<StringSymbol>,
     required: Box<[Parameter]>,
     default: Box<[Parameter]>,
     variadic: Option<Parameter>,
 }
 
 impl Signature {
-    pub fn new(name: Option<ConstID>, required: Vec<Parameter>, default: Vec<Parameter>, variadic: Option<Parameter>) -> Self {
+    pub fn new(name: Option<StringSymbol>, required: Vec<Parameter>, default: Vec<Parameter>, variadic: Option<Parameter>) -> Self {
         Self {
             name,
             required: required.into_boxed_slice(),
@@ -41,37 +42,34 @@ impl Signature {
         }
     }
     
-    pub fn name(&self) -> Option<ConstID> {
-        self.name
-    }
-    
-    pub fn is_variadic(&self) -> bool {
-        self.variadic.is_some()
-    }
+    pub fn name(&self) -> Option<StringSymbol> { self.name }
+    pub fn required(&self) -> &[Parameter] { &self.required }
+    pub fn default(&self) -> &[Parameter] { &self.default }
+    pub fn variadic(&self) -> Option<&Parameter> { self.variadic.as_ref() }
     
     pub fn min_arity(&self) -> usize {
         self.required.len()
     }
     
     pub fn max_arity(&self) -> Option<usize> {
-        if self.is_variadic() { None }
+        if self.variadic().is_some() { None }
         else { Some(self.required.len() + self.default.len()) }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Parameter {
-    name: ConstID,
+    name: StringSymbol,
     decl: DeclType,
 }
 
 // TODO don't create an entire chunk for each default argument
 
 impl Parameter {
-    pub fn new(name: ConstID, decl: DeclType) -> Self {
+    pub fn new(name: StringSymbol, decl: DeclType) -> Self {
         Self { name, decl }
     }
     
-    pub fn name(&self) -> &ConstID { &self.name }
+    pub fn name(&self) -> &StringSymbol { &self.name }
     pub fn decl(&self) -> &DeclType { &self.decl }
 }

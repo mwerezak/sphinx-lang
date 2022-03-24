@@ -5,7 +5,15 @@ use crate::runtime::ops;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, ModuleCache, ModuleID, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
+use crate::debug::DebugSymbol;
 
+
+// store traceback information
+struct FrameInfo {
+    symbol: Option<DebugSymbol>,
+    module_id: Option<ModuleID>,
+    chunk_id: Option<ChunkID>,
+}
 
 enum Control {
     Continue,

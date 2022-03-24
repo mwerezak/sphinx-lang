@@ -3,9 +3,10 @@ use std::cmp;
 use std::cell::{RefCell, Ref};
 use std::ops::{Deref, DerefMut};
 use std::marker::PhantomData;
-use string_interner::{self, DefaultBackend, DefaultSymbol};
+use string_interner::{self, DefaultBackend};
 use string_interner::symbol::Symbol;
 
+use crate::language::InternSymbol;
 use crate::runtime::DefaultBuildHasher;
 
 
@@ -99,8 +100,7 @@ impl fmt::Display for StringSymbol {
 }
 
 
-pub type InternSymbol = DefaultSymbol;
-type InternBackend = DefaultBackend<DefaultSymbol>;
+type InternBackend = DefaultBackend<InternSymbol>;
 
 // StringInterner is used for storage of strings in code units during compilation,
 // StringTable is used for string symbol lookups at runtime

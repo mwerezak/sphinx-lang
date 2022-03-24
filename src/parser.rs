@@ -2,8 +2,9 @@ use std::collections::VecDeque;
 
 use log::debug;
 
+use crate::language::InternSymbol;
 use crate::lexer::{TokenMeta, Token, TokenIndex, LexerError};
-use crate::runtime::strings::{InternSymbol, StringInterner};
+use crate::runtime::strings::StringInterner;
 use crate::debug::SourceError;
 
 
