@@ -8,7 +8,8 @@ use crate::language::FloatType;
 use crate::codegen::OpCode;
 use crate::codegen::chunk::{UnloadedProgram, ChunkID};
 use crate::codegen::consts::{Constant, ConstID};
-use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable, SymbolResolutionError};
+use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, ResolvedSymbolTable};
+use crate::debug::symbol::errors::SymbolResolutionError;
 
 
 const PAD_WIDTH: usize = 60;
@@ -20,11 +21,11 @@ pub struct Disassembler<'c, 's> {
 }
 
 // helper for Disassembler::try_resolve_symbol()
-type ResolvedSymbolResult = Result<ResolvedSymbol, SymbolResolutionError>;
+type ResolvedSymbolResult<'s> = Result<&'s ResolvedSymbol, &'s SymbolResolutionError>;
 enum Symbol<'s> {
     // None means "repeat"
     Unresolved(Option<&'s DebugSymbol>),
-    Resolved(Option<&'s ResolvedSymbolResult>),
+    Resolved(Option<ResolvedSymbolResult<'s>>),
 }
 
 impl<'c, 's> Disassembler<'c, 's> {
@@ -76,7 +77,7 @@ impl<'c, 's> Disassembler<'c, 's> {
     // handles all the logic around whether we have a symbol table, if there was a symbol resolution error, repeats...
     fn try_resolve_symbol<'a>(&self, unresolved: Option<&'a DebugSymbol>, last_symbol: Option<&DebugSymbol>) -> Option<Symbol<'a>> where 's: 'a {
         let resolved = unresolved.and_then(|symbol| self.symbol_table.and_then(
-            |symbol_table| symbol_table.get(&symbol)
+            |symbol_table| symbol_table.lookup(&symbol)
         ));
         
         let is_repeat = last_symbol.and(unresolved).is_some() && last_symbol.unwrap() == unresolved.unwrap();
@@ -198,7 +199,7 @@ impl<'c, 's> Disassembler<'c, 's> {
         
     }
     
-    fn write_debug_symbol(&self, fmt: &mut impl fmt::Write, symbol: Option<&ResolvedSymbolResult>) -> fmt::Result {
+    fn write_debug_symbol(&self, fmt: &mut impl fmt::Write, symbol: Option<ResolvedSymbolResult>) -> fmt::Result {
         match symbol {
             Some(Ok(symbol)) => {
                 write!(fmt, "{: >4}| ", symbol.lineno())?;

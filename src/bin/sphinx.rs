@@ -11,7 +11,7 @@ use sphinx_lang::codegen::{Program, CompiledProgram};
 use sphinx_lang::runtime::VirtualMachine;
 use sphinx_lang::runtime::module::{ModuleCache, GlobalEnv};
 use sphinx_lang::runtime::strings::StringInterner;
-use sphinx_lang::debug::symbol::BufferedResolver;
+use sphinx_lang::debug::symbol::resolver::BufferedResolver;
 
 fn main() {
     env_logger::init();
