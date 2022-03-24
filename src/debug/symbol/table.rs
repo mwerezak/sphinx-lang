@@ -30,6 +30,14 @@ impl DebugSymbolTable {
         self.entries.push(entry)
     }
     
+    pub fn lookup(&self, offset: usize) -> Option<&DebugSymbol> {
+        if let Ok(index) = self.entries.binary_search_by_key(&offset, |entry| entry.0) {
+            self.entries[index].1.as_ref()
+        } else {
+            None
+        }
+    }
+    
     pub fn iter(&self) -> impl Iterator<Item=(usize, Option<&DebugSymbol>)> + '_ {
         self.entries.iter().map(|entry| {
             let SymbolTableEntry(offset, symbol) = entry;
@@ -45,7 +53,7 @@ impl DebugSymbolTable {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SymbolTableEntry(usize, Option<DebugSymbol>);
 
 impl PartialOrd for SymbolTableEntry {
