@@ -410,12 +410,12 @@ impl CodeGenerator<'_> {
         self.chunk().len()
     }
     
-    fn push_symbol(&mut self, symbol: Option<&DebugSymbol>) {
+    fn push_symbol(&mut self, symbol: DebugSymbol) {
         let chunk_id = self.chunk_id;
         let offset = self.current_offset();
         self.symbols_mut()
             .get_mut(&chunk_id).unwrap()
-            .insert(offset, symbol.copied())
+            .insert(offset, symbol)
     }
     
     fn create_chunk(&mut self, symbol: Option<&DebugSymbol>) -> CompileResult<CodeGenerator> {
@@ -430,20 +430,32 @@ impl CodeGenerator<'_> {
     
     fn emit_instr(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode) {
         debug_assert!(opcode.instr_len() == 1);
-        self.push_symbol(symbol);
+        
+        if let Some(symbol) = symbol {
+            self.push_symbol(*symbol);
+        }
+        
         self.chunk_mut().push_byte(opcode);
     }
     
     fn emit_instr_byte(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode, byte: u8) {
         debug_assert!(opcode.instr_len() == 2);
-        self.push_symbol(symbol);
+        
+        if let Some(symbol) = symbol {
+            self.push_symbol(*symbol);
+        }
+        
         self.chunk_mut().push_byte(opcode);
         self.chunk_mut().push_byte(byte);
     }
     
     fn emit_instr_data(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode, bytes: &[u8]) {
         debug_assert!(opcode.instr_len() == 1 + bytes.len());
-        self.push_symbol(symbol);
+        
+        if let Some(symbol) = symbol {
+            self.push_symbol(*symbol);
+        }
+        
         self.chunk_mut().push_byte(opcode);
         self.chunk_mut().extend_bytes(bytes);
     }
@@ -458,7 +470,9 @@ impl CodeGenerator<'_> {
     }
     
     fn emit_dummy_instr(&mut self, symbol: Option<&DebugSymbol>, width: usize) {
-        self.push_symbol(symbol);
+        if let Some(symbol) = symbol {
+            self.push_symbol(*symbol);
+        }
         
         for i in 0..width {
             self.chunk_mut().push_byte(OpCode::Nop);

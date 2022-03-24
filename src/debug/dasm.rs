@@ -74,13 +74,13 @@ impl<'c, 's> Disassembler<'c, 's> {
         Ok(())
     }
     
-    fn seek_next_symbol(offset: usize, symbols: &mut iter::Peekable<impl Iterator<Item=(usize, Option<&'s DebugSymbol>)>>) -> Option<&'s DebugSymbol> {
+    fn seek_next_symbol(offset: usize, symbols: &mut iter::Peekable<impl Iterator<Item=(usize, &'s DebugSymbol)>>) -> Option<&'s DebugSymbol> {
         while matches!(symbols.peek(), Some((next_offset, _)) if *next_offset < offset) {
             symbols.next();
         }
         
         match symbols.next() {
-            Some((next_offset, symbol)) if next_offset == offset => symbol,
+            Some((next_offset, symbol)) if next_offset == offset => Some(symbol),
             _ => None,
         }
     }

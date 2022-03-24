@@ -20,7 +20,7 @@ impl DebugSymbolTable {
         Self { entries: Vec::new() }
     }
     
-    pub fn insert(&mut self, offset: usize, symbol: Option<DebugSymbol>) {
+    pub fn insert(&mut self, offset: usize, symbol: DebugSymbol) {
         let entry = SymbolTableEntry(offset, symbol);
         
         if matches!(self.entries.last(), Some(last_entry) if entry <= *last_entry) {
@@ -31,30 +31,27 @@ impl DebugSymbolTable {
     }
     
     pub fn lookup(&self, offset: usize) -> Option<&DebugSymbol> {
-        if let Ok(index) = self.entries.binary_search_by_key(&offset, |entry| entry.0) {
-            self.entries[index].1.as_ref()
+        if let Ok(index) = self.entries.binary_search_by_key(&offset, SymbolTableEntry::offset) {
+            Some(&self.entries[index].1)
         } else {
             None
         }
     }
     
-    pub fn iter(&self) -> impl Iterator<Item=(usize, Option<&DebugSymbol>)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item=(usize, &DebugSymbol)> + '_ {
         self.entries.iter().map(|entry| {
             let SymbolTableEntry(offset, symbol) = entry;
-            (*offset, symbol.as_ref())
+            (*offset, symbol)
         })
     }
     
     pub fn symbols(&self) -> impl Iterator<Item=&DebugSymbol> {
-        self.entries.iter().filter_map(|entry| {
-            let SymbolTableEntry(_, symbol) = entry;
-            symbol.as_ref()
-        })
+        self.entries.iter().map(|entry| &entry.1)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct SymbolTableEntry(usize, Option<DebugSymbol>);
+struct SymbolTableEntry(usize, DebugSymbol);
 
 impl PartialOrd for SymbolTableEntry {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -66,4 +63,8 @@ impl Ord for SymbolTableEntry {
     fn cmp(&self, other: &Self) -> Ordering {
         usize::cmp(&self.0, &other.0)
     }
+}
+
+impl SymbolTableEntry {
+    fn offset(&self) -> usize { self.0 }
 }
