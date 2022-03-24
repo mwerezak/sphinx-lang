@@ -1,7 +1,8 @@
+use std::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::module::{ModuleID, Access};
-use crate::runtime::strings::StringSymbol;
+use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::gc::GCObject;
 
 
@@ -26,6 +27,7 @@ impl From<Function> for GCObject {
 
 #[derive(Clone, Debug)]
 pub struct Signature {
+    display: String,
     name: Option<StringSymbol>,
     required: Box<[Parameter]>,
     default: Box<[Parameter]>,
@@ -34,8 +36,12 @@ pub struct Signature {
 
 impl Signature {
     pub fn new(name: Option<StringSymbol>, required: Vec<Parameter>, default: Vec<Parameter>, variadic: Option<Parameter>) -> Self {
+        // build this once and cache the result, because it's expensive
+        let display = format_signature(name.as_ref(), &required, &default, variadic.as_ref());
+        
         Self {
             name,
+            display,
             required: required.into_boxed_slice(),
             default: default.into_boxed_slice(),
             variadic,
@@ -72,4 +78,46 @@ impl Parameter {
     
     pub fn name(&self) -> &StringSymbol { &self.name }
     pub fn decl(&self) -> &DeclType { &self.decl }
+}
+
+
+impl fmt::Display for Signature {
+    // lots of allocations...
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.write_str(&self.display)
+    }
+}
+
+
+fn format_signature(name: Option<&StringSymbol>, required: &[Parameter], default: &[Parameter], variadic: Option<&Parameter>) -> String {
+    STRING_TABLE.with(|string_table| {
+        let string_table = string_table.borrow();
+        
+        let name = name
+            .map(|name| string_table.resolve(&name));
+        
+        let required_names = required.iter()
+            .map(|param| string_table.resolve(&param.name))
+            .collect::<Vec<&str>>()
+            .join(", ");
+            
+        let default_names = default.iter()
+            .map(|param| string_table.resolve(&param.name))
+            .map(|name| format!("{} = ...", name))
+            .collect::<Vec<String>>()
+            .join(", ");
+        
+        let variadic_name = variadic
+            .map(|param| string_table.resolve(&param.name))
+            .map(|name| format!("{}...", name));
+        
+        let parameters;
+        if let Some(variadic) = variadic_name {
+            parameters = [required_names, default_names, variadic].join(", ");
+        } else {
+            parameters = [required_names, default_names].join(", ");
+        }
+        
+        format!("fun {}({})", name.unwrap_or(""), parameters)
+    })
 }
