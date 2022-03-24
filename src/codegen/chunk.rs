@@ -91,13 +91,13 @@ pub struct ChunkBuilder {
 
 impl Default for ChunkBuilder {
     fn default() -> Self {
-        Self::with_strings(StringInterner::new())
+        Self::new()
     }
 }
 
 impl ChunkBuilder {
     pub fn new() -> Self {
-        Self::default()
+        Self::with_strings(StringInterner::new())
     }
     
     pub fn with_strings(strings: StringInterner) -> Self {

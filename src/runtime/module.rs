@@ -37,16 +37,14 @@ pub struct Namespace {
 }
 
 impl Default for Namespace {
-    fn default() -> Self {
-        Self { 
-            store: HashMap::with_hasher(DefaultBuildHasher::default()),
-        }
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl Namespace {
     pub fn new() -> Self {
-        Self::default()
+        Self { 
+            store: HashMap::with_hasher(DefaultBuildHasher::default()),
+        }
     }
     
     // if the variable already exists, it is overwritten
@@ -150,16 +148,16 @@ pub struct ModuleCache {
 }
 
 impl Default for ModuleCache {
-    fn default() -> Self {
+    fn default() -> Self { Self::new() }
+}
+
+impl ModuleCache {
+    pub fn new() -> Self {
         Self {
             modules: HashMap::with_hasher(DefaultBuildHasher::default()),
             id_hasher: DefaultBuildHasher::default(),
         }
     }
-}
-
-impl ModuleCache {
-    pub fn new() -> Self { Self::default() }
     
     pub fn get(&self, module_id: &ModuleID) -> Option<&Module> {
         self.modules.get(module_id)
