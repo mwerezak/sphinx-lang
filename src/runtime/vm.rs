@@ -360,7 +360,7 @@ impl<'m> VMState<'m> {
             
             OpCode::InsertLocal => {
                 let value = stack.peek().clone();
-                stack.insert(self.locals.into(), value);
+                stack.insert(self.local_index(self.locals), value);
                 self.locals += 1;
             },
             OpCode::StoreLocal => {
