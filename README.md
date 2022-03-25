@@ -27,7 +27,3 @@ My goal is to have a lightweight, expressive language. At the same time, I also 
 # Syntax Highlighting Support
 
 At the present moment, nearly complete syntax highlighting is available for users of Sublime Text - just copy `sphinx.sublime-syntax` into your user packages directory. If you use a different text editor and want syntax highlighting for Sphinx, feel free to drop a request on GitHub. Getting the language working is my first priority, but I don't mind taking a look at it.
-
-# Acknowledgement
-
-I want to acknowledge Robert Nystrom for his wonderful book on [Crafting Interpreters](https://craftinginterpreters.com), which was an inspiration for starting this project and provided some direction while getting started. In case there's any confusion, I want it to be clear that Sphinx is not related to the language developed in that book, and been designed and developed independently from the ground up.
