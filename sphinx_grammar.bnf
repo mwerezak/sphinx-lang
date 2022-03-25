@@ -46,7 +46,7 @@ group ::= "(" expression ( ":" type_expression )? ")" ; (* can be type annotated
 
 (*** if/block Expressions ***)
 
-if_expression ::= "if" expression "then" statement_list ( "elseif" expression "then" statement_list )* ( "else" statement_list )? "end" ;
+if_expression ::= "if" expression "then" statement_list ( "elif" expression "then" statement_list )* ( "else" statement_list )? "end" ;
 block_expression ::= ( label )? "begin" ( statement )* ( control_flow )? "end" ;  (* break can be supplied a value inside of begin_blocks *)
 
 (*** Assignment ***)

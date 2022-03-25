@@ -423,7 +423,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 let label = self.try_parse_label(ctx)?;
                 
                 let expr = 
-                    if !matches!(self.peek()?.token, Token::End | Token::Semicolon) {
+                    if !matches!(self.peek()?.token, Token::End | Token::Elif | Token::Else | Token::Semicolon ) {
                         Some(Box::new(self.parse_expr_variant(ctx)?))
                     } else { None };
                 
@@ -435,7 +435,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 ctx.set_start(&self.advance().unwrap());
                 
                 let expr = 
-                    if !matches!(self.peek()?.token, Token::End | Token::Semicolon) {
+                    if !matches!(self.peek()?.token, Token::End | Token::Elif | Token::Else | Token::Semicolon ) {
                         Some(Box::new(self.parse_expr_variant(ctx)?))
                     } else { None };
                 
