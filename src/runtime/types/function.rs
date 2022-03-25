@@ -90,8 +90,6 @@ pub struct Parameter {
     decl: DeclType,
 }
 
-// TODO don't create an entire chunk for each default argument
-
 impl Parameter {
     pub fn new(name: StringSymbol, decl: DeclType) -> Self {
         Self { name, decl }

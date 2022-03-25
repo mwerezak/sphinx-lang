@@ -413,7 +413,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 
                 let label = self.try_parse_label(ctx)?;
                 
-                ControlFlow::Continue(label)
+                ControlFlow::Continue(label, ctx.frame().as_debug_symbol())
             },
             
             Token::Break => {
@@ -427,7 +427,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                         Some(Box::new(self.parse_expr_variant(ctx)?))
                     } else { None };
                 
-                ControlFlow::Break(label, expr)
+                ControlFlow::Break(label, expr, ctx.frame().as_debug_symbol())
             },
             
             Token::Return => {
@@ -439,7 +439,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                         Some(Box::new(self.parse_expr_variant(ctx)?))
                     } else { None };
                 
-                ControlFlow::Return(expr)
+                ControlFlow::Return(expr, ctx.frame().as_debug_symbol())
             }
             
             _ => return Ok(None),

@@ -44,9 +44,9 @@ pub struct StmtList {
 
 #[derive(Debug, Clone)]
 pub enum ControlFlow {
-    Continue(Option<Label>),
-    Break(Option<Label>, Option<Box<Expr>>),
-    Return(Option<Box<Expr>>),
+    Continue(Option<Label>, Option<DebugSymbol>),
+    Break(Option<Label>, Option<Box<Expr>>, Option<DebugSymbol>),
+    Return(Option<Box<Expr>>, Option<DebugSymbol>),
 }
 
 impl StmtList {

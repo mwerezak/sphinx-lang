@@ -636,14 +636,20 @@ impl CodeGenerator<'_> {
         // handle control flow
         if let Some(control) = stmt_list.end_control() {
             match control {
-                ControlFlow::Continue(label) => {
+                ControlFlow::Continue(label, symbol) => {
                     unimplemented!()
                 }
-                ControlFlow::Break(label, expr) => {
+                ControlFlow::Break(label, expr, symbol) => {
                     unimplemented!()
                 }
-                ControlFlow::Return(expr) => {
-                    unimplemented!()
+                ControlFlow::Return(expr, symbol) => {
+                    let symbol = symbol.as_ref();
+                    if let Some(expr) = expr {
+                        self.compile_expr(symbol, expr)?;
+                    } else {
+                        self.emit_instr(symbol, OpCode::Nil);
+                    }
+                    self.emit_instr(symbol, OpCode::Return);
                 }
             }
         }
@@ -1183,9 +1189,7 @@ impl CodeGenerator<'_> {
         chunk.compile_function_preamble(symbol, fundef)?;
         
         // function body
-        for stmt in fundef.body.stmt_list().iter() {
-            chunk.push_stmt(stmt)?;
-        }
+        chunk.compile_stmt_list(fundef.body.stmt_list())?;
         
         // function result
         if let Some(expr) = fundef.body.result() {
