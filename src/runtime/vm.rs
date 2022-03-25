@@ -189,8 +189,8 @@ struct VMState<'m> {
     globals: &'m GlobalEnv,
     chunk: &'m [u8],
     chunk_id: Option<ChunkID>,
-    frame: usize,
-    locals: LocalIndex,
+    frame: usize,        // start index for locals belonging to this frame
+    locals: LocalIndex,  // local variable count
     pc: usize,
 }
 
@@ -230,14 +230,6 @@ impl<'m> VMState<'m> {
             pc: 0,
         }
     }
-    
-    fn get_callsite(&self, offset: usize) -> CallSite {
-        CallSite::Chunk {
-            offset,
-            module_id: self.module.module_id(),
-            chunk_id: self.chunk_id,
-        }
-    }
 
     #[inline(always)]
     fn offset_pc(&self, offset: isize) -> Option<usize> {
@@ -266,6 +258,20 @@ impl<'m> VMState<'m> {
         panic!("invalid operand")
     }
 
+    // convert a local variable index to an index into the value stack
+    #[inline]
+    fn local_index(&self, local: LocalIndex) -> usize {
+        self.frame + usize::from(local)
+    }
+    
+    fn get_callsite(&self, offset: usize) -> CallSite {
+        CallSite::Chunk {
+            offset,
+            module_id: self.module.module_id(),
+            chunk_id: self.chunk_id,
+        }
+    }
+
     #[inline(always)]
     fn exec_next(&mut self, stack: &mut ValueStack) -> ExecResult<Control> {
         let op_byte = self.chunk.get(self.pc).expect("pc out of bounds");
@@ -283,16 +289,20 @@ impl<'m> VMState<'m> {
             OpCode::Return => return Ok(Control::Return),
             
             OpCode::Call => {
-                let nargs = Self::into_usize(stack.peek().clone());
-                stack.swap_last(stack.len() - nargs - 1);
+                const CALL_LOCALS: usize = 2;
                 
-                let frame = stack.len() - nargs - 2;
+                let nargs = Self::into_usize(stack.peek().clone());
+                let call_locals = CALL_LOCALS + nargs;
+                
+                stack.swap_last(stack.len() - call_locals + 1);
+                
+                let frame = stack.len() - call_locals;
                 let callee = stack.peek_at(frame);
                 
                 let args = stack.peek_many(nargs);
                 let call = CallInfo {
+                    frame,
                     call: callee.invoke(args)?,
-                    frame: frame.try_into().expect("frame index overflow"),
                     site: self.get_callsite(current_offset),
                 };
                 return Ok(Control::Call(call))
@@ -354,30 +364,32 @@ impl<'m> VMState<'m> {
                 self.locals += 1;
             },
             OpCode::StoreLocal => {
-                let index = usize::from(data[0]);
-                stack.replace_at(self.frame + index, stack.peek().clone());
+                let index = LocalIndex::from(data[0]);
+                stack.replace_at(self.local_index(index), stack.peek().clone());
             },
             OpCode::StoreLocal16 => {
-                let index = usize::from(read_le_bytes!(u16, data));
-                stack.replace_at(self.frame + index, stack.peek().clone());
+                let index = LocalIndex::from(read_le_bytes!(u16, data));
+                stack.replace_at(self.local_index(index), stack.peek().clone());
             },
             OpCode::LoadLocal => {
-                let index = usize::from(data[0]);
-                debug_assert!(index < self.locals.into());
-                stack.push(stack.peek_at(self.frame + index).clone());
+                let index = LocalIndex::from(data[0]);
+                debug_assert!(index < self.locals);
+                stack.push(stack.peek_at(self.local_index(index)).clone());
             },
             OpCode::LoadLocal16 => {
-                let index = usize::from(read_le_bytes!(u16, data));
+                let index = LocalIndex::from(read_le_bytes!(u16, data));
                 debug_assert!(index < self.locals.into());
-                stack.push(stack.peek_at(self.frame + index).clone());
+                stack.push(stack.peek_at(self.local_index(index)).clone());
             },
             OpCode::DropLocals => {
                 let count = LocalIndex::from(data[0]);
-                let locals = self.frame + usize::from(self.locals);
-                if stack.len() == locals {
+                debug_assert!(count <= self.locals);
+                
+                let locals_end_index = self.local_index(self.locals);
+                if stack.len() == locals_end_index {
                     stack.discard(usize::from(count));
                 } else {
-                    let index = usize::from(locals) - usize::from(count);
+                    let index = locals_end_index - usize::from(count);
                     stack.discard_at(index, usize::from(count));
                 }
                 self.locals -= count;
