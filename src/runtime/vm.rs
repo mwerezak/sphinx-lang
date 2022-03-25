@@ -30,7 +30,7 @@ struct CallInfo {
 enum Control {
     Continue,
     Call(CallInfo),
-    Return(Variant),
+    Return,
     Exit,
 }
 
@@ -56,7 +56,7 @@ impl<'m> VirtualMachine<'m> {
             traceback: Vec::new(),
             calls: Vec::new(),
             values: ValueStack::new(),
-            state: VMState::with_chunk(module, None, main_chunk, 0),
+            state: VMState::main_chunk(module, main_chunk),
         }
     }
     
@@ -68,7 +68,7 @@ impl<'m> VirtualMachine<'m> {
             traceback: Vec::new(),
             calls: Vec::new(),
             values: ValueStack::new(),
-            state: VMState::with_globals(module, repl_env, None, main_chunk, 0),
+            state: VMState::main_repl(module, repl_env, main_chunk),
         }
     }
     
@@ -76,11 +76,11 @@ impl<'m> VirtualMachine<'m> {
         loop {
             match self.state.exec_next(&mut self.values)? {
                 Control::Call(info) => self.setup_call(info)?,
-                Control::Return(value) => {
+                Control::Return => {
                     if self.calls.is_empty() {
                         break
                     }
-                    self.return_call(value);
+                    self.return_call();
                 },
                 Control::Exit => break,
                 Control::Continue => { }
@@ -101,9 +101,13 @@ impl<'m> VirtualMachine<'m> {
             },
             
             Call::Chunk(module_id, chunk_id) => {
-                let module = self.module_cache.get(&module_id).expect("invalid module id");
+                let module = self.module_cache.get(&module_id)
+                    .expect("invalid module id");
                 
-                let mut state = VMState::new(module, chunk_id, call.frame);
+                let locals = LocalIndex::try_from(self.values.len() - usize::from(call.frame))
+                    .expect("local index overflow");
+                
+                let mut state = VMState::call_frame(module, chunk_id, call.frame, locals);
                 std::mem::swap(&mut self.state, &mut state);
                 self.calls.push(state);
             },
@@ -112,12 +116,13 @@ impl<'m> VirtualMachine<'m> {
         Ok(())
     }
     
-    fn return_call(&mut self, retval: Variant) {
+    fn return_call(&mut self) {
         let frame = self.state.frame;
         
         let mut state = self.calls.pop().expect("empty call stack");
         std::mem::swap(&mut self.state, &mut state);
         
+        let retval = self.values.pop();
         self.values.truncate(frame.into());
         self.values.push(retval);
         self.traceback.pop();
@@ -189,23 +194,38 @@ struct VMState<'m> {
 }
 
 impl<'m> VMState<'m> {
-    fn new(module: &'m Module, chunk_id: ChunkID, frame: LocalIndex) -> Self {
-        let chunk =  module.data().get_chunk(chunk_id);
-        Self::with_chunk(module, Some(chunk_id), chunk, frame)
+    fn call_frame(module: &'m Module, chunk_id: ChunkID, frame: LocalIndex, locals: LocalIndex) -> Self {
+        Self {
+            module,
+            globals: module.globals(),
+            chunk: module.data().get_chunk(chunk_id),
+            chunk_id: Some(chunk_id),
+            locals,
+            frame,
+            pc: 0,
+        }
     }
     
-    fn with_chunk(module: &'m Module, chunk_id: Option<ChunkID>, chunk: &'m [u8], frame: LocalIndex) -> Self {
-        Self::with_globals(module, module.globals(), chunk_id, chunk, frame)
+    fn main_chunk(module: &'m Module, chunk: &'m [u8]) -> Self {
+        Self {
+            module,
+            globals: module.globals(),
+            chunk,
+            chunk_id: None,
+            locals: 0,
+            frame: 0,
+            pc: 0,
+        }
     }
     
-    fn with_globals(module: &'m Module, globals: &'m GlobalEnv, chunk_id: Option<ChunkID>, chunk: &'m [u8], frame: LocalIndex) -> Self {
+    fn main_repl(module: &'m Module, globals: &'m GlobalEnv, chunk: &'m [u8]) -> Self {
         Self {
             module,
             globals,
             chunk,
-            chunk_id,
+            chunk_id: None,
             locals: 0,
-            frame,
+            frame: 0,
             pc: 0,
         }
     }
@@ -259,7 +279,7 @@ impl<'m> VMState<'m> {
         match opcode {
             OpCode::Nop => { },
             
-            OpCode::Return => return Ok(Control::Return(stack.pop())),
+            OpCode::Return => return Ok(Control::Return),
             
             OpCode::Call => {
                 let nargs = Self::into_usize(stack.peek().clone());

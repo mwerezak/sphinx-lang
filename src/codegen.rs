@@ -180,10 +180,8 @@ impl Scope {
         Ok(self.locals.last().unwrap())
     }
     
-    // i.e., without the "nonlocal" keyword
-    // this returns true if we can assign into the enclosing scope
-    fn allow_enclosing_assignment(&self) -> bool {
-        matches!(self.tag, ScopeTag::Loop | ScopeTag::Branch)
+    fn is_frame_start(&self) -> bool {
+        self.frame.is_none()
     }
 }
 
@@ -210,7 +208,12 @@ impl ScopeTracker {
     }
     
     fn push_scope(&mut self, tag: ScopeTag, chunk: Option<ChunkID>, symbol: Option<&DebugSymbol>) {
-        let frame = self.local_scope().and_then(|scope| scope.last_index());
+        let frame;
+        if tag == ScopeTag::Function {
+            frame = None; // inside a function, locals are indexed from the start of the frame
+        } else {
+            frame = self.local_scope().and_then(|scope| scope.last_index());
+        }
         
         let scope = Scope {
             tag, 
@@ -243,43 +246,23 @@ impl ScopeTracker {
         self.scopes.iter().rev()
     }
     
-    // find the nearest local in any scope
-    fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
-        self.scopes.iter().rev().find_map(|scope| scope.find_local(name))
-    }
-    
     // find the nearest local in scopes that allow nonlocal assignment
-    fn resolve_local_strict(&self, name: &LocalName) -> Option<&Local> {
+    fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
         for scope in self.iter_scopes() {
             let local = scope.find_local(name);
             if local.is_some() {
                 return local;
             }
-            
-            if !scope.allow_enclosing_assignment() {
+            if scope.is_frame_start() {
                 break;
             }
         }
-        
         None
     }
     
-    // search scopes that would have been skipped by resolve_local_strict()
-    fn resolve_nonlocal(&self, name: &LocalName) -> Option<&Local> {
-        let mut is_local = true;
-        for scope in self.iter_scopes() {
-            if is_local {
-                is_local &= scope.allow_enclosing_assignment();
-                continue;
-            }
-            
-            let local = scope.find_local(name);
-            if local.is_some() {
-                return local;
-            }
-        }
-        
-        None
+    // without the nonlocal keyword, that is
+    fn can_assign_global(&self) -> bool {
+        self.scopes.iter().skip(1).all(|scope| !scope.is_frame_start())
     }
 }
 
@@ -1048,7 +1031,7 @@ impl CodeGenerator<'_> {
             let local = LocalName::Symbol(*name);
             
             // check if the name is found in the local scope...
-            let result = self.scope().resolve_local_strict(&local).map(|local| (local.decl, local.index));
+            let result = self.scope().resolve_local(&local).map(|local| (local.decl, local.index));
             
             if let Some((decl, index)) = result {
                 if decl != DeclType::Mutable {
@@ -1058,29 +1041,30 @@ impl CodeGenerator<'_> {
                 
                 return Ok(());
             }
+            
+            // TODO upvalues
             
             // otherwise search enclosing scopes...
+            // let result = self.scope().resolve_nonlocal(&local).map(|local| (local.decl, local.index));
             
-            let result = self.scope().resolve_nonlocal(&local).map(|local| (local.decl, local.index));
-            
-            if let Some((decl, index)) = result {
-                if !assign.nonlocal {
-                    return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
-                }
-                if decl != DeclType::Mutable {
-                    return Err(CompileError::from(ErrorKind::CantAssignImmutable));
-                }
-                self.emit_assign_local(symbol, index);
+            // if let Some((decl, index)) = result {
+            //     if !assign.nonlocal {
+            //         return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
+            //     }
+            //     if decl != DeclType::Mutable {
+            //         return Err(CompileError::from(ErrorKind::CantAssignImmutable));
+            //     }
+            //     self.emit_assign_local(symbol, index);
                 
-                return Ok(());
-            }
+            //     return Ok(());
+            // }
             
         }
         
         // ...finally, try to assign global
         
         // allow assignment to global only if all enclosing scopes permit it
-        if !assign.nonlocal && !self.scope().iter_scopes().all(|scope| scope.allow_enclosing_assignment()) {
+        if !assign.nonlocal && !self.scope().can_assign_global() {
             return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
         }
         
@@ -1232,7 +1216,7 @@ impl CodeGenerator<'_> {
         
         for param in signature.required.iter() {
             self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
-            self.emit_instr(None, OpCode::InsertLocal);
+            //self.emit_instr(None, OpCode::InsertLocal);
         }
         
         // will define local variables for all default arguments
@@ -1241,7 +1225,7 @@ impl CodeGenerator<'_> {
             
             for param in signature.default.iter() {
                 self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
-                self.emit_instr(symbol, OpCode::InsertLocal);
+                // self.emit_instr(symbol, OpCode::InsertLocal);
             }
         }
         
@@ -1249,7 +1233,7 @@ impl CodeGenerator<'_> {
             self.compile_variadic_arg(signature)?;
 
             self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
-            self.emit_instr(symbol, OpCode::InsertLocal);
+            // self.emit_instr(symbol, OpCode::InsertLocal);
         }
 
         Ok(())
@@ -1307,6 +1291,7 @@ impl CodeGenerator<'_> {
             let symbol = Some(param.default.debug_symbol());
             let expr = param.default.variant();
             self.compile_expr(symbol, expr)?;
+            self.emit_instr(None, OpCode::InsertLocal);
         }
         
         jump_targets.insert(default_count.into(), self.current_offset());
@@ -1349,6 +1334,7 @@ impl CodeGenerator<'_> {
         let tuple_jump_target = self.current_offset();
         self.patch_jump_instr(Jump::PopIfTrue, tuple_jump_site, Jump::PopIfTrue.dummy_width(), tuple_jump_target)?;
         self.emit_instr(None, OpCode::TupleN);
+        self.emit_instr(None, OpCode::InsertLocal);
         
         let end_jump_target = self.current_offset();
         self.patch_jump_instr(Jump::Uncond, end_jump_site, Jump::Uncond.dummy_width(), end_jump_target)?;
