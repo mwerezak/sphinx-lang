@@ -6,7 +6,7 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::types::{Metatable, Call};
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
-use crate::runtime::gc::GCHandle;
+use crate::runtime::gc::{GCHandle, GCObject};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -74,6 +74,14 @@ impl Variant {
     }
     
     pub fn invoke(&self, _args: &[Variant]) -> Option<Call> {
+        // TODO make GC objects suck less
+        if let Self::Object(handle) = self {
+            return handle.with_ref(|obj| {
+                let GCObject::Function(fun) = &*obj;
+                Some(fun.as_call())
+            })
+        }
+        
         None
     }
 }
