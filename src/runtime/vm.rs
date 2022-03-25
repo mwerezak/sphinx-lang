@@ -325,12 +325,12 @@ impl<'m> VMState<'m> {
             OpCode::InsertGlobal => {
                 let name = Self::into_name(stack.pop());
                 let value = stack.peek().clone();
-                self.globals.borrow_mut().create(name, Access::ReadOnly, value)?;
+                self.globals.borrow_mut().create(name, Access::ReadOnly, value);
             },
             OpCode::InsertGlobalMut => {
                 let name = Self::into_name(stack.pop());
                 let value = stack.peek().clone();
-                self.globals.borrow_mut().create(name, Access::ReadWrite, value)?;
+                self.globals.borrow_mut().create(name, Access::ReadWrite, value);
             },
             OpCode::StoreGlobal => {
                 let name = Self::into_name(stack.pop());

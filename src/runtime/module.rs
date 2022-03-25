@@ -26,13 +26,13 @@ pub enum Access {
     ReadWrite,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Variable {
     access: Access,
     value: Variant,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Namespace {
     store: HashMap<StringSymbol, Variable, DefaultBuildHasher>,
 }
@@ -49,9 +49,8 @@ impl Namespace {
     }
     
     // if the variable already exists, it is overwritten
-    pub fn create(&mut self, name: StringSymbol, access: Access, value: Variant) -> ExecResult<()> {
+    pub fn create(&mut self, name: StringSymbol, access: Access, value: Variant) {
         self.store.insert(name, Variable { access, value });
-        Ok(())
     }
     
     pub fn delete(&mut self, name: &StringSymbol) -> ExecResult<()> {
@@ -77,10 +76,16 @@ impl Namespace {
         
         Ok(&mut variable.value)
     }
+    
+    pub fn extend(&mut self, other: &Namespace) {
+        for (name, variable) in other.store.iter() {
+            self.create(*name, variable.access, variable.value.clone())
+        }
+    }
 }
 
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct GlobalEnv {
     namespace: RefCell<Namespace>,
 }
@@ -140,6 +145,8 @@ impl Module {
             }
         }
     }
+    
+    
 }
 
 #[derive(Debug)]
@@ -164,14 +171,17 @@ impl ModuleCache {
         self.modules.get(module_id)
     }
     
-    /// Create a new module
     pub fn insert(&mut self, data: ProgramData, name: Option<String>, source: Option<ModuleSource>) -> ModuleID {
+        self.insert_with_globals(data, name, source, GlobalEnv::new())
+    }
+    
+    pub fn insert_with_globals(&mut self, data: ProgramData, name: Option<String>, source: Option<ModuleSource>, globals: GlobalEnv) -> ModuleID {
         let module_id = self.new_module_id(name.as_deref(), source.as_ref());
         
         let module = Module {
             id: module_id,
             name, source, data,
-            globals: GlobalEnv::new(),
+            globals,
         };
         
         self.modules.insert(module_id, module);
