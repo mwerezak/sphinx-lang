@@ -46,6 +46,11 @@ fn main() {
             Arg::new("compile_only")
             .short('d')
             .help("Produce compiled bytecode instead of executing (not implemented)")
+        )
+        .arg(
+            Arg::new("debug")
+            .long("debug")
+            .help("Enable step-through debugging")
         );
     
     let version = app.get_version().unwrap();
@@ -97,7 +102,11 @@ fn main() {
         let module_id = module_cache.insert(program.data, Some(name.to_string()), Some(source));
         
         let vm = VirtualMachine::new(&module_cache, module_id, &program.main);
-        vm.run().expect("runtime error");
+        if args.is_present("debug") {
+            run_debugger(vm);
+        } else {
+            vm.run().expect("runtime error");
+        }
     }
 }
 
@@ -129,6 +138,25 @@ fn build_program(_args: &ArgMatches, name: &str, source: &ModuleSource) -> Optio
     }
 }
 
+fn run_debugger(vm: VirtualMachine) {
+    for status in vm.run_steps() {
+        match status {
+            Err(error) => {
+                println!("Runtime error: {:?}", error);
+                break;
+            }
+            Ok(snapshot) => {
+                println!("{}", snapshot);
+            }
+        }
+        
+        let mut input = String::new();
+        let result = io::stdin().read_line(&mut input);
+        if let Err(..) = result { }
+    }
+    
+    println!("Execution stopped.");
+}
 
 fn parse_and_print_ast(_args: &ArgMatches, name: &str, source: &ModuleSource) {
     let source_text = match source.read_text() {
