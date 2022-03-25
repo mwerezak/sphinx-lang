@@ -19,10 +19,9 @@ contexts:
     - match: \b(end)\b
       scope: invalid
     - include: early-expressions
-    - include: misc-keywords
+    - include: statement-keywords
     - include: loop-statements
     - include: for-statements
-    - include: control-flow-keywords
     - include: late-expressions
     - match: ';'
       scope: punctuation.terminator
@@ -36,7 +35,7 @@ contexts:
     - include: reserved-names
     - include: numbers
     - include: operators
-    - include: declaration-keywords
+    - include: expression-keywords
     - include: strings
     - include: tuples
     - include: blocks
@@ -56,17 +55,17 @@ contexts:
     - include: identifiers
 
   # other keywords
-  declaration-keywords:
+  expression-keywords:
     - match: \b(let|var)\b
       scope: keyword.declaration.other
     - match: \b(nonlocal)\b
       scope: keyword.other
-
-  misc-keywords:
-    - match: \b(del|echo|assert)\b
+    - match: \b(echo)\b
       scope: keyword.other
 
-  control-flow-keywords:
+  statement-keywords:
+    - match: \b(del|assert)\b
+      scope: keyword.other
     - match: \b(return)\b
       scope: keyword.control
     - match: \b(break|continue)\b\s*(::\w+)?

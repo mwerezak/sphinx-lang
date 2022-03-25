@@ -608,11 +608,6 @@ impl CodeGenerator<'_> {
             
             Stmt::ForLoop { } => unimplemented!(),
             
-            Stmt::Echo(expr) => {
-                self.compile_expr(symbol, expr)?;
-                self.emit_instr(symbol, OpCode::Inspect);
-                self.emit_instr(symbol, OpCode::Pop);
-            },
             Stmt::Assert(expr) => {
                 self.compile_expr(symbol, expr)?;
                 self.emit_instr(symbol, OpCode::Assert);
@@ -729,6 +724,11 @@ impl CodeGenerator<'_> {
             Expr::IfExpr { branches, else_clause } => self.compile_if_expression(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
             
             Expr::FunctionDef(fundef) => self.compile_function_def(symbol, fundef)?,
+            
+            Expr::Echo(expr) => {
+                self.compile_expr(symbol, expr)?;
+                self.emit_instr(symbol, OpCode::Inspect);
+            },
         }
         Ok(())
     }

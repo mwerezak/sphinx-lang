@@ -5,6 +5,7 @@ use clap::{Command, Arg, ArgMatches};
 use sphinx_lang::frontend;
 use sphinx_lang::BuildErrors;
 use sphinx_lang::source::{ModuleSource, SourceText};
+use sphinx_lang::parser::expr::Expr;
 use sphinx_lang::parser::stmt::{Stmt, StmtMeta};
 use sphinx_lang::codegen::{Program, CompiledProgram};
 use sphinx_lang::runtime::VirtualMachine;
@@ -262,7 +263,7 @@ impl<'m> Repl<'m> {
             if let Some(stmt) = ast.pop() {
                 let (mut stmt, symbol) = stmt.take();
                 if let Stmt::Expression(expr) = stmt {
-                    stmt = Stmt::Echo(expr);
+                    stmt = Stmt::Expression(Expr::Echo(Box::new(expr)));
                 }
                 ast.push(StmtMeta::new(stmt, symbol))
             }

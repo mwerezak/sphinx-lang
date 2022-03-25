@@ -193,10 +193,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             };
 
             match next.token {
-                Token::EOF | Token::Semicolon | Token::Var | 
-                Token::While  | Token::Do | Token::For | 
+                Token::EOF | Token::Semicolon |
+                Token::While  | Token::Loop | Token::For |
                 Token::Continue | Token::Break | Token::Return | 
-                Token::Echo 
+                Token::Label(..) | Token::Assert
                     => break,
                 
                 Token::End if inside_block => break,
@@ -239,10 +239,6 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             Token::Label(..) => self.parse_stmt_label(ctx)?,
             
-            Token::Echo => {
-                ctx.set_start(&self.advance().unwrap());
-                Stmt::Echo(self.parse_expr_variant(ctx)?)
-            },
             Token::Assert => {
                 ctx.set_start(&self.advance().unwrap());
                 Stmt::Assert(self.parse_expr_variant(ctx)?)
@@ -767,6 +763,11 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             Token::Label(..) => self.parse_expr_label(ctx)?,
             
             // Token::OpenBrace => Ok(ExprMeta::ObjectCtor(self.parse_object_constructor(ctx)?)),
+            
+            Token::Echo => {
+                ctx.set_start(&self.advance().unwrap());
+                Expr::Echo(Box::new(self.parse_expr_variant(ctx)?))
+            },
             
             _ => self.parse_primary(ctx)?,
         };

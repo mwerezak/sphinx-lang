@@ -29,7 +29,6 @@ pub enum Stmt {
     
     ForLoop { },
     
-    Echo(Expr),
     Assert(Expr),
 }
 

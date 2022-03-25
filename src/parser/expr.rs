@@ -38,6 +38,8 @@ pub enum Expr {
     FunctionDef(FunctionDef),
     
     // ClassDef
+    
+    Echo(Box<Expr>),
 }
 
 
