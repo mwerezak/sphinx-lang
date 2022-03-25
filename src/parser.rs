@@ -1216,8 +1216,13 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let mut args = Vec::new();
         let mut unpack = None;
         
+        
         // check for empty argument list
-        if !matches!(self.peek()?.token, Token::CloseParen) {
+        if matches!(self.peek()?.token, Token::CloseParen) {
+            
+            ctx.set_end(&self.advance().unwrap());
+            
+        } else {
         
             // we use the fact that argument lists parse very similarly to tuples
             // parse a single ExprMeta. If the variant is a Tuple (not a group containing a tuple!),
