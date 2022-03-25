@@ -82,7 +82,7 @@ fn main() {
             
             let repl_env = GlobalEnv::new();
             
-            let vm = VirtualMachine::new_repl(&module_cache, &repl_env, module_id, &program.main);
+            let vm = VirtualMachine::repl(&module_cache, &repl_env, module_id, &program.main);
             vm.run().expect("runtime error");
             
             println!("\nSphinx Version {}\n", version);
@@ -281,7 +281,7 @@ impl<'m> Repl<'m> {
             
             let module_id = self.module_cache.insert(program.data, None, None);
             
-            let vm = VirtualMachine::new_repl(self.module_cache, self.repl_env, module_id, &program.main);
+            let vm = VirtualMachine::repl(self.module_cache, self.repl_env, module_id, &program.main);
             if let Err(error) = vm.run() {
                 println!("Runtime error: {:?}", error);
             }

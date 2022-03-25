@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::Metatable;
+use crate::runtime::types::{Metatable, Call};
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::gc::GCHandle;
@@ -71,6 +71,10 @@ impl Variant {
             _ => true
         }
         
+    }
+    
+    pub fn invoke(&self, _args: &[Variant]) -> Option<Call> {
+        None
     }
 }
 
@@ -218,6 +222,7 @@ impl fmt::Display for Variant {
         }
     }
 }
+
 
 
 

@@ -2,6 +2,7 @@ use crate::language::{IntType, FloatType};
 use crate::codegen::{Program, ProgramData, ChunkID, ConstID, Constant, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::ops;
+use crate::runtime::types::Call;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, ModuleCache, ModuleID, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -19,11 +20,20 @@ enum CallSite {
     Native,
 }
 
+// data used to set up a new call
+struct CallInfo {
+    frame: LocalIndex,
+    call: Call,
+    site: CallSite,
+}
+
 enum Control {
     Continue,
-    Return,
+    Call(CallInfo),
+    Return(Variant),
     Exit,
 }
+
 
 // Stack-based Virtual Machine
 #[derive(Debug)]
@@ -46,11 +56,11 @@ impl<'m> VirtualMachine<'m> {
             traceback: Vec::new(),
             calls: Vec::new(),
             values: ValueStack::new(),
-            state: VMState::new(module, main_chunk, 0),
+            state: VMState::with_chunk(module, None, main_chunk, 0),
         }
     }
     
-    pub fn new_repl(module_cache: &'m ModuleCache, repl_env: &'m GlobalEnv, module_id: ModuleID, main_chunk: &'m [u8]) -> Self {
+    pub fn repl(module_cache: &'m ModuleCache, repl_env: &'m GlobalEnv, module_id: ModuleID, main_chunk: &'m [u8]) -> Self {
         let module = module_cache.get(&module_id).expect("invalid module id");
         
         Self {
@@ -58,18 +68,59 @@ impl<'m> VirtualMachine<'m> {
             traceback: Vec::new(),
             calls: Vec::new(),
             values: ValueStack::new(),
-            state: VMState::with_globals(module, repl_env, main_chunk, 0),
+            state: VMState::with_globals(module, repl_env, None, main_chunk, 0),
         }
     }
     
     pub fn run(mut self) -> ExecResult<()> {
-        while let Some(state) = self.calls.last_mut() {
-            match state.exec_next(&mut self.values)? {
+        loop {
+            match self.state.exec_next(&mut self.values)? {
+                Control::Call(info) => self.setup_call(info)?,
+                Control::Return(value) => {
+                    if self.calls.is_empty() {
+                        break
+                    }
+                    self.return_call(value);
+                },
+                Control::Exit => break,
                 Control::Continue => { }
-                Control::Return | Control::Exit => break,
             }
         }
         Ok(())
+    }
+    
+    fn setup_call(&mut self, call: CallInfo) -> ExecResult<()> {
+        self.traceback.push(call.site);
+        
+        match call.call {
+            Call::Native(retval) => {
+                let retval = retval?;
+                self.values.truncate(call.frame.into());
+                self.values.push(retval);
+                self.traceback.pop();
+            },
+            
+            Call::Chunk(module_id, chunk_id) => {
+                let module = self.module_cache.get(&module_id).expect("invalid module id");
+                
+                let mut state = VMState::new(module, chunk_id, call.frame);
+                std::mem::swap(&mut self.state, &mut state);
+                self.calls.push(state);
+            },
+        }
+        
+        Ok(())
+    }
+    
+    fn return_call(&mut self, retval: Variant) {
+        let frame = self.state.frame;
+        
+        let mut state = self.calls.pop().expect("empty call stack");
+        std::mem::swap(&mut self.state, &mut state);
+        
+        self.values.truncate(frame.into());
+        self.values.push(retval);
+        self.traceback.pop();
     }
 }
 
@@ -123,7 +174,7 @@ macro_rules! cond_jump {
 }
 
 
-pub type LocalIndex = u16;
+pub type LocalIndex = u16;  // TODO make this u32 and add opcodes
 
 // stores the active chunk execution information
 #[derive(Debug)]
@@ -131,24 +182,39 @@ struct VMState<'m> {
     module: &'m Module,
     globals: &'m GlobalEnv,
     chunk: &'m [u8],
-    frame: usize,  // index of the first local
+    chunk_id: Option<ChunkID>,
+    frame: LocalIndex,
     locals: LocalIndex,
     pc: usize,
 }
 
 impl<'m> VMState<'m> {
-    fn new(module: &'m Module, chunk: &'m [u8], frame: usize) -> Self {
-        Self::with_globals(module, module.globals(), chunk, frame)
+    fn new(module: &'m Module, chunk_id: ChunkID, frame: LocalIndex) -> Self {
+        let chunk =  module.data().get_chunk(chunk_id);
+        Self::with_chunk(module, Some(chunk_id), chunk, frame)
     }
     
-    fn with_globals(module: &'m Module, globals: &'m GlobalEnv, chunk: &'m [u8], frame: usize) -> Self {
+    fn with_chunk(module: &'m Module, chunk_id: Option<ChunkID>, chunk: &'m [u8], frame: LocalIndex) -> Self {
+        Self::with_globals(module, module.globals(), chunk_id, chunk, frame)
+    }
+    
+    fn with_globals(module: &'m Module, globals: &'m GlobalEnv, chunk_id: Option<ChunkID>, chunk: &'m [u8], frame: LocalIndex) -> Self {
         Self {
             module,
             globals,
             chunk,
-            frame,
+            chunk_id,
             locals: 0,
+            frame,
             pc: 0,
+        }
+    }
+    
+    fn get_callsite(&self, offset: usize) -> CallSite {
+        CallSite::Chunk {
+            offset,
+            module_id: self.module.module_id(),
+            chunk_id: self.chunk_id,
         }
     }
 
@@ -186,15 +252,36 @@ impl<'m> VMState<'m> {
             .unwrap_or_else(|| panic!("invalid instruction: {:x}", op_byte));
         
         let data_slice = (self.pc + 1) .. (self.pc + opcode.instr_len());
+        let current_offset = self.pc;
         self.pc += opcode.instr_len(); // pc points to next instruction
         
         let data = self.chunk.get(data_slice).expect("truncated instruction");
         match opcode {
             OpCode::Nop => { },
             
-            OpCode::Return => return Ok(Control::Return),
+            OpCode::Return => return Ok(Control::Return(stack.pop())),
             
-            OpCode::Call => unimplemented!(),
+            OpCode::Call => {
+                let nargs = Self::into_usize(stack.peek().clone());
+                stack.swap_last(stack.len() - nargs - 1);
+                
+                let frame = stack.len() - nargs - 2;
+                let callee = stack.peek_at(frame);
+                
+                let args = stack.peek_many(nargs);
+                let call = callee.invoke(args).ok_or_else(|| {
+                    stack.discard(1 + nargs);
+                    RuntimeError::from(ErrorKind::NotCallable(stack.pop()))
+                })?;
+                
+                let call_info = CallInfo {
+                    call,
+                    frame: frame.try_into().expect("frame index overflow"),
+                    site: self.get_callsite(current_offset),
+                };
+                return Ok(Control::Call(call_info))
+            },
+            
             OpCode::CallUnpack => unimplemented!(),
             
             OpCode::Pop => { 
@@ -410,6 +497,11 @@ impl ValueStack {
     fn pop_many(&mut self, count: usize) -> Vec<Variant> {
         self.stack.split_off(self.stack.len() - count)
     }
+
+    #[inline(always)]
+    fn truncate(&mut self, index: usize) {
+        self.stack.truncate(index)
+    }
     
     #[inline(always)]
     fn discard(&mut self, count: usize) {
@@ -451,8 +543,9 @@ impl ValueStack {
     }
     
     #[inline(always)]
-    fn swap(&mut self, index_a: usize, index_b: usize) {
-        self.stack.swap(index_a, index_b)
+    fn swap_last(&mut self, index: usize) {
+        let len = self.stack.len();
+        self.stack.swap(index, len - 1)
     }
     
     #[inline(always)]

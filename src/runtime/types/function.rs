@@ -2,6 +2,7 @@ use std::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::module::{ModuleID, Access};
+use crate::runtime::types::Call;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::gc::GCObject;
 
@@ -15,6 +16,10 @@ pub struct Function {
 impl Function {
     pub fn new(signature: Signature, module_id: ModuleID, chunk_id :ChunkID) -> Self {
         Self { signature, module_id, chunk_id }
+    }
+    
+    pub fn as_call(&self) -> Call {
+        Call::Chunk(self.module_id, self.chunk_id)
     }
 }
 

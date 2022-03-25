@@ -10,7 +10,7 @@ use std::mem::size_of;
 
                         // width set here so that the longest mnemonic is 16 chars
 const OP_NOP:           u8 = 0x00;
-const OP_RETURN:        u8 = 0x01;  // return from current function?
+const OP_RETURN:        u8 = 0x01;  // [ ...call frame... ret_value ] => [ ret_value ]
 
 // The odd argument order is because the VM will swap "nargs" with "arg[n]" after reading "nargs".
 // This is because the function preamble will fill in any missing default arguments such that the
@@ -18,10 +18,10 @@ const OP_RETURN:        u8 = 0x01;  // return from current function?
 // This wouldn't be possible if nargs was in some arbitrary location in the middle of the argument list,
 // so swapping it to the beginning is the most efficient way to handle this.
 
-// [ callobj arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
+// [ callee arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
 const OP_CALL:          u8 = 0x02;
 
-// [ callobj arg[n] arg[0] ... arg[n-1] arg_seq nargs ] => [ ret_value ]  -- nargs does not include arg_seq! 
+// [ callee arg[n] arg[0] ... arg[n-1] arg_seq nargs ] => [ ret_value ]  -- nargs does not include arg_seq! 
 const OP_CALL_UNPACK:   u8 = 0x03;
 
 // 0x08-40        Immediate Values

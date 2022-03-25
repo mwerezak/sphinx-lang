@@ -16,6 +16,7 @@ pub enum ErrorKind {
     NameNotDefined(String),
     CantAssignImmutable,  // can't assign to immutable global variable
     UnhashableValue(Variant),
+    NotCallable(Variant),
     AssertFailed,
     Other,
 }
@@ -61,6 +62,7 @@ impl fmt::Display for RuntimeError {
             ErrorKind::NameNotDefined(name) => format!("undefined variable \"{}\"", name),
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
             ErrorKind::UnhashableValue(..) => format!("unhashable value"),
+            ErrorKind::NotCallable(..) => format!("'...' type is not callable"),
             ErrorKind::AssertFailed => format!("assertion failed"),
             ErrorKind::Other => String::new(),
         };

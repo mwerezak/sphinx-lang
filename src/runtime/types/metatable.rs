@@ -1,5 +1,6 @@
 use crate::runtime::Variant;
 use crate::runtime::ops::eval_not;
+use crate::runtime::types::Call;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -7,47 +8,47 @@ type Method0<R> = fn(&Variant) -> ExecResult<R>;
 type Method1<R> = fn(&Variant, &Variant) -> ExecResult<R>;
 // type Method2<R> = fn(&Variant, &Variant, &Variant) -> ExecResult<R>;
 
-// pub type MethodSelf = Method0<Variant>;
-// pub type MethodArg1 = Method1<Variant>;
-// pub type MethodArg2 = Method2<Variant>;
-
 pub type MethodUnary = Method0<Variant>;
 pub type MethodBinary = Method1<Option<Variant>>; // a None result will cause the reflected version to be called
 pub type MethodBinaryReflected = Method1<Variant>;
 pub type MethodCompare = Method1<Option<bool>>;
 
+pub type MethodCall = fn(&Variant, &[Variant]) -> Call;
+
 #[derive(Default)]
 pub struct Metatable {
+    call: Option<MethodCall>,
+    
     // Operator Overloads
-    op_pos: Option<MethodUnary>,
-    op_neg: Option<MethodUnary>,
-    op_inv: Option<MethodUnary>,
+    op_pos: Option<MethodUnary>,  // __pos
+    op_neg: Option<MethodUnary>,  // __neg
+    op_inv: Option<MethodUnary>,  // __inv
     
-    op_add: Option<MethodBinary>,
-    op_sub: Option<MethodBinary>,
-    op_mul: Option<MethodBinary>,
-    op_div: Option<MethodBinary>,
-    op_mod: Option<MethodBinary>,
-    op_and: Option<MethodBinary>,
-    op_xor: Option<MethodBinary>,
-    op_or:  Option<MethodBinary>,
-    op_shl: Option<MethodBinary>,
-    op_shr: Option<MethodBinary>,
+    op_add: Option<MethodBinary>, // __add
+    op_sub: Option<MethodBinary>, // __sub
+    op_mul: Option<MethodBinary>, // __mul
+    op_div: Option<MethodBinary>, // __div
+    op_mod: Option<MethodBinary>, // __mod
+    op_and: Option<MethodBinary>, // __and
+    op_xor: Option<MethodBinary>, // __xor
+    op_or:  Option<MethodBinary>, // __or
+    op_shl: Option<MethodBinary>, // __shl
+    op_shr: Option<MethodBinary>, // __shr
     
-    op_radd: Option<MethodBinaryReflected>,
-    op_rsub: Option<MethodBinaryReflected>,
-    op_rmul: Option<MethodBinaryReflected>,
-    op_rdiv: Option<MethodBinaryReflected>,
-    op_rmod: Option<MethodBinaryReflected>,
-    op_rand: Option<MethodBinaryReflected>,
-    op_rxor: Option<MethodBinaryReflected>,
-    op_ror:  Option<MethodBinaryReflected>,
-    op_rshl: Option<MethodBinaryReflected>,
-    op_rshr: Option<MethodBinaryReflected>,
+    op_radd: Option<MethodBinaryReflected>, // __radd
+    op_rsub: Option<MethodBinaryReflected>, // __rsub
+    op_rmul: Option<MethodBinaryReflected>, // __rmul
+    op_rdiv: Option<MethodBinaryReflected>, // __rdiv
+    op_rmod: Option<MethodBinaryReflected>, // __rmod
+    op_rand: Option<MethodBinaryReflected>, // __rand
+    op_rxor: Option<MethodBinaryReflected>, // __rxor
+    op_ror:  Option<MethodBinaryReflected>, // __ror
+    op_rshl: Option<MethodBinaryReflected>, // __rshl
+    op_rshr: Option<MethodBinaryReflected>, // __rshr
     
-    cmp_lt: Option<MethodCompare>,
-    cmp_le: Option<MethodCompare>,
-    cmp_eq: Option<MethodCompare>,
+    cmp_lt: Option<MethodCompare>, // __lt
+    cmp_le: Option<MethodCompare>, // __le
+    cmp_eq: Option<MethodCompare>, // __eq
 }
 
 

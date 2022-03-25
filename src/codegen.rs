@@ -1211,7 +1211,7 @@ impl CodeGenerator<'_> {
         }
         
         // end the function scope
-        // don't need to emit end scope instructions, should be handled by return
+        // don't need to emit end scope instructions, will be handled by return
         chunk.scope_mut().pop_scope();
         chunk.finish();
         
