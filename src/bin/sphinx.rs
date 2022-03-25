@@ -86,9 +86,12 @@ fn main() {
             let mut module_cache = ModuleCache::new();
             let module_id = module_cache.insert(program.data, Some(name.to_string()), Some(source));
             
-            
             let vm = VirtualMachine::new(&module_cache, module_id, &program.main);
-            vm.run().expect("runtime error");
+            if args.is_present("debug") {
+                run_debugger(vm);
+            } else {
+                vm.run().expect("runtime error");
+            }
             
             println!("\nSphinx Version {}\n", version);
             
