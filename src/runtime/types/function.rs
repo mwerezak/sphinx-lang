@@ -1,10 +1,12 @@
 use std::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::codegen::{ChunkID, ConstID};
+use crate::runtime::Variant;
 use crate::runtime::module::{ModuleID, Access};
 use crate::runtime::types::Call;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::gc::GCObject;
+use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
 pub struct Function {
@@ -17,6 +19,8 @@ impl Function {
     pub fn new(signature: Signature, module_id: ModuleID, chunk_id :ChunkID) -> Self {
         Self { signature, module_id, chunk_id }
     }
+    
+    pub fn signature(&self) -> &Signature { &self.signature }
     
     pub fn as_call(&self) -> Call {
         Call::Chunk(self.module_id, self.chunk_id)
@@ -65,6 +69,18 @@ impl Signature {
     pub fn max_arity(&self) -> Option<usize> {
         if self.variadic().is_some() { None }
         else { Some(self.required.len() + self.default.len()) }
+    }
+    
+    pub fn check_args(&self, args: &[Variant]) -> ExecResult<()> {
+        if args.len() < self.required.len() {
+            return Err(ErrorKind::MissingArguments(args.len(), self.clone()).into())
+        }
+        
+        if matches!(self.max_arity(), Some(max_arity) if args.len() > max_arity) {
+            return Err(ErrorKind::TooManyArguments(args.len(), self.clone()).into())
+        }
+        
+        Ok(())
     }
 }
 

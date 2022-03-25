@@ -289,17 +289,12 @@ impl<'m> VMState<'m> {
                 let callee = stack.peek_at(frame);
                 
                 let args = stack.peek_many(nargs);
-                let call = callee.invoke(args).ok_or_else(|| {
-                    stack.discard(1 + nargs);
-                    RuntimeError::from(ErrorKind::NotCallable(stack.pop()))
-                })?;
-                
-                let call_info = CallInfo {
-                    call,
+                let call = CallInfo {
+                    call: callee.invoke(args)?,
                     frame: frame.try_into().expect("frame index overflow"),
                     site: self.get_callsite(current_offset),
                 };
-                return Ok(Control::Call(call_info))
+                return Ok(Control::Call(call))
             },
             
             OpCode::CallUnpack => unimplemented!(),

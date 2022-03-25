@@ -3,12 +3,15 @@ use std::error::Error;
 
 use crate::utils;
 use crate::runtime::Variant;
+use crate::runtime::strings::StringSymbol;
+use crate::runtime::types::function::Signature;
 
 // TODO box error
 pub type ExecResult<T> = Result<T, RuntimeError>;
 
 #[derive(Debug)]
 pub enum ErrorKind {
+    // TODO replace variant with type name
     InvalidUnaryOperand(Variant),  // unsupported operand for type
     InvalidBinaryOperand(Variant, Variant),
     OverflowError,
@@ -17,6 +20,8 @@ pub enum ErrorKind {
     CantAssignImmutable,  // can't assign to immutable global variable
     UnhashableValue(Variant),
     NotCallable(Variant),
+    MissingArguments(usize, Signature),
+    TooManyArguments(usize, Signature),
     AssertFailed,
     Other,
 }
@@ -55,6 +60,7 @@ impl Error for RuntimeError {
 impl fmt::Display for RuntimeError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let message = match self.kind() {
+            // TODO
             ErrorKind::InvalidUnaryOperand(..) => format!("unsupported operand for type '...'"),
             ErrorKind::InvalidBinaryOperand(..) => format!("unsupported operand for type '...' and '...'"),
             ErrorKind::OverflowError => format!("integer arithmetic overflow"),
@@ -63,6 +69,8 @@ impl fmt::Display for RuntimeError {
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
             ErrorKind::UnhashableValue(..) => format!("unhashable value"),
             ErrorKind::NotCallable(..) => format!("'...' type is not callable"),
+            ErrorKind::MissingArguments(..) => format!("name() missing N required arguments: '...', '...', and '...'"),
+            ErrorKind::TooManyArguments(..) => format!("name() takes  N arguments but M were given"),
             ErrorKind::AssertFailed => format!("assertion failed"),
             ErrorKind::Other => String::new(),
         };

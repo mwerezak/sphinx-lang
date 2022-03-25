@@ -73,16 +73,17 @@ impl Variant {
         
     }
     
-    pub fn invoke(&self, _args: &[Variant]) -> Option<Call> {
+    pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
         // TODO make GC objects suck less
         if let Self::Object(handle) = self {
             return handle.with_ref(|obj| {
                 let GCObject::Function(fun) = &*obj;
-                Some(fun.as_call())
+                fun.signature().check_args(args)?;
+                Ok(fun.as_call())
             })
         }
         
-        None
+        Err(ErrorKind::NotCallable(self.clone()).into())
     }
 }
 
