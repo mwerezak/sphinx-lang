@@ -6,19 +6,9 @@ use crate::runtime::types::Call;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, ModuleCache, ModuleID, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
-use crate::debug::DebugSymbol;
+use crate::debug::traceback::CallSite;
+use crate::debug::snapshot::{VMSnapshot, VMStateSnapshot};
 
-
-/// Traceback information
-#[derive(Debug, Clone)]
-enum CallSite {
-    Chunk {
-        offset: usize,
-        module_id: ModuleID,
-        chunk_id: Option<ChunkID>,
-    },
-    Native,
-}
 
 // data used to set up a new call
 struct CallInfo {
@@ -598,18 +588,10 @@ impl ValueStack {
 // For debugging
 
 
-#[derive(Debug)]
-pub struct VMSnapshot {
-    traceback: Vec<CallSite>,
-    calls: Vec<VMStateSnapshot>,
-    values: Vec<Variant>,
-    state: VMStateSnapshot,
-}
 
 impl From<&VirtualMachine<'_>> for VMSnapshot {
     fn from (vm: &VirtualMachine) -> Self {
         Self {
-            traceback: vm.traceback.clone(),
             calls: vm.calls.iter().map(VMStateSnapshot::from).collect(),
             values: vm.values.stack.clone(),
             state: (&vm.state).into(),
@@ -618,23 +600,22 @@ impl From<&VirtualMachine<'_>> for VMSnapshot {
 }
 
 
-#[derive(Debug)]
-pub struct VMStateSnapshot {
-    module_id: ModuleID,
-    chunk_id: Option<ChunkID>,
-    frame: usize,
-    locals: LocalIndex,
-    pc: usize,
-}
 
 impl From<&VMState<'_>> for VMStateSnapshot {
     fn from(state: &VMState) -> Self {
+        let next_instr = state.chunk.get(state.pc)
+            .map(|byte| OpCode::try_from(*byte).map_or_else(
+                |byte| vec![ byte ],
+                |opcode| state.chunk[state.pc..(state.pc + opcode.instr_len())].to_vec()
+            ));
+        
         Self {
             module_id: state.module.module_id(),
             chunk_id: state.chunk_id,
             frame: state.frame,
             locals: state.locals,
             pc: state.pc,
+            next_instr,
         }
     }
 }

@@ -2,6 +2,8 @@ use std::error::Error;
 
 pub mod symbol;
 pub mod dasm;
+pub mod traceback;
+pub mod snapshot;
 
 pub use symbol::{DebugSymbol, DebugSymbolResolver};
 

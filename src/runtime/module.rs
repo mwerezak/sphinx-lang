@@ -11,12 +11,13 @@ use std::hash::{Hash, Hasher, BuildHasher};
 use std::collections::HashMap;
 use crate::source::ModuleSource;
 use crate::language::FloatType;
-use crate::codegen::{ProgramData, Constant, ConstID};
 use crate::runtime::{Variant, DefaultBuildHasher};
 use crate::runtime::gc::GCObject;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::types::function::Function;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
+
+pub use crate::codegen::{ProgramData, Constant, ConstID, ChunkID};
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

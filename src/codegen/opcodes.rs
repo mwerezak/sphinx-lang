@@ -325,6 +325,17 @@ impl From<OpCode> for u8 {
     fn from(opcode: OpCode) -> Self { opcode as u8 }
 }
 
+impl TryFrom<u8> for OpCode {
+    type Error = u8;
+    fn try_from(byte: u8) -> Result<Self, Self::Error> {
+        if let Some(opcode) = OpCode::from_byte(byte) {
+            Ok(opcode)
+        } else {
+            Err(byte)
+        }
+    }
+}
+
 impl PartialEq<u8> for OpCode {
     fn eq(&self, other: &u8) -> bool { *other == (*self).into() }
 }
