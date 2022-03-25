@@ -10,7 +10,7 @@ use crate::debug::DebugSymbol;
 
 
 /// Traceback information
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum CallSite {
     Chunk {
         offset: usize,
@@ -73,20 +73,25 @@ impl<'m> VirtualMachine<'m> {
     }
     
     pub fn run(mut self) -> ExecResult<()> {
-        loop {
-            match self.state.exec_next(&mut self.values)? {
-                Control::Call(info) => self.setup_call(info)?,
-                Control::Return => {
-                    if self.calls.is_empty() {
-                        break
-                    }
-                    self.return_call();
-                },
-                Control::Exit => break,
-                Control::Continue => { }
-            }
-        }
+        while !self.exec_next()? { }
         Ok(())
+    }
+    
+    pub fn run_steps(self) -> impl Iterator<Item=ExecResult<VMSnapshot>> + 'm {
+        VMStepper::from(self)
+    }
+    
+    #[inline]
+    fn exec_next(&mut self) -> ExecResult<bool> {
+        match self.state.exec_next(&mut self.values)? {
+            Control::Exit => return Ok(true),
+            Control::Return if self.calls.is_empty() => return Ok(true),
+            
+            Control::Call(info) => self.setup_call(info)?,
+            Control::Return => self.return_call(),
+            Control::Continue => { }
+        }
+        Ok(false)
     }
     
     fn setup_call(&mut self, call: CallInfo) -> ExecResult<()> {
@@ -110,6 +115,9 @@ impl<'m> VirtualMachine<'m> {
                 let mut state = VMState::call_frame(module, chunk_id, call.frame, locals);
                 std::mem::swap(&mut self.state, &mut state);
                 self.calls.push(state);
+                
+                log::debug!("Setup call: {{ frame: {}, locals: {} }}", self.state.frame, self.state.locals);
+                log::debug!("Stack: {:?}", self.values);
             },
         }
         
@@ -126,6 +134,9 @@ impl<'m> VirtualMachine<'m> {
         self.values.truncate(frame.into());
         self.values.push(retval);
         self.traceback.pop();
+        
+        log::debug!("Return call: {{ frame: {}, locals: {} }}", self.state.frame, self.state.locals);
+        log::debug!("Stack: {:?}", self.values);
     }
 }
 
@@ -583,3 +594,77 @@ impl ValueStack {
     
 }
 
+
+// For debugging
+
+
+#[derive(Debug)]
+pub struct VMSnapshot {
+    traceback: Vec<CallSite>,
+    calls: Vec<VMStateSnapshot>,
+    values: Vec<Variant>,
+    state: VMStateSnapshot,
+}
+
+impl From<&VirtualMachine<'_>> for VMSnapshot {
+    fn from (vm: &VirtualMachine) -> Self {
+        Self {
+            traceback: vm.traceback.clone(),
+            calls: vm.calls.iter().map(VMStateSnapshot::from).collect(),
+            values: vm.values.stack.clone(),
+            state: (&vm.state).into(),
+        }
+    }
+}
+
+
+#[derive(Debug)]
+pub struct VMStateSnapshot {
+    module_id: ModuleID,
+    chunk_id: Option<ChunkID>,
+    frame: usize,
+    locals: LocalIndex,
+    pc: usize,
+}
+
+impl From<&VMState<'_>> for VMStateSnapshot {
+    fn from(state: &VMState) -> Self {
+        Self {
+            module_id: state.module.module_id(),
+            chunk_id: state.chunk_id,
+            frame: state.frame,
+            locals: state.locals,
+            pc: state.pc,
+        }
+    }
+}
+
+struct VMStepper<'m> {
+    vm: VirtualMachine<'m>,
+    stop: bool,
+}
+
+impl<'m> From<VirtualMachine<'m>> for VMStepper<'m> {
+    fn from(vm: VirtualMachine<'m>) -> Self {
+        Self { vm, stop: false }
+    }
+}
+
+impl<'m> Iterator for VMStepper<'m> {
+    type Item = ExecResult<VMSnapshot>;
+    
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.stop {
+            return None
+        }
+        
+        let status = self.vm.exec_next();
+        if let Err(error) = status {
+            self.stop = true;
+            return Some(Err(error));
+        }
+        
+        self.stop = status.unwrap();
+        Some(Ok(VMSnapshot::from(&self.vm)))
+    }
+}
