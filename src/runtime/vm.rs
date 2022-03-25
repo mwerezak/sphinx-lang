@@ -289,10 +289,10 @@ impl<'m> VMState<'m> {
             OpCode::Return => return Ok(Control::Return),
             
             OpCode::Call => {
-                const CALL_LOCALS: usize = 2;
+                const SYSTEM_ARGS: usize = 2; // [ callee, nargs, ... ]
                 
                 let nargs = Self::into_usize(stack.peek().clone());
-                let call_locals = CALL_LOCALS + nargs;
+                let call_locals = SYSTEM_ARGS + nargs;
                 
                 stack.swap_last(stack.len() - call_locals + 1);
                 
