@@ -3,7 +3,8 @@ use std::rc::Rc;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Metatable, Call};
+use crate::runtime::types::{Call, Type};
+use crate::runtime::types::metatable::Metatable;
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::gc::{GCHandle, GCObject};
@@ -22,11 +23,27 @@ pub enum Variant {
     String(StringSymbol),
     // TODO just GC tuples
     Tuple(Rc<[Variant]>),  //  will use COW semantics, so if we need to send to another thread we can just clone the underlying data
-    Object(GCHandle),
+    GC(GCHandle),
     // LoadedModule(ModuleID)
 }
 
 impl Variant {
+    pub fn get_type(&self) -> Type {
+        match self {
+            Self::Nil => Type::Nil,
+            Self::BoolTrue  => Type::Boolean,
+            Self::BoolFalse => Type::Boolean,
+            Self::Integer(..) => Type::Integer,
+            Self::Float(..)   => Type::Float,
+            Self::String(..)  => Type::String,
+            Self::EmptyTuple => Type::Tuple,
+            Self::Tuple(..)  => Type::Tuple,
+            Self::GC(..) => {
+                unimplemented!()
+            },
+        }
+    }
+    
     pub fn metatable(&self) -> &Metatable {
         match self {
             Self::String(..) => &METATABLE_STRING,
@@ -75,7 +92,7 @@ impl Variant {
     
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
         // TODO make GC objects suck less
-        if let Self::Object(handle) = self {
+        if let Self::GC(handle) = self {
             return handle.with_ref(|obj| {
                 let GCObject::Function(fun) = &*obj;
                 fun.signature().check_args(args)?;
@@ -116,7 +133,7 @@ impl From<&str> for Variant {
 }
 
 impl From<GCHandle> for Variant {
-    fn from(handle: GCHandle) -> Self { Self::Object(handle) }
+    fn from(handle: GCHandle) -> Self { Self::GC(handle) }
 }
 
 
@@ -205,7 +222,7 @@ impl fmt::Debug for Variant {
                 write!(fmt, "{:?})", last)
             }
             
-            Self::Object(handle) => write!(fmt, "{:?}", handle),
+            Self::GC(handle) => write!(fmt, "{:?}", handle),
         }
     }
 }
