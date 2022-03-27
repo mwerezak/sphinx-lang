@@ -75,12 +75,10 @@ end
 
 variadic_fun("red", "blue", "green")  # prints "red" then "blue" then "green"
 
-# Note: named arguments are not supported (it helps make function invocation fast)
-# Instead, pass an anonymous object.
+# Note: named arguments are not supported.
+# You can pass an anonymous object instead.
 configure_something({ option1: true, option2: false })
 
-# I plan to add support for named arguments, but all functions will either be
-# fully positional-only or named-only.
 
 
 # Argument unpacking and wrapping decorators
