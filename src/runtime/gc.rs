@@ -1,116 +1,133 @@
-///! The current implementation is fairly primitive, and will probably change
+/// Partial clone of rust-gc's mark and sweep implementation
 
-use std::cell::{RefCell, Ref, RefMut};
-use std::ops::{Deref, DerefMut};
-use std::marker::PhantomData;
+use std::mem;
+use std::any::Any;
+use std::ptr::NonNull;
+use std::cell::{Cell, RefCell};
+use log;
 
-use crate::runtime::types::function::Function;
+mod handle;
+pub use handle::GCHandle;
 
 
 thread_local! {
-    pub static GC_STATE: RefCell<GCState> = RefCell::new(GCState::init());
+    static GC_STATE: RefCell<GCState> = RefCell::new(GCState::default());
 }
 
-
-pub enum GCObject {
-    Function(Box<Function>),
-    // Object(Box<...>),
-    // Metatable(Box<...>),
-    
+struct GCState {
+    stats: GCStats,
+    config: GCConfig,
+    boxes_start: Option<NonNull<GCBox<dyn Any>>>,
 }
 
-impl GCObject {
-    pub fn allocate(self) -> GCHandle {
-        GC_STATE.with(|gc| gc.borrow_mut().insert(self))
-    }
-    
-    // metatable
-}
-
-type PhantomUnsend = PhantomData<*mut ()>;
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct GCHandle {
-    index: usize,
-    _marker: PhantomUnsend,
-}
-
-impl From<usize> for GCHandle {
-    fn from(index: usize) -> Self {
-        Self { index, _marker: PhantomData }
-    }
-}
-
-impl GCHandle {
-    fn index(&self) -> usize { self.index }
-    
-    pub fn with_ref<R>(&self, func: impl FnOnce(Ref<GCObject>) -> R) -> R {
-        GC_STATE.with(|gc| func(gc.borrow().lookup(self)))
-    }
-    
-    pub fn with_mut<R>(&self, func: impl FnOnce(RefMut<GCObject>) -> R) -> R {
-        GC_STATE.with(|gc| func(gc.borrow().lookup_mut(self)))
-    }
-}
-
-impl std::fmt::Debug for GCHandle {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(fmt, "GC(&{})", self.index)
-    }
-}
-
-
-struct GCBox {
+/// TODO store GCBoxes in linear chunks instead of individual linked nodes
+struct GCBox<T> where T: Any + ?Sized + 'static {
+    next: Option<NonNull<GCBox<dyn Any>>>,
     marked: bool,
-    object: RefCell<GCObject>,
+    data: T,
 }
 
-impl From<GCObject> for GCBox {
-    fn from(object: GCObject) -> Self {
+impl<T> GCBox<T> {
+    fn value(&self) -> &T { &self.data }
+}
+
+
+#[derive(Debug)]
+struct GCStats {
+    allocated: usize,
+    cycle_count: usize,
+}
+
+struct GCConfig {
+    threshold: u16,
+    pause_factor: u16,  // percent memory use relative to last cycle before starting a new cycle
+}
+
+impl Default for GCConfig {
+    fn default() -> Self {
         Self {
-            marked: false,
-            object: RefCell::new(object),
+            threshold: 8*1024, // 8 kiB
+            pause_factor: 200,
         }
     }
 }
 
-impl GCBox {
-    fn borrow(&self) -> Ref<GCObject> {
-        self.object.borrow()
+impl Default for GCState {
+    fn default() -> Self {
+        GCState::new(GCConfig::default())
     }
-    
-    fn borrow_mut(&self) -> RefMut<GCObject> {
-        self.object.borrow_mut()
-    }
-}
-
-
-pub struct GCState {
-    // stats: 
-    // config: 
-    boxes: Vec<GCBox>,
 }
 
 impl GCState {
-    fn init() -> Self {
+    fn new(config: GCConfig) -> Self {
         Self {
-            boxes: Vec::new(),
+            config,
+            stats: GCStats {
+                allocated: 0,
+                cycle_count: 0,
+            },
+            boxes_start: None,
         }
     }
     
-    pub fn insert(&mut self, object: GCObject) -> GCHandle {
-        let index = self.boxes.len();
-        self.boxes.push(object.into());
-        GCHandle::from(index)
+    fn should_collect(&self) -> bool {
+        false // TODO
     }
     
-    pub fn lookup(&self, handle: &GCHandle) -> Ref<GCObject> {
-        let gcbox = self.boxes.get(handle.index()).expect("invalid handle");
-        gcbox.borrow()
+    fn allocate<T>(&mut self, data: T) -> NonNull<GCBox<T>> {
+        if self.should_collect() {
+            unimplemented!()
+        }
+        
+        let gcbox = Box::new(GCBox {
+            next: None,
+            marked: false,
+            data,
+        });
+        
+        self.insert_box(gcbox)
     }
     
-    pub fn lookup_mut(&self, handle: &GCHandle) -> RefMut<GCObject> {
-        let gcbox = self.boxes.get(handle.index()).expect("invalid handle");
-        gcbox.borrow_mut()
+    fn insert_box<T>(&mut self, mut gcbox: Box<GCBox<T>>) -> NonNull<GCBox<T>> {
+        gcbox.next = self.boxes_start.take();
+        
+        let ptr = unsafe {
+            NonNull::new_unchecked(Box::into_raw(gcbox))
+        };
+        self.boxes_start = Some(ptr);
+        self.stats.allocated +=  mem::size_of::<GCBox<T>>();
+        
+        ptr
     }
+    
+    
+}
+
+impl Drop for GCState {
+    fn drop(&mut self) {
+        unimplemented!()
+    }
+}
+
+
+// Whether or not the thread is currently in the sweep phase of garbage collection.
+thread_local!(pub static GC_SWEEP: Cell<bool> = Cell::new(false));
+
+struct DropGuard;
+
+impl DropGuard {
+    fn new() -> DropGuard {
+        GC_SWEEP.with(|flag| flag.set(true));
+        DropGuard
+    }
+}
+
+impl Drop for DropGuard {
+    fn drop(&mut self) {
+        GC_SWEEP.with(|flag| flag.set(false));
+    }
+}
+
+fn deref_safe() -> bool {
+    GC_SWEEP.with(|flag| !flag.get())
 }

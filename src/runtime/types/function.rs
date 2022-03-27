@@ -5,10 +5,10 @@ use crate::runtime::Variant;
 use crate::runtime::module::{ModuleID, Access};
 use crate::runtime::types::Call;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
-use crate::runtime::gc::GCObject;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
+#[derive(Debug)]
 pub struct Function {
     signature: Signature,
     module_id: ModuleID,
@@ -24,12 +24,6 @@ impl Function {
     
     pub fn as_call(&self) -> Call {
         Call::Chunk(self.module_id, self.chunk_id)
-    }
-}
-
-impl From<Function> for GCObject {
-    fn from(function: Function) -> Self {
-        Self::Function(Box::new(function))
     }
 }
 
@@ -101,12 +95,10 @@ impl Parameter {
 
 
 impl fmt::Display for Signature {
-    // lots of allocations...
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.write_str(&self.display)
     }
 }
-
 
 fn format_signature(name: Option<&StringSymbol>, required: &[Parameter], default: &[Parameter], variadic: Option<&Parameter>) -> String {
     STRING_TABLE.with(|string_table| {
@@ -115,28 +107,22 @@ fn format_signature(name: Option<&StringSymbol>, required: &[Parameter], default
         let name = name
             .map(|name| string_table.resolve(name));
         
+        let mut parameters = Vec::new();
+        
         let required_names = required.iter()
-            .map(|param| string_table.resolve(&param.name))
-            .collect::<Vec<&str>>()
-            .join(", ");
+            .map(|param| string_table.resolve(&param.name).to_string());
+        parameters.extend(required_names);
             
         let default_names = default.iter()
             .map(|param| string_table.resolve(&param.name))
-            .map(|name| format!("{} = ...", name))
-            .collect::<Vec<String>>()
-            .join(", ");
+            .map(|name| format!("{} = ...", name));
+        parameters.extend(default_names);
         
         let variadic_name = variadic
             .map(|param| string_table.resolve(&param.name))
             .map(|name| format!("{}...", name));
+        parameters.extend(variadic_name);
         
-        let parameters;
-        if let Some(variadic) = variadic_name {
-            parameters = [required_names, default_names, variadic].join(", ");
-        } else {
-            parameters = [required_names, default_names].join(", ");
-        }
-        
-        format!("fun {}({})", name.unwrap_or(""), parameters)
+        format!("fun {}({})", name.unwrap_or(""), parameters.join(", "))
     })
 }

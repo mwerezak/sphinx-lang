@@ -3,11 +3,11 @@ use std::rc::Rc;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Call, Type};
+use crate::runtime::types::{Call, Type, Function};
 use crate::runtime::types::metatable::Metatable;
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
-use crate::runtime::gc::{GCHandle, GCObject};
+use crate::runtime::gc::GCHandle;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -21,10 +21,11 @@ pub enum Variant {
     Integer(IntType),
     Float(FloatType),
     String(StringSymbol),
+    
     // TODO just GC tuples
     Tuple(Rc<[Variant]>),  //  will use COW semantics, so if we need to send to another thread we can just clone the underlying data
-    GC(GCHandle),
-    // LoadedModule(ModuleID)
+    
+    Function(GCHandle<Function>),
 }
 
 impl Variant {
@@ -38,7 +39,7 @@ impl Variant {
             Self::String(..)  => Type::String,
             Self::EmptyTuple => Type::Tuple,
             Self::Tuple(..)  => Type::Tuple,
-            Self::GC(..) => {
+            Self::Function(..) => {
                 unimplemented!()
             },
         }
@@ -91,16 +92,14 @@ impl Variant {
     }
     
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
-        // TODO make GC objects suck less
-        if let Self::GC(handle) = self {
-            return handle.with_ref(|obj| {
-                let GCObject::Function(fun) = &*obj;
+        match self {
+            Self::Function(fun) => {
                 fun.signature().check_args(args)?;
                 Ok(fun.as_call())
-            })
+            },
+            
+            _ => Err(ErrorKind::NotCallable(self.clone()).into())
         }
-        
-        Err(ErrorKind::NotCallable(self.clone()).into())
     }
 }
 
@@ -132,10 +131,11 @@ impl From<&str> for Variant {
     }
 }
 
-impl From<GCHandle> for Variant {
-    fn from(handle: GCHandle) -> Self { Self::GC(handle) }
+impl From<Function> for Variant {
+    fn from(value: Function) -> Self {
+        Self::Function(GCHandle::allocate(value))
+    }
 }
-
 
 // Not all Variants are hashable, so there is a separate type to handle that
 
@@ -222,7 +222,7 @@ impl fmt::Debug for Variant {
                 write!(fmt, "{:?})", last)
             }
             
-            Self::GC(handle) => write!(fmt, "{:?}", handle),
+            Self::Function(handle) => write!(fmt, "{:?}", handle),
         }
     }
 }

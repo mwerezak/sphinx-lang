@@ -12,9 +12,8 @@ use std::collections::HashMap;
 use crate::source::ModuleSource;
 use crate::language::FloatType;
 use crate::runtime::{Variant, DefaultBuildHasher};
-use crate::runtime::gc::GCObject;
+use crate::runtime::types::Function;
 use crate::runtime::strings::StringSymbol;
-use crate::runtime::types::function::Function;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 pub use crate::codegen::{ProgramData, Constant, ConstID, ChunkID};
@@ -140,8 +139,7 @@ impl Module {
             Constant::Function(chunk_id, function_id) => {
                 let signature = self.data.get_signature(function_id);
                 let function = Function::new(signature.clone(), self.id, chunk_id);
-                let obj = GCObject::from(function);
-                Variant::from(obj.allocate())
+                Variant::from(function)
             }
         }
     }

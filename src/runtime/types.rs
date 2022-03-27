@@ -9,6 +9,8 @@ pub mod metatable;
 pub mod primitive;
 pub mod function;
 
+pub use function::Function;
+
 
 /// Call directive
 pub enum Call {
