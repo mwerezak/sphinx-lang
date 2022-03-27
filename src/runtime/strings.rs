@@ -19,7 +19,7 @@ thread_local! {
 
 type PhantomUnsend = PhantomData<*mut ()>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StringSymbol(InternSymbol, PhantomUnsend);
 
 // Not Send because we depend on the thread-local string table.
@@ -88,6 +88,12 @@ impl Ord for StringSymbol {
                 string_table.resolve(other),
             )
         })
+    }
+}
+
+impl fmt::Debug for StringSymbol {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "StringSymbol({})", self.as_usize())
     }
 }
 
