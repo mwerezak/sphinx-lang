@@ -134,7 +134,7 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
         current_line.push(c);
         
         // if we are at the start of a new symbol, open it
-        while matches!(next_symbols.peek(), Some(&cmp::Reverse(IndexSort(sym,..))) if index == sym.start) {
+        while matches!(next_symbols.peek(), Some(&cmp::Reverse(IndexSort(sym,..))) if index == sym.start()) {
             let symbol = next_symbols.pop().unwrap().0.0;
             
             active_symbols.entry(symbol).or_insert_with(|| {
@@ -146,7 +146,7 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
         }
         
         // if we are at the end of an open symbol, mark it as closing
-        while matches!(open_symbols.peek(), Some(&cmp::Reverse(IndexSort(sym,..))) if index == sym.end) {
+        while matches!(open_symbols.peek(), Some(&cmp::Reverse(IndexSort(sym,..))) if index == sym.end()) {
             let symbol = open_symbols.pop().unwrap().0.0;
             if let Some((lines, lineno, start_index)) = active_symbols.remove(&symbol) {
                 closing_symbols.entry(symbol).or_insert_with(|| {
@@ -227,10 +227,10 @@ enum SortIndex { Start, End }
 struct IndexSort<'s>(&'s DebugSymbol, SortIndex);
 
 impl IndexSort<'_> {
-    fn sort_value(&self) -> &TokenIndex {
+    fn sort_value(&self) -> TokenIndex {
         match self.1 {
-            SortIndex::Start => &self.0.start,
-            SortIndex::End => &self.0.end,
+            SortIndex::Start => self.0.start(),
+            SortIndex::End => self.0.end(),
         }
     }
 }
@@ -244,7 +244,7 @@ impl Eq for IndexSort<'_> { }
 
 impl PartialOrd for IndexSort<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(TokenIndex::cmp(self.sort_value(), other.sort_value()))
+        Some(TokenIndex::cmp(&self.sort_value(), &other.sort_value()))
     }
 }
 

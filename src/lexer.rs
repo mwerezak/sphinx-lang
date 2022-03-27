@@ -1,6 +1,7 @@
 use std::io;
 use std::iter::{Iterator, Peekable};
 use crate::language;
+use crate::debug::{DebugSymbol, TokenIndex, TokenLength};
 
 
 mod token;
@@ -94,14 +95,6 @@ fn split_array_pair_mut<T>(pair: &mut [T; 2]) -> (&mut T, &mut T) {
     (first, second)
 }
 
-fn token_length(start_idx: &TokenIndex, end_idx: &TokenIndex) -> Result<TokenLength, std::num::TryFromIntError> {
-    if end_idx > start_idx { 
-        TokenLength::try_from(end_idx - start_idx)
-    } else { 
-        Ok(0)
-    }
-}
-
 // to avoid interior self-referentiality inside Lexer (not permitted in safe Rust), 
 // instead of passing around references, we pass indices into the rules Vec instead
 type RuleID = usize;
@@ -156,7 +149,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
             None => Ok(None),
             Some(result) => match result {
                 Ok(c) => Ok(Some(c)),
-                Err(error) => Err(self.inner_error(Box::new(error), ErrorKind::IOError, self.current)),
+                Err(error) => Err(self.error(ErrorKind::IOError, self.current).caused_by(Box::new(error))),
             },
         }
     }
@@ -172,7 +165,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
         
         result.map_err(|_| {
             let ioerror = self.source.next().unwrap().unwrap_err();
-            self.inner_error(Box::new(ioerror), ErrorKind::IOError, self.current)
+            self.error(ErrorKind::IOError, self.current).caused_by(Box::new(ioerror))
         })
     }
     
@@ -353,7 +346,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
                     let rule_id = *complete.iter().min().unwrap();
                     let matching_rule = &mut self.rules[rule_id];
                     let token = matching_rule.get_token()
-                        .map_err(|err| self.inner_error(err, ErrorKind::CouldNotReadToken, token_start))?;
+                        .map_err(|err| self.error(ErrorKind::CouldNotReadToken, token_start).caused_by(err))?;
                     
                     return self.token_data(token, token_start);
                 
@@ -393,7 +386,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
             let rule_id = *next_complete.iter().min().unwrap();
             let matching_rule = &mut self.rules[rule_id];
             let token = matching_rule.get_token()
-                .map_err(|err| self.inner_error(err, ErrorKind::CouldNotReadToken, token_start))?;
+                .map_err(|err| self.error(ErrorKind::CouldNotReadToken, token_start).caused_by(err))?;
             
             return self.token_data(token, token_start);
         }
@@ -427,7 +420,7 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
         let rule = &mut self.rules[rule_id];
         if matches!(rule.current_state(), MatchResult::CompleteMatch) {
             let token = rule.get_token()
-                .map_err(|err| self.inner_error(err, ErrorKind::CouldNotReadToken, token_start))?;
+                .map_err(|err| self.error(ErrorKind::CouldNotReadToken, token_start).caused_by(err))?;
             
             return self.token_data(token, token_start);
         }
@@ -439,34 +432,25 @@ impl<S> Lexer<S> where S: Iterator<Item=io::Result<char>> {
         }
     }
     
-    fn token_data(&self, token: Token, token_start: TokenIndex) -> Result<TokenMeta, LexerError> {
-        let length = token_length(&token_start, &self.current);
-        
-        let span = Span {
-            index: token_start,
-            length: length.unwrap_or(0),
-        };
+    fn get_symbol(start_idx: TokenIndex, end_idx: TokenIndex) -> Result<DebugSymbol, LexerError> {
+        let length = TokenLength::try_from(end_idx.saturating_sub(start_idx));
+        let symbol = DebugSymbol::new(start_idx, length.unwrap_or(0));
         
         if length.is_err() {
-            Err(LexerError::new(ErrorKind::MaxTokenLengthExceeded, span))
+            Err(LexerError::new(ErrorKind::MaxTokenLengthExceeded, symbol))
         } else {
-            Ok(TokenMeta { token, span, newline: self.newline })
+            Ok(symbol)
         }
     }
     
-    fn error(&self, kind: ErrorKind, token_start: TokenIndex) -> LexerError {
-        let span = Span {
-            index: token_start,
-            length: token_length(&token_start, &self.current).unwrap_or(0),
-        };
-        LexerError::new(kind, span)
+    fn token_data(&self, token: Token, token_start: TokenIndex) -> Result<TokenMeta, LexerError> {
+        let symbol = Self::get_symbol(token_start, self.current)?;
+        Ok(TokenMeta { token, symbol, newline: self.newline })
     }
     
-    fn inner_error(&self, err: Box<dyn std::error::Error>, kind: ErrorKind, token_start: TokenIndex) -> LexerError {
-        let span = Span {
-            index: token_start,
-            length: token_length(&token_start, &self.current).unwrap_or(0),
-        };
-        LexerError::new(kind, span).caused_by(err)
+    fn error(&self, kind: ErrorKind, token_start: TokenIndex) -> LexerError {
+        let length = TokenLength::try_from(self.current.saturating_sub(token_start));
+        let symbol = DebugSymbol::new(token_start, length.unwrap_or(0));
+        LexerError::new(kind, symbol)
     }
 }

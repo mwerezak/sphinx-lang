@@ -5,7 +5,7 @@ pub mod dasm;
 pub mod traceback;
 pub mod snapshot;
 
-pub use symbol::{DebugSymbol, DebugSymbolResolver};
+pub use symbol::{DebugSymbol, DebugSymbolResolver, TokenIndex, TokenLength};
 
 mod tests;
 

@@ -204,7 +204,7 @@ impl<'c, 's> Disassembler<'c, 's> {
     
     fn write_unresolved_symbol(&self, fmt: &mut impl fmt::Write, symbol: Option<&DebugSymbol>) -> fmt::Result {
         match symbol {
-            Some(symbol) => write!(fmt, "| ${}:{}", symbol.start, symbol.end),
+            Some(symbol) => write!(fmt, "| ${}:{}", symbol.start(), symbol.end()),
             None => write!(fmt, "|"),  // repeats
         }
         

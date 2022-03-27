@@ -2,7 +2,7 @@ use log;
 use std::fmt;
 use std::error::Error;
 use crate::utils;
-use crate::lexer::{Span, TokenMeta, LexerError};
+use crate::lexer::{TokenMeta, LexerError};
 use crate::debug::SourceError;
 use crate::debug::symbol::{DebugSymbol, TokenIndex};
 
@@ -76,7 +76,7 @@ impl From<LexerError> for ParserError {
         Self { 
             kind: ErrorKind::LexerError, 
             context: None,
-            symbol: Some((&error.span).into()),
+            symbol: Some(*error.debug_symbol()),
             cause: Some(Box::new(error)),
         }
     }
@@ -225,34 +225,27 @@ impl<'m> ErrorContext {
 #[derive(Debug, Clone)]
 pub struct ContextFrame {
     tag: ContextTag,
-    start: Option<Span>,
-    end: Option<Span>,
+    start: Option<DebugSymbol>,
+    end: Option<DebugSymbol>,
 }
 
-fn span_lt(first: &Span, second: &Span) -> bool { first.index < second.index }
-// fn span_min<'m>(first: &'m Span, second: &'m Span) -> &'m Span {
-//     if span_lt(first, second) { first } else { second }
-// }
-// fn span_max<'m>(first: &'m Span, second: &'m Span) -> &'m Span {
-//     if !span_lt(first, second) { first } else { second }
-// }
 
 impl ContextFrame {
     pub fn new(tag: ContextTag) -> Self { ContextFrame { tag, start: None, end: None } }
     
     pub fn context(&self) -> ContextTag { self.tag }
-    pub fn start(&self) -> Option<&Span> { self.start.as_ref() }
-    pub fn end(&self) -> Option<&Span> { self.end.as_ref() }
+    pub fn start(&self) -> Option<&DebugSymbol> { self.start.as_ref() }
+    pub fn end(&self) -> Option<&DebugSymbol> { self.end.as_ref() }
     
     pub fn set_start(&mut self, token: &TokenMeta) { 
-        self.start.replace(token.span); 
+        self.start.replace(token.symbol); 
     }
     
     pub fn set_end(&mut self, token: &TokenMeta) { 
-        self.end.replace(token.span); 
+        self.end.replace(token.symbol); 
     }
     
-    pub fn set_span(&mut self, start: Option<Span>, end: Option<Span>) {
+    pub fn set_span(&mut self, start: Option<DebugSymbol>, end: Option<DebugSymbol>) {
         self.start = start;
         self.end = end;
     }
@@ -260,10 +253,10 @@ impl ContextFrame {
     pub fn extend(&mut self, other: ContextFrame) {
         let spans = [self.start, other.start, self.end, other.end];
         let start = spans.iter().filter_map(|s| s.as_ref())
-            .min_by(|a, b| a.start_index().cmp(&b.start_index()));
+            .min_by(|a, b| a.start().cmp(&b.start()));
         
         let end = spans.iter().filter_map(|s| s.as_ref())
-            .max_by(|a, b| a.end_index().cmp(&b.end_index()));
+            .max_by(|a, b| a.end().cmp(&b.end()));
         
         self.start = start.copied();
         self.end = end.copied();
@@ -273,13 +266,11 @@ impl ContextFrame {
         match (self.start, self.end) {
             
             (Some(start), Some(end)) => {
-                let start_index = start.index;
-                let end_index = end.index + TokenIndex::from(end.length);
-                Some((start_index, end_index).into())
+                (start.start(), end.end()).try_into().ok()
             },
             
-            (Some(span), None) | (None, Some(span)) => {
-                Some((&span).into())
+            (Some(symbol), None) | (None, Some(symbol)) => {
+                Some(symbol)
             },
             
             (None, None) => None,

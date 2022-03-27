@@ -1,6 +1,6 @@
 use std::fmt;
 use std::error::Error;
-use crate::lexer::Span;
+use crate::debug::DebugSymbol;
 
 
 // Lexer Errors
@@ -34,26 +34,25 @@ impl fmt::Display for LexerErrorKind {
 
 #[derive(Debug)]
 pub struct LexerError {
-    // these are pub for tests
-    pub kind: ErrorKind,
-    pub span: Span,
+    kind: ErrorKind,
+    symbol: DebugSymbol,
     cause: Option<Box<dyn Error>>,
 }
 
 impl LexerError {
-    pub fn new(kind: ErrorKind, span: Span) -> Self {
+    pub fn new(kind: ErrorKind, symbol: DebugSymbol) -> Self {
         LexerError {
-            kind, span,
+            kind, symbol,
             cause: None,
         }
     }
     
-    pub fn caused_by(mut self, cause: impl Into<Box<dyn Error>>) -> Self {
-        self.cause = Some(cause.into()); self
+    pub fn caused_by(mut self, cause: Box<dyn Error>) -> Self {
+        self.cause = Some(cause); self
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
-    pub fn span(&self) -> &Span { &self.span }
+    pub fn debug_symbol(&self) -> &DebugSymbol { &self.symbol }
     
 }
 

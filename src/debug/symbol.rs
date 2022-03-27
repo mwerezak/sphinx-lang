@@ -1,7 +1,4 @@
 use std::rc::Rc;
-use crate::lexer::Span;
-
-pub use crate::lexer::{TokenIndex, TokenLength};
 
 pub mod table;
 pub mod resolver;
@@ -11,26 +8,42 @@ pub use table::{ChunkSymbols, DebugSymbolTable};
 pub use resolver::{DebugSymbolResolver, ResolvedSymbolTable};
 
 
-/// When provided along with the source text, identifies a span of source code
+// Max source file length ~4 billion characters (assuming mostly single byte UTF8 that's a ~4GB file)
+// Max token length 65535 characters
+pub type TokenIndex = u32;
+pub type TokenLength = u16;
+
+
+/// When provided along with the source text, identifies a span of source code.
+/// Because they are passed around everywhere, the debug symbols used by Sphinx are very light weight.
+/// Just an index into the source text and a length. In order to be useful they must first be resolved
+/// using a `DebugSymbolResolver`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DebugSymbol {
-    pub start: TokenIndex,
-    pub end: TokenIndex,
+    start: TokenIndex,
+    length: TokenLength,
 }
 
-impl From<(TokenIndex, TokenIndex)> for DebugSymbol {
-    fn from(tuple: (TokenIndex, TokenIndex)) -> Self {
+impl TryFrom<(TokenIndex, TokenIndex)> for DebugSymbol {
+    type Error = (TokenIndex, TokenIndex);
+    fn try_from(tuple: (TokenIndex, TokenIndex)) -> Result<Self, Self::Error> {
         let (start, end) = tuple;
-        DebugSymbol { start, end }
+        if let Ok(length) = TokenLength::try_from(end - start) {
+            Ok(DebugSymbol { start, length })
+        } else {
+            Err((start, end))
+        }
     }
 }
 
-impl From<&Span> for DebugSymbol {
-    fn from(span: &Span) -> Self {
-        let start = span.index;
-        let end = span.index + TokenIndex::from(span.length);
-        DebugSymbol { start, end }
+impl DebugSymbol {
+    pub fn new(start: TokenIndex, length: TokenLength) -> Self {
+        Self { start, length }
     }
+    
+    pub fn start(&self) -> TokenIndex { self.start }
+    pub fn end(&self) -> TokenIndex { self.start + TokenIndex::from(self.length) }
+    pub fn len(&self) -> TokenLength { self.length }
 }
 
 

@@ -3,9 +3,9 @@ use std::collections::VecDeque;
 use log::debug;
 
 use crate::language::InternSymbol;
-use crate::lexer::{TokenMeta, Token, TokenIndex, LexerError};
+use crate::lexer::{TokenMeta, Token, LexerError};
 use crate::runtime::strings::StringInterner;
-use crate::debug::SourceError;
+use crate::debug::{SourceError, TokenIndex};
 
 
 pub mod expr;
@@ -53,7 +53,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     }
     
     /// for debugging
-    fn current_index(&mut self) -> TokenIndex { self.peek().unwrap().span.index }
+    fn current_index(&mut self) -> TokenIndex { 
+        let token = self.peek().unwrap();
+        token.symbol.start()
+    }
     
     fn advance(&mut self) -> ParseResult<TokenMeta> {
         let next = self.next.take()

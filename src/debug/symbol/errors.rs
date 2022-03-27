@@ -51,7 +51,7 @@ impl fmt::Display for SymbolResolutionError {
             ErrorKind::Other => None,
         };
         
-        let message = format!("could not resolve symbol ${}:{}", self.symbol.start, self.symbol.end);
+        let message = format!("could not resolve symbol ${}:{}", self.symbol.start, self.symbol.end());
         utils::format_error(fmt, message.as_str(), inner_message, self.source())
     }
 }
