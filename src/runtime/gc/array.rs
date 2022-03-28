@@ -36,7 +36,7 @@ impl<T> Drop for Array<T> {
 }
 
 impl<T> SizeOf for Array<T> {
-    fn size_of(&self) -> usize {
+    fn extra_size(&self) -> usize {
         unsafe { mem::size_of_val(&*self.ptr.as_ptr()) }
     }
 }

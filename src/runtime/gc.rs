@@ -22,27 +22,18 @@ struct GCBox<T> where T: ?Sized + 'static {
 
 impl<T> GCBox<T> where T: ?Sized {
     fn value(&self) -> &T { &self.data }
-
-    #[inline]
-    const fn header_size() -> usize {
-        // not totally accurate because we don't include padding, but that's okay
-        mem::size_of::<Option<NonNull<GCBox<dyn Any>>>>() 
-        + mem::size_of::<bool>()
-    }
 }
 
 impl<T> GCBox<T> where T: ?Sized + SizeOf {
     #[inline]
     fn size(&self) -> usize {
-        Self::header_size() + self.value().size_of()
+        mem::size_of_val(self) + self.value().extra_size()
     }
 }
 
 pub trait SizeOf {
     #[inline]
-    fn size_of(&self) -> usize {
-        mem::size_of_val(self)
-    }
+    fn extra_size(&self) -> usize { 0 }
 }
 
 
@@ -116,7 +107,6 @@ impl GCState {
         
         self.boxes_start = Some(ptr);
         self.stats.allocated += size;
-        println!("allocated: {}", size);
         
         ptr
     }
