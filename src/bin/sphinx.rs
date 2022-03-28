@@ -312,6 +312,7 @@ impl<'m> Repl<'m> {
             
             let program = Program::load(build.program);
             
+            // ensure any functions in the new micro-module have access to the existing repl_env globals
             let module_id = self.module_cache.insert_with_globals(program.data, None, None, self.repl_env.clone());
             
             let vm = VirtualMachine::repl(self.module_cache, self.repl_env, module_id, &program.main);
@@ -319,7 +320,7 @@ impl<'m> Repl<'m> {
                 println!("Runtime error: {:?}", error);
             }
             
-            // This is super inefficient, but it's the REPL, so that's okay?
+            // This is super inefficient, but it's just the REPL, so that's okay?
             let module = self.module_cache.get(&module_id).unwrap();
             self.repl_env.borrow_mut().extend(&module.globals().borrow());
             

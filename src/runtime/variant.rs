@@ -8,7 +8,7 @@ use crate::runtime::types::metatable::Metatable;
 use crate::runtime::types::function::{Function, NativeFunction, Call, Invoke};
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
-use crate::runtime::gc::{GCHandle, GCArray, SizeOf};
+use crate::runtime::gc::{GC, GCArray, SizeOf};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -25,8 +25,8 @@ pub enum Variant {
     String(StringSymbol),
     
     Tuple(GCArray<Variant>),
-    Function(GCHandle<Function>),
-    NativeFunction(GCHandle<NativeFunction>),
+    Function(GC<Function>),
+    NativeFunction(GC<NativeFunction>),
 }
 
 impl Variant {
@@ -131,7 +131,7 @@ impl From<Box<[Variant]>> for Variant {
 
 impl From<Function> for Variant {
     fn from(func: Function) -> Self {
-        Self::Function(GCHandle::allocate(func))
+        Self::Function(GC::allocate(func))
     }
 }
 

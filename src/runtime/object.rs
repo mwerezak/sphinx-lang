@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
 pub struct RuntimeObject {
-    //type: GCHandle
+    //type: GC
     table: FxHashMap,
 }

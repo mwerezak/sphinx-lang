@@ -6,7 +6,7 @@ use std::fmt;
 use std::mem;
 use std::ops::Deref;
 use std::ptr::NonNull;
-use crate::runtime::gc::{GCBox, GCHandle, GC_STATE, deref_safe, SizeOf};
+use crate::runtime::gc::{GCBox, GC, GC_STATE, deref_safe, SizeOf};
 
 
 pub(crate) struct Array<T> {
@@ -44,7 +44,7 @@ impl<T> SizeOf for Array<T> {
 
 #[derive(Clone)]
 pub struct GCArray<T> where T: 'static {
-    handle: GCHandle<Array<T>>,
+    handle: GC<Array<T>>,
     data_ptr: NonNull<[T]>,
 }
 
@@ -62,7 +62,7 @@ impl<T> GCArray<T> {
             
             Self {
                 data_ptr: array.ptr,
-                handle: GCHandle::from_raw(gc.allocate(array)),
+                handle: GC::from_raw(gc.allocate(array)),
             }
         })
     }

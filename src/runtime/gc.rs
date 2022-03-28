@@ -9,7 +9,7 @@ use log;
 mod handle;
 mod array;
 
-pub use handle::GCHandle;
+pub use handle::GC;
 pub use array::GCArray;
 
 
