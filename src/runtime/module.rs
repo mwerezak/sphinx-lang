@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use crate::source::ModuleSource;
 use crate::language::FloatType;
 use crate::runtime::{Variant, DefaultBuildHasher};
-use crate::runtime::types::Function;
+use crate::runtime::types::function::Function;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 

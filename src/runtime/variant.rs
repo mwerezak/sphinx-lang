@@ -3,8 +3,9 @@ use std::rc::Rc;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Call, Type, Function};
+use crate::runtime::types::Type;
 use crate::runtime::types::metatable::Metatable;
+use crate::runtime::types::function::{Function, NativeFunction, Call, Invoke};
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::gc::{GCHandle, GCArray, SizeOf};
@@ -25,22 +26,22 @@ pub enum Variant {
     
     Tuple(GCArray<Variant>),
     Function(GCHandle<Function>),
+    NativeFunction(GCHandle<NativeFunction>),
 }
 
 impl Variant {
     pub fn get_type(&self) -> Type {
         match self {
             Self::Nil => Type::Nil,
-            Self::BoolTrue  => Type::Boolean,
+            Self::BoolTrue => Type::Boolean,
             Self::BoolFalse => Type::Boolean,
             Self::Integer(..) => Type::Integer,
-            Self::Float(..)   => Type::Float,
-            Self::String(..)  => Type::String,
+            Self::Float(..) => Type::Float,
+            Self::String(..) => Type::String,
             Self::EmptyTuple => Type::Tuple,
-            Self::Tuple(..)  => Type::Tuple,
-            Self::Function(..) => {
-                unimplemented!()
-            },
+            Self::Tuple(..) => Type::Tuple,
+            Self::Function(..) => Type::Function,
+            Self::NativeFunction(..) => Type::Function,
         }
     }
     
@@ -88,10 +89,7 @@ impl Variant {
     
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
         match self {
-            Self::Function(fun) => {
-                fun.signature().check_args(args)?;
-                Ok(fun.as_call())
-            },
+            Self::Function(fun) => fun.invoke(args),
             
             _ => Err(ErrorKind::NotCallable(self.clone()).into())
         }
@@ -223,7 +221,8 @@ impl fmt::Debug for Variant {
                 write!(fmt, "{:?})", last)
             }
             
-            Self::Function(handle) => write!(fmt, "{:?}", handle),
+            Self::Function(fun) => write!(fmt, "<{}>", fun.signature()),
+            Self::NativeFunction(fun) => write!(fmt, "<built-in {}>", fun.signature()),
         }
     }
 }

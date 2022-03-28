@@ -9,15 +9,6 @@ pub mod metatable;
 pub mod primitive;
 pub mod function;
 
-pub use function::Function;
-
-
-/// Call directive
-pub enum Call {
-    Chunk(ModuleID, ChunkID),    // the module & chunk to call into
-    Native(ExecResult<Variant>), // eagerly computed result
-}
-
 
 // Type tag for Sphinx's "primitive" types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

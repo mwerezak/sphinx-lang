@@ -2,7 +2,7 @@ use crate::language::{IntType, FloatType};
 use crate::codegen::{Program, ProgramData, ChunkID, ConstID, Constant, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::ops;
-use crate::runtime::types::Call;
+use crate::runtime::types::function::Call;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, ModuleCache, ModuleID, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -12,6 +12,7 @@ use crate::debug::snapshot::{VMSnapshot, VMStateSnapshot};
 
 // data used to set up a new call
 struct CallInfo {
+    nargs: usize,
     frame: usize,
     call: Call,
     site: CallSite,
@@ -88,8 +89,9 @@ impl<'m> VirtualMachine<'m> {
         self.traceback.push(call.site);
         
         match call.call {
-            Call::Native(retval) => {
-                let retval = retval?;
+            Call::Native(func) => {
+                let args = self.values.peek_many(call.nargs);
+                let retval = func(args)?;
                 self.values.truncate(call.frame.into());
                 self.values.push(retval);
                 self.traceback.pop();
@@ -301,6 +303,7 @@ impl<'m> VMState<'m> {
                 
                 let args = stack.peek_many(nargs);
                 let call = CallInfo {
+                    nargs,
                     frame,
                     call: callee.invoke(args)?,
                     site: self.get_callsite(current_offset),
