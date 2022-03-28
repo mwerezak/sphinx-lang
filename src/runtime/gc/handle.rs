@@ -8,21 +8,14 @@ use crate::runtime::gc::{GCBox, GC_STATE, deref_safe};
 
 
 #[derive(Debug)]
-pub struct GCHandle<T> where T: 'static {
+pub struct GCHandle<T> where T: ?Sized + 'static {
     ptr: NonNull<GCBox<T>>,
     _marker: PhantomData<Rc<GCBox<T>>>,
 }
 
-impl<T> GCHandle<T> {
+impl<T> GCHandle<T> where T: ?Sized {
     fn from_raw(ptr: NonNull<GCBox<T>>) -> Self {
         Self { ptr, _marker: PhantomData }
-    }
-    
-    pub fn allocate(data: T) -> Self {
-        GC_STATE.with(|gc| {
-            let mut gc = gc.borrow_mut();
-            Self::from_raw(gc.allocate(data))
-        })
     }
     
     #[inline]
@@ -33,7 +26,23 @@ impl<T> GCHandle<T> {
     }
 }
 
-impl<T> Clone for GCHandle<T> {
+impl<T> GCHandle<T> {
+    pub fn allocate(data: T) -> Self {
+        GC_STATE.with(|gc| {
+            let mut gc = gc.borrow_mut();
+            Self::from_raw(gc.allocate(data))
+        })
+    }
+}
+
+// impl<T> From<Box<T>> for GCHandle<T> where T: ?Sized {
+//     fn from(data: Box<T>) -> Self {
+//         unimplemented!()
+//     }
+// }
+
+
+impl<T> Clone for GCHandle<T> where T: ?Sized {
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr.clone(),
@@ -42,7 +51,7 @@ impl<T> Clone for GCHandle<T> {
     }
 }
 
-impl<T> Deref for GCHandle<T> {
+impl<T> Deref for GCHandle<T> where T: ?Sized {
     type Target = T;
     
     #[inline]

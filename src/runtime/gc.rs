@@ -21,13 +21,13 @@ struct GCState {
 }
 
 /// TODO store GCBoxes in linear chunks instead of individual linked nodes
-struct GCBox<T> where T: Any + ?Sized + 'static {
+struct GCBox<T> where T: ?Sized + 'static {
     next: Option<NonNull<GCBox<dyn Any>>>,
     marked: bool,
     data: T,
 }
 
-impl<T> GCBox<T> {
+impl<T> GCBox<T> where T: ?Sized {
     fn value(&self) -> &T { &self.data }
 }
 

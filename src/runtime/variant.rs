@@ -22,9 +22,7 @@ pub enum Variant {
     Float(FloatType),
     String(StringSymbol),
     
-    // TODO just GC tuples
-    Tuple(Rc<[Variant]>),  //  will use COW semantics, so if we need to send to another thread we can just clone the underlying data
-    
+    Tuple(Rc<[Variant]>),  // uses Rc for now since there is no way to GC DSTs because we can't box them :(
     Function(GCHandle<Function>),
 }
 
