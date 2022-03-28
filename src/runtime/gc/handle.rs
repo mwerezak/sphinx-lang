@@ -1,26 +1,26 @@
+use std::fmt;
 use std::rc::Rc;
 use std::ops::Deref;
 use std::ptr::NonNull;
 use std::marker::PhantomData;
 
-use crate::runtime::gc::{GCBox, GC_STATE, deref_safe};
+use crate::runtime::gc::{GCBox, GCArray, GC_STATE, deref_safe};
 
 
 
-#[derive(Debug)]
 pub struct GCHandle<T> where T: ?Sized + 'static {
     ptr: NonNull<GCBox<T>>,
     _marker: PhantomData<Rc<GCBox<T>>>,
 }
 
 impl<T> GCHandle<T> where T: ?Sized {
-    fn from_raw(ptr: NonNull<GCBox<T>>) -> Self {
+    pub(super) fn from_raw(ptr: NonNull<GCBox<T>>) -> Self {
         Self { ptr, _marker: PhantomData }
     }
     
     #[inline]
-    fn inner(&self) -> &GCBox<T> {
-        // must not deref GCHandles during sweep. This should only be possible in a Drop impl
+    pub(super) fn inner(&self) -> &GCBox<T> {
+        // must not deref during sweep. This should only be possible in a Drop impl
         debug_assert!(deref_safe());
         unsafe { &*self.ptr.as_ptr() }
     }
@@ -59,3 +59,16 @@ impl<T> Deref for GCHandle<T> where T: ?Sized {
         self.inner().value()
     }
 }
+
+impl<T> fmt::Debug for GCHandle<T> where T: ?Sized {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if fmt.alternate() {
+            write!(fmt, "GCHandle({:#?})", self.ptr)
+        } else {
+            write!(fmt, "GCHandle({:?})", self.ptr)
+        }
+    }
+}
+
+
+

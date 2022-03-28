@@ -407,7 +407,7 @@ impl<'m> VMState<'m> {
                 let items = stack.peek_many(tuple_len)
                     .to_vec().into_boxed_slice();
                 
-                let tuple = Variant::make_tuple(items);
+                let tuple = Variant::from(items);
                 stack.replace_many(tuple_len, tuple);
             },
             OpCode::TupleN => {
@@ -417,7 +417,7 @@ impl<'m> VMState<'m> {
                 let items = stack.peek_many(tuple_len)
                     .to_vec().into_boxed_slice();
                 
-                let tuple = Variant::make_tuple(items);
+                let tuple = Variant::from(items);
                 stack.replace_many(tuple_len, tuple);
             },
             

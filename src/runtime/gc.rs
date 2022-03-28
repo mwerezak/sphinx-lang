@@ -7,18 +7,11 @@ use std::cell::{Cell, RefCell};
 use log;
 
 mod handle;
+mod array;
+
 pub use handle::GCHandle;
+pub use array::GCArray;
 
-
-thread_local! {
-    static GC_STATE: RefCell<GCState> = RefCell::new(GCState::default());
-}
-
-struct GCState {
-    stats: GCStats,
-    config: GCConfig,
-    boxes_start: Option<NonNull<GCBox<dyn Any>>>,
-}
 
 /// TODO store GCBoxes in linear chunks instead of individual linked nodes
 struct GCBox<T> where T: ?Sized + 'static {
@@ -31,6 +24,16 @@ impl<T> GCBox<T> where T: ?Sized {
     fn value(&self) -> &T { &self.data }
 }
 
+
+thread_local! {
+    static GC_STATE: RefCell<GCState> = RefCell::new(GCState::default());
+}
+
+struct GCState {
+    stats: GCStats,
+    config: GCConfig,
+    boxes_start: Option<NonNull<GCBox<dyn Any>>>,
+}
 
 #[derive(Debug)]
 struct GCStats {

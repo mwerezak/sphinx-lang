@@ -7,7 +7,7 @@ use crate::runtime::types::{Call, Type, Function};
 use crate::runtime::types::metatable::Metatable;
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
-use crate::runtime::gc::GCHandle;
+use crate::runtime::gc::{GCHandle, GCArray};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -22,7 +22,7 @@ pub enum Variant {
     Float(FloatType),
     String(StringSymbol),
     
-    Tuple(Rc<[Variant]>),  // uses Rc for now since there is no way to GC DSTs because we can't box them :(
+    Tuple(GCArray<Variant>),
     Function(GCHandle<Function>),
 }
 
@@ -75,10 +75,6 @@ impl Variant {
         Some(value)
     }
     
-    pub fn make_tuple(items: Box<[Variant]>) -> Self {
-        Self::Tuple(Rc::from(items))
-    }
-    
     pub fn can_hash(&self) -> bool {
         match self {
             Self::Float(..) => false,
@@ -129,9 +125,15 @@ impl From<&str> for Variant {
     }
 }
 
+impl From<Box<[Variant]>> for Variant {
+    fn from(items: Box<[Variant]>) -> Self {
+        Self::Tuple(GCArray::from_boxed_slice(items))
+    }
+}
+
 impl From<Function> for Variant {
-    fn from(value: Function) -> Self {
-        Self::Function(GCHandle::allocate(value))
+    fn from(func: Function) -> Self {
+        Self::Function(GCHandle::allocate(func))
     }
 }
 
