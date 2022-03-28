@@ -41,7 +41,9 @@ pub struct Signature {
 }
 
 impl Signature {
-    pub fn new(name: Option<StringSymbol>, required: Vec<Parameter>, default: Vec<Parameter>, variadic: Option<Parameter>) -> Self {
+    pub fn new(name: Option<impl Into<StringSymbol>>, required: Vec<Parameter>, default: Vec<Parameter>, variadic: Option<Parameter>) -> Self {
+        let name = name.map(|name| name.into());
+        
         // build this once and cache the result, because it's expensive
         let display = format_signature(name.as_ref(), &required, &default, variadic.as_ref());
         
@@ -88,8 +90,8 @@ pub struct Parameter {
 }
 
 impl Parameter {
-    pub fn new(name: StringSymbol, decl: DeclType) -> Self {
-        Self { name, decl }
+    pub fn new(name: impl Into<StringSymbol>, decl: DeclType) -> Self {
+        Self { name: name.into(), decl }
     }
     
     pub fn name(&self) -> &StringSymbol { &self.name }

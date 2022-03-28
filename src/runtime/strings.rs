@@ -63,6 +63,12 @@ impl From<InternSymbol> for StringSymbol {
     }
 }
 
+impl From<&str> for StringSymbol {
+    fn from(string: &str) -> Self {
+        STRING_TABLE.with(|string_table| string_table.borrow_mut().get_or_intern(string))
+    }
+}
+
 // Lexicographical ordering of strings
 impl PartialOrd for StringSymbol {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {

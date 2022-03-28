@@ -18,6 +18,7 @@ pub enum Variant {
     EmptyTuple,
     BoolTrue,
     BoolFalse,
+    
     Integer(IntType),
     Float(FloatType),
     String(StringSymbol),
@@ -119,9 +120,8 @@ impl From<StringSymbol> for Variant {
 }
 
 impl From<&str> for Variant {
-    fn from(value: &str) -> Self {
-        let symbol = STRING_TABLE.with(|string_table| string_table.borrow_mut().get_or_intern(value));
-        symbol.into()
+    fn from(string: &str) -> Self {
+        Self::String(string.into())
     }
 }
 
