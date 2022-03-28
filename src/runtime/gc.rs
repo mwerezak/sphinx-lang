@@ -22,6 +22,27 @@ struct GCBox<T> where T: ?Sized + 'static {
 
 impl<T> GCBox<T> where T: ?Sized {
     fn value(&self) -> &T { &self.data }
+
+    #[inline]
+    const fn header_size() -> usize {
+        // not totally accurate because we don't include padding, but that's okay
+        mem::size_of::<Option<NonNull<GCBox<dyn Any>>>>() 
+        + mem::size_of::<bool>()
+    }
+}
+
+impl<T> GCBox<T> where T: ?Sized + SizeOf {
+    #[inline]
+    fn size(&self) -> usize {
+        Self::header_size() + self.value().size_of()
+    }
+}
+
+pub trait SizeOf {
+    #[inline]
+    fn size_of(&self) -> usize {
+        mem::size_of_val(self)
+    }
 }
 
 
@@ -77,28 +98,25 @@ impl GCState {
         false // TODO
     }
     
-    fn allocate<T>(&mut self, data: T) -> NonNull<GCBox<T>> {
+    fn allocate<T: SizeOf>(&mut self, data: T) -> NonNull<GCBox<T>> {
         if self.should_collect() {
             unimplemented!()
         }
         
         let gcbox = Box::new(GCBox {
-            next: None,
+            next: self.boxes_start.take(),
             marked: false,
             data,
         });
-        
-        self.insert_box(gcbox)
-    }
-    
-    fn insert_box<T>(&mut self, mut gcbox: Box<GCBox<T>>) -> NonNull<GCBox<T>> {
-        gcbox.next = self.boxes_start.take();
-        
+
+        let size = gcbox.size();
         let ptr = unsafe {
             NonNull::new_unchecked(Box::into_raw(gcbox))
         };
+        
         self.boxes_start = Some(ptr);
-        self.stats.allocated +=  mem::size_of::<GCBox<T>>();
+        self.stats.allocated += size;
+        println!("allocated: {}", size);
         
         ptr
     }

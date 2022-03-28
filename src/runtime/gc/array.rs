@@ -3,9 +3,10 @@
 
 
 use std::fmt;
+use std::mem;
 use std::ops::Deref;
 use std::ptr::NonNull;
-use crate::runtime::gc::{GCBox, GCHandle, GC_STATE, deref_safe};
+use crate::runtime::gc::{GCBox, GCHandle, GC_STATE, deref_safe, SizeOf};
 
 
 pub(crate) struct Array<T> {
@@ -31,6 +32,12 @@ impl<T> Drop for Array<T> {
     fn drop(&mut self) {
         // SAFETY: This is safe because ptr is obtained only from Box::into_raw()
         unsafe { Box::from_raw(self.ptr.as_ptr()); }
+    }
+}
+
+impl<T> SizeOf for Array<T> {
+    fn size_of(&self) -> usize {
+        unsafe { mem::size_of_val(&*self.ptr.as_ptr()) }
     }
 }
 

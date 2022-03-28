@@ -5,6 +5,7 @@ use crate::runtime::Variant;
 use crate::runtime::module::{ModuleID, Access};
 use crate::runtime::types::Call;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
+use crate::runtime::gc::SizeOf;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -14,6 +15,8 @@ pub struct Function {
     module_id: ModuleID,
     chunk_id: ChunkID,
 }
+
+impl SizeOf for Function { }
 
 impl Function {
     pub fn new(signature: Signature, module_id: ModuleID, chunk_id :ChunkID) -> Self {

@@ -7,7 +7,7 @@ use crate::runtime::types::{Call, Type, Function};
 use crate::runtime::types::metatable::Metatable;
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
-use crate::runtime::gc::{GCHandle, GCArray};
+use crate::runtime::gc::{GCHandle, GCArray, SizeOf};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -136,6 +136,7 @@ impl From<Function> for Variant {
         Self::Function(GCHandle::allocate(func))
     }
 }
+
 
 // Not all Variants are hashable, so there is a separate type to handle that
 

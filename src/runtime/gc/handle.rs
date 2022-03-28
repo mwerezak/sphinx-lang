@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::ptr::NonNull;
 use std::marker::PhantomData;
 
-use crate::runtime::gc::{GCBox, GCArray, GC_STATE, deref_safe};
+use crate::runtime::gc::{GCBox, GCArray, GC_STATE, deref_safe, SizeOf};
 
 
 
@@ -26,7 +26,7 @@ impl<T> GCHandle<T> where T: ?Sized {
     }
 }
 
-impl<T> GCHandle<T> {
+impl<T: SizeOf> GCHandle<T> {
     pub fn allocate(data: T) -> Self {
         GC_STATE.with(|gc| {
             let mut gc = gc.borrow_mut();
@@ -69,6 +69,3 @@ impl<T> fmt::Debug for GCHandle<T> where T: ?Sized {
         }
     }
 }
-
-
-
