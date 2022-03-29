@@ -14,24 +14,25 @@ pub use array::GCArray;
 
 
 /// TODO store GCBoxes in linear chunks instead of individual linked nodes
-struct GCBox<T> where T: ?Sized + 'static {
-    next: Option<NonNull<GCBox<dyn Any>>>,
+struct GCBox<T> where T: GCTrace + ?Sized + 'static {
+    next: Option<NonNull<GCBox<dyn GCTrace>>>,
     marked: bool,
     data: T,
 }
 
-impl<T> GCBox<T> where T: ?Sized {
+impl<T> GCBox<T> where T: GCTrace + ?Sized {
     fn value(&self) -> &T { &self.data }
 }
 
-impl<T> GCBox<T> where T: ?Sized + SizeOf {
+impl<T> GCBox<T> where T: GCTrace + ?Sized {
     #[inline]
     fn size(&self) -> usize {
         mem::size_of_val(self) + self.value().extra_size()
     }
 }
 
-pub trait SizeOf {
+pub trait GCTrace {
+    /// if the GC'd data owns any allocations, this should return the extra allocated size
     #[inline]
     fn extra_size(&self) -> usize { 0 }
 }
@@ -44,7 +45,7 @@ thread_local! {
 struct GCState {
     stats: GCStats,
     config: GCConfig,
-    boxes_start: Option<NonNull<GCBox<dyn Any>>>,
+    boxes_start: Option<NonNull<GCBox<dyn GCTrace>>>,
 }
 
 #[derive(Debug)]
@@ -89,7 +90,7 @@ impl GCState {
         false // TODO
     }
     
-    fn allocate<T: SizeOf>(&mut self, data: T) -> NonNull<GCBox<T>> {
+    fn allocate<T: GCTrace>(&mut self, data: T) -> NonNull<GCBox<T>> {
         if self.should_collect() {
             unimplemented!()
         }

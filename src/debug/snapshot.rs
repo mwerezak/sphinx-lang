@@ -1,8 +1,9 @@
 use std::fmt::{Display, Formatter, Result};
+use crate::source::ModuleSource;
 use crate::codegen::opcodes::OpCode;
 use crate::runtime::Variant;
 use crate::runtime::vm::LocalIndex;
-use crate::runtime::module::{ModuleID, ChunkID};
+use crate::runtime::module::ChunkID;
 
 
 pub struct VMSnapshot {
@@ -17,12 +18,12 @@ impl Display for VMSnapshot {
         writeln!(fmt, "== Call Stack ==")?;
         
         for (idx, state) in self.calls.iter().enumerate() {
-            write!(fmt, "{: >4}: Module: {:#X}, Chunk: ", idx, state.module_id)?;
+            write!(fmt, "{: >4}: Module: {}, Chunk: ", idx, state.module)?;
             format_chunk_id(fmt,state.chunk_id)?;
             writeln!(fmt, ", Frame: {}, Locals: {}", state.frame, state.locals)?;
         }
         
-        write!(fmt, "{: >4}: Module: {:#X}, Chunk: ", self.calls.len(), self.state.module_id)?;
+        write!(fmt, "{: >4}: Module: {}, Chunk: ", self.calls.len(), self.state.module)?;
         format_chunk_id(fmt, self.state.chunk_id)?;
         writeln!(fmt, ", Frame: {}, Locals: {}", self.state.frame, self.state.locals)?;
         
@@ -44,7 +45,7 @@ impl Display for VMSnapshot {
 
 
 pub struct VMStateSnapshot {
-    pub module_id: ModuleID,
+    pub module: String,
     pub chunk_id: Option<ChunkID>,
     pub frame: usize,
     pub locals: LocalIndex,
@@ -55,7 +56,7 @@ pub struct VMStateSnapshot {
 impl Display for VMStateSnapshot {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
         
-        write!(fmt, "Module: {:#X}, Chunk: ", self.module_id)?;
+        write!(fmt, "Module: {}, Chunk: ", self.module)?;
         format_chunk_id(fmt, self.chunk_id)?;
         writeln!(fmt)?;
         

@@ -4,16 +4,15 @@ use std::ops::Deref;
 use std::ptr::NonNull;
 use std::marker::PhantomData;
 
-use crate::runtime::gc::{GCBox, GCArray, GC_STATE, deref_safe, SizeOf};
+use crate::runtime::gc::{GCBox, GCArray, GC_STATE, deref_safe, GCTrace};
 
 
-
-pub struct GC<T> where T: ?Sized + 'static {
+pub struct GC<T> where T: GCTrace + ?Sized + 'static {
     ptr: NonNull<GCBox<T>>,
     _marker: PhantomData<Rc<GCBox<T>>>,
 }
 
-impl<T> GC<T> where T: ?Sized {
+impl<T> GC<T> where T: GCTrace + ?Sized {
     pub(super) fn from_raw(ptr: NonNull<GCBox<T>>) -> Self {
         Self { ptr, _marker: PhantomData }
     }
@@ -24,9 +23,13 @@ impl<T> GC<T> where T: ?Sized {
         debug_assert!(deref_safe());
         unsafe { &*self.ptr.as_ptr() }
     }
+    
+    pub fn ptr_eq(self: &GC<T>, other: &GC<T>) -> bool {
+        unimplemented!()
+    }
 }
 
-impl<T: SizeOf> GC<T> {
+impl<T: GCTrace> GC<T> {
     pub fn allocate(data: T) -> Self {
         GC_STATE.with(|gc| {
             let mut gc = gc.borrow_mut();
@@ -42,7 +45,7 @@ impl<T: SizeOf> GC<T> {
 // }
 
 
-impl<T> Clone for GC<T> where T: ?Sized {
+impl<T> Clone for GC<T> where T: GCTrace + ?Sized {
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr.clone(),
@@ -51,7 +54,10 @@ impl<T> Clone for GC<T> where T: ?Sized {
     }
 }
 
-impl<T> Deref for GC<T> where T: ?Sized {
+impl<T> Copy for GC<T> where T: GCTrace + ?Sized { }
+
+
+impl<T> Deref for GC<T> where T: GCTrace + ?Sized {
     type Target = T;
     
     #[inline]
@@ -60,7 +66,7 @@ impl<T> Deref for GC<T> where T: ?Sized {
     }
 }
 
-impl<T> fmt::Debug for GC<T> where T: ?Sized {
+impl<T> fmt::Debug for GC<T> where T: GCTrace + ?Sized {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         if fmt.alternate() {
             write!(fmt, "GC({:#?})", self.ptr)

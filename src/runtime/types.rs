@@ -1,7 +1,6 @@
 use std::fmt;
 use crate::codegen::ChunkID;
 use crate::runtime::Variant;
-use crate::runtime::module::ModuleID;
 use crate::runtime::errors::ExecResult;
 
 pub mod operator;

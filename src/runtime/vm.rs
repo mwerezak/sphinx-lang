@@ -1,10 +1,11 @@
 use crate::language::{IntType, FloatType};
 use crate::codegen::{Program, ProgramData, ChunkID, ConstID, Constant, OpCode};
 use crate::runtime::Variant;
+use crate::runtime::gc::GC;
 use crate::runtime::ops;
 use crate::runtime::types::function::Call;
 use crate::runtime::strings::StringSymbol;
-use crate::runtime::module::{Module, ModuleCache, ModuleID, Access, GlobalEnv};
+use crate::runtime::module::{Module, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 use crate::debug::traceback::CallSite;
 use crate::debug::snapshot::{VMSnapshot, VMStateSnapshot};
@@ -28,38 +29,22 @@ enum Control {
 
 // Stack-based Virtual Machine
 #[derive(Debug)]
-pub struct VirtualMachine<'m> {
-    module_cache: &'m ModuleCache,
+pub struct VirtualMachine<'c> {
     traceback: Vec<CallSite>,
     
-    calls: Vec<VMState<'m>>,
+    calls: Vec<VMState<'c>>,
     values: ValueStack,
-    state: VMState<'m>,
+    state: VMState<'c>,
 }
 
-impl<'m> VirtualMachine<'m> {
+impl<'c> VirtualMachine<'c> {
     /// Create a new VM with the specified root module and an empty main chunk
-    pub fn new(module_cache: &'m ModuleCache, module_id: ModuleID, main_chunk: &'m [u8]) -> Self {
-        let module = module_cache.get(&module_id).expect("invalid module id");
-        
+    pub fn new(main_module: GC<Module>, main_chunk: &'c [u8]) -> Self {
         Self {
-            module_cache,
             traceback: Vec::new(),
             calls: Vec::new(),
             values: ValueStack::new(),
-            state: VMState::main_chunk(module, main_chunk),
-        }
-    }
-    
-    pub fn repl(module_cache: &'m ModuleCache, repl_env: &'m GlobalEnv, module_id: ModuleID, main_chunk: &'m [u8]) -> Self {
-        let module = module_cache.get(&module_id).expect("invalid module id");
-        
-        Self {
-            module_cache,
-            traceback: Vec::new(),
-            calls: Vec::new(),
-            values: ValueStack::new(),
-            state: VMState::main_repl(module, repl_env, main_chunk),
+            state: VMState::main_chunk(main_module, main_chunk),
         }
     }
     
@@ -68,13 +53,15 @@ impl<'m> VirtualMachine<'m> {
         Ok(())
     }
     
-    pub fn run_steps(self) -> impl Iterator<Item=ExecResult<VMSnapshot>> + 'm {
+    pub fn run_steps(self) -> impl Iterator<Item=ExecResult<VMSnapshot>> + 'c {
         VMStepper::from(self)
     }
     
     #[inline]
     fn exec_next(&mut self) -> ExecResult<bool> {
-        match self.state.exec_next(&mut self.values)? {
+        let control = self.state.exec_next(&mut self.values)?;
+        
+        match control {
             Control::Exit => return Ok(true),
             Control::Return if self.calls.is_empty() => return Ok(true),
             
@@ -82,6 +69,7 @@ impl<'m> VirtualMachine<'m> {
             Control::Return => self.return_call(),
             Control::Continue => { }
         }
+        
         Ok(false)
     }
     
@@ -97,10 +85,7 @@ impl<'m> VirtualMachine<'m> {
                 self.traceback.pop();
             },
             
-            Call::Chunk(module_id, chunk_id) => {
-                let module = self.module_cache.get(&module_id)
-                    .expect("invalid module id");
-                
+            Call::Chunk(module, chunk_id) => {
                 let locals = LocalIndex::try_from(self.values.len() - call.frame)
                     .expect("local index overflow");
                 
@@ -182,53 +167,47 @@ macro_rules! cond_jump {
 }
 
 
-pub type LocalIndex = u16;  // TODO make this u32 and add opcodes
+pub type LocalIndex = u16;
 
-// stores the active chunk execution information
+
 #[derive(Debug)]
-struct VMState<'m> {
-    module: &'m Module,
-    globals: &'m GlobalEnv,
-    chunk: &'m [u8],
+struct VMState<'c> {
+    module: GC<Module>,
+    chunk: &'c [u8],
     chunk_id: Option<ChunkID>,
     frame: usize,        // start index for locals belonging to this frame
     locals: LocalIndex,  // local variable count
     pc: usize,
 }
 
-impl<'m> VMState<'m> {
-    fn call_frame(module: &'m Module, chunk_id: ChunkID, frame: usize, locals: LocalIndex) -> Self {
+impl<'c> VMState<'c> {
+    fn call_frame(module: GC<Module>, chunk_id: ChunkID, frame: usize, locals: LocalIndex) -> Self {
+        
+        // This hack allows us to get around the self-referentiality of storing both "module" and "chunk"
+        // in the same struct. The alternative would be to store "chunk" as an `Option<Box<[u8]>>` and call 
+        // `module.data().get_chunk()` before every single instruction, but I want to avoid the overhead of that.
+        // SAFETY: This is safe because "module" is rooted as long as this VMState is in the call stack, 
+        // and VMStates are never stored outside of a VirtualMachine's call stack.
+        let chunk: *const [u8] = module.data().get_chunk(chunk_id);
+        let chunk = unsafe { chunk.as_ref::<'c>().unwrap() };
+        
         Self {
             module,
-            globals: module.globals(),
-            chunk: module.data().get_chunk(chunk_id),
+            chunk,
             chunk_id: Some(chunk_id),
-            locals,
             frame,
+            locals,
             pc: 0,
         }
     }
     
-    fn main_chunk(module: &'m Module, chunk: &'m [u8]) -> Self {
+    fn main_chunk(module: GC<Module>, chunk: &'c [u8]) -> Self {
         Self {
             module,
-            globals: module.globals(),
             chunk,
             chunk_id: None,
-            locals: 0,
             frame: 0,
-            pc: 0,
-        }
-    }
-    
-    fn main_repl(module: &'m Module, globals: &'m GlobalEnv, chunk: &'m [u8]) -> Self {
-        Self {
-            module,
-            globals,
-            chunk,
-            chunk_id: None,
             locals: 0,
-            frame: 0,
             pc: 0,
         }
     }
@@ -269,7 +248,7 @@ impl<'m> VMState<'m> {
     fn get_callsite(&self, offset: usize) -> CallSite {
         CallSite::Chunk {
             offset,
-            module_id: self.module.module_id(),
+            module: self.module,
             chunk_id: self.chunk_id,
         }
     }
@@ -326,37 +305,37 @@ impl<'m> VMState<'m> {
             
             OpCode::LoadConst => {
                 let cid = ConstID::from(data[0]);
-                let value = self.module.get_const(cid);
+                let value = Module::get_const(self.module, cid);
                 stack.push(value);
             },
             OpCode::LoadConst16 => {
                 let cid = ConstID::from(read_le_bytes!(u16, data));
-                let value = self.module.get_const(cid);
+                let value = Module::get_const(self.module, cid);
                 stack.push(value);
             },
             
             OpCode::InsertGlobal => {
                 let name = Self::into_name(stack.pop());
                 let value = stack.peek().clone();
-                self.globals.borrow_mut().create(name, Access::ReadOnly, value);
+                self.module.globals().borrow_mut().create(name, Access::ReadOnly, value);
             },
             OpCode::InsertGlobalMut => {
                 let name = Self::into_name(stack.pop());
                 let value = stack.peek().clone();
-                self.globals.borrow_mut().create(name, Access::ReadWrite, value);
+                self.module.globals().borrow_mut().create(name, Access::ReadWrite, value);
             },
             OpCode::StoreGlobal => {
                 let name = Self::into_name(stack.pop());
                 let value = stack.peek().clone();
                 
-                let mut globals = self.globals.borrow_mut();
+                let mut globals = self.module.globals().borrow_mut();
                 let store = globals.lookup_mut(&name)?;
                 *store = value;
             },
             OpCode::LoadGlobal => {
                 let value = {
                     let name = Self::into_name(stack.peek().clone());
-                    self.globals.borrow().lookup(&name)?.clone()
+                    self.module.globals().borrow().lookup(&name)?.clone()
                 };
                 stack.replace(value);
             },
@@ -625,7 +604,7 @@ impl From<&VMState<'_>> for VMStateSnapshot {
             ));
         
         Self {
-            module_id: state.module.module_id(),
+            module: state.module.name().to_string(),
             chunk_id: state.chunk_id,
             frame: state.frame,
             locals: state.locals,

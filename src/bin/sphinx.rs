@@ -9,7 +9,8 @@ use sphinx_lang::parser::expr::Expr;
 use sphinx_lang::parser::stmt::{Stmt, StmtMeta};
 use sphinx_lang::codegen::{Program, CompiledProgram};
 use sphinx_lang::runtime::VirtualMachine;
-use sphinx_lang::runtime::module::{ModuleCache, GlobalEnv};
+use sphinx_lang::runtime::gc::GC;
+use sphinx_lang::runtime::module::{Module, GlobalEnv};
 use sphinx_lang::runtime::strings::StringInterner;
 use sphinx_lang::debug::symbol::resolver::BufferedResolver;
 
@@ -65,11 +66,9 @@ fn main() {
         source = ModuleSource::File(PathBuf::from(s));
         name = s;
     } else {
-        let mut module_cache = ModuleCache::new();
         let repl_env = GlobalEnv::new();
+        Repl::new(version.to_string(), repl_env).run();
         
-        println!("\nSphinx Version {}\n", version);
-        Repl::new(&mut module_cache, &repl_env).run();
         return;
     }
     
@@ -83,29 +82,25 @@ fn main() {
         if let Some(build) = build_program(&args, name, &source) {
             let program = Program::load(build.program);
             
-            let mut module_cache = ModuleCache::new();
-            let module_id = module_cache.insert(program.data, Some(name.to_string()), Some(source));
+            let repl_env = GlobalEnv::new();
+            let main_module = Module::with_globals(repl_env, Some(source), program.data);
             
-            let vm = VirtualMachine::new(&module_cache, module_id, &program.main);
+            let vm = VirtualMachine::new(main_module, &program.main);
             if args.is_present("debug") {
                 run_debugger(vm);
             } else {
                 vm.run().expect("runtime error");
             }
             
-            println!("\nSphinx Version {}\n", version);
-            
-            let repl_env = module_cache.get(&module_id).unwrap().globals().clone();
-            Repl::new(&mut module_cache, &repl_env).run()
+            Repl::new(version.to_string(), repl_env).run()
         }
     }
     else if let Some(build) = build_program(&args, name, &source) {
         let program = Program::load(build.program);
         
-        let mut module_cache = ModuleCache::new();
-        let module_id = module_cache.insert(program.data, Some(name.to_string()), Some(source));
+        let main_module = Module::new(Some(source), program.data);
         
-        let vm = VirtualMachine::new(&module_cache, module_id, &program.main);
+        let vm = VirtualMachine::new(main_module, &program.main);
         if args.is_present("debug") {
             run_debugger(vm);
         } else {
@@ -191,9 +186,9 @@ fn parse_and_print_ast(_args: &ArgMatches, name: &str, source: &ModuleSource) {
 const PROMT_START: &str = ">>> ";
 const PROMT_CONTINUE: &str = "... ";
 
-struct Repl<'m> {
-    module_cache: &'m mut ModuleCache,
-    repl_env: &'m GlobalEnv,
+struct Repl {
+    version: String,
+    repl_env: GC<GlobalEnv>,
 }
 
 enum ReadLine {
@@ -203,10 +198,10 @@ enum ReadLine {
     Quit,
 }
 
-impl<'m> Repl<'m> {
-    pub fn new(module_cache: &'m mut ModuleCache, repl_env: &'m GlobalEnv) -> Self {
+impl Repl {
+    pub fn new(version: String, repl_env: GC<GlobalEnv>) -> Self {
         Self {
-            module_cache, repl_env,
+            version, repl_env,
         }
     }
     
@@ -235,6 +230,7 @@ impl<'m> Repl<'m> {
     }
     
     pub fn run(&mut self) {
+        println!("\nSphinx Version {}\n", self.version);
         
         loop {
             let mut interner;
@@ -312,17 +308,12 @@ impl<'m> Repl<'m> {
             
             let program = Program::load(build.program);
             
-            // ensure any functions in the new micro-module have access to the existing repl_env globals
-            let module_id = self.module_cache.insert_with_globals(program.data, None, None, self.repl_env.clone());
+            let module = Module::with_globals(self.repl_env, None, program.data);
             
-            let vm = VirtualMachine::repl(self.module_cache, self.repl_env, module_id, &program.main);
+            let vm = VirtualMachine::new(module, &program.main);
             if let Err(error) = vm.run() {
                 println!("Runtime error: {:?}", error);
             }
-            
-            // This is super inefficient, but it's just the REPL, so that's okay?
-            let module = self.module_cache.get(&module_id).unwrap();
-            self.repl_env.borrow_mut().extend(&module.globals().borrow());
             
         }
         

@@ -6,7 +6,7 @@ use std::fmt;
 use std::mem;
 use std::ops::Deref;
 use std::ptr::NonNull;
-use crate::runtime::gc::{GCBox, GC, GC_STATE, deref_safe, SizeOf};
+use crate::runtime::gc::{GCBox, GC, GC_STATE, deref_safe, GCTrace};
 
 
 pub(crate) struct Array<T> {
@@ -35,7 +35,7 @@ impl<T> Drop for Array<T> {
     }
 }
 
-impl<T> SizeOf for Array<T> {
+impl<T> GCTrace for Array<T> where T: GCTrace {
     fn extra_size(&self) -> usize {
         unsafe { mem::size_of_val(&*self.ptr.as_ptr()) }
     }
@@ -43,12 +43,12 @@ impl<T> SizeOf for Array<T> {
 
 
 #[derive(Clone)]
-pub struct GCArray<T> where T: 'static {
+pub struct GCArray<T> where T: GCTrace + 'static {
     handle: GC<Array<T>>,
     data_ptr: NonNull<[T]>,
 }
 
-impl<T> GCArray<T> {
+impl<T> GCArray<T> where T: GCTrace {
     #[inline]
     pub(super) fn inner(&self) -> &GCBox<Array<T>> {
         self.handle.inner()
@@ -68,7 +68,7 @@ impl<T> GCArray<T> {
     }
 }
 
-impl<T> Deref for GCArray<T> {
+impl<T> Deref for GCArray<T> where T: GCTrace {
     type Target = [T];
     
     #[inline]
@@ -79,7 +79,7 @@ impl<T> Deref for GCArray<T> {
     }
 }
 
-impl<T> fmt::Debug for GCArray<T> {
+impl<T> fmt::Debug for GCArray<T> where T: GCTrace {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         if fmt.alternate() {
             write!(fmt, "GCArray({:#?})", self.data_ptr)

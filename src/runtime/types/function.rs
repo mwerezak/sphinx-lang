@@ -2,9 +2,9 @@ use std::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::Variant;
-use crate::runtime::module::{ModuleID, Access};
+use crate::runtime::module::{Module, Access};
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
-use crate::runtime::gc::SizeOf;
+use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
@@ -12,7 +12,7 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 pub type NativeFn = fn(&[Variant]) -> ExecResult<Variant>;
 
 pub enum Call {
-    Chunk(ModuleID, ChunkID),
+    Chunk(GC<Module>, ChunkID),
     Native(NativeFn),
 }
 
@@ -30,15 +30,15 @@ pub trait Invoke {
 #[derive(Debug)]
 pub struct Function {
     signature: Signature,
-    module_id: ModuleID,
+    module: GC<Module>,
     chunk_id: ChunkID,
 }
 
-impl SizeOf for Function { }
+impl GCTrace for Function { }
 
 impl Function {
-    pub fn new(signature: Signature, module_id: ModuleID, chunk_id :ChunkID) -> Self {
-        Self { signature, module_id, chunk_id }
+    pub fn new(signature: Signature, module: GC<Module>, chunk_id :ChunkID) -> Self {
+        Self { signature, module, chunk_id }
     }
 }
 
@@ -46,7 +46,7 @@ impl Invoke for Function {
     fn signature(&self) -> &Signature { &self.signature }
     
     fn as_call(&self) -> Call {
-        Call::Chunk(self.module_id, self.chunk_id)
+        Call::Chunk(self.module, self.chunk_id)
     }
 }
 
@@ -56,7 +56,7 @@ pub struct NativeFunction {
     func: NativeFn,
 }
 
-impl SizeOf for NativeFunction { }
+impl GCTrace for NativeFunction { }
 
 impl NativeFunction {
     pub fn new(signature: Signature, func: NativeFn) -> Self {

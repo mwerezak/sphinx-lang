@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use crate::source::ModuleSource;
 use crate::language::FloatType;
 use crate::runtime::{Variant, DefaultBuildHasher};
+use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::types::function::Function;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -96,8 +97,8 @@ impl From<Namespace> for GlobalEnv {
 }
 
 impl GlobalEnv {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new() -> GC<Self> {
+        GC::allocate(Self::default())
     }
     
     pub fn borrow(&self) -> Ref<Namespace> {
@@ -109,103 +110,73 @@ impl GlobalEnv {
     }
 }
 
+impl GCTrace for GlobalEnv { }
 
-pub type ModuleID = u64;
+
 
 #[derive(Debug)]
 pub struct Module {
-    id: ModuleID,
-    name: Option<String>,
+    name: String,
     source: Option<ModuleSource>,
     data: ProgramData,
-    globals: GlobalEnv,
+    globals: GC<GlobalEnv>,
+}
+
+impl GCTrace for Module {
+    fn extra_size(&self) -> usize {
+        std::mem::size_of_val(self.name.as_str())
+    }
 }
 
 impl Module {
-    pub fn module_id(&self) -> ModuleID { self.id }
+    pub fn new(source: Option<ModuleSource>, data: ProgramData) -> GC<Self> {
+        let globals = GlobalEnv::new();
+        Self::with_globals(globals, source, data)
+    }
+    
+    pub fn with_globals(globals: GC<GlobalEnv>, source: Option<ModuleSource>, data: ProgramData) -> GC<Self> {
+        let module = Self {
+            name: Self::get_name(source.as_ref()),
+            source,
+            data,
+            globals,
+        };
+        GC::allocate(module)
+    }
+    
+    pub fn name(&self) -> &str { self.name.as_str() }
     
     pub fn source(&self) -> Option<&ModuleSource> { self.source.as_ref() }
     
+    #[inline(always)]
     pub fn data(&self) -> &ProgramData { &self.data }
     
+    #[inline(always)]
     pub fn globals(&self) -> &GlobalEnv { &self.globals }
     
     #[inline]
-    pub fn get_const(&self, cid: ConstID) -> Variant {
-        match *self.data.get_const(cid) {
+    pub fn get_const(self_module: GC<Self>, cid: ConstID) -> Variant {
+        match *self_module.data.get_const(cid) {
             Constant::Integer(value) => Variant::from(value),
+            
             Constant::Float(bytes) => FloatType::from_le_bytes(bytes).into(),
-            Constant::String(idx) => Variant::from(*self.data.get_string(idx)),
+            
+            Constant::String(idx) => Variant::from(*self_module.data.get_string(idx)),
+            
             Constant::Function(chunk_id, function_id) => {
-                let signature = self.data.get_signature(function_id);
-                let function = Function::new(signature.clone(), self.id, chunk_id);
+                let signature = self_module.data.get_signature(function_id);
+                let function = Function::new(signature.clone(), self_module, chunk_id);
                 Variant::from(function)
             }
         }
     }
     
-    
-}
-
-#[derive(Debug)]
-pub struct ModuleCache {
-    modules: HashMap<ModuleID, Module, DefaultBuildHasher>,
-    id_hasher: DefaultBuildHasher,
-}
-
-impl Default for ModuleCache {
-    fn default() -> Self { Self::new() }
-}
-
-impl ModuleCache {
-    pub fn new() -> Self {
-        Self {
-            modules: HashMap::with_hasher(DefaultBuildHasher::default()),
-            id_hasher: DefaultBuildHasher::default(),
+    fn get_name(source: Option<&ModuleSource>) -> String {
+        if let Some(ModuleSource::File(path)) = source {
+            path.display().to_string()
         }
-    }
-    
-    pub fn get(&self, module_id: &ModuleID) -> Option<&Module> {
-        self.modules.get(module_id)
-    }
-    
-    pub fn insert(&mut self, data: ProgramData, name: Option<String>, source: Option<ModuleSource>) -> ModuleID {
-        self.insert_with_globals(data, name, source, GlobalEnv::new())
-    }
-    
-    pub fn insert_with_globals(&mut self, data: ProgramData, name: Option<String>, source: Option<ModuleSource>, globals: GlobalEnv) -> ModuleID {
-        let module_id = self.new_module_id(name.as_deref(), source.as_ref());
-        
-        let module = Module {
-            id: module_id,
-            name, source, data,
-            globals,
-        };
-        
-        self.modules.insert(module_id, module);
-        
-        module_id
-    }
-    
-    /// Get a new, unused module ID.
-    fn new_module_id(&self, name: Option<&str>, source: Option<&ModuleSource>) -> ModuleID {
-        
-        let mut new_id;
-        if let Some(name) = name {
-            let mut state = self.id_hasher.build_hasher();
-            name.hash(&mut state);
-            new_id = state.finish();
-        } else if let Some(source) = source {
-            let mut state = self.id_hasher.build_hasher();
-            source.hash(&mut state);
-            new_id = state.finish();
-        } else {
-            new_id = 0;
+        else {
+            "<anonymous module>".to_string()
         }
-        
-        while self.modules.contains_key(&new_id) {
-            new_id = new_id.wrapping_add(1);
-        }
-        new_id
     }
 }

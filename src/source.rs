@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::{PathBuf, Path};
 use std::io;
-use crate::utils::ReadChars;
+use std::fmt;
+use crate::utils::{self, ReadChars};
 
 use crate::lexer::LexerBuilder;
 use crate::parser::{Parser, ParserError};
@@ -14,16 +15,6 @@ type ReadFileChars = ReadChars<io::BufReader<fs::File>>;
 pub enum ModuleSource {
     String(String),
     File(PathBuf),
-}
-
-#[derive(Debug)]
-pub enum SourceText {
-    String(String),
-    File(ReadFileChars),
-}
-
-impl<S> From<S> for SourceText where S: ToString {
-    fn from(text: S) -> Self { SourceText::String(text.to_string()) }
 }
 
 impl ModuleSource {
@@ -40,8 +31,19 @@ impl ModuleSource {
         let reader = io::BufReader::new(file);
         Ok(ReadChars::new(reader))
     }
-    
 }
+
+
+#[derive(Debug)]
+pub enum SourceText {
+    String(String),
+    File(ReadFileChars),
+}
+
+impl<S> From<S> for SourceText where S: ToString {
+    fn from(text: S) -> Self { SourceText::String(text.to_string()) }
+}
+
 
 
 /// High-level Parsing Interface
