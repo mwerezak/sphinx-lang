@@ -12,6 +12,7 @@ use sphinx_lang::runtime::VirtualMachine;
 use sphinx_lang::runtime::gc::GC;
 use sphinx_lang::runtime::module::{Module, GlobalEnv};
 use sphinx_lang::runtime::strings::StringInterner;
+use sphinx_lang::stdlib::prelude;
 use sphinx_lang::debug::symbol::resolver::BufferedResolver;
 
 fn main() {
@@ -66,7 +67,9 @@ fn main() {
         source = ModuleSource::File(PathBuf::from(s));
         name = s;
     } else {
-        let repl_env = GlobalEnv::new();
+        let repl_env = GlobalEnv::allocate();
+        repl_env.borrow_mut().extend(&prelude::create_prelude());
+        
         Repl::new(version.to_string(), repl_env).run();
         
         return;
@@ -82,7 +85,9 @@ fn main() {
         if let Some(build) = build_program(&args, name, &source) {
             let program = Program::load(build.program);
             
-            let repl_env = GlobalEnv::new();
+            let repl_env = GlobalEnv::allocate();
+            repl_env.borrow_mut().extend(&prelude::create_prelude());
+            
             let main_module = Module::with_globals(repl_env, Some(source), program.data);
             
             let vm = VirtualMachine::new(main_module, &program.main);
@@ -98,7 +103,10 @@ fn main() {
     else if let Some(build) = build_program(&args, name, &source) {
         let program = Program::load(build.program);
         
-        let main_module = Module::new(Some(source), program.data);
+        let main_env = GlobalEnv::allocate();
+        main_env.borrow_mut().extend(&prelude::create_prelude());
+        
+        let main_module = Module::with_globals(main_env, Some(source), program.data);
         
         let vm = VirtualMachine::new(main_module, &program.main);
         if args.is_present("debug") {

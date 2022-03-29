@@ -9,11 +9,11 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
 /// Call directive
-pub type NativeFn = fn(&[Variant]) -> ExecResult<Variant>;
+
 
 pub enum Call {
     Chunk(GC<Module>, ChunkID),
-    Native(NativeFn),
+    Native(GC<NativeFunction>),
 }
 
 pub trait Invoke {
@@ -51,27 +51,42 @@ impl Invoke for Function {
 }
 
 
+pub type NativeFn = fn(self_fun: &NativeFunction, args: &[Variant]) -> ExecResult<Variant>;
+
 pub struct NativeFunction {
     signature: Signature,
+    defaults: Option<Box<[Variant]>>,
     func: NativeFn,
 }
 
 impl GCTrace for NativeFunction { }
 
 impl NativeFunction {
-    pub fn new(signature: Signature, func: NativeFn) -> Self {
-        Self { signature, func }
+    pub fn new(signature: Signature, defaults: Option<Box<[Variant]>>, func: NativeFn) -> Self {
+        Self { signature, defaults, func }
+    }
+    
+    pub fn signature(&self) -> &Signature { &self.signature }
+    
+    pub fn defaults(&self) -> &[Variant] {
+        match self.defaults.as_ref() {
+            Some(defaults) => &*defaults,
+            None => &[],
+        }
+    }
+    
+    pub fn invoke(&self, args: &[Variant]) -> ExecResult<Variant> {
+        (self.func)(self, args)
     }
 }
 
-impl Invoke for NativeFunction {
+impl Invoke for GC<NativeFunction> {
     fn signature(&self) -> &Signature { &self.signature }
     
     fn as_call(&self) -> Call {
-        Call::Native(self.func)
+        Call::Native(*self)
     }
 }
-
 
 
 #[derive(Clone, Debug)]
@@ -124,7 +139,54 @@ impl Signature {
         
         Ok(())
     }
+    
+    /// Get the length of the argument buffer required by bind_args()
+    pub fn arg_len(&self) -> usize {
+        self.required.len() + self.default.len()
+    }
+    
+    /// Helper for native functions. Prepares a complete argument buffer by cloning argument values,
+    /// Assumes check_args() has already succeeded.
+    pub fn bind_args<'a>(&self, args: &'a [Variant], defaults: &'a [Variant], argbuf: &'a mut [Variant]) -> BoundArgs<'a> {
+        debug_assert!(args.len() >= self.required.len());
+        debug_assert!(argbuf.len() == self.arg_len());
+        debug_assert!(defaults.len() == self.default.len());
+        
+        let mut arg_idx = 0;
+        for _ in self.required.iter() {
+            argbuf[arg_idx] = args[arg_idx];
+            arg_idx += 1;
+        }
+        
+        for (default_idx, _) in self.default.iter().enumerate() {
+            if arg_idx < args.len() {
+                argbuf[arg_idx] = args[arg_idx];
+            } else {
+                argbuf[arg_idx] = defaults[default_idx];
+            }
+            arg_idx += 1;
+        }
+        
+        let varargs;
+        if arg_idx > args.len() {
+            varargs = &[] as &[Variant];
+        } else {
+            let (_, rest) = args.split_at(arg_idx);
+            varargs = rest;
+        }
+        
+        BoundArgs {
+            args: argbuf,
+            varargs,
+        }
+    }
 }
+
+pub struct BoundArgs<'a> {
+    pub args: &'a [Variant],
+    pub varargs: &'a [Variant],
+}
+
 
 #[derive(Clone, Debug)]
 pub struct Parameter {
@@ -135,6 +197,14 @@ pub struct Parameter {
 impl Parameter {
     pub fn new(name: impl Into<StringSymbol>, decl: DeclType) -> Self {
         Self { name: name.into(), decl }
+    }
+    
+    pub fn new_let(name: impl Into<StringSymbol>) -> Self {
+        Self::new(name, DeclType::Immutable)
+    }
+    
+    pub fn new_var(name: impl Into<StringSymbol>) -> Self {
+        Self::new(name, DeclType::Mutable)
     }
     
     pub fn name(&self) -> &StringSymbol { &self.name }
@@ -173,4 +243,70 @@ fn format_signature(name: Option<&StringSymbol>, required: &[Parameter], default
         
         format!("fun {}({})", name.unwrap_or(""), parameters.join(", "))
     })
+}
+
+
+
+
+/// Helper macros for creating native functions
+mod helpers {
+
+    /// Imports the native_function!() macro and required helpers.
+    #[macro_export]
+    macro_rules! use_function_def_helpers {
+        () => {
+            use crate::{native_function, variadic, count};
+        }
+    }
+    
+    #[macro_export]
+    macro_rules! count {
+        () => (0usize);
+        ( $x:tt $($xs:tt)* ) => (1usize + count!($($xs)*));
+    }
+    
+    #[macro_export]
+    macro_rules! variadic {
+        () => { None };
+        ( $name:tt ) => { Some(Parameter::new_var(stringify!($name))) };
+    }
+
+    #[macro_export]
+    macro_rules! native_function {
+        
+        // with default params
+        ( $func_name:tt : $( $required:tt  ),* ; $( $( $default:tt = $default_value:expr ),+ ; )? $( ... $variadic:tt )? => $body:expr ) => {
+            {
+                let signature = Signature::new(
+                    Some(stringify!($func_name)),
+                    vec![ $( Parameter::new_var(stringify!($required)) ),* ],
+                    vec![ $( $( Parameter::new_var(stringify!($default)) ),+ )? ],
+                    variadic!( $( $variadic )? ),
+                );
+                
+                $(
+                    let defaults = Box::new([ $( Variant::from($default_value) ),+ ]);
+                )?
+                
+                fn body(self_fun: &NativeFunction, args: &[Variant]) -> ExecResult<Variant> {
+                    const _ARGC: usize = count!( $( $required )+ ) $( + count!( $( $default )+ ) )?;
+                    
+                    let mut _argbuf = [Variant::Nil; _ARGC];
+                    let _bound = self_fun.signature().bind_args(args, self_fun.defaults(), &mut _argbuf);
+                    let _rest = _bound.args;
+                    
+                    $( let ($required, _rest) = _rest.split_first().unwrap(); )*
+                    $( $( let ($default, _rest) = _rest.split_first().unwrap(); )+ )?
+                    
+                    $( let $variadic = _bound.varargs; )?
+                    
+                    $body
+                }
+                
+                NativeFunction::new(signature, Some(defaults), body)
+            }
+        };
+
+
+    }
 }

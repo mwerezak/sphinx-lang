@@ -97,7 +97,7 @@ impl From<Namespace> for GlobalEnv {
 }
 
 impl GlobalEnv {
-    pub fn new() -> GC<Self> {
+    pub fn allocate() -> GC<Self> {
         GC::allocate(Self::default())
     }
     
@@ -129,8 +129,8 @@ impl GCTrace for Module {
 }
 
 impl Module {
-    pub fn new(source: Option<ModuleSource>, data: ProgramData) -> GC<Self> {
-        let globals = GlobalEnv::new();
+    pub fn allocate(source: Option<ModuleSource>, data: ProgramData) -> GC<Self> {
+        let globals = GlobalEnv::allocate();
         Self::with_globals(globals, source, data)
     }
     

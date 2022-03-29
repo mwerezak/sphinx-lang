@@ -13,7 +13,7 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 
 // Fundamental data value type
-#[derive(Clone)] // add Copy?
+#[derive(Clone, Copy)]
 pub enum Variant {
     Nil,
     EmptyTuple,
@@ -90,6 +90,7 @@ impl Variant {
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
         match self {
             Self::Function(fun) => fun.invoke(args),
+            Self::NativeFunction(fun) => fun.invoke(args),
             
             _ => Err(ErrorKind::NotCallable(self.clone()).into())
         }
@@ -132,6 +133,12 @@ impl From<Box<[Variant]>> for Variant {
 impl From<Function> for Variant {
     fn from(func: Function) -> Self {
         Self::Function(GC::allocate(func))
+    }
+}
+
+impl From<NativeFunction> for Variant {
+    fn from(func: NativeFunction) -> Self {
+        Self::NativeFunction(GC::allocate(func))
     }
 }
 

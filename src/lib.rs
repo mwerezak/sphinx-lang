@@ -16,6 +16,7 @@ pub mod parser;
 pub mod language;
 pub mod codegen;
 pub mod runtime;
+pub mod stdlib;
 
 pub mod frontend;
 pub mod debug;

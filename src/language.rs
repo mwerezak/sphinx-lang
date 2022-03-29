@@ -6,6 +6,8 @@ use crate::lexer::rules::keywords::KeywordRule;
 use crate::lexer::rules::literals::*;
 use crate::lexer::rules::literals::string::*;
 
+pub use crate::stdlib::prelude::create_prelude;
+
 
 pub type IntType = i64;    // internal representation for integers
 pub type FloatType = f64;  // internal representation for floats

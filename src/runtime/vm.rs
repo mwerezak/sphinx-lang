@@ -79,7 +79,7 @@ impl<'c> VirtualMachine<'c> {
         match call.call {
             Call::Native(func) => {
                 let args = self.values.peek_many(call.nargs);
-                let retval = func(args)?;
+                let retval = func.invoke(args)?;
                 self.values.truncate(call.frame.into());
                 self.values.push(retval);
                 self.traceback.pop();
@@ -385,9 +385,7 @@ impl<'c> VMState<'c> {
             OpCode::Tuple => {
                 let tuple_len = usize::from(data[0]);
                 
-                // peek and clone to ensure items stay rooted for GC
-                let items = stack.peek_many(tuple_len)
-                    .to_vec().into_boxed_slice();
+                let items = stack.pop_many(tuple_len).into_boxed_slice();
                 
                 let tuple = Variant::from(items);
                 stack.replace_many(tuple_len, tuple);
@@ -395,9 +393,7 @@ impl<'c> VMState<'c> {
             OpCode::TupleN => {
                 let tuple_len = Self::into_usize(stack.pop());
                 
-                // peek and clone to ensure items stay rooted for GC
-                let items = stack.peek_many(tuple_len)
-                    .to_vec().into_boxed_slice();
+                let items = stack.pop_many(tuple_len).into_boxed_slice();
                 
                 let tuple = Variant::from(items);
                 stack.replace_many(tuple_len, tuple);

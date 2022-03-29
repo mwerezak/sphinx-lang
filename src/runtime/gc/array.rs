@@ -42,7 +42,7 @@ impl<T> GCTrace for Array<T> where T: GCTrace {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct GCArray<T> where T: GCTrace + 'static {
     handle: GC<Array<T>>,
     data_ptr: NonNull<[T]>,
