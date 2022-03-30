@@ -1,7 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 use std::ops::Deref;
-use std::ptr::NonNull;
+use std::ptr::{self, NonNull};
 use std::marker::PhantomData;
 
 use crate::runtime::gc::{GCBox, GCArray, GC_STATE, deref_safe, GCTrace};
@@ -24,8 +24,8 @@ impl<T> GC<T> where T: GCTrace + ?Sized {
         unsafe { &*self.ptr.as_ptr() }
     }
     
-    pub fn ptr_eq(self: &GC<T>, other: &GC<T>) -> bool {
-        unimplemented!()
+    pub fn ptr_eq(self_gc: &GC<T>, other_gc: &GC<T>) -> bool {
+        ptr::eq(self_gc.ptr.as_ptr(), other_gc.ptr.as_ptr())
     }
 }
 

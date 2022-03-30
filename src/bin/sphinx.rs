@@ -12,8 +12,8 @@ use sphinx_lang::runtime::VirtualMachine;
 use sphinx_lang::runtime::gc::GC;
 use sphinx_lang::runtime::module::{Module, GlobalEnv};
 use sphinx_lang::runtime::strings::StringInterner;
-use sphinx_lang::stdlib::prelude;
 use sphinx_lang::debug::symbol::resolver::BufferedResolver;
+use sphinx_lang::stdlib;
 
 fn main() {
     env_logger::init();
@@ -67,9 +67,7 @@ fn main() {
         source = ModuleSource::File(PathBuf::from(s));
         name = s;
     } else {
-        let repl_env = GlobalEnv::allocate();
-        repl_env.borrow_mut().extend(&prelude::create_prelude());
-        
+        let repl_env = GC::allocate(stdlib::prelude_env());
         Repl::new(version.to_string(), repl_env).run();
         
         return;
@@ -85,10 +83,8 @@ fn main() {
         if let Some(build) = build_program(&args, name, &source) {
             let program = Program::load(build.program);
             
-            let repl_env = GlobalEnv::allocate();
-            repl_env.borrow_mut().extend(&prelude::create_prelude());
-            
-            let main_module = Module::with_globals(repl_env, Some(source), program.data);
+            let repl_env = GC::allocate(stdlib::prelude_env());
+            let main_module = Module::with_env(Some(source), program.data, repl_env);
             
             let vm = VirtualMachine::new(main_module, &program.main);
             if args.is_present("debug") {
@@ -103,10 +99,8 @@ fn main() {
     else if let Some(build) = build_program(&args, name, &source) {
         let program = Program::load(build.program);
         
-        let main_env = GlobalEnv::allocate();
-        main_env.borrow_mut().extend(&prelude::create_prelude());
-        
-        let main_module = Module::with_globals(main_env, Some(source), program.data);
+        let main_env = GC::allocate(stdlib::prelude_env());
+        let main_module = Module::with_env(Some(source), program.data, main_env);
         
         let vm = VirtualMachine::new(main_module, &program.main);
         if args.is_present("debug") {
@@ -316,7 +310,7 @@ impl Repl {
             
             let program = Program::load(build.program);
             
-            let module = Module::with_globals(self.repl_env, None, program.data);
+            let module = Module::with_env(None, program.data, self.repl_env);
             
             let vm = VirtualMachine::new(module, &program.main);
             if let Err(error) = vm.run() {

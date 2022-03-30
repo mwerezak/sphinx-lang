@@ -29,7 +29,7 @@ fn time() -> FloatType {
 }
 
 
-pub fn create_prelude() -> Namespace {
+pub(super) fn create_prelude() -> Namespace {
     let mut prelude = Namespace::new();
     prelude.create("add_example".into(), Access::ReadOnly, Variant::from(add_example()));
     prelude

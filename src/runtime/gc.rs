@@ -22,9 +22,7 @@ struct GCBox<T> where T: GCTrace + ?Sized + 'static {
 
 impl<T> GCBox<T> where T: GCTrace + ?Sized {
     fn value(&self) -> &T { &self.data }
-}
-
-impl<T> GCBox<T> where T: GCTrace + ?Sized {
+    
     #[inline]
     fn size(&self) -> usize {
         mem::size_of_val(self) + self.value().extra_size()
