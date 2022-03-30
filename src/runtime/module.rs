@@ -6,6 +6,8 @@
 ///! Importing a Sphinx module simply means executing a Sphinx sub-program and binding the
 ///! resulting module to a name.
 
+use std::fmt;
+use std::path::PathBuf;
 use std::cell::{RefCell, Ref, RefMut};
 use std::hash::{Hash, Hasher, BuildHasher};
 use std::collections::HashMap;
@@ -117,20 +119,15 @@ impl GlobalEnv {
 impl GCTrace for GlobalEnv { }
 
 
-
 #[derive(Debug)]
 pub struct Module {
-    name: String,
+    ident: ModuleIdent,
     source: Option<ModuleSource>,
     data: ProgramData,
     globals: GC<GlobalEnv>,
 }
 
-impl GCTrace for Module {
-    fn extra_size(&self) -> usize {
-        std::mem::size_of_val(self.name.as_str())
-    }
-}
+impl GCTrace for Module { }
 
 impl Module {
     pub fn allocate(source: Option<ModuleSource>, data: ProgramData) -> GC<Self> {
@@ -139,8 +136,12 @@ impl Module {
     }
     
     pub fn with_env(source: Option<ModuleSource>, data: ProgramData, globals: GC<GlobalEnv>) -> GC<Self> {
+        let ident = 
+            if let Some(source) = source.as_ref() { ModuleIdent::from(source) }
+            else { ModuleIdent::from(globals) };
+        
         let module = Self {
-            name: Self::get_name(source.as_ref()),
+            ident,
             source,
             data,
             globals,
@@ -148,7 +149,7 @@ impl Module {
         GC::allocate(module)
     }
     
-    pub fn name(&self) -> &str { self.name.as_str() }
+    pub fn ident(&self) -> &ModuleIdent { &self.ident }
     
     pub fn source(&self) -> Option<&ModuleSource> { self.source.as_ref() }
     
@@ -174,13 +175,58 @@ impl Module {
             }
         }
     }
-    
-    fn get_name(source: Option<&ModuleSource>) -> String {
-        if let Some(ModuleSource::File(path)) = source {
-            path.display().to_string()
+}
+
+
+/// Used to uniquely identify a module
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ModuleIdent {
+    SourcePath(PathBuf), // canonicalized path to the source file
+    SourceHash(u64),  // hash of source text
+    RefHash(u64),  // GC address of globals, for Native Modules
+}
+
+impl From<&ModuleSource> for ModuleIdent {
+    fn from(source: &ModuleSource) -> Self {
+        match source {
+            ModuleSource::File(path) => {
+                Self::SourcePath(path.canonicalize().expect("invalid source path"))
+            },
+            
+            ModuleSource::String(text) => {
+                let mut state = DefaultBuildHasher::default().build_hasher();
+                text.hash(&mut state);
+                let hash = state.finish();
+                Self::SourceHash(hash)
+            }
         }
-        else {
-            "<anonymous module>".to_string()
+    }
+}
+
+impl From<GC<GlobalEnv>> for ModuleIdent {
+    fn from(env: GC<GlobalEnv>) -> Self {
+        let mut state = DefaultBuildHasher::default().build_hasher();
+        <GC<GlobalEnv> as Hash>::hash(&env, &mut state);
+        let hash = state.finish();
+        Self::RefHash(hash)
+    }
+}
+
+impl fmt::Display for ModuleIdent {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SourcePath(path) => {
+                let prefix = std::env::current_dir().ok();
+                
+                let path = prefix.map(|prefix| path.strip_prefix(prefix).ok()).flatten()
+                    .unwrap_or(path);
+                
+                write!(fmt, "\"{}\"", path.display())
+            },
+            
+            Self::SourceHash(hash) => write!(fmt, "#{:016X}", hash),
+            
+            Self::RefHash(hash) => write!(fmt, "&{:016X}", hash),
         }
     }
 }

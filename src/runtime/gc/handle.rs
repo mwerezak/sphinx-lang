@@ -2,6 +2,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::ops::Deref;
 use std::ptr::{self, NonNull};
+use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 use crate::runtime::gc::{GCBox, GCArray, GC_STATE, deref_safe, GCTrace};
@@ -53,6 +54,14 @@ impl<T> From<GC<T>> for GC<dyn GCTrace> where T: GCTrace {
 //     }
 // }
 
+impl<T> Deref for GC<T> where T: GCTrace + ?Sized {
+    type Target = T;
+    
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.inner().value()
+    }
+}
 
 impl<T> Clone for GC<T> where T: GCTrace + ?Sized {
     fn clone(&self) -> Self {
@@ -65,15 +74,12 @@ impl<T> Clone for GC<T> where T: GCTrace + ?Sized {
 
 impl<T> Copy for GC<T> where T: GCTrace + ?Sized { }
 
-
-impl<T> Deref for GC<T> where T: GCTrace + ?Sized {
-    type Target = T;
-    
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        self.inner().value()
+impl<T> Hash for GC<T> where T: GCTrace {
+    fn hash<H>(&self, state: &mut H) where H: Hasher {
+        <NonNull<GCBox<T>> as Hash>::hash(&self.ptr, state)
     }
 }
+
 
 impl<T> fmt::Debug for GC<T> where T: GCTrace + ?Sized {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
