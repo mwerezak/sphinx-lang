@@ -83,7 +83,7 @@ echo "Hello, world!"  # print() function will be available later once there is a
 # Mutable and immutable variables
 let immutable = "can't change me"
 var mutable = 0
-echo mutable += 1  # almost all constructs are expressions
+echo mutable += 1  # almost all constructs in Sphinx are expressions
 
 var annotated: Float = 3.14159  # not implemented yet, but someday...
 
@@ -117,10 +117,9 @@ end
 
 variadic_fun("red", "blue", "green")  # prints "red" then "blue" then "green"
 
-# Note: named arguments are not supported.
+# Note: named arguments are not supported. It may be added in the future.
 # You can pass an anonymous object instead.
 configure_something({ option1: true, option2: false })
-
 
 
 # Argument unpacking and wrapping decorators
