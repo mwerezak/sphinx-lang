@@ -36,7 +36,7 @@ impl<T> Drop for Array<T> {
 }
 
 impl<T> GCTrace for Array<T> where T: GCTrace {
-    fn extra_size(&self) -> usize {
+    fn size_hint(&self) -> usize {
         unsafe { mem::size_of_val(&*self.ptr.as_ptr()) }
     }
 }

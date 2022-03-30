@@ -25,7 +25,7 @@ impl<T> GCBox<T> where T: GCTrace + ?Sized {
     
     #[inline]
     fn size(&self) -> usize {
-        mem::size_of_val(self) + self.value().extra_size()
+        mem::size_of_val(self) + self.value().size_hint()
     }
     
     fn ptr_eq(&self, other: &GCBox<T>) -> bool {
@@ -40,7 +40,7 @@ impl<T> GCBox<T> where T: GCTrace + ?Sized {
 pub trait GCTrace {
     /// if the GC'd data owns any allocations, this should return the extra allocated size
     #[inline]
-    fn extra_size(&self) -> usize { 0 }
+    fn size_hint(&self) -> usize { 0 }
 }
 
 
