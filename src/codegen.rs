@@ -21,7 +21,7 @@ pub mod opcodes;
 pub mod errors;
 
 pub use opcodes::OpCode;
-pub use chunk::{UnloadedProgram, Program, ProgramData, ChunkID};
+pub use chunk::{UnloadedProgram, Program, ProgramData, Chunk, ChunkID};
 pub use consts::{ConstID, Constant};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
@@ -141,7 +141,7 @@ enum ScopeTag {
 struct Scope {
     tag: ScopeTag,
     depth: usize,
-    chunk: Option<ChunkID>,
+    chunk: Chunk,
     symbol: Option<DebugSymbol>,
     
     frame: Option<LocalIndex>,
@@ -206,7 +206,7 @@ impl ScopeTracker {
         self.scopes.last_mut()
     }
     
-    fn push_scope(&mut self, tag: ScopeTag, chunk: Option<ChunkID>, symbol: Option<&DebugSymbol>) {
+    fn push_scope(&mut self, tag: ScopeTag, chunk: Chunk, symbol: Option<&DebugSymbol>) {
         let frame;
         if tag == ScopeTag::Function {
             frame = None; // inside a function, locals are indexed from the start of the frame
@@ -285,9 +285,9 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(strings: StringInterner) -> Self {
-        // insert RLE container for main chunk
+        // insert symbol container for main chunk
         let mut symbols = ChunkSymbols::new();
-        symbols.insert(None, DebugSymbolTable::new());
+        symbols.insert(Chunk::Main, DebugSymbolTable::new());
         
         Self {
             builder: ChunkBuilder::with_strings(strings),
@@ -297,23 +297,19 @@ impl Compiler {
         }
     }
     
-    fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<ChunkID> {
+    fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<Chunk> {
         let chunk_id = self.builder.new_chunk(info)?;
-        self.symbols.entry(Some(chunk_id))
+        self.symbols.entry(chunk_id)
             .or_insert_with(DebugSymbolTable::new);
         
         Ok(chunk_id)
     }
     
-    fn get_chunk(&mut self, chunk_id: Option<ChunkID>) -> CodeGenerator {
+    fn get_chunk(&mut self, chunk_id: Chunk) -> CodeGenerator {
         CodeGenerator {
             compiler: self,
             chunk_id,
         }
-    }
-    
-    fn main_chunk(&mut self) -> CodeGenerator {
-        self.get_chunk(None)
     }
     
     pub fn compile_program<'a>(mut self, program: impl Iterator<Item=&'a StmtMeta>) -> Result<CompiledProgram, Vec<CompileError>> {
@@ -324,14 +320,14 @@ impl Compiler {
     }
     
     pub fn push_stmt(&mut self, stmt: &StmtMeta) {
-        if let Err(error) = self.main_chunk().push_stmt(stmt) {
+        if let Err(error) = self.get_chunk(Chunk::Main).push_stmt(stmt) {
             self.errors.push(error);
         }
     }
     
     pub fn finish(mut self) -> Result<CompiledProgram, Vec<CompileError>> {
         if self.errors.is_empty() {
-            self.main_chunk().finish();
+            self.get_chunk(Chunk::Main).finish();
             
             let output = CompiledProgram {
                 program: self.builder.build(),
@@ -348,7 +344,7 @@ impl Compiler {
 
 struct CodeGenerator<'c> {
     compiler: &'c mut Compiler,
-    chunk_id: Option<ChunkID>,
+    chunk_id: Chunk,
 }
 
 impl CodeGenerator<'_> {
@@ -368,7 +364,7 @@ impl CodeGenerator<'_> {
         self.emit_instr(None, OpCode::Return);
     }
     
-    fn chunk_id(&self) -> Option<ChunkID> { self.chunk_id }
+    fn chunk_id(&self) -> Chunk { self.chunk_id }
     
     fn builder(&self) -> &ChunkBuilder { &self.compiler.builder }
     fn builder_mut(&mut self) -> &mut ChunkBuilder { &mut self.compiler.builder }
@@ -405,7 +401,7 @@ impl CodeGenerator<'_> {
             symbol: symbol.copied(),
         };
         let chunk_id = self.compiler.new_chunk(info)?;
-        Ok(self.compiler.get_chunk(Some(chunk_id)))
+        Ok(self.compiler.get_chunk(chunk_id))
     }
     
     ///////// Emitting Bytecode /////////
@@ -1173,34 +1169,39 @@ impl CodeGenerator<'_> {
     
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
         // create a new chunk for the function
-        let mut chunk = self.create_chunk(symbol)?;
-        let chunk_id = chunk.chunk_id().unwrap();
+        let mut chunk_gen = self.create_chunk(symbol)?;
+        
+        let chunk = chunk_gen.chunk_id();
+        let chunk_id = match chunk {
+            Chunk::ChunkID(chunk_id) => chunk_id,
+            _ => panic!("chunk {:?} is not valid for function", chunk),
+        };
         
         // and a new local scope
         // don't need to emit new scope instructions, should handled by function call
-        chunk.scope_mut().push_scope(ScopeTag::Function, Some(chunk_id), symbol);
+        chunk_gen.scope_mut().push_scope(ScopeTag::Function, chunk, symbol);
         
         // don't need to generate IN_LOCAL instructions for these, the VM should include them automatically
-        chunk.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
-        chunk.scope_mut().insert_local(DeclType::Immutable, LocalName::NArgs)?;
+        chunk_gen.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
+        chunk_gen.scope_mut().insert_local(DeclType::Immutable, LocalName::NArgs)?;
         
         // prepare argument list
-        chunk.compile_function_preamble(symbol, fundef)?;
+        chunk_gen.compile_function_preamble(symbol, fundef)?;
         
         // function body
-        chunk.compile_stmt_list(fundef.body.stmt_list())?;
+        chunk_gen.compile_stmt_list(fundef.body.stmt_list())?;
         
         // function result
         if let Some(expr) = fundef.body.result() {
-            chunk.compile_expr_with_symbol(expr)?;
+            chunk_gen.compile_expr_with_symbol(expr)?;
         } else {
-            chunk.emit_instr(symbol, OpCode::Nil);
+            chunk_gen.emit_instr(symbol, OpCode::Nil);
         }
         
         // end the function scope
         // don't need to emit end scope instructions, will be handled by return
-        chunk.scope_mut().pop_scope();
-        chunk.finish();
+        chunk_gen.scope_mut().pop_scope();
+        chunk_gen.finish();
         
         // compile the function signature
         let signature = self.compile_function_signature(symbol, &fundef.signature)?;

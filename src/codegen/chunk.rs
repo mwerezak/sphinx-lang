@@ -14,12 +14,19 @@ use crate::debug::DebugSymbol;
 // these are limited to u16 right now because they are loaded by opcodes
 pub type ChunkID = u16;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Chunk {
+    Main,
+    ChunkID(ChunkID),
+}
 
-// pub enum ChunkTag {
-//     Module,
-//     Function,
-//     DefaultArg,
-// }
+impl From<ChunkID> for Chunk {
+    fn from(chunk_id: ChunkID) -> Self {
+        Self::ChunkID(chunk_id)
+    }
+}
+
+
 
 #[derive(Default, Debug, Clone)]
 pub struct ChunkInfo {
@@ -116,28 +123,26 @@ impl ChunkBuilder {
     
     // Bytecode
     
-    pub fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<ChunkID> {
+    pub fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<Chunk> {
         let chunk_id = ChunkID::try_from(self.chunks.len())
             .map_err(|_| CompileError::from(ErrorKind::ChunkCountLimit))?;
         
         self.chunks.push(ChunkBuf::new(info));
         
-        Ok(chunk_id)
+        Ok(chunk_id.into())
     }
 
-    pub fn chunk(&self, chunk_id: Option<ChunkID>) -> &ChunkBuf { 
-        if let Some(chunk_id) = chunk_id {
-            &self.chunks[usize::from(chunk_id)]
-        } else {
-            &self.main
+    pub fn chunk(&self, chunk_id: Chunk) -> &ChunkBuf {
+        match chunk_id {
+            Chunk::Main => &self.main,
+            Chunk::ChunkID(id) => &self.chunks[usize::from(id)],
         }
     }
     
-    pub fn chunk_mut(&mut self, chunk_id: Option<ChunkID>) -> &mut ChunkBuf { 
-        if let Some(chunk_id) = chunk_id {
-            &mut self.chunks[usize::from(chunk_id)]
-        } else {
-            &mut self.main
+    pub fn chunk_mut(&mut self, chunk_id: Chunk) -> &mut ChunkBuf { 
+        match chunk_id {
+            Chunk::Main => &mut self.main,
+            Chunk::ChunkID(id) => &mut self.chunks[usize::from(id)],
         }
     }
     

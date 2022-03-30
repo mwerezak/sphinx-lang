@@ -6,7 +6,7 @@ use string_interner::Symbol as _;
 
 use crate::language::FloatType;
 use crate::codegen::OpCode;
-use crate::codegen::chunk::{UnloadedProgram, ChunkID};
+use crate::codegen::chunk::{UnloadedProgram, Chunk, ChunkID};
 use crate::codegen::consts::{Constant, ConstID};
 use crate::debug::symbol::{DebugSymbol, DebugSymbolTable, ResolvedSymbol, ResolvedSymbolTable, ChunkSymbols};
 use crate::debug::symbol::errors::SymbolResolutionError;
@@ -43,13 +43,13 @@ impl<'c, 's> Disassembler<'c, 's> {
     
     pub fn write_disassembly(&self, fmt: &mut impl Write) -> fmt::Result {
         writeln!(fmt, "\n\nmain:\n")?;
-        let symbols = self.symbols.map(|symbols| symbols.get(&None)).flatten();
+        let symbols = self.symbols.map(|symbols| symbols.get(&Chunk::Main)).flatten();
         self.decode_chunk(fmt, self.program.main(), symbols)?;
         
         for (chunk_id, chunk) in self.program.iter_chunks() {
             writeln!(fmt, "\n\nchunk {}:\n", chunk_id)?;
             
-            let symbols = self.symbols.map(|symbols| symbols.get(&Some(chunk_id))).flatten();
+            let symbols = self.symbols.map(|symbols| symbols.get(&Chunk::ChunkID(chunk_id))).flatten();
             self.decode_chunk(fmt, chunk, symbols)?;
         }
         

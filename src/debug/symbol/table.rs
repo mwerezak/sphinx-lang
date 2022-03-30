@@ -1,9 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use crate::codegen::ChunkID;
+use crate::codegen::Chunk;
 use crate::debug::symbol::DebugSymbol;
 
-pub type ChunkSymbols = HashMap<Option<ChunkID>, DebugSymbolTable>;
+pub type ChunkSymbols = HashMap<Chunk, DebugSymbolTable>;
 
 /// Maps bytecode offsets to DebugSymbols
 #[derive(Debug)]
