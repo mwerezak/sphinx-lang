@@ -48,10 +48,14 @@ pub struct GCArray<T> where T: GCTrace + 'static {
     data_ptr: NonNull<[T]>,
 }
 
-impl<T> GCArray<T> where T: GCTrace {
+impl<T> GCArray<T> where T: GCTrace + 'static {
     #[inline]
     pub(super) fn inner(&self) -> &GCBox<Array<T>> {
         self.handle.inner()
+    }
+    
+    pub fn handle(&self)  -> GC<dyn GCTrace> {
+        self.handle.into()
     }
     
     pub fn from_boxed_slice(data: Box<[T]>) -> Self {

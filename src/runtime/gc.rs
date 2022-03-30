@@ -2,7 +2,7 @@
 
 use std::mem;
 use std::any::Any;
-use std::ptr::NonNull;
+use std::ptr::{self, NonNull};
 use std::cell::{Cell, RefCell};
 use log;
 
@@ -26,6 +26,14 @@ impl<T> GCBox<T> where T: GCTrace + ?Sized {
     #[inline]
     fn size(&self) -> usize {
         mem::size_of_val(self) + self.value().extra_size()
+    }
+    
+    fn ptr_eq(&self, other: &GCBox<T>) -> bool {
+        // in case T is a trait object, work around for https://github.com/rust-lang/rust/issues/46139
+        ptr::eq(
+            ptr::addr_of!(self.marked),
+            ptr::addr_of!(other.marked),
+        )
     }
 }
 

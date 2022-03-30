@@ -25,7 +25,7 @@ impl<T> GC<T> where T: GCTrace + ?Sized {
     }
     
     pub fn ptr_eq(self_gc: &GC<T>, other_gc: &GC<T>) -> bool {
-        ptr::eq(self_gc.ptr.as_ptr(), other_gc.ptr.as_ptr())
+        self_gc.inner().ptr_eq(other_gc.inner())
     }
 }
 
@@ -35,6 +35,15 @@ impl<T: GCTrace> GC<T> {
             let mut gc = gc.borrow_mut();
             Self::from_raw(gc.allocate(data))
         })
+    }
+}
+
+impl<T> From<GC<T>> for GC<dyn GCTrace> where T: GCTrace {
+    fn from(handle: GC<T>) -> Self {
+        Self {
+            ptr: handle.ptr,
+            _marker: PhantomData,
+        }
     }
 }
 

@@ -7,6 +7,7 @@
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
+use crate::runtime::gc::GC;
 use crate::runtime::types::metatable::{UnaryTag, BinaryTag, CompareTag};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
@@ -69,7 +70,16 @@ fn eval_meta_comparison(tag: CompareTag, lhs: &Variant, rhs: &Variant) -> ExecRe
     match result {
         Some(Err(error)) => Err(error),
         Some(Ok(Some(value))) => Ok(value),
-        _ if tag == CompareTag::EQ => Ok(false), // equality always succeeds
+        
+        // equality always succeeds
+        _ if tag == CompareTag::EQ => {
+            // fall back to reference equality for GC types
+            let result = lhs.as_gc()
+                .and_then(|lhs| rhs.as_gc().map(|rhs| (lhs, rhs)))
+                .map_or(false, |(lhs, rhs)| GC::ptr_eq(&lhs, &rhs));
+            
+            Ok(result)
+        }, 
         
         _ => Err(ErrorKind::InvalidBinaryOperand(lhs.clone(), rhs.clone()).into()),
     }

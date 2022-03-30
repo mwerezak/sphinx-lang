@@ -95,6 +95,10 @@ impl Variant {
             _ => Err(ErrorKind::NotCallable(self.clone()).into())
         }
     }
+    
+    pub fn as_gc(self) -> Option<GC<dyn GCTrace>> {
+        GC::<dyn GCTrace>::try_from(self).ok()
+    }
 }
 
 impl From<bool> for Variant {
@@ -143,6 +147,20 @@ impl From<NativeFunction> for Variant {
 }
 
 impl GCTrace for Variant { }
+
+// extract the GC handle for GC'd types
+impl TryFrom<Variant> for GC<dyn GCTrace> {
+    type Error = Variant;
+    
+    fn try_from(value: Variant) -> Result<Self, Self::Error> {
+        match value {
+            Variant::Tuple(tuple) => Ok(tuple.handle()),
+            Variant::Function(fun) => Ok(fun.into()),
+            Variant::NativeFunction(fun) => Ok(fun.into()),
+            _ => Err(value),
+        }
+    }
+}
 
 
 // Not all Variants are hashable, so there is a separate type to handle that
