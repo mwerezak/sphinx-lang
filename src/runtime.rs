@@ -21,3 +21,4 @@ pub use errors::{RuntimeError, ExecResult};
 
 pub type DefaultHasher = AHasher;
 pub type DefaultBuildHasher = ahash::RandomState;
+pub type HashMap<K, V> = std::collections::HashMap<K,V, DefaultBuildHasher>;

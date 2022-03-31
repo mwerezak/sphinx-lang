@@ -10,16 +10,15 @@ use std::fmt;
 use std::path::PathBuf;
 use std::cell::{RefCell, Ref, RefMut};
 use std::hash::{Hash, Hasher, BuildHasher};
-use std::collections::HashMap;
 use crate::source::ModuleSource;
 use crate::language::FloatType;
-use crate::runtime::{Variant, DefaultBuildHasher};
+use crate::runtime::{Variant, HashMap, DefaultBuildHasher};
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::types::function::Function;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
-pub use crate::codegen::{ProgramData, Constant, ConstID, ChunkID};
+pub use crate::codegen::{ProgramData, Constant, ConstID, Chunk, ChunkID};
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,7 +35,7 @@ pub struct Variable {
 
 #[derive(Debug, Clone)]
 pub struct Namespace {
-    store: HashMap<StringSymbol, Variable, DefaultBuildHasher>,
+    store: HashMap<StringSymbol, Variable>,
 }
 
 impl Default for Namespace {
@@ -146,6 +145,7 @@ impl Module {
             data,
             globals,
         };
+        
         GC::allocate(module)
     }
     
@@ -186,6 +186,10 @@ pub enum ModuleIdent {
     RefHash(u64),  // GC address of globals, for Native Modules
 }
 
+lazy_static! {
+    static ref IDENT_HASH: DefaultBuildHasher = DefaultBuildHasher::default();
+}
+
 impl From<&ModuleSource> for ModuleIdent {
     fn from(source: &ModuleSource) -> Self {
         match source {
@@ -194,7 +198,7 @@ impl From<&ModuleSource> for ModuleIdent {
             },
             
             ModuleSource::String(text) => {
-                let mut state = DefaultBuildHasher::default().build_hasher();
+                let mut state = IDENT_HASH.build_hasher();
                 text.hash(&mut state);
                 let hash = state.finish();
                 Self::SourceHash(hash)
@@ -205,7 +209,7 @@ impl From<&ModuleSource> for ModuleIdent {
 
 impl From<GC<GlobalEnv>> for ModuleIdent {
     fn from(env: GC<GlobalEnv>) -> Self {
-        let mut state = DefaultBuildHasher::default().build_hasher();
+        let mut state = IDENT_HASH.build_hasher();
         <GC<GlobalEnv> as Hash>::hash(&env, &mut state);
         let hash = state.finish();
         Self::RefHash(hash)

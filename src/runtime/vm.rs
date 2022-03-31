@@ -1,5 +1,5 @@
 use crate::language::{IntType, FloatType};
-use crate::codegen::{Program, ProgramData, ChunkID, ConstID, Constant, OpCode};
+use crate::codegen::{Program, ProgramData, Chunk, ChunkID, ConstID, Constant, OpCode};
 use crate::runtime::Variant;
 use crate::runtime::gc::GC;
 use crate::runtime::ops;
@@ -7,7 +7,7 @@ use crate::runtime::types::function::Call;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
-use crate::debug::traceback::CallSite;
+use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::{VMSnapshot, VMStateSnapshot};
 
 
@@ -16,7 +16,7 @@ struct CallInfo {
     nargs: usize,
     frame: usize,
     call: Call,
-    site: CallSite,
+    site: TraceSite,
 }
 
 enum Control {
@@ -30,7 +30,7 @@ enum Control {
 // Stack-based Virtual Machine
 #[derive(Debug)]
 pub struct VirtualMachine<'c> {
-    traceback: Vec<CallSite>,
+    traceback: Vec<TraceSite>,
     
     calls: Vec<VMState<'c>>,
     values: ValueStack,
@@ -59,7 +59,8 @@ impl<'c> VirtualMachine<'c> {
     
     #[inline]
     fn exec_next(&mut self) -> ExecResult<bool> {
-        let control = self.state.exec_next(&mut self.values)?;
+        let control = self.state.exec_next(&mut self.values)
+            .map_err(|error| error.insert_trace(self.traceback.iter().cloned()))?;
         
         match control {
             Control::Exit => return Ok(true),
@@ -174,7 +175,7 @@ pub type LocalIndex = u16;
 struct VMState<'c> {
     module: GC<Module>,
     chunk: &'c [u8],
-    chunk_id: Option<ChunkID>,
+    chunk_id: Chunk,
     frame: usize,        // start index for locals belonging to this frame
     locals: LocalIndex,  // local variable count
     pc: usize,
@@ -194,7 +195,7 @@ impl<'c> VMState<'c> {
         Self {
             module,
             chunk,
-            chunk_id: Some(chunk_id),
+            chunk_id: Chunk::ChunkID(chunk_id),
             frame,
             locals,
             pc: 0,
@@ -205,7 +206,7 @@ impl<'c> VMState<'c> {
         Self {
             module,
             chunk,
-            chunk_id: None,
+            chunk_id: Chunk::Main,
             frame: 0,
             locals: 0,
             pc: 0,
@@ -245,8 +246,8 @@ impl<'c> VMState<'c> {
         self.frame + usize::from(local)
     }
     
-    fn get_callsite(&self, offset: usize) -> CallSite {
-        CallSite::Chunk {
+    fn get_trace(&self, offset: usize) -> TraceSite {
+        TraceSite::Chunk {
             offset,
             module: self.module,
             chunk_id: self.chunk_id,
@@ -264,6 +265,13 @@ impl<'c> VMState<'c> {
         self.pc += opcode.instr_len(); // pc points to next instruction
         
         let data = self.chunk.get(data_slice).expect("truncated instruction");
+        
+        self.exec_instruction(current_offset, opcode, data, stack)
+            .map_err(|error| error.insert_site(self.get_trace(current_offset)))
+    }
+    
+    #[inline(always)]
+    fn exec_instruction(&mut self, current_offset: usize, opcode: OpCode, data: &[u8], stack: &mut ValueStack) -> ExecResult<Control> {
         match opcode {
             OpCode::Nop => { },
             
@@ -285,7 +293,7 @@ impl<'c> VMState<'c> {
                     nargs,
                     frame,
                     call: callee.invoke(args)?,
-                    site: self.get_callsite(current_offset),
+                    site: self.get_trace(current_offset),
                 };
                 return Ok(Control::Call(call))
             },

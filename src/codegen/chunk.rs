@@ -27,10 +27,13 @@ impl From<ChunkID> for Chunk {
 }
 
 
-
-#[derive(Default, Debug, Clone)]
-pub struct ChunkInfo {
-    pub symbol: Option<DebugSymbol>,
+#[derive(Debug, Clone)]
+pub enum ChunkInfo {
+    ModuleMain,
+    Function {
+        id: FunctionID,
+        symbol: Option<DebugSymbol>,
+    },
 }
 
 /// A buffer used by ChunkBuilder
@@ -112,7 +115,7 @@ impl ChunkBuilder {
     
     pub fn with_strings(strings: StringInterner) -> Self {
         Self {
-            main: ChunkBuf::new(ChunkInfo::default()),
+            main: ChunkBuf::new(ChunkInfo::ModuleMain),
             chunks: Vec::new(),
             functions: Vec::new(),
             consts: Vec::new(),
@@ -226,7 +229,7 @@ impl ChunkBuilder {
 // TODO store all chunk bytes in a single array
 // TODO figure out how debug symbols will work, esp. at runtime
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct ChunkIndex {
     info: ChunkInfo,
     offset: usize,
@@ -326,6 +329,11 @@ impl ProgramData {
     pub fn get_chunk(&self, chunk_id: ChunkID) -> &[u8] {
         let index = &self.chunk_index[usize::from(chunk_id)];
         &self.chunks[index.as_range()]
+    }
+    
+    pub fn chunk_info(&self, chunk_id: ChunkID) -> &ChunkInfo {
+        let index = &self.chunk_index[usize::from(chunk_id)];
+        &index.info
     }
     
     pub fn get_const(&self, index: ConstID) -> &Constant {

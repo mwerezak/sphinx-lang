@@ -396,11 +396,8 @@ impl CodeGenerator<'_> {
             .insert(offset, symbol)
     }
     
-    fn create_chunk(&mut self, symbol: Option<&DebugSymbol>) -> CompileResult<CodeGenerator> {
-        let info = ChunkInfo {
-            symbol: symbol.copied(),
-        };
-        let chunk_id = self.compiler.new_chunk(info)?;
+    fn create_chunk(&mut self, metadata: ChunkInfo) -> CompileResult<CodeGenerator> {
+        let chunk_id = self.compiler.new_chunk(metadata)?;
         Ok(self.compiler.get_chunk(chunk_id))
     }
     
@@ -1168,8 +1165,17 @@ impl CodeGenerator<'_> {
     ///////// Function Definitions /////////
     
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
+        // compile the function signature
+        let signature = self.compile_function_signature(symbol, &fundef.signature)?;
+        let function_id = self.builder_mut().push_function(signature);
+        
         // create a new chunk for the function
-        let mut chunk_gen = self.create_chunk(symbol)?;
+        let info = ChunkInfo::Function {
+            id: function_id,
+            symbol: symbol.map(|symbol| *symbol),
+        };
+
+        let mut chunk_gen = self.create_chunk(info)?;
         
         let chunk = chunk_gen.chunk_id();
         let chunk_id = match chunk {
@@ -1202,10 +1208,6 @@ impl CodeGenerator<'_> {
         // don't need to emit end scope instructions, will be handled by return
         chunk_gen.scope_mut().pop_scope();
         chunk_gen.finish();
-        
-        // compile the function signature
-        let signature = self.compile_function_signature(symbol, &fundef.signature)?;
-        let function_id = self.builder_mut().push_function(signature);
         
         // load the function object as the expression result
         self.emit_load_const(symbol, Constant::Function(chunk_id, function_id))?;

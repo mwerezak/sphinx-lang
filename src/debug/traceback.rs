@@ -1,13 +1,92 @@
+use std::fmt;
+use crate::source::ModuleSource;
+use crate::codegen::chunk::ChunkInfo;
+use crate::runtime::HashMap;
 use crate::runtime::gc::GC;
-use crate::runtime::module::{Module, ChunkID};
+use crate::runtime::module::{Module, ModuleIdent, Chunk};
+use crate::runtime::types::function::{Function, NativeFunction};
+use crate::debug::symbol::ResolvedSymbol;
+
 
 /// Traceback information
 #[derive(Debug, Clone)]
-pub enum CallSite {
+pub enum TraceSite {
     Chunk {
         offset: usize,
         module: GC<Module>,
-        chunk_id: Option<ChunkID>,
+        chunk_id: Chunk,
     },
-    Native,
+    Native,  // TODO reference native function?
+}
+
+
+pub struct FrameSummary<'a> {
+    trace: &'a TraceSite,
+}
+
+impl fmt::Display for FrameSummary<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.trace {
+            TraceSite::Chunk { offset, module, chunk_id } => {
+                let module_desc = module_desc(module);
+                let loc_desc = format!("<@{:#X}>", offset);
+                let chunk_desc = chunk_desc(module, chunk_id);
+                writeln!(fmt, "{}, {} in {}", module_desc, loc_desc, chunk_desc)
+            },
+            
+            TraceSite::Native => {
+                writeln!(fmt, "<native code>")
+            },
+        }
+    }
+}
+
+fn module_desc(module: &Module) -> String {
+    if let Some(ModuleSource::File(path)) = module.source() {
+        format!("File \"{}\"", path.display())
+    } else {
+        "<anonymous module>".to_string()
+    }
+}
+
+fn chunk_desc(module: &Module, chunk_id: &Chunk) -> String {
+    match chunk_id {
+        Chunk::Main => "<module>".to_string(),
+        
+        Chunk::ChunkID(chunk_id) => match module.data().chunk_info(*chunk_id) {
+            ChunkInfo::ModuleMain => "<module>".to_string(),
+            
+            ChunkInfo::Function { id, .. } => {
+                let signature = module.data().get_signature(*id);
+                format!("{}", signature)
+            },
+        },
+    }
+}
+
+
+pub struct Traceback<'a> {
+    frames: Vec<FrameSummary<'a>>,
+}
+
+
+impl<'a> Traceback<'a> {
+    pub fn build(trace: impl Iterator<Item=&'a TraceSite>) -> Self {
+        Self {
+            frames: trace.map(|trace| FrameSummary { trace }).collect(),
+        }
+    }
+}
+
+impl fmt::Display for Traceback<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.write_str("Stack trace (most recent call last):\n")?;
+        
+        let frame_count = self.frames.len();
+        for (idx, frame) in self.frames.iter().enumerate() {
+            writeln!(fmt, "#{} {}", frame_count - idx, frame)?;
+        }
+        
+        Ok(())
+    }
 }

@@ -314,7 +314,7 @@ impl Repl {
             
             let vm = VirtualMachine::new(module, &program.main);
             if let Err(error) = vm.run() {
-                println!("Runtime error: {:?}", error);
+                println!("{}{}", error.traceback(), error);
             }
             
         }

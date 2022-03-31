@@ -3,7 +3,7 @@ use crate::source::ModuleSource;
 use crate::codegen::opcodes::OpCode;
 use crate::runtime::Variant;
 use crate::runtime::vm::LocalIndex;
-use crate::runtime::module::ChunkID;
+use crate::runtime::module::Chunk;
 
 
 pub struct VMSnapshot {
@@ -46,7 +46,7 @@ impl Display for VMSnapshot {
 
 pub struct VMStateSnapshot {
     pub module: String,
-    pub chunk_id: Option<ChunkID>,
+    pub chunk_id: Chunk,
     pub frame: usize,
     pub locals: LocalIndex,
     pub pc: usize,
@@ -80,11 +80,10 @@ impl Display for VMStateSnapshot {
     }
 }
 
-fn format_chunk_id(fmt: &mut Formatter<'_>, chunk_id: Option<ChunkID>) -> Result {
-    if let Some(chunk_id) = chunk_id {
-        write!(fmt, "{}", chunk_id)
-    } else {
-        fmt.write_str("<main>")
+fn format_chunk_id(fmt: &mut Formatter<'_>, chunk_id: Chunk) -> Result {
+    match chunk_id {
+        Chunk::Main => fmt.write_str("<main>"),
+        Chunk::ChunkID(chunk_id) => write!(fmt, "{}", chunk_id),
     }
 }
 

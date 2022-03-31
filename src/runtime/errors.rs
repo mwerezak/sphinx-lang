@@ -5,6 +5,7 @@ use crate::utils;
 use crate::runtime::Variant;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::types::function::Signature;
+use crate::debug::traceback::{TraceSite, Traceback};
 
 // TODO box error
 pub type ExecResult<T> = Result<T, RuntimeError>;
@@ -28,13 +29,14 @@ pub enum ErrorKind {
 
 impl From<ErrorKind> for RuntimeError {
     fn from(kind: ErrorKind) -> Self {
-        RuntimeError { kind, cause: None }
+        RuntimeError { kind, traceback: Vec::new(), cause: None }
     }
 }
 
 #[derive(Debug)]
 pub struct RuntimeError {
     kind: ErrorKind,
+    traceback: Vec<TraceSite>,
     cause: Option<Box<dyn Error>>,
 }
 
@@ -44,10 +46,22 @@ impl RuntimeError {
     }
     
     pub fn caused_by(mut self, cause: impl Error + 'static) -> Self {
-        self.cause = Some(Box::new(cause)); self
+        self.cause.replace(Box::new(cause)); self
+    }
+    
+    pub fn insert_trace(mut self, trace: impl Iterator<Item=TraceSite>) -> Self {
+        self.traceback.splice(0..0, trace); self
+    }
+    
+    pub fn insert_site(mut self, site: TraceSite) -> Self {
+        self.traceback.insert(0, site); self
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
+    
+    pub fn traceback(&self) -> Traceback<'_> {
+        Traceback::build(self.traceback.iter())
+    }
 }
 
 impl Error for RuntimeError {
