@@ -48,11 +48,10 @@ impl<E> fmt::Display for RenderError<'_, '_, E> where E: Error {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let RenderError(error, source_lines) = self;
         
-        let message = utils::title_case_string(&error.to_string());
         if let Some(source_lines) = source_lines {
-            write!(fmt, "{}.\n\n{}", message, source_lines)
+            write!(fmt, "{}.\n\n{}", error, source_lines)
         } else {
-            write!(fmt, "{}.", message)
+            write!(fmt, "{}.", error)
         }
     }
 }

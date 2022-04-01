@@ -145,7 +145,7 @@ impl fmt::Display for ParserError {
             ErrorKind::SyntaxError(message) => message,
         };
         
-        utils::format_error(fmt, "syntax error", Some(message), self.source())
+        utils::format_error(fmt, "Syntax error", Some(message), self.source())
     }
 }
 

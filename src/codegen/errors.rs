@@ -85,6 +85,6 @@ impl fmt::Display for CompileError {
             ErrorKind::Other(message) => message,
         };
         
-        utils::format_error(fmt, "compile error", Some(message), self.source())
+        utils::format_error(fmt, "Compile error", Some(message), self.source())
     }
 }
