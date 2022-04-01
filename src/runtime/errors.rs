@@ -16,6 +16,7 @@ pub enum ErrorKind {
     InvalidUnaryOperand(Variant),  // unsupported operand for type
     InvalidBinaryOperand(Variant, Variant),
     OverflowError,
+    DivideByZero,
     NegativeShiftCount,
     NameNotDefined(String),
     CantAssignImmutable,  // can't assign to immutable global variable
@@ -77,6 +78,7 @@ impl fmt::Display for RuntimeError {
             // TODO
             ErrorKind::InvalidUnaryOperand(..) => format!("unsupported operand for type '...'"),
             ErrorKind::InvalidBinaryOperand(..) => format!("unsupported operand for type '...' and '...'"),
+            ErrorKind::DivideByZero => format!("divide by zero"),
             ErrorKind::OverflowError => format!("integer arithmetic overflow"),
             ErrorKind::NegativeShiftCount => format!("negative bitshift count"),
             ErrorKind::NameNotDefined(name) => format!("undefined variable \"{}\"", name),

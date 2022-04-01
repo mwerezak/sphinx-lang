@@ -216,7 +216,13 @@ eval_binary_arithmetic!(eval_mul, int_mul, float_mul, BinaryTag::Mul);
 #[inline(always)] fn float_mul(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs * rhs)) }
 
 eval_binary_arithmetic!(eval_div, int_div, float_div, BinaryTag::Div);
-#[inline(always)] fn int_div(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { checked_int_math!(checked_div, lhs, rhs) }
+#[inline(always)] fn int_div(lhs: IntType, rhs: IntType) -> ExecResult<Variant> { 
+    match lhs.checked_div(rhs) {
+        Some(value) => Ok(Variant::Integer(value)),
+        None if rhs == 0 => Err(ErrorKind::DivideByZero.into()),
+        None => Err(ErrorKind::OverflowError.into()),
+    }
+}
 #[inline(always)] fn float_div(lhs: FloatType, rhs: FloatType) -> ExecResult<Variant> { Ok(Variant::Float(lhs / rhs)) }
 
 eval_binary_arithmetic!(eval_mod, int_mod, float_mod, BinaryTag::Mod);
