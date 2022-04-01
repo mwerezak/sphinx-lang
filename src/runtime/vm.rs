@@ -394,17 +394,13 @@ impl<'c> VMState<'c> {
                 let tuple_len = usize::from(data[0]);
                 
                 let items = stack.pop_many(tuple_len).into_boxed_slice();
-                
-                let tuple = Variant::from(items);
-                stack.replace_many(tuple_len, tuple);
+                stack.push(Variant::from(items));
             },
             OpCode::TupleN => {
                 let tuple_len = Self::into_usize(stack.pop());
                 
                 let items = stack.pop_many(tuple_len).into_boxed_slice();
-                
-                let tuple = Variant::from(items);
-                stack.replace_many(tuple_len, tuple);
+                stack.push(Variant::from(items));
             },
             
             OpCode::UInt8 => {
