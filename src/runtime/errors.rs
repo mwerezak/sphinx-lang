@@ -49,12 +49,12 @@ impl RuntimeError {
         self.cause.replace(Box::new(cause)); self
     }
     
-    pub fn insert_trace(mut self, trace: impl Iterator<Item=TraceSite>) -> Self {
-        self.traceback.splice(0..0, trace); self
+    pub fn extend_trace(mut self, trace: impl Iterator<Item=TraceSite>) -> Self {
+        self.traceback.extend(trace); self
     }
     
-    pub fn insert_site(mut self, site: TraceSite) -> Self {
-        self.traceback.insert(0, site); self
+    pub fn push_frame(mut self, site: TraceSite) -> Self {
+        self.traceback.push(site); self
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }

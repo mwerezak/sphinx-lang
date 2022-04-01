@@ -31,11 +31,11 @@ impl fmt::Display for FrameSummary<'_> {
                 let module_desc = module_desc(module);
                 let loc_desc = format!("<@{:#X}>", offset);
                 let chunk_desc = chunk_desc(module, chunk_id);
-                writeln!(fmt, "{}, {} in {}", module_desc, loc_desc, chunk_desc)
+                write!(fmt, "{}, {} in {}", module_desc, loc_desc, chunk_desc)
             },
             
             TraceSite::Native => {
-                writeln!(fmt, "<native code>")
+                write!(fmt, "<native code>")
             },
         }
     }
@@ -82,9 +82,8 @@ impl fmt::Display for Traceback<'_> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.write_str("Stack trace (most recent call last):\n")?;
         
-        let frame_count = self.frames.len();
-        for (idx, frame) in self.frames.iter().enumerate() {
-            writeln!(fmt, "#{} {}", frame_count - idx, frame)?;
+        for (idx, frame) in self.frames.iter().enumerate().rev() {
+            writeln!(fmt, "#{} {}", idx + 1, frame)?;
         }
         
         Ok(())

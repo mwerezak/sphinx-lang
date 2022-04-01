@@ -60,7 +60,7 @@ impl<'c> VirtualMachine<'c> {
     #[inline]
     fn exec_next(&mut self) -> ExecResult<bool> {
         let control = self.state.exec_next(&mut self.values)
-            .map_err(|error| error.insert_trace(self.traceback.iter().cloned()))?;
+            .map_err(|error| error.extend_trace(self.traceback.iter().rev().cloned()))?;
         
         match control {
             Control::Exit => return Ok(true),
@@ -267,7 +267,7 @@ impl<'c> VMState<'c> {
         let data = self.chunk.get(data_slice).expect("truncated instruction");
         
         self.exec_instruction(current_offset, opcode, data, stack)
-            .map_err(|error| error.insert_site(self.get_trace(current_offset)))
+            .map_err(|error| error.push_frame(self.get_trace(current_offset)))
     }
     
     #[inline(always)]
