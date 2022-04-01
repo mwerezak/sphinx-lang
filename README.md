@@ -1,7 +1,5 @@
 An intepreter for a dynamic language inspired by Lua and Python, see ``syntax_examples.sph``.
 
-I probably should come up with a different name, one that isn't also used by a widely-known documentation tool...
-
 # Sphinx
 
 Welcome to the Sphinx programming language! Sphinx is (or will be) a dynamically typed programming language that is inspired by Lua and Python, and implemented entirely in Rust!
