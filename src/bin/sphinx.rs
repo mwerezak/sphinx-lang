@@ -90,7 +90,9 @@ fn main() {
             if args.is_present("debug") {
                 run_debugger(vm);
             } else {
-                vm.run().expect("runtime error");
+                if let Err(error) = vm.run() {
+                    println!("{}{}", error.traceback(), error);
+                }
             }
             
             Repl::new(version.to_string(), repl_env).run()
@@ -106,7 +108,9 @@ fn main() {
         if args.is_present("debug") {
             run_debugger(vm);
         } else {
-            vm.run().expect("runtime error");
+            if let Err(error) = vm.run() {
+                println!("{}{}", error.traceback(), error);
+            }
         }
     }
 }

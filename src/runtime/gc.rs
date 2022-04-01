@@ -123,7 +123,7 @@ impl GCState {
 
 impl Drop for GCState {
     fn drop(&mut self) {
-        unimplemented!()
+        // unimplemented!()
     }
 }
 
