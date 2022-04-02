@@ -1,17 +1,13 @@
 #![cfg(test)]
 
 use std::hash::{Hasher, BuildHasher};
-use crate::runtime::strings::FxHashBuilder;
-
-use std::hash::BuildHasherDefault;
-use std::collections::hash_map::DefaultHasher;
-
+use crate::runtime::DefaultBuildHasher;
 
 #[test]
 fn hash_intern_hasher_is_stable() {
     let string = "vjiowjtajfioaj3r=3-ovp0-sikf";
     
-    let hasher_factory = FxHashBuilder::default();
+    let hasher_factory = DefaultBuildHasher::default();
     // let hasher_factory = BuildHasherDefault::<DefaultHasher>::default();
     
     let mut last_hash = None;

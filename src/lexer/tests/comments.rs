@@ -1,6 +1,7 @@
 #![cfg(test)]
 
-use crate::lexer::{LexerBuilder, Token, TokenMeta, Span};
+use crate::debug::DebugSymbol;
+use crate::lexer::{LexerBuilder, Token, TokenMeta};
 use crate::lexer::rules::MultiCharRule;
 use crate::lexer::rules::comments::*;
 
@@ -30,45 +31,45 @@ fn lexer_test_comments() {
     
     assert_token_sequence!(lexer,
     
-        token => {
+        token if symbol.len() == 3 => {
             token: Token::IntegerLiteral(0),
-            span: Span { length: 3, .. },
+            symbol,
             ..
         } "foo",
         
-        token => {
+        token if symbol.len() == 5 => {
             token: Token::Comment,
-            span: Span { length: 5, .. },
+            symbol,
             ..
         } "#bar",
         
-        token => {
+        token if symbol.len() == 8 => {
             token: Token::Comment,
-            span: Span { length: 8, .. },
+            symbol,
             ..
         } "#   #{{",
         
-        token => {
+        token if symbol.len() == 3 => {
             token: Token::IntegerLiteral(2),
-            span: Span { length: 3, .. },
+            symbol,
             ..
         } "baz",
         
-        token => {
+        token if symbol.len() == 65 => {
             token: Token::Comment,
-            span: Span { length: 65, .. },
+            symbol,
             ..
         } "multiline comment block",
     
-        token => {
+        token if symbol.len() == 3 => {
             token: Token::IntegerLiteral(1),
-            span: Span { length: 3, .. },
+            symbol,
             ..
         } "bar",
     
-        token => {
+        token if symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { length: 0, .. },
+            symbol,
             ..
         } "EOF",
     
@@ -101,27 +102,27 @@ fn lexer_test_skip_comments() {
     
     assert_token_sequence!(lexer,
     
-        token => {
+        token if symbol.len() == 3 => {
             token: Token::IntegerLiteral(0),
-            span: Span { length: 3, .. },
+            symbol,
             ..
         } "foo",
         
-        token => {
+        token if symbol.len() == 3 => {
             token: Token::IntegerLiteral(2),
-            span: Span { length: 3, .. },
+            symbol,
             ..
         } "baz",
         
-        token => {
+        token if symbol.len() == 3 => {
             token: Token::IntegerLiteral(1),
-            span: Span { length: 3, .. },
+            symbol,
             ..
         } "bar",
         
-        token => {
+        token if symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { length: 0, .. },
+            symbol,
             ..
         } "EOF",
     

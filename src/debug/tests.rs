@@ -12,9 +12,9 @@ fn debug_symbols_test_symbol_resolution() {
     let module = ModuleSource::String(text.to_string());
     
     let symbols = vec![
-        DebugSymbol::from((0, 7)),
-        DebugSymbol::from((0, 20)),
-        DebugSymbol::from((13, 24)),
+        DebugSymbol::try_from((0, 7)).unwrap(),
+        DebugSymbol::try_from((0, 20)).unwrap(),
+        DebugSymbol::try_from((13, 24)).unwrap(),
     ];
     
     let symbol_table = module.resolve_symbols(symbols.iter()).unwrap();

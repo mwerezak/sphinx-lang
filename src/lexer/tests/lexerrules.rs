@@ -1,7 +1,9 @@
 #![cfg(test)]
 
-use crate::lexer::{LexerBuilder, Token, TokenMeta, Span};
+use crate::debug::DebugSymbol;
+use crate::lexer::{LexerBuilder, Token, TokenMeta};
 use crate::lexer::errors::{LexerError, ErrorKind};
+use crate::lexer::tests::ErrorData;
 
 #[test]
 fn lexer_matches_tokens_1() {
@@ -14,21 +16,21 @@ fn lexer_matches_tokens_1() {
         .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
-        token => {
+        token if symbol.start() == 0 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(0),
-            span: Span { index: 0, length: 3 },
+            symbol,
             newline: true,
         } "foo",
         
-        token => {
+        token if symbol.start() == 3 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(1),
-            span: Span { index: 3, length: 3 },
+            symbol,
             newline: false,
         } "bar",
         
-        token => {
+        token if symbol.start() == 6 && symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { index: 6, length: 0 },
+            symbol,
             newline: false,
         } "EOF",
     );
@@ -44,15 +46,15 @@ fn lexer_skips_whitespace() {
         .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
-        token => {
+        token if symbol.start() == 2 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(1),
-            span: Span { index: 2, length: 3 },
+            symbol,
             newline: true,
         } "foo",
         
-        token => {
+        token if symbol.start() == 8 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(2),
-            span: Span { index: 8, length: 3 },
+            symbol,
             newline: false,
         } "bar",
     );
@@ -69,15 +71,15 @@ fn lexer_tracks_line_numbers() {
         .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,
-        token => {
+        token if symbol.start() == 2 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(1),
-            span: Span { index: 2, length: 3 },
+            symbol,
             newline: true,
         } "foo",
         
-        token => {
+        token if symbol.start() == 10 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(2),
-            span: Span { index: 10, length: 3 },
+            symbol,
             newline: true,
         } "bar",
     );
@@ -100,33 +102,33 @@ fn single_char_rule_matches_chars_and_dont_match_invalid() {
     
     assert_token_sequence!(lexer,
         
-        token => {
+        token if symbol.start() == 0 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(1),
-            span: Span { index: 0, length: 1 },
+            symbol,
             ..
         } "a",
         
-        token => {
+        token if symbol.start() == 2 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(2),
-            span: Span { index: 2, length: 1 },
+            symbol,
             ..
         } "b",
         
-        token => {
+        token if symbol.start() == 3 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(3),
-            span: Span { index: 3, length: 1 },
+            symbol,
             ..
         } "c",
         
-        error => {
+        error if symbol.start() == 4 && symbol.len() == 1 => {
             kind: ErrorKind::NoMatchingRule,
-            span: Span { index: 4, length: 1 },
+            symbol,
             ..
         } "d",
         
-        token => {
+        token if symbol.start() == 5 && symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { index: 5, length: 0 },
+            symbol,
             ..
         } "EOF",
     );
@@ -145,27 +147,27 @@ fn rule_substring_tokens_match_1() {
     
     assert_token_sequence!(lexer,
         
-        token => {
+        token if symbol.start() == 0 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(0),
-            span: Span { index: 0, length: 1 },
+            symbol,
             ..
         } "a",
         
-        token => {
+        token if symbol.start() == 2 && symbol.len() == 2 => {
             token: Token::IntegerLiteral(1),
-            span: Span { index: 2, length: 2 },
+            symbol,
             ..
         } "ab",
         
-        token => {
+        token if symbol.start() == 5 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(2),
-            span: Span { index: 5, length: 3 },
+            symbol,
             ..
         } "abc",
         
-        token => {
+        token if symbol.start() == 8 && symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { index: 8, length: 0 },
+            symbol,
             ..
         } "EOF"
         
@@ -185,27 +187,27 @@ fn rule_substring_tokens_match_2() {
     
     assert_token_sequence!(lexer,
         
-        token => {
+        token if symbol.start() == 0 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(0),
-            span: Span { index: 0, length: 1 },
+            symbol,
             ..
         } "a.1",
         
-        token => {
+        token if symbol.start() == 2 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(0),
-            span: Span { index: 2, length: 1 },
+            symbol,
             ..
         } "a.2",
         
-        token => {
+        token if symbol.start() == 3 && symbol.len() == 2 => {
             token: Token::IntegerLiteral(1),
-            span: Span { index: 3, length: 2 },
+            symbol,
             ..
         } "ab",
         
-        token => {
+        token if symbol.start() == 5 && symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { index: 5, length: 0 },
+            symbol,
             ..
         } "EOF"
         
@@ -224,21 +226,21 @@ fn rule_substring_tokens_match_eof() {
     
     assert_token_sequence!(lexer,
     
-        token => {
+        token if symbol.start() == 0 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(0),
-            span: Span { index: 0, length: 1 },
+            symbol,
             newline: true,
         },
         
-        token => {
+        token if symbol.start() == 3 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(0),
-            span: Span { index: 3, length: 1 },
+            symbol,
             newline: true,
         },
         
-        token => {
+        token if symbol.start() == 4 && symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { index: 4, length: 0 },
+            symbol,
             newline: false,
         } "EOF"
     
@@ -258,27 +260,27 @@ fn lexer_test_matches_tokens_2() {
     
     assert_token_sequence!(lexer,
     
-        token => {
+        token if symbol.start() == 0 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(2),
-            span: Span { index: 0, length: 3 },
+            symbol,
             ..
         } "and",
         
-        token => {
+        token if symbol.start() == 4 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(0),
-            span: Span { index: 4, length: 1 },
+            symbol,
             ..
         } "+",
         
-        token => {
+        token if symbol.start() == 5 && symbol.len() == 2 => {
             token: Token::IntegerLiteral(1),
-            span: Span { index: 5, length: 2 },
+            symbol,
             ..
         } "or",
         
-        token => {
+        token if symbol.start() == 8 && symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { index: 8, length: 0 },
+            symbol,
             ..
         } "EOF"
     
@@ -298,39 +300,39 @@ fn lexer_error_invalid_token() {
     
     assert_token_sequence!(lexer,
     
-        token => {
+        token if symbol.start() == 0 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(1),
-            span: Span { index: 0, length: 3 },
+            symbol,
             ..
         } "foo",
         
-        token => {
+        token if symbol.start() == 4 && symbol.len() == 1 => {
             token: Token::IntegerLiteral(0),
-            span: Span { index: 4, length: 1 },
+            symbol,
             ..
         } "+",
         
-        token => {
+        token if symbol.start() == 5 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(2),
-            span: Span { index: 5, length: 3 },
+            symbol,
             ..
         } "bar",
         
-        error => {
+        error if symbol.start() == 9 && symbol.len() == 3 => {
             kind: ErrorKind::NoMatchingRule,
-            span: Span { index: 9, length: 3 },
+            symbol,
             ..
         } "bad",
         
-        token => {
+        token if symbol.start() == 13 && symbol.len() == 3 => {
             token: Token::IntegerLiteral(3),
-            span: Span { index: 13, length: 3 },
+            symbol,
             ..
         } "baz",
         
-        token => {
+        token if symbol.start() == 16 && symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { index: 16, length: 0 },
+            symbol,
             ..
         } "EOF",
     

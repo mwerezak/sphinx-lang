@@ -1,5 +1,14 @@
 #![cfg(test)]
 
+use crate::debug::DebugSymbol;
+use crate::lexer::errors::{LexerError, ErrorKind};
+
+struct ErrorData<'a> {
+    kind: &'a ErrorKind,
+    symbol: &'a DebugSymbol,
+}
+
+
 macro_rules! assert_next_token {
     
     // assert_next_token!(<lexer>, token { <match body> } [if <guard>] , "failure message")
@@ -15,9 +24,15 @@ macro_rules! assert_next_token {
     ( $lexer:expr, error $error_body:tt $( if $guard:expr )? $(, $msg:expr )? ) => {
         
         let out = $lexer.next_token();
-        
         println!("{:?}", out);
-        assert!(matches!(out.unwrap_err(), LexerError $error_body $( if $guard)? ) $(, $msg )?)
+        
+        let error = out.unwrap_err();
+        let data = ErrorData {
+            kind: error.kind(),
+            symbol: error.debug_symbol(),
+        };
+
+        assert!(matches!(data, ErrorData $error_body $( if $guard)? ) $(, $msg )?)
     };
 }
 

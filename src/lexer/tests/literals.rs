@@ -1,10 +1,10 @@
 #![cfg(test)]
 
-use crate::lexer::{LexerBuilder, Token, TokenMeta, LexerError, ErrorKind, Span};
+use crate::lexer::{LexerBuilder, Token, TokenMeta, LexerError, ErrorKind, DebugSymbol};
 use crate::lexer::rules::SingleCharRule;
 use crate::lexer::rules::literals::*;
 use crate::lexer::rules::keywords::KeywordRule;
-
+use crate::lexer::tests::ErrorData;
 
 #[test]
 fn lexer_test_identifiers() {
@@ -25,69 +25,69 @@ fn lexer_test_identifiers() {
     
     assert_token_sequence!(lexer,
     
-        token if s == "valid" => {
+        token if s == "valid" && symbol.len() == 5 => {
             token: Token::Identifier(s),
-            span: Span { length: 5, .. },
+            symbol,
             ..
         } "valid",
 
-        token if s == "_also" => {
+        token if s == "_also" && symbol.len() == 5 => {
             token: Token::Identifier(s),
-            span: Span { length: 5, .. },
+            symbol,
             ..
         } "_also",
 
-        token if s == "asd2_32df_s3" => {
+        token if s == "asd2_32df_s3" && symbol.len() == 12 => {
             token: Token::Identifier(s),
-            span: Span { length: 12, .. },
+            symbol,
             ..
         } "asd2_32df_s3",
         
-        token if s == "both" => {
+        token if s == "both" && symbol.len() == 4 => {
             token: Token::Identifier(s),
-            span: Span { length: 4, .. },
+            symbol,
             ..
         } "both",
         
-        token => {
+        token if symbol.len() == 1 => {
             token: Token::IntegerLiteral(0),
-            span: Span { length: 1, .. },
+            symbol,
             ..
         } "+",
         
-        token if s == "valid2" => {
+        token if s == "valid2" && symbol.len() == 6 => {
             token: Token::Identifier(s),
-            span: Span { length: 6, .. },
+            symbol,
             ..
         } "valid2",
         
-        error => {
+        error if symbol.len() == 1 => {
             kind: ErrorKind::NoMatchingRule,
-            span: Span { length: 1, .. },
+            symbol,
             ..
         } "0no - 0",
         
-        error => {
+        error if symbol.len() == 1 => {
             kind: ErrorKind::NoMatchingRule,
-            span: Span { length: 1, .. },
+            symbol,
             ..
         } "0no - n",
 
-        error => {
+        error if symbol.len() == 1 => {
             kind: ErrorKind::NoMatchingRule,
-            span: Span { length: 1, .. },
+            symbol,
             ..
         } "0no - o",
 
-        token if s == "_0valid" => {
+        token if s == "_0valid" && symbol.len() == 7 => {
             token: Token::Identifier(s),
-            span: Span { length: 7, .. },
+            symbol,
             ..
         } "_0valid",
 
-        token => {
+        token if symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { length: 0, .. },
+            symbol,
             ..
         } "EOF",
     
@@ -106,33 +106,33 @@ fn lexer_test_keywords_and_identifiers() {
     
     assert_token_sequence!(lexer,
     
-        token => {
+        token if symbol.len() == 1 => {
             token: Token::Fun,
-            span: Span { length: 1, .. },
+            symbol,
             ..
         } "k",
         
-        token if s == "_k" => {
+        token if s == "_k" && symbol.len() == 2 => {
             token: Token::Identifier(s),
-            span: Span { length: 2, .. },
+            symbol,
             ..
         } "_k",
         
-        error => {
+        error if symbol.len() == 1 => {
             kind: ErrorKind::NoMatchingRule,
-            span: Span { length: 1, .. },
+            symbol,
             ..
         } "9k.1",
         
-        error => {
+        error if symbol.len() == 1 => {
             kind: ErrorKind::NoMatchingRule,
-            span: Span { length: 1, .. },
+            symbol,
             ..
         } "9k.2",
         
-        token if s == "k9" => {
+        token if s == "k9" && symbol.len() == 2 => {
             token: Token::Identifier(s),
-            span: Span { length: 2, .. },
+            symbol,
             ..
         } "k9",
     );
@@ -149,15 +149,15 @@ fn lexer_test_keyword_at_eof() {
         
     assert_token_sequence!(lexer,
         
-        token => {
+        token if symbol.start() == 1 && symbol.len() == 1 => {
             token: Token::Fun,
-            span: Span { length: 1, index: 1, .. },
+            symbol,
             ..
         } "k",
         
-        token => {
+        token if symbol.start() == 2 && symbol.len() == 0 => {
             token: Token::EOF,
-            span: Span { length: 0, index: 2, .. },
+            symbol,
             ..
         } "eof",
         
@@ -176,27 +176,27 @@ fn lexer_test_integer_literals() {
     
     assert_token_sequence!(lexer,
         
-        token if n == 1123 => {
+        token if n == 1123 && symbol.len() == 5 => {
             token: Token::IntegerLiteral(n),
-            span: Span { length: 5, .. },
+            symbol,
             ..
         } "01123",
         
-        error => {
+        error if symbol.len() == 1 => {
             kind: ErrorKind::NoMatchingRule,
-            span: Span { length: 1, .. },
+            symbol,
             ..
         } "x",
         
-        error => {
+        error if symbol.len() == 1 => {
             kind: ErrorKind::NoMatchingRule,
-            span: Span { length: 1, .. },
+            symbol,
             ..
         } "A",
         
-        token if n == 0xFACE => {
+        token if n == 0xFACE && symbol.len() == 6 => {
             token: Token::IntegerLiteral(n),
-            span: Span { length: 6, .. },
+            symbol,
             ..
         } "0xFACE",
         

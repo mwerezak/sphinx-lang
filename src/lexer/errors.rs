@@ -5,10 +5,8 @@ use crate::debug::DebugSymbol;
 
 // Lexer Errors
 
-pub type ErrorKind = LexerErrorKind;
-
 #[derive(Debug)]
-pub enum LexerErrorKind {
+pub enum ErrorKind {
     IOError,
     UnexpectedEOF,
     NoMatchingRule,
@@ -17,7 +15,7 @@ pub enum LexerErrorKind {
     SourceTooLong,
 }
 
-impl fmt::Display for LexerErrorKind {
+impl fmt::Display for ErrorKind {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let msg = match self {
             Self::IOError => "error reading source text",

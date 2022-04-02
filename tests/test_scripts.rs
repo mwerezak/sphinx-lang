@@ -57,7 +57,7 @@ mod if_tests {
 }
 
 mod loop_tests {
-    use super::*;
+    // use super::*;
     
     // break not yet implemented :(
     // test_script!(loop_, "tests/loop/loop.sph");  
@@ -76,7 +76,7 @@ mod while_tests {
 }
 
 mod closure_tests {
-    use super::*;
+    // use super::*;
     
     // test_script!(nested_closure, "tests/closure/nested_closure.sph");
 }
