@@ -33,6 +33,15 @@ impl ModuleSource {
     }
 }
 
+impl fmt::Display for ModuleSource {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::File(path) => write!(fmt, "file \"{}\"", path.display()),
+            Self::String(string) => write!(fmt, "source text \"{}\"", utils::trim_str(string, 16)),
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub enum SourceText {

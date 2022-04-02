@@ -66,6 +66,8 @@ pub fn build_source(source_text: SourceText) -> Result<CompiledProgram, BuildErr
     Ok(compile_result.unwrap())
 }
 
+
+
 /// Produce AST from SourceText
 pub fn parse_source(interner: &mut StringInterner, source_text: SourceText) -> Result<Vec<StmtMeta>, Vec<ParserError>> {
     let lexer_factory = language::create_default_lexer_rules();
@@ -78,4 +80,24 @@ pub fn parse_source(interner: &mut StringInterner, source_text: SourceText) -> R
 pub fn compile_ast(interner: StringInterner, ast: Vec<StmtMeta>) -> Result<CompiledProgram, Vec<CompileError>> {
     let compiler = Compiler::new(interner);
     compiler.compile_program(ast.iter())
+}
+
+
+pub fn print_build_errors(errors: &BuildErrors, source: &ModuleSource) {
+    match errors {
+        BuildErrors::Source(error) => {
+            println!("Error reading source: {}.", error);
+        }
+        
+        BuildErrors::Syntax(errors) => {
+            println!("Errors in {}:\n", source);
+            frontend::print_source_errors(source, &errors);
+        }
+        
+        BuildErrors::Compile(errors) => {
+            println!("Errors in {}:\n", source);
+            frontend::print_source_errors(source, &errors);
+        }
+    }
+    
 }

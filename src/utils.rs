@@ -1,25 +1,25 @@
-use std::fmt;
+use std::fmt::{Display, Write, Formatter, self};
 use std::io;
 use std::io::BufRead;
 use std::collections::VecDeque;
 
 // useful for writing string literals, to ensure that a gigantic string doesnt swamp the output
-pub fn trim_str(target: &str, maxlen: usize) -> TrimStr<'_> {
+pub fn trim_str(target: &impl AsRef<str>, maxlen: usize) -> impl Display + '_ {
     TrimStr {
-        target,
+        target: target.as_ref(),
         maxlen,
     }
 }
 
 // captures the arguments to trim_str(), to implement trimming in fmt() without requiring an extra string buffer
-pub struct TrimStr<'s> {
+struct TrimStr<'s> {
     target: &'s str,
     maxlen: usize,
 }
 
 // note, this gives us a blanket implementation of ToString as well, so if you do want a new string buffer you can get that too
-impl<'s> fmt::Display for TrimStr<'s> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for TrimStr<'_> {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         if self.target.len() > self.maxlen {
             write!(fmt, "{}...", &self.target[..(self.maxlen-3)])
         } else {
@@ -28,13 +28,32 @@ impl<'s> fmt::Display for TrimStr<'s> {
     }
 }
 
-pub fn title_case_string(s: &str) -> String {
-    let mut chars = s.chars();
-    match chars.next() {
-        None => String::new(),
-        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+pub fn title_case(s: &impl AsRef<str>) -> impl Display + '_ {
+    TitleCase { target: s.as_ref() }
+}
+
+struct TitleCase<'s> {
+    target: &'s str,
+}
+
+impl Display for TitleCase<'_> {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        let mut prev = None;
+        for next in self.target.chars() {
+            if next.is_alphabetic() && prev.map_or(true, char::is_whitespace) {
+                for c in next.to_uppercase() {
+                    fmt.write_char(c)?;
+                }
+            } else {
+                fmt.write_char(next)?;
+            }
+            
+            prev.replace(next);
+        }
+        Ok(())
     }
 }
+
 
 // This struct is born out of a desire to read a file into unicode characters 
 // without pulling the entire file into a buffer
@@ -90,7 +109,7 @@ impl<R> Iterator for ReadChars<R> where R: BufRead {
 // Formatter that uses a closure
 // Useful to avoid a lot of boilerplate when there are multiple ways to Display a struct
 
-pub fn delegate_fmt<F>(fmt_func: F) -> impl fmt::Display where F: Fn(&mut fmt::Formatter<'_>) -> fmt::Result {
+pub fn make_display<F>(fmt_func: F) -> impl fmt::Display where F: Fn(&mut fmt::Formatter<'_>) -> fmt::Result {
     FnFormatter { fmt_func }
 }
 

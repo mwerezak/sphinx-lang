@@ -118,7 +118,7 @@ fn fmt_source_line_single(fmt: &mut Formatter<'_>, symbol: &ResolvedSymbol) -> f
 
 
 fn render_symbol_lines(symbol: &ResolvedSymbol) -> impl fmt::Display + '_ {
-    utils::delegate_fmt(|fmt| fmt_symbol_lines(fmt, symbol))
+    utils::make_display(|fmt| fmt_symbol_lines(fmt, symbol))
 }
 
 // format a symbol, including the surrounding text on the same lines, and trim trailing whitespace
@@ -133,7 +133,7 @@ fn fmt_symbol_lines(fmt: &mut Formatter<'_>, symbol: &ResolvedSymbol) -> fmt::Re
 // if the symbol isn't multiline, this produces the same output as render_symbol_lines()
 // if it is multiline, this renders the first line of the symbol followed by "..."
 fn render_symbol_single_line(symbol: &ResolvedSymbol) -> impl fmt::Display + '_ {
-    utils::delegate_fmt(|fmt| fmt_symbol_single_line(fmt, symbol))
+    utils::make_display(|fmt| fmt_symbol_single_line(fmt, symbol))
 }
 
 fn fmt_symbol_single_line(fmt: &mut fmt::Formatter<'_>, symbol: &ResolvedSymbol) -> fmt::Result { 

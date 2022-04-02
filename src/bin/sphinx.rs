@@ -80,7 +80,7 @@ fn main() {
         unimplemented!()
     }
     else if args.is_present("interactive") {
-        if let Some(build) = build_program(&args, name, &source) {
+        if let Some(build) = build_program(&source) {
             let program = Program::load(build.program);
             
             let repl_env = GC::allocate(stdlib::prelude_env());
@@ -98,7 +98,7 @@ fn main() {
             Repl::new(version.to_string(), repl_env).run()
         }
     }
-    else if let Some(build) = build_program(&args, name, &source) {
+    else if let Some(build) = build_program(&source) {
         let program = Program::load(build.program);
         
         let main_env = GC::allocate(stdlib::prelude_env());
@@ -116,26 +116,10 @@ fn main() {
 }
 
 
-fn build_program(_args: &ArgMatches, name: &str, source: &ModuleSource) -> Option<CompiledProgram> {
-    // build module
+fn build_program(source: &ModuleSource) -> Option<CompiledProgram> {
     match sphinx_lang::build_module(source) {
-        Err(error) => {
-            match error {
-                BuildErrors::Source(error) => {
-                    println!("Error reading source: {}.", error);
-                }
-                
-                BuildErrors::Syntax(errors) => {
-                    println!("Errors in file \"{}\":\n", name);
-                    frontend::print_source_errors(source, &errors);
-                }
-                
-                BuildErrors::Compile(errors) => {
-                    println!("Errors in file \"{}\":\n", name);
-                    frontend::print_source_errors(source, &errors);
-                }
-            }
-            
+        Err(errors) => {
+            sphinx_lang::print_build_errors(&errors, source);
             None
         },
         
