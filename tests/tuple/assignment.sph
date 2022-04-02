@@ -1,0 +1,3 @@
+var first, second = "abc", "def"
+second, first = first, second
+assert "def", "abc" == first, second

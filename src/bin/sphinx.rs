@@ -3,14 +3,12 @@ use std::path::PathBuf;
 use clap::{Command, Arg, ArgMatches};
 
 use sphinx_lang::frontend;
-use sphinx_lang::BuildErrors;
 use sphinx_lang::source::{ModuleSource, SourceText};
 use sphinx_lang::parser::expr::Expr;
 use sphinx_lang::parser::stmt::{Stmt, StmtMeta};
 use sphinx_lang::codegen::{Program, CompiledProgram};
-use sphinx_lang::runtime::VirtualMachine;
-use sphinx_lang::runtime::gc::GC;
-use sphinx_lang::runtime::module::{Module, GlobalEnv};
+use sphinx_lang::runtime::{Module, VirtualMachine, GC};
+use sphinx_lang::runtime::module::GlobalEnv;
 use sphinx_lang::runtime::strings::StringInterner;
 use sphinx_lang::debug::symbol::resolver::BufferedResolver;
 use sphinx_lang::stdlib;

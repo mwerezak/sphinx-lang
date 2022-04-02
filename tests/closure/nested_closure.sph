@@ -1,0 +1,25 @@
+var f = nil
+
+fun f1()
+  let a = "a"
+  fun f2()
+    let b = "b"
+    fun f3()
+      let c = "c";
+      fun f4()
+        echo a
+        echo b
+        echo c
+      end
+      nonlocal f = f4;
+    end
+    f3()
+  end
+  f2()
+end
+f1();
+
+f();
+# expect: a
+# expect: b
+# expect: c

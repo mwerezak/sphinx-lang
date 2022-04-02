@@ -3,7 +3,7 @@ if true then echo "good" else assert false end  # expect: good
 if false then assert false else echo "good" end  # expect: good
 
 # Allow block condition.
-if (begin echo "block" end) then    # expect: block
+if (begin echo "block" false end) then    # expect: block
     assert false 
 end  
 

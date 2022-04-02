@@ -1,0 +1,13 @@
+
+var a = 0
+loop
+    echo a += 1
+    
+    if a >= 100 then 
+        break
+    end
+    
+    if a >= 101 then
+        assert false
+    end
+end
