@@ -15,6 +15,8 @@ use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Sh
 use crate::runtime::strings::{StringInterner};
 use crate::debug::symbol::{DebugSymbol, ChunkSymbols, DebugSymbolTable};
 
+mod scope;
+
 pub mod chunk;
 pub mod consts;
 pub mod opcodes;
@@ -26,6 +28,7 @@ pub use consts::{ConstID, Constant};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
 use opcodes::*;
+use scope::{ScopeTracker, LocalName};
 use chunk::{ChunkBuilder, ChunkInfo, ChunkBuf};
 use consts::{UnloadedSignature, UnloadedParam};
 
@@ -107,166 +110,6 @@ const fn get_jump_opcode(jump: Jump, offset: JumpOffset) -> OpCode {
 }
 
 
-
-// Scope Tracking
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum LocalName {
-    // local variable names defined by AST string symbols
-    Symbol(InternSymbol),
-    
-    // special local variables
-    Receiver,  // inside a function call, this refers to the object that was called
-    NArgs,     // inside a function call, the number of arguments passed at the call site
-}
-
-#[derive(Debug)]
-struct Local {
-    decl: DeclType,
-    name: LocalName,
-    index: LocalIndex,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ScopeTag {
-    Block,
-    Loop,
-    Branch,
-    Function,
-    Class,
-}
-
-
-#[derive(Debug)]
-struct Scope {
-    tag: ScopeTag,
-    depth: usize,
-    chunk: Chunk,
-    symbol: Option<DebugSymbol>,
-    
-    frame: Option<LocalIndex>,
-    locals: Vec<Local>,
-}
-
-impl Scope {
-    fn debug_symbol(&self) -> Option<&DebugSymbol> {
-        self.symbol.as_ref()
-    }
-    
-    fn last_index(&self) -> Option<LocalIndex> {
-        self.locals.last().map_or(self.frame, |local| Some(local.index))
-    }
-    
-    fn find_local(&self, name: &LocalName) -> Option<&Local> {
-        self.locals.iter().find(|local| local.name == *name)
-    }
-    
-    fn find_local_mut(&mut self, name: &LocalName) -> Option<&mut Local> {
-        self.locals.iter_mut().find(|local| local.name == *name)
-    }
-    
-    fn push_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<&Local> {
-        let index = self.last_index().map_or(
-            Ok(0),
-            |index| index.checked_add(1)
-                .ok_or_else(|| CompileError::from(ErrorKind::LocalVariableLimit))
-        )?;
-        
-        let local = Local {
-            decl, name, index,
-        };
-        self.locals.push(local);
-        Ok(self.locals.last().unwrap())
-    }
-    
-    fn is_frame_start(&self) -> bool {
-        self.frame.is_none()
-    }
-}
-
-#[derive(Debug)]
-struct ScopeTracker {
-    scopes: Vec<Scope>,
-}
-
-impl ScopeTracker {
-    fn new() -> Self {
-        Self { scopes: Vec::new() }
-    }
-    
-    fn is_global_scope(&self) -> bool {
-        self.scopes.is_empty()
-    }
-    
-    fn local_scope(&self) -> Option<&Scope> {
-        self.scopes.last()
-    }
-    
-    fn local_scope_mut(&mut self) -> Option<&mut Scope> {
-        self.scopes.last_mut()
-    }
-    
-    fn push_scope(&mut self, tag: ScopeTag, chunk: Chunk, symbol: Option<&DebugSymbol>) {
-        let frame;
-        if tag == ScopeTag::Function {
-            frame = None; // inside a function, locals are indexed from the start of the frame
-        } else {
-            frame = self.local_scope().and_then(|scope| scope.last_index());
-        }
-        
-        let scope = Scope {
-            tag, 
-            chunk,
-            symbol: symbol.copied(),
-            depth: self.scopes.len(),
-            frame,
-            locals: Vec::new(),
-        };
-        self.scopes.push(scope);
-    }
-    
-    fn pop_scope(&mut self) -> Scope {
-        self.scopes.pop().expect("pop global scope")
-    }
-    
-    fn insert_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<()> {
-        let local_scope = self.local_scope_mut().expect("insert local in global scope");
-        
-        // see if this local already exists in the current scope
-        if let Some(mut local) = local_scope.find_local_mut(&name) {
-            (*local).decl = decl; // redeclare with new mutability
-        } else {
-            local_scope.push_local(decl, name)?;
-        }
-        Ok(())
-    }
-    
-    fn iter_scopes(&self) -> impl Iterator<Item=&Scope> {
-        self.scopes.iter().rev()
-    }
-    
-    // find the nearest local in scopes that allow nonlocal assignment
-    fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
-        for scope in self.iter_scopes() {
-            let local = scope.find_local(name);
-            if local.is_some() {
-                return local;
-            }
-            if scope.is_frame_start() {
-                break;
-            }
-        }
-        None
-    }
-    
-    // without the nonlocal keyword, that is
-    fn can_assign_global(&self) -> bool {
-        self.scopes.iter().skip(1).all(|scope| !scope.is_frame_start())
-    }
-}
-
-
-
 /// Output container
 #[derive(Debug)]
 pub struct CompiledProgram {
@@ -274,8 +117,8 @@ pub struct CompiledProgram {
     pub symbols: ChunkSymbols,
 }
 
-// Code Generator
 
+// Code Generator
 pub struct Compiler {
     builder: ChunkBuilder,
     scope: ScopeTracker,
@@ -548,9 +391,9 @@ impl CodeGenerator<'_> {
     
     ///////// Scopes /////////
     
-    fn emit_begin_scope(&mut self, tag: ScopeTag, symbol: Option<&DebugSymbol>) {
+    fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>) {
         let chunk_id = self.chunk_id;
-        self.scope_mut().push_scope(tag, chunk_id, symbol);
+        self.scope_mut().push_scope(symbol);
     }
     
     fn emit_end_scope(&mut self) {
@@ -558,7 +401,7 @@ impl CodeGenerator<'_> {
         let symbol = scope.debug_symbol();
         
         // discard all the locals from the stack
-        let mut discard = scope.locals.len();
+        let mut discard = scope.locals().len();
         while discard > u8::MAX.into() {
             self.emit_instr_byte(symbol, OpCode::DropLocals, u8::MAX);
             discard -= usize::from(u8::MAX);
@@ -571,7 +414,7 @@ impl CodeGenerator<'_> {
     
     // If the local name cannot be found, no instructions are emitted and None is returned
     fn try_emit_load_local(&mut self, symbol: Option<&DebugSymbol>, name: &LocalName) -> Option<u16> {
-        if let Some(index) = self.scope().resolve_local(name).map(|local| local.index) {
+        if let Some(index) = self.scope().resolve_local(name).map(|local| local.index()) {
             if let Ok(index) = u8::try_from(index) {
                 self.emit_instr_byte(symbol, OpCode::LoadLocal, index);
             } else {
@@ -648,7 +491,7 @@ impl CodeGenerator<'_> {
         
         let loop_target = self.current_offset();
         
-        self.emit_begin_scope(ScopeTag::Loop, symbol);
+        self.emit_begin_scope(symbol);
         self.compile_stmt_list(body)?;
         self.emit_end_scope();
         
@@ -667,7 +510,7 @@ impl CodeGenerator<'_> {
         
         let loop_target = self.current_offset();
         
-        self.emit_begin_scope(ScopeTag::Loop, symbol);
+        self.emit_begin_scope(symbol);
         self.compile_stmt_list(body)?;
         self.emit_end_scope();
         
@@ -895,7 +738,7 @@ impl CodeGenerator<'_> {
     
     fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclarationRef) -> CompileResult<()> {
         match &decl.lhs {
-            LValue::Identifier(name) => if self.scope().is_global_scope() {
+            LValue::Identifier(name) => if self.scope().is_global() {
                 self.compile_decl_global_name(symbol, decl.decl, *name, decl.init)
             } else {
                 self.compile_decl_local_name(symbol, decl.decl, *name, decl.init)
@@ -1029,13 +872,13 @@ impl CodeGenerator<'_> {
             let local = LocalName::Symbol(*name);
             
             // check if the name is found in the local scope...
-            let result = self.scope().resolve_local(&local).map(|local| (local.decl, local.index));
+            let result = self.scope().resolve_local(&local);
             
-            if let Some((decl, index)) = result {
-                if decl != DeclType::Mutable {
+            if let Some(local) = result.cloned() {
+                if local.decl() != DeclType::Mutable {
                     return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                 }
-                self.emit_assign_local(symbol, index);
+                self.emit_assign_local(symbol, local.index());
                 
                 return Ok(());
             }
@@ -1097,7 +940,7 @@ impl CodeGenerator<'_> {
     
     fn compile_block_expression(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
         
-        self.emit_begin_scope(ScopeTag::Block, symbol);
+        self.emit_begin_scope(symbol);
         self.compile_expr_block(symbol, suite)?;
         self.emit_end_scope();
         
@@ -1127,7 +970,7 @@ impl CodeGenerator<'_> {
                 else { Jump::PopIfFalse };
             self.emit_dummy_instr(symbol, branch_jump.dummy_width());
             
-            self.emit_begin_scope(ScopeTag::Branch, symbol);
+            self.emit_begin_scope(symbol);
             self.compile_expr_block(symbol, branch.suite())?;
             self.emit_end_scope();
             
@@ -1146,7 +989,7 @@ impl CodeGenerator<'_> {
         // else clause
         if let Some(suite) = else_clause {
             
-            self.emit_begin_scope(ScopeTag::Branch, symbol);
+            self.emit_begin_scope(symbol);
             self.compile_expr_block(symbol, suite)?;
             self.emit_end_scope();
             
@@ -1185,7 +1028,7 @@ impl CodeGenerator<'_> {
         
         // and a new local scope
         // don't need to emit new scope instructions, should handled by function call
-        chunk_gen.scope_mut().push_scope(ScopeTag::Function, chunk, symbol);
+        chunk_gen.scope_mut().push_frame(symbol);
         
         // don't need to generate IN_LOCAL instructions for these, the VM should include them automatically
         chunk_gen.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;

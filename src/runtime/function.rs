@@ -28,6 +28,11 @@ pub trait Invoke {
 }
 
 
+pub struct Upvalue {
+    index: usize,  // index into the value stack
+}
+
+
 #[derive(Debug)]
 pub struct Function {
     signature: Signature,
