@@ -41,9 +41,8 @@ impl Local {
 
 #[derive(Debug)]
 pub struct Scope {
-    depth: usize,
     symbol: Option<DebugSymbol>,
-    frame: Option<LocalIndex>, // last local index of the enclosing scope
+    prev_index: Option<LocalIndex>,
     locals: Vec<Local>,
 }
 
@@ -57,7 +56,7 @@ impl Scope {
     }
     
     fn last_index(&self) -> Option<LocalIndex> {
-        self.locals.last().map_or(self.frame, |local| Some(local.index))
+        self.locals.last().map_or(self.prev_index, |local| Some(local.index))
     }
     
     fn find_local(&self, name: &LocalName) -> Option<&Local> {
@@ -82,94 +81,159 @@ impl Scope {
         Ok(self.locals.last().unwrap())
     }
     
-    fn is_call_frame(&self) -> bool {
-        self.frame.is_none()
+    fn insert_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<()> {
+        // see if this local already exists in the current scope
+        if let Some(mut local) = self.find_local_mut(&name) {
+            (*local).decl = decl; // redeclare with new mutability
+        } else {
+            self.push_local(decl, name)?;
+        }
+        Ok(())
     }
 }
 
+
+// TODO: better name
+#[derive(Debug)]
+struct Scopes {
+    scopes: Vec<Scope>,
+}
+
+impl Scopes {
+    fn new() -> Self {
+        Self { scopes: Vec::new() }
+    }
+    
+    fn is_empty(&self) -> bool {
+        self.scopes.is_empty()
+    }
+    
+    fn current_scope(&self) -> Option<&Scope> {
+        self.scopes.last()
+    }
+    
+    fn current_scope_mut(&mut self) -> Option<&mut Scope> {
+        self.scopes.last_mut()
+    }
+    
+    fn push_scope(&mut self, symbol: Option<&DebugSymbol>) {
+        let prev_index = self.scopes.last().and_then(|scope| scope.last_index());
+        
+        let scope = Scope {
+            prev_index,
+            symbol: symbol.copied(),
+            locals: Vec::new(),
+        };
+        
+        self.scopes.push(scope);
+    }
+    
+    fn pop_scope(&mut self) -> Scope {
+        self.scopes.pop().expect("pop empty scope")
+    }
+    
+    // find the nearest local in scopes that allow nonlocal assignment
+    fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
+        self.scopes.iter().rev()
+            .find_map(|scope| scope.find_local(name))
+    }
+}
+
+
+#[derive(Debug)]
+pub struct Upvalue {
+    
+}
+
+#[derive(Debug)]
+struct CallFrame {
+    scopes: Scopes,
+    upvalues: Vec<Upvalue>,
+}
+
+impl CallFrame {
+    fn new(symbol: Option<&DebugSymbol>) -> Self {
+        let mut scopes = Scopes::new();
+        scopes.push_scope(symbol);
+        
+        Self {
+            scopes,
+            upvalues: Vec::new(),
+        }
+    }
+    
+    fn scopes(&self) -> &Scopes { &self.scopes }
+    
+    fn scopes_mut(&mut self) -> &mut Scopes { &mut self.scopes }
+}
+
+
 #[derive(Debug)]
 pub struct ScopeTracker {
-    scopes: Vec<Scope>,
+    scopes: Scopes,
+    frames: Vec<CallFrame>,
 }
 
 impl ScopeTracker {
     pub fn new() -> Self {
-        Self { scopes: Vec::new() }
+        Self {
+            scopes: Scopes::new(),
+            frames: Vec::new(),
+        }
     }
     
     pub fn is_global(&self) -> bool {
-        self.scopes.is_empty()
+        self.frames.is_empty() && self.scopes.is_empty()
     }
     
-    pub fn local_scope(&self) -> Option<&Scope> {
-        self.scopes.last()
-    }
-    
-    pub fn local_scope_mut(&mut self) -> Option<&mut Scope> {
-        self.scopes.last_mut()
+    fn current_frame(&self) -> Option<&CallFrame> {
+        self.frames.last()
     }
     
     pub fn push_frame(&mut self, symbol: Option<&DebugSymbol>) {
-        let scope = Scope {
-            frame: None,
-            symbol: symbol.copied(),
-            depth: self.scopes.len(),
-            locals: Vec::new(),
-        };
-        
-        self.scopes.push(scope);
+        self.frames.push(CallFrame::new(symbol))
     }
     
-    /// Non-frame scope. e.g. block-expressions, if-blocks, loop bodies, etc.
+    pub fn pop_frame(&mut self) {
+        self.frames.pop().expect("pop empty frames");
+    }
+    
+    fn current_scope(&self) -> &Scopes {
+        self.frames.last()
+            .map_or(&self.scopes, |frame| frame.scopes())
+    }
+    
+    fn current_scope_mut(&mut self) -> &mut Scopes {
+        self.frames.last_mut()
+            .map_or(&mut self.scopes, |frame| frame.scopes_mut())
+    }
+    
+    pub fn local_scope(&self) -> Option<&Scope> {
+        self.current_scope().current_scope()
+    }
+    
     pub fn push_scope(&mut self, symbol: Option<&DebugSymbol>) {
-        let frame = self.local_scope().and_then(|scope| scope.last_index());
-        
-        let scope = Scope {
-            frame,
-            symbol: symbol.copied(),
-            depth: self.scopes.len(),
-            locals: Vec::new(),
-        };
-        
-        self.scopes.push(scope);
+        self.current_scope_mut().push_scope(symbol);
     }
     
     pub fn pop_scope(&mut self) -> Scope {
-        self.scopes.pop().expect("pop global scope")
+        let scope = self.current_scope_mut().pop_scope();
+        debug_assert!(self.frames.last().map_or(true, |frame| !frame.scopes().is_empty()), "pop last scope from call frame");
+        scope
     }
     
     pub fn insert_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<()> {
-        let local_scope = self.local_scope_mut().expect("insert local in global scope");
-        
-        // see if this local already exists in the current scope
-        if let Some(mut local) = local_scope.find_local_mut(&name) {
-            (*local).decl = decl; // redeclare with new mutability
-        } else {
-            local_scope.push_local(decl, name)?;
-        }
-        Ok(())
-    }
-    
-    pub fn iter_scopes(&self) -> impl Iterator<Item=&Scope> {
-        self.scopes.iter().rev()
+        let scope = self.current_scope_mut().current_scope_mut().expect("insert local in global scope");
+        scope.insert_local(decl, name)
     }
     
     // find the nearest local in scopes that allow nonlocal assignment
     pub fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
-        for scope in self.iter_scopes() {
-            let local = scope.find_local(name);
-            if local.is_some() {
-                return local;
-            }
-            if scope.is_call_frame() {
-                break;
-            }
-        }
-        None
+        self.current_scope().resolve_local(name)
     }
     
     // without the nonlocal keyword, that is
-    pub fn can_assign_global(&self) -> bool {
-        self.scopes.iter().skip(1).all(|scope| !scope.is_call_frame())
+    pub fn can_assign_nonlocal(&self) -> bool {
+        unimplemented!()
     }
 }

@@ -868,7 +868,7 @@ impl CodeGenerator<'_> {
         
         // Generate assignment
         
-        if self.scope().local_scope().is_some() {
+        if !self.scope().is_global() {
             let local = LocalName::Symbol(*name);
             
             // check if the name is found in the local scope...
@@ -905,9 +905,9 @@ impl CodeGenerator<'_> {
         // ...finally, try to assign global
         
         // allow assignment to global only if all enclosing scopes permit it
-        if !assign.nonlocal && !self.scope().can_assign_global() {
-            return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
-        }
+        // if !assign.nonlocal && !self.scope().can_assign_global() {
+        //     return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
+        // }
         
         self.emit_load_const(symbol, Constant::from(*name))?;
         self.emit_instr(symbol, OpCode::StoreGlobal);
@@ -1049,7 +1049,7 @@ impl CodeGenerator<'_> {
         
         // end the function scope
         // don't need to emit end scope instructions, will be handled by return
-        chunk_gen.scope_mut().pop_scope();
+        chunk_gen.scope_mut().pop_frame();
         chunk_gen.finish();
         
         // load the function object as the expression result

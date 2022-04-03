@@ -28,6 +28,8 @@ pub trait Invoke {
 }
 
 
+pub type UpvalueIndex = u16;
+
 pub struct Upvalue {
     index: usize,  // index into the value stack
 }

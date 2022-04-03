@@ -170,7 +170,6 @@ macro_rules! cond_jump {
 
 pub type LocalIndex = u16;
 
-
 #[derive(Debug)]
 struct VMState<'c> {
     module: GC<Module>,
