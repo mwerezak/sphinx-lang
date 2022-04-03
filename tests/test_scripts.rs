@@ -5,6 +5,7 @@ use sphinx_lang::stdlib;
 use sphinx_lang::source::ModuleSource;
 use sphinx_lang::codegen::{Program, CompiledProgram};
 use sphinx_lang::runtime::{Module, VirtualMachine, GC};
+use sphinx_lang::runtime::errors::{ExecResult, ErrorKind};
 
 
 fn build_program(source: &ModuleSource) -> Option<CompiledProgram> {
@@ -18,7 +19,7 @@ fn build_program(source: &ModuleSource) -> Option<CompiledProgram> {
     }
 }
 
-fn run_test_script(path: &Path) {
+fn run_test_script(path: &Path) -> ExecResult<()> {
     let source = ModuleSource::File(path.into());
     let build = build_program(&source).expect("build failed");
     
@@ -28,16 +29,23 @@ fn run_test_script(path: &Path) {
     let main_module = Module::with_env(Some(source), program.data, main_env);
     
     let vm = VirtualMachine::new(main_module, &program.main);
-    if let Err(error) = vm.run() {
-        panic!("{}{}", error.traceback(), error);
-    }
+    vm.run()
 }
 
 macro_rules! test_script {
     ( $name:tt, $path:expr ) => {
         #[test]
         fn $name() {
-            run_test_script(Path::new($path))
+            if let Err(error) = run_test_script(Path::new($path)) {
+                panic!("{}{}", error.traceback(), error);
+            }
+        }
+    };
+    ( $name:tt, $path:expr, error: $error:pat ) => {
+        #[test]
+        fn $name() {
+            let error = run_test_script(Path::new($path)).unwrap_err();
+            assert!(matches!(error.kind(), $error));
         }
     };
 }
@@ -73,6 +81,25 @@ mod while_tests {
     use super::*;
     
     test_script!(while_, "tests/while/while.sph");
+}
+
+mod variable_tests {
+    use super::*;
+    
+    test_script!(early_bound, "tests/variable/early_bound.sph");
+    test_script!(in_middle_of_block, "tests/variable/in_middle_of_block.sph");
+    test_script!(in_nested_block, "tests/variable/in_nested_block.sph");
+    test_script!(redeclare_global, "tests/variable/redeclare_global.sph");
+}
+
+mod function_tests {
+    use super::*;
+    
+    test_script!(empty_body, "tests/function/empty_body.sph");
+    test_script!(local_recursion, "tests/function/local_recursion.sph");
+    test_script!(nested_call_with_arguments, "tests/function/nested_call_with_arguments.sph");
+    test_script!(inner_block, "tests/function/inner_block.sph");
+    test_script!(missing_arguments, "tests/function/missing_arguments.sph", error: ErrorKind::MissingArguments(..));
 }
 
 mod closure_tests {

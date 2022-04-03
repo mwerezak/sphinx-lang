@@ -138,6 +138,7 @@ pub fn eval_not(operand: &Variant) -> ExecResult<Variant> {
 pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> ExecResult<bool> {
     let value = match (lhs, rhs) {
         
+        (Variant::Nil, Variant::Nil) => true,
         (Variant::EmptyTuple, Variant::EmptyTuple) => true,
         
         (Variant::BoolTrue,  Variant::BoolTrue)  => true,

@@ -1,0 +1,11 @@
+
+fun f()
+    let a = "1"
+    begin
+        let a = "2"
+        assert "2" == echo a
+    end
+    assert "1" == echo a
+end
+
+f()

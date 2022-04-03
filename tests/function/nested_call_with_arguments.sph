@@ -1,0 +1,11 @@
+fun return_arg(arg) arg end
+
+fun return_call_with_arg(func, arg)
+    return_arg(func)(arg)
+end
+
+fun print_arg(arg)
+    echo arg
+end
+
+assert return_call_with_arg(print_arg, "hello world") == "hello world"

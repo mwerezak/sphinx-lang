@@ -1,0 +1,10 @@
+begin
+    var a = "a"
+    assert (echo a) == "a"
+    var b = a + " b"
+    assert (echo b) == "a b"
+    var c = a + " c"
+    assert (echo c) == "a c"
+    var d = b + " d"
+    assert (echo d) == "a b d"
+end

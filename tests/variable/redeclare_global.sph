@@ -1,0 +1,3 @@
+let a = "1"
+let a = "2"
+assert "2" == echo a

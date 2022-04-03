@@ -1,0 +1,6 @@
+begin
+    let a = "outer"
+    begin
+        assert "outer" == echo a
+    end
+end

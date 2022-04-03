@@ -1,0 +1,10 @@
+let a = "outer"
+begin
+    fun foo()
+        echo a
+    end
+    
+    assert foo() == "outer"
+    let a = "inner"
+    assert foo() == "outer"
+end
