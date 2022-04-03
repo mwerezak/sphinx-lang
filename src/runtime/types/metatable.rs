@@ -1,6 +1,6 @@
 use crate::runtime::Variant;
 use crate::runtime::ops::eval_not;
-use crate::runtime::types::function::Call;
+use crate::runtime::function::Call;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 

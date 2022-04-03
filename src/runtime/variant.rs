@@ -5,7 +5,7 @@ use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
 use crate::runtime::types::Type;
 use crate::runtime::types::metatable::Metatable;
-use crate::runtime::types::function::{Function, NativeFunction, Call, Invoke};
+use crate::runtime::function::{Function, NativeFunction, Call, Invoke};
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::gc::{GC, GCArray, GCTrace};

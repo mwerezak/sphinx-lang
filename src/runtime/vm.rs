@@ -3,7 +3,7 @@ use crate::codegen::{Program, ProgramData, Chunk, ChunkID, ConstID, Constant, Op
 use crate::runtime::Variant;
 use crate::runtime::gc::GC;
 use crate::runtime::ops;
-use crate::runtime::types::function::Call;
+use crate::runtime::function::Call;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};

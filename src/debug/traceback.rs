@@ -4,7 +4,7 @@ use crate::codegen::chunk::ChunkInfo;
 use crate::runtime::HashMap;
 use crate::runtime::gc::GC;
 use crate::runtime::module::{Module, ModuleIdent, Chunk};
-use crate::runtime::types::function::{Function, NativeFunction};
+use crate::runtime::function::{Function, NativeFunction};
 use crate::debug::symbol::ResolvedSymbol;
 
 

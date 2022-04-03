@@ -5,7 +5,7 @@ use string_interner::Symbol as _;
 use crate::language::{IntType, FloatType, InternSymbol};
 use crate::runtime::{DefaultBuildHasher, Variant, STRING_TABLE};
 use crate::runtime::strings::{StringInterner, StringSymbol};
-use crate::runtime::types::function::{Signature, Parameter};
+use crate::runtime::function::{Signature, Parameter};
 use crate::codegen::consts::{Constant, ConstID, StringID, FunctionID, UnloadedSignature, UnloadedParam};
 use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
 use crate::debug::DebugSymbol;

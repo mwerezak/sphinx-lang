@@ -6,7 +6,6 @@ use crate::runtime::errors::ExecResult;
 pub mod operator;
 pub mod metatable;
 pub mod primitive;
-pub mod function;
 
 
 // Type tag for Sphinx's "primitive" types

@@ -2,7 +2,7 @@
 use crate::language::FloatType;
 use crate::runtime::Variant;
 use crate::runtime::module::{Namespace, Access};
-use crate::runtime::types::function::{Invoke, NativeFunction, Signature, Parameter};
+use crate::runtime::function::{Invoke, NativeFunction, Signature, Parameter};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 use crate::stdlib;
 
