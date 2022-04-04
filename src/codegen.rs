@@ -778,7 +778,7 @@ impl CodeGenerator<'_> {
     
     fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclarationRef) -> CompileResult<()> {
         match &decl.lhs {
-            LValue::Identifier(name) => if self.scope().is_global() {
+            LValue::Identifier(name) => if self.scope().is_global_scope() {
                 self.compile_decl_global_name(symbol, decl.decl, *name, decl.init)
             } else {
                 self.compile_decl_local_name(symbol, decl.decl, *name, decl.init)
@@ -908,47 +908,47 @@ impl CodeGenerator<'_> {
         
         // Generate assignment
         
-        if !self.scope().is_global() {
-            let local = LocalName::Symbol(*name);
+        if !self.scope().is_global_scope() {
+            
+            let local_name = LocalName::Symbol(*name);
             
             // check if the name is found in the local scope...
-            let result = self.scope().resolve_local(&local);
+            let result = self.scope().resolve_local(&local_name);
             
             if let Some(local) = result.cloned() {
                 if local.decl() != DeclType::Mutable {
                     return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                 }
+                
                 self.emit_assign_local(symbol, local.index());
                 
                 return Ok(());
             }
             
-            // TODO upvalues
+            if !assign.nonlocal {
+                return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
+            }
             
-            // otherwise search enclosing scopes...
-            // let result = self.scope().resolve_nonlocal(&local).map(|local| (local.decl, local.index));
-            
-            // if let Some((decl, index)) = result {
-            //     if !assign.nonlocal {
-            //         return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
-            //     }
-            //     if decl != DeclType::Mutable {
-            //         return Err(CompileError::from(ErrorKind::CantAssignImmutable));
-            //     }
-            //     self.emit_assign_local(symbol, index);
-                
-            //     return Ok(());
-            // }
-            
+            // check if an upvalue is found or can be created...
+            if !self.scope().is_global_frame() {
+                if let Some(upval) = self.scope_mut().resolve_or_create_upval(&local_name)? {
+                    if upval.decl() != DeclType::Mutable {
+                        return Err(CompileError::from(ErrorKind::CantAssignImmutable));
+                    }
+                    
+                    let index = upval.index();
+                    if let Ok(index) = u8::try_from(index) {
+                        self.emit_instr_byte(symbol, OpCode::StoreUpvalue, index);
+                    } else {
+                        self.emit_instr_data(symbol, OpCode::StoreUpvalue16, &index.to_le_bytes());
+                    }
+                    
+                    return Ok(());
+                }
+            }
         }
-        
-        // ...finally, try to assign global
-        
-        // allow assignment to global only if all enclosing scopes permit it
-        // if !assign.nonlocal && !self.scope().can_assign_global() {
-        //     return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
-        // }
-        
+
+        // ...finally, try to assign to a global, which are late bound
         self.emit_load_const(symbol, Constant::from(*name))?;
         self.emit_instr(symbol, OpCode::StoreGlobal);
         Ok(())

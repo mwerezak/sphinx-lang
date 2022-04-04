@@ -132,6 +132,7 @@ impl NestedScopes {
         self.scopes.pop().expect("pop empty scope")
     }
     
+    /// Iterate in name resolution order
     fn iter(&self) -> impl Iterator<Item=&Scope> {
         self.scopes.iter().rev()
     }
@@ -235,8 +236,12 @@ impl ScopeTracker {
         }
     }
     
-    pub fn is_global(&self) -> bool {
+    pub fn is_global_scope(&self) -> bool {
         self.frames.is_empty() && self.scopes.is_empty()
+    }
+    
+    pub fn is_global_frame(&self) -> bool {
+        self.frames.is_empty()
     }
     
     pub fn push_frame(&mut self, symbol: Option<&DebugSymbol>) {
@@ -276,7 +281,6 @@ impl ScopeTracker {
         scope.insert_local(decl, name)
     }
     
-    // find the nearest local in scopes that allow nonlocal assignment
     pub fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
         self.current_scope()
             .iter().find_map(|scope| scope.find_local(name))
@@ -292,14 +296,6 @@ impl ScopeTracker {
             .map(|idx| &self.frames.last().unwrap().upvalues[usize::from(idx)]);
         
         Ok(upval)
-    }
-    
-    // helper to get a frame by index and its enclosing frame
-    fn get_frames_mut(frames: &mut [ScopeFrame], frame_idx: usize) -> (&mut ScopeFrame, Option<&mut ScopeFrame>) {
-        let (frames, _) = frames.split_at_mut(frame_idx + 1);
-        let (current_frame, frames) = frames.split_last_mut().unwrap();
-        let enclosing_frame = frames.split_last_mut().map(|(last, _)| last);
-        (current_frame, enclosing_frame)
     }
     
     // recursive helper
@@ -334,9 +330,11 @@ impl ScopeTracker {
         Ok(None)
     }
     
-    
-    // without the nonlocal keyword, that is
-    pub fn can_assign_nonlocal(&self) -> bool {
-        unimplemented!()
+    // helper to get a frame by index and its enclosing frame
+    fn get_frames_mut(frames: &mut [ScopeFrame], frame_idx: usize) -> (&mut ScopeFrame, Option<&mut ScopeFrame>) {
+        let (frames, _) = frames.split_at_mut(frame_idx + 1);
+        let (current_frame, frames) = frames.split_last_mut().unwrap();
+        let enclosing_frame = frames.split_last_mut().map(|(last, _)| last);
+        (current_frame, enclosing_frame)
     }
 }
