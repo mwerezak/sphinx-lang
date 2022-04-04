@@ -7,9 +7,9 @@ fun f1()
     fun f3()
       let c = "c";
       fun f4()
-        echo a
-        echo b
-        echo c
+        assert "a" == echo a
+        assert "b" == echo b
+        assert "c" == echo c
       end
       nonlocal f = f4;
     end
@@ -20,6 +20,3 @@ end
 f1();
 
 f();
-# expect: a
-# expect: b
-# expect: c

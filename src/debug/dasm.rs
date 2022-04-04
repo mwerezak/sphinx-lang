@@ -113,7 +113,7 @@ impl<'c, 's> Disassembler<'c, 's> {
                 
                 OpCode::Drop | OpCode::DropLocals => {
                     let len = instr[1];
-                    write!(line, "{:16} {: >4}    ", opcode, len)?;
+                    write!(line, "{:16} {: >4}", opcode, len)?;
                 }
                 
                 OpCode::LoadConst => {
@@ -137,8 +137,30 @@ impl<'c, 's> Disassembler<'c, 's> {
                     write!(line, "{:16} {: >4}    ", opcode, index)?;
                 },
                 
+                OpCode::InsertUpvalueLocal => {
+                    let index = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
+                OpCode::InsertUpvalueLocal16 => {
+                    let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
+                OpCode::InsertUpvalueNonlocal => {
+                    let index = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
+                OpCode::InsertUpvalueNonlocal16 => {
+                    let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
+                
                 OpCode::LoadUpvalue => {
                     let index = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
+                
+                OpCode::LoadUpvalue16 => {
+                    let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
                     write!(line, "{:16} {: >4}    ", opcode, index)?;
                 }
                 

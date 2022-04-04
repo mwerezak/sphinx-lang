@@ -28,7 +28,7 @@ pub use consts::{ConstID, Constant};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
 use opcodes::*;
-use scope::{ScopeTracker, LocalName};
+use scope::{ScopeTracker, LocalName, Upvalue, UpvalueTarget};
 use chunk::{ChunkBuilder, ChunkInfo, ChunkBuf};
 use consts::{UnloadedSignature, UnloadedParam};
 
@@ -438,6 +438,26 @@ impl CodeGenerator<'_> {
             Ok(Some(index))
         } else {
             Ok(None)
+        }
+    }
+    
+    fn emit_upvalue(&mut self, symbol: Option<&DebugSymbol>, target: UpvalueTarget) {
+        match target {
+            UpvalueTarget::Local(index) => {
+                if let Ok(index) = u8::try_from(index) {
+                    self.emit_instr_byte(symbol, OpCode::InsertUpvalueLocal, index);
+                } else {
+                    self.emit_instr_data(symbol, OpCode::InsertUpvalueLocal16, &index.to_le_bytes());
+                }
+            },
+            
+            UpvalueTarget::Upvalue(index) => {
+                if let Ok(index) = u8::try_from(index) {
+                    self.emit_instr_byte(symbol, OpCode::InsertUpvalueNonlocal, index);
+                } else {
+                    self.emit_instr_data(symbol, OpCode::InsertUpvalueNonlocal16, &index.to_le_bytes());
+                }
+            },
         }
     }
     
@@ -1076,7 +1096,9 @@ impl CodeGenerator<'_> {
         self.emit_load_const(symbol, Constant::Function(chunk_id, function_id))?;
         
         // compile upvalues
-        unimplemented!();
+        for upvalue in frame.upvalues().iter() {
+            self.emit_upvalue(symbol, upvalue.target());
+        }
         
         Ok(())
     }

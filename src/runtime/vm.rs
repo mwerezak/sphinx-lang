@@ -384,7 +384,22 @@ impl<'c> VMState<'c> {
                 self.locals -= count;
             },
             
+            OpCode::InsertUpvalueLocal => {
+                unimplemented!()
+            }
+            OpCode::InsertUpvalueLocal16 => {
+                unimplemented!()
+            }
+            OpCode::InsertUpvalueNonlocal => {
+                unimplemented!()
+            }
+            OpCode::InsertUpvalueNonlocal16 => {
+                unimplemented!()
+            }
             OpCode::LoadUpvalue => {
+                unimplemented!()
+            }
+            OpCode::LoadUpvalue16 => {
                 unimplemented!()
             }
             

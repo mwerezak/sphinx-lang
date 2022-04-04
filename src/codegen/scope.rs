@@ -146,8 +146,8 @@ pub struct Upvalue {
     target: UpvalueTarget,
 }
 
-#[derive(Debug, Clone)]
-enum UpvalueTarget {
+#[derive(Debug, Clone, Copy)]
+pub enum UpvalueTarget {
     Local(LocalIndex),
     Upvalue(UpvalueIndex),
 }
@@ -155,7 +155,8 @@ enum UpvalueTarget {
 impl Upvalue {
     pub fn decl(&self) -> DeclType { self.decl }
     pub fn name(&self) -> LocalName { self.name }
-    pub fn index(&self) -> LocalIndex { self.index }
+    pub fn index(&self) -> UpvalueIndex { self.index }
+    pub fn target(&self) -> UpvalueTarget { self.target }
 }
 
 

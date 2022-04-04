@@ -24,18 +24,18 @@ const OP_CALL:          u8 = 0x02;
 // [ callee arg[n] arg[0] ... arg[n-1] arg_seq nargs ] => [ ret_value ]  -- nargs does not include arg_seq! 
 const OP_CALL_UNPACK:   u8 = 0x03;
 
-// 0x08-40        Immediate Values
+// 0x10-40        Immediate Values
 
-const OP_POP:           u8 = 0x08;  // [ _ ] => []
-const OP_DROP:          u8 = 0x09;  // (u8); [ value[0] ... value[N] ] => []
-const OP_CLONE:         u8 = 0x0A;  // [ value ] => [ value value ]
+const OP_POP:           u8 = 0x10;  // [ _ ] => []
+const OP_DROP:          u8 = 0x11;  // (u8); [ value[0] ... value[N] ] => []
+const OP_CLONE:         u8 = 0x12;  // [ value ] => [ value value ]
 
-const OP_TUPLE:         u8 = 0x0B;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
-const OP_TUPLEN:        u8 = 0x0C;  // [ item[0] ... item[N] N ] => [ tuple ]
+const OP_TUPLE:         u8 = 0x13;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
+const OP_TUPLEN:        u8 = 0x14;  // [ item[0] ... item[N] N ] => [ tuple ]
 
-const OP_LD_CONST:      u8 = 0x10;  // (u8); _ => [ value ]
-const OP_LD_CONST_16:   u8 = 0x11;  // (u16); _ => [ value ]
-// const OP_LD_CONST_32:   u8 = 0x12;  // (u32); _ => [ value ]
+const OP_LD_CONST:      u8 = 0x15;  // (u8); _ => [ value ]
+const OP_LD_CONST_16:   u8 = 0x16;  // (u16); _ => [ value ]
+// const OP_LD_CONST_32:   u8 = 0x17;  // (u32); _ => [ value ]
 
 const OP_IN_GLOBAL_IM:  u8 = 0x18;  // [ value name ] => [ value ]
 const OP_IN_GLOBAL_MUT: u8 = 0x19;  // [ value name ] => [ value ]
@@ -46,33 +46,39 @@ const OP_DP_GLOBAL:     u8 = 0x1C;  // [ name ] => []
 const OP_IN_LOCAL:      u8 = 0x20;  // [ value ] => [ value ]; vm.locals += 1
 const OP_ST_LOCAL:      u8 = 0x21;  // (u8);  [ value ] => [ value ]
 const OP_ST_LOCAL_16:   u8 = 0x22;  // (u16); [ value ] => [ value ]
-// const OP_LD_LOCAL_32:   u8 = 0x23;  // (u32); _ => [ value ]
-const OP_LD_LOCAL:      u8 = 0x24;  // (u8);  _ => [ value ]
-const OP_LD_LOCAL_16:   u8 = 0x25;  // (u16); _ => [ value ]
-// const OP_LD_LOCAL_32:   u8 = 0x27;  // (u32); _ => [ value ]
-const OP_DP_LOCALS:     u8 = 0x28;  // (u8); [ ... local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
+const OP_LD_LOCAL:      u8 = 0x23;  // (u8);  _ => [ value ]
+const OP_LD_LOCAL_16:   u8 = 0x24;  // (u16); _ => [ value ]
+const OP_DP_LOCALS:     u8 = 0x25;  // (u8); [ ... local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
 
-const OP_LD_UPVAL:      u8 = 0x29;
+const OP_IN_UPVAL_L:    u8 = 0x28;  // (u8)  [ function ] => [ function ]
+const OP_IN_UPVAL_L_16: u8 = 0x29;  // (u16) [ function ] => [ function ]
+const OP_IN_UPVAL_U:    u8 = 0x2A;  // (u8)  [ function ] => [ function ]
+const OP_IN_UPVAL_U_16: u8 = 0x2B;  // (u16) [ function ] => [ function ]
+// const OP_ST_UPVAL:      u8 = 0x2C;
+// const OP_ST_UPVAL_16:      u8 = 0x2D;
+const OP_LD_UPVAL:      u8 = 0x2E;
+const OP_LD_UPVAL_16:      u8 = 0x2F;
 
-// const OP_LD_NAME:       u8 = 0x28;
-// const OP_LD_INDEX:      u8 = 0x29;
+
+// const OP_LD_NAME:       u8 = 0x30;
+// const OP_LD_INDEX:      u8 = 0x31;
 
 
 // Dynamic Insert/Store
 
 // These are used to implement tuple-destructuring assignment/declaration
-// const OP_IN_DYN         u8 = 0x30;  // [ value dyn_target bool ] => [] 
-// const OP_ST_DYN         u8 = 0x31;  // [ value dyn_target ] => []
+// const OP_IN_DYN         u8 = 0x38;  // [ value dyn_target bool ] => [] 
+// const OP_ST_DYN         u8 = 0x39;  // [ value dyn_target ] => []
 
-const OP_LD_NIL:        u8 = 0x38;  // _ => [ nil ]
-const OP_LD_FALSE:      u8 = 0x39;  // _ => [ false ]
-const OP_LD_TRUE:       u8 = 0x3A;  // _ => [ true ]
-const OP_LD_EMPTY:      u8 = 0x3B;  // _ => [ () ]
+const OP_LD_NIL:        u8 = 0x40;  // _ => [ nil ]
+const OP_LD_FALSE:      u8 = 0x41;  // _ => [ false ]
+const OP_LD_TRUE:       u8 = 0x42;  // _ => [ true ]
+const OP_LD_EMPTY:      u8 = 0x43;  // _ => [ () ]
 
 // small numbers
-const OP_LD_U8:         u8 = 0x3C;  // (u8); _ => [ value ]
-const OP_LD_I8:         u8 = 0x3D;  // (i8); _ => [ value ]
-const OP_LD_F8:         u8 = 0x3E;  // (i8); _ => [ value ]
+const OP_LD_U8:         u8 = 0x44;  // (u8); _ => [ value ]
+const OP_LD_I8:         u8 = 0x45;  // (i8); _ => [ value ]
+const OP_LD_F8:         u8 = 0x46;  // (i8); _ => [ value ]
 
 // const OP_DYN_TARGET:    u8 = 0x48;  // (u8); [ ... ] => [ dyn_target ]
 
@@ -163,7 +169,12 @@ pub enum OpCode {
     LoadLocal16 = OP_LD_LOCAL_16,
     DropLocals = OP_DP_LOCALS,
     
+    InsertUpvalueLocal = OP_IN_UPVAL_L,
+    InsertUpvalueLocal16 = OP_IN_UPVAL_L_16,
+    InsertUpvalueNonlocal = OP_IN_UPVAL_U,
+    InsertUpvalueNonlocal16 = OP_IN_UPVAL_U_16,
     LoadUpvalue = OP_LD_UPVAL,
+    LoadUpvalue16 = OP_LD_UPVAL_16,
     
     Nil = OP_LD_NIL,
     True = OP_LD_TRUE,
@@ -243,7 +254,12 @@ impl OpCode {
             OP_LD_LOCAL_16 => Self::LoadLocal16,
             OP_DP_LOCALS => Self::DropLocals,
             
+            OP_IN_UPVAL_L => Self::InsertUpvalueLocal,
+            OP_IN_UPVAL_L_16 => Self::InsertUpvalueLocal16,
+            OP_IN_UPVAL_U => Self::InsertUpvalueNonlocal,
+            OP_IN_UPVAL_U_16 => Self::InsertUpvalueNonlocal16,
             OP_LD_UPVAL => Self::LoadUpvalue,
+            OP_LD_UPVAL_16 => Self::LoadUpvalue16,
             
             OP_LD_NIL => Self::Nil,
             OP_LD_TRUE => Self::True,
@@ -311,7 +327,12 @@ impl OpCode {
             Self::LoadLocal16    => 1 + size_of::<u16>(),
             Self::DropLocals     => 1 + size_of::<u8>(),
             
+            Self::InsertUpvalueLocal      => 1 + size_of::<u8>(),
+            Self::InsertUpvalueLocal16    => 1 + size_of::<u16>(),
+            Self::InsertUpvalueNonlocal   => 1 + size_of::<u8>(),
+            Self::InsertUpvalueNonlocal16 => 1 + size_of::<u16>(),
             Self::LoadUpvalue    => 1 + size_of::<u8>(),
+            Self::LoadUpvalue16  => 1 + size_of::<u16>(),
             
             Self::Tuple          => 1 + size_of::<u8>(),
             Self::UInt8          => 1 + size_of::<u8>(),
@@ -379,7 +400,12 @@ impl std::fmt::Display for OpCode {
             Self::LoadLocal16 => "LD_LOCAL_16",
             Self::DropLocals => "DP_LOCALS",
             
+            Self::InsertUpvalueLocal => "IN_UPVAL_L",
+            Self::InsertUpvalueLocal16 => "IN_UPVAL_L_16",
+            Self::InsertUpvalueNonlocal => "IN_UPVAL_U",
+            Self::InsertUpvalueNonlocal16 => "IN_UPVAL_U_16",
             Self::LoadUpvalue => "LD_UPVAL",
+            Self::LoadUpvalue16 => "LD_UPVAL_16",
             
             Self::Nil => "LD_NIL",
             Self::True => "LD_TRUE",
