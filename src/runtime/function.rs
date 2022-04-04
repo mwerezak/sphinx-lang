@@ -28,6 +28,8 @@ pub trait Invoke {
 }
 
 
+// Compiled Functions
+
 pub type UpvalueIndex = u16;
 
 pub struct Upvalue {
@@ -58,6 +60,8 @@ impl Invoke for Function {
     }
 }
 
+
+// Native Functions
 
 pub type NativeFn = fn(self_fun: &NativeFunction, args: &[Variant]) -> ExecResult<Variant>;
 

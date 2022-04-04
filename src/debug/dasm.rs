@@ -145,11 +145,11 @@ impl<'c, 's> Disassembler<'c, 's> {
                     let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
                     write!(line, "{:16} {: >4}    ", opcode, index)?;
                 }
-                OpCode::InsertUpvalueNonlocal => {
+                OpCode::InsertUpvalueExtern => {
                     let index = instr[1];
                     write!(line, "{:16} {: >4}    ", opcode, index)?;
                 }
-                OpCode::InsertUpvalueNonlocal16 => {
+                OpCode::InsertUpvalueExtern16 => {
                     let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
                     write!(line, "{:16} {: >4}    ", opcode, index)?;
                 }

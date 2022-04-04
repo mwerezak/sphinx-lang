@@ -453,9 +453,9 @@ impl CodeGenerator<'_> {
             
             UpvalueTarget::Upvalue(index) => {
                 if let Ok(index) = u8::try_from(index) {
-                    self.emit_instr_byte(symbol, OpCode::InsertUpvalueNonlocal, index);
+                    self.emit_instr_byte(symbol, OpCode::InsertUpvalueExtern, index);
                 } else {
-                    self.emit_instr_data(symbol, OpCode::InsertUpvalueNonlocal16, &index.to_le_bytes());
+                    self.emit_instr_data(symbol, OpCode::InsertUpvalueExtern16, &index.to_le_bytes());
                 }
             },
         }

@@ -62,7 +62,7 @@ impl Signature {
     }
     
     /// Helper for native functions. Prepares a complete argument buffer by cloning argument values,
-    /// Assumes check_args() has already succeeded.
+    /// while handling default and variadic arguments. Assumes check_args() has already succeeded.
     pub fn bind_args<'a>(&self, args: &'a [Variant], defaults: &'a [Variant], argbuf: &'a mut [Variant]) -> BoundArgs<'a> {
         debug_assert!(args.len() >= self.required.len());
         debug_assert!(argbuf.len() == self.arg_len());

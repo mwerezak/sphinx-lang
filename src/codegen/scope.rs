@@ -291,6 +291,7 @@ impl ScopeTracker {
         self.resolve_upval_helper(name, current_idx)
     }
     
+    // recursive helper
     fn resolve_upval_helper(&mut self, name: &LocalName, frame_idx: usize) -> CompileResult<Option<Upvalue>> {
         {
             let (frames, _) = self.frames.split_at_mut(frame_idx + 1);

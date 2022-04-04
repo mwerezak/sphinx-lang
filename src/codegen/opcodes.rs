@@ -8,9 +8,9 @@ use std::mem::size_of;
 
 // 0x00-07        Control
 
-                        // width set here so that the longest mnemonic is 16 chars
-const OP_NOP:           u8 = 0x00;
-const OP_RETURN:        u8 = 0x01;  // [ ...call frame... ret_value ] => [ ret_value ]
+                           // width set here so that the longest mnemonic is 16 chars
+const OP_NOP:              u8 = 0x00;
+const OP_RETURN:           u8 = 0x01;  // [ ...call frame... ret_value ] => [ ret_value ]
 
 // The odd argument order is because the VM will swap "nargs" with "arg[n]" after reading "nargs".
 // This is because the function preamble will fill in any missing default arguments such that the
@@ -19,45 +19,46 @@ const OP_RETURN:        u8 = 0x01;  // [ ...call frame... ret_value ] => [ ret_v
 // so swapping it to the beginning is the most efficient way to handle this.
 
 // [ callee arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
-const OP_CALL:          u8 = 0x02;
+const OP_CALL:             u8 = 0x02;
 
+// This instruction is needed because when unpacking, the final nargs value needs to be computed dynamically.
 // [ callee arg[n] arg[0] ... arg[n-1] arg_seq nargs ] => [ ret_value ]  -- nargs does not include arg_seq! 
-const OP_CALL_UNPACK:   u8 = 0x03;
+const OP_CALL_UNPACK:      u8 = 0x03;
 
 // 0x10-40        Immediate Values
 
-const OP_POP:           u8 = 0x10;  // [ _ ] => []
-const OP_DROP:          u8 = 0x11;  // (u8); [ value[0] ... value[N] ] => []
-const OP_CLONE:         u8 = 0x12;  // [ value ] => [ value value ]
+const OP_POP:              u8 = 0x10;  // [ _ ] => []
+const OP_DROP:             u8 = 0x11;  // (u8); [ value[0] ... value[N] ] => []
+const OP_CLONE:            u8 = 0x12;  // [ value ] => [ value value ]
 
-const OP_TUPLE:         u8 = 0x13;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
-const OP_TUPLEN:        u8 = 0x14;  // [ item[0] ... item[N] N ] => [ tuple ]
+const OP_TUPLE:            u8 = 0x13;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
+const OP_TUPLEN:           u8 = 0x14;  // [ item[0] ... item[N] N ] => [ tuple ]
 
-const OP_LD_CONST:      u8 = 0x15;  // (u8); _ => [ value ]
-const OP_LD_CONST_16:   u8 = 0x16;  // (u16); _ => [ value ]
+const OP_LD_CONST:         u8 = 0x15;  // (u8); _ => [ value ]
+const OP_LD_CONST_16:      u8 = 0x16;  // (u16); _ => [ value ]
 // const OP_LD_CONST_32:   u8 = 0x17;  // (u32); _ => [ value ]
 
-const OP_IN_GLOBAL_IM:  u8 = 0x18;  // [ value name ] => [ value ]
-const OP_IN_GLOBAL_MUT: u8 = 0x19;  // [ value name ] => [ value ]
-const OP_ST_GLOBAL:     u8 = 0x1A;  // [ value name ] => [ value ]
-const OP_LD_GLOBAL:     u8 = 0x1B;  // [ name ] => [ value ]
-const OP_DP_GLOBAL:     u8 = 0x1C;  // [ name ] => []
+const OP_IN_GLOBAL_IM:     u8 = 0x18;  // [ value name ] => [ value ]
+const OP_IN_GLOBAL_MUT:    u8 = 0x19;  // [ value name ] => [ value ]
+const OP_ST_GLOBAL:        u8 = 0x1A;  // [ value name ] => [ value ]
+const OP_LD_GLOBAL:        u8 = 0x1B;  // [ name ] => [ value ]
+const OP_DP_GLOBAL:        u8 = 0x1C;  // [ name ] => []
 
-const OP_IN_LOCAL:      u8 = 0x20;  // [ value ] => [ value ]; vm.locals += 1
-const OP_ST_LOCAL:      u8 = 0x21;  // (u8);  [ value ] => [ value ]
-const OP_ST_LOCAL_16:   u8 = 0x22;  // (u16); [ value ] => [ value ]
-const OP_LD_LOCAL:      u8 = 0x23;  // (u8);  _ => [ value ]
-const OP_LD_LOCAL_16:   u8 = 0x24;  // (u16); _ => [ value ]
-const OP_DP_LOCALS:     u8 = 0x25;  // (u8); [ ... local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
+const OP_IN_LOCAL:         u8 = 0x20;  // [ value ] => [ value ]; vm.locals += 1
+const OP_ST_LOCAL:         u8 = 0x21;  // (u8);  [ value ] => [ value ]
+const OP_ST_LOCAL_16:      u8 = 0x22;  // (u16); [ value ] => [ value ]
+const OP_LD_LOCAL:         u8 = 0x23;  // (u8);  _ => [ value ]
+const OP_LD_LOCAL_16:      u8 = 0x24;  // (u16); _ => [ value ]
+const OP_DP_LOCALS:        u8 = 0x25;  // (u8); [ local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
 
-const OP_IN_UPVAL_L:    u8 = 0x28;  // (u8)  [ function ] => [ function ]
-const OP_IN_UPVAL_L_16: u8 = 0x29;  // (u16) [ function ] => [ function ]
-const OP_IN_UPVAL_U:    u8 = 0x2A;  // (u8)  [ function ] => [ function ]
-const OP_IN_UPVAL_U_16: u8 = 0x2B;  // (u16) [ function ] => [ function ]
-// const OP_ST_UPVAL:      u8 = 0x2C;
-// const OP_ST_UPVAL_16:      u8 = 0x2D;
-const OP_LD_UPVAL:      u8 = 0x2E;
-const OP_LD_UPVAL_16:      u8 = 0x2F;
+const OP_IN_UPVAL_LOC:     u8 = 0x28;  // (u8);  [ function ] => [ function ]
+const OP_IN_UPVAL_LOC_16:  u8 = 0x29;  // (u16); [ function ] => [ function ]
+const OP_IN_UPVAL_EXT:     u8 = 0x2A;  // (u8);  [ function ] => [ function ]
+const OP_IN_UPVAL_EXT_16:  u8 = 0x2B;  // (u16); [ function ] => [ function ]
+const OP_ST_UPVAL:         u8 = 0x2C;  // (u8);  [ value ] => [ value ]
+const OP_ST_UPVAL_16:      u8 = 0x2D;  // (u16); [ value ] => [ value ]
+const OP_LD_UPVAL:         u8 = 0x2E;  // (u8);  _ => [ value ]
+const OP_LD_UPVAL_16:      u8 = 0x2F;  // (u16); _ => [ value ]
 
 
 // const OP_LD_NAME:       u8 = 0x30;
@@ -70,59 +71,59 @@ const OP_LD_UPVAL_16:      u8 = 0x2F;
 // const OP_IN_DYN         u8 = 0x38;  // [ value dyn_target bool ] => [] 
 // const OP_ST_DYN         u8 = 0x39;  // [ value dyn_target ] => []
 
-const OP_LD_NIL:        u8 = 0x40;  // _ => [ nil ]
-const OP_LD_FALSE:      u8 = 0x41;  // _ => [ false ]
-const OP_LD_TRUE:       u8 = 0x42;  // _ => [ true ]
-const OP_LD_EMPTY:      u8 = 0x43;  // _ => [ () ]
+const OP_LD_NIL:           u8 = 0x40;  // _ => [ nil ]
+const OP_LD_FALSE:         u8 = 0x41;  // _ => [ false ]
+const OP_LD_TRUE:          u8 = 0x42;  // _ => [ true ]
+const OP_LD_EMPTY:         u8 = 0x43;  // _ => [ () ]
 
 // small numbers
-const OP_LD_U8:         u8 = 0x44;  // (u8); _ => [ value ]
-const OP_LD_I8:         u8 = 0x45;  // (i8); _ => [ value ]
-const OP_LD_F8:         u8 = 0x46;  // (i8); _ => [ value ]
+const OP_LD_U8:            u8 = 0x44;  // (u8); _ => [ value ]
+const OP_LD_I8:            u8 = 0x45;  // (i8); _ => [ value ]
+const OP_LD_F8:            u8 = 0x46;  // (i8); _ => [ value ]
 
 // const OP_DYN_TARGET:    u8 = 0x48;  // (u8); [ ... ] => [ dyn_target ]
 
 // 0x50-57      Unary Operations
 
-const OP_NEG:           u8 = 0x50;  // [ operand ] => [ result ]
-const OP_POS:           u8 = 0x51;
-const OP_INV:           u8 = 0x52;
-const OP_NOT:           u8 = 0x53;
+const OP_NEG:              u8 = 0x50;  // [ operand ] => [ result ]
+const OP_POS:              u8 = 0x51;
+const OP_INV:              u8 = 0x52;
+const OP_NOT:              u8 = 0x53;
 
 // 0x58-60      Binary Operations
 
-const OP_AND:           u8 = 0x58;  // [ lhs rhs ] => [ result ]
-const OP_XOR:           u8 = 0x59;
-const OP_OR:            u8 = 0x5A;
-const OP_SHL:           u8 = 0x5B;
-const OP_SHR:           u8 = 0x5C;
+const OP_AND:              u8 = 0x58;  // [ lhs rhs ] => [ result ]
+const OP_XOR:              u8 = 0x59;
+const OP_OR:               u8 = 0x5A;
+const OP_SHL:              u8 = 0x5B;
+const OP_SHR:              u8 = 0x5C;
 
-const OP_ADD:           u8 = 0x60;
-const OP_SUB:           u8 = 0x61;
-const OP_MUL:           u8 = 0x62;
-const OP_DIV:           u8 = 0x63;
-const OP_MOD:           u8 = 0x64;
+const OP_ADD:              u8 = 0x60;
+const OP_SUB:              u8 = 0x61;
+const OP_MUL:              u8 = 0x62;
+const OP_DIV:              u8 = 0x63;
+const OP_MOD:              u8 = 0x64;
 
-const OP_EQ:            u8 = 0x68;
-const OP_NE:            u8 = 0x69;
-const OP_LT:            u8 = 0x6A;
-const OP_LE:            u8 = 0x6B;
-const OP_GE:            u8 = 0x6C;
-const OP_GT:            u8 = 0x6D;
+const OP_EQ:               u8 = 0x68;
+const OP_NE:               u8 = 0x69;
+const OP_LT:               u8 = 0x6A;
+const OP_LE:               u8 = 0x6B;
+const OP_GE:               u8 = 0x6C;
+const OP_GT:               u8 = 0x6D;
 
 // 0x70-7F      Jumps
 
-const OP_JUMP:          u8 = 0x70;  // (i16);
-const OP_JUMP_FALSE:    u8 = 0x71;  // (i16); [ cond ] => [ cond ]
-const OP_JUMP_TRUE:     u8 = 0x72;  // (i16); [ cond ] => [ cond ]
-const OP_PJMP_FALSE:    u8 = 0x73;  // (i16); [ cond ] => []
-const OP_PJMP_TRUE:     u8 = 0x74;  // (i16); [ cond ] => []
+const OP_JUMP:             u8 = 0x70;  // (i16);
+const OP_JUMP_FALSE:       u8 = 0x71;  // (i16); [ cond ] => [ cond ]
+const OP_JUMP_TRUE:        u8 = 0x72;  // (i16); [ cond ] => [ cond ]
+const OP_PJMP_FALSE:       u8 = 0x73;  // (i16); [ cond ] => []
+const OP_PJMP_TRUE:        u8 = 0x74;  // (i16); [ cond ] => []
 
-const OP_LJUMP:         u8 = 0x75;  // (i32);
-const OP_LJUMP_FALSE:   u8 = 0x76;  // (i32); [ cond ] => [ cond ]
-const OP_LJUMP_TRUE:    u8 = 0x77;  // (i32); [ cond ] => [ cond ]
-const OP_PLJMP_FALSE:   u8 = 0x78;  // (i32); [ cond ] => []
-const OP_PLJMP_TRUE:    u8 = 0x79;  // (i32); [ cond ] => []
+const OP_LJUMP:            u8 = 0x75;  // (i32);
+const OP_LJUMP_FALSE:      u8 = 0x76;  // (i32); [ cond ] => [ cond ]
+const OP_LJUMP_TRUE:       u8 = 0x77;  // (i32); [ cond ] => [ cond ]
+const OP_PLJMP_FALSE:      u8 = 0x78;  // (i32); [ cond ] => []
+const OP_PLJMP_TRUE:       u8 = 0x79;  // (i32); [ cond ] => []
 
 // 0x80-8F      Iteration
 
@@ -133,11 +134,11 @@ const OP_PLJMP_TRUE:    u8 = 0x79;  // (i32); [ cond ] => []
 
 // 0xF0         Debugging/Tracing/Misc
 
-const DBG_INSPECT:      u8 = 0xF0;
-const DBG_ASSERT:       u8 = 0xF1;
-const DBG_DUMP_STACK:   u8 = 0xF2;
-const DBG_DUMP_GLOBALS: u8 = 0xF3;
-const DBG_DUMP_STRINGS: u8 = 0xF4;
+const DBG_INSPECT:         u8 = 0xF0;
+const DBG_ASSERT:          u8 = 0xF1;
+const DBG_DUMP_STACK:      u8 = 0xF2;
+const DBG_DUMP_GLOBALS:    u8 = 0xF3;
+const DBG_DUMP_STRINGS:    u8 = 0xF4;
 
 
 #[repr(u8)]
@@ -157,6 +158,7 @@ pub enum OpCode {
     
     LoadConst  = OP_LD_CONST,
     LoadConst16 = OP_LD_CONST_16,
+    
     InsertGlobal = OP_IN_GLOBAL_IM,
     InsertGlobalMut = OP_IN_GLOBAL_MUT,
     StoreGlobal = OP_ST_GLOBAL,
@@ -169,10 +171,12 @@ pub enum OpCode {
     LoadLocal16 = OP_LD_LOCAL_16,
     DropLocals = OP_DP_LOCALS,
     
-    InsertUpvalueLocal = OP_IN_UPVAL_L,
-    InsertUpvalueLocal16 = OP_IN_UPVAL_L_16,
-    InsertUpvalueNonlocal = OP_IN_UPVAL_U,
-    InsertUpvalueNonlocal16 = OP_IN_UPVAL_U_16,
+    InsertUpvalueLocal = OP_IN_UPVAL_LOC,
+    InsertUpvalueLocal16 = OP_IN_UPVAL_LOC_16,
+    InsertUpvalueExtern = OP_IN_UPVAL_EXT,
+    InsertUpvalueExtern16 = OP_IN_UPVAL_EXT_16,
+    StoreUpvalue = OP_ST_UPVAL,
+    StoreUpvalue16 = OP_ST_UPVAL_16,
     LoadUpvalue = OP_LD_UPVAL,
     LoadUpvalue16 = OP_LD_UPVAL_16,
     
@@ -254,10 +258,12 @@ impl OpCode {
             OP_LD_LOCAL_16 => Self::LoadLocal16,
             OP_DP_LOCALS => Self::DropLocals,
             
-            OP_IN_UPVAL_L => Self::InsertUpvalueLocal,
-            OP_IN_UPVAL_L_16 => Self::InsertUpvalueLocal16,
-            OP_IN_UPVAL_U => Self::InsertUpvalueNonlocal,
-            OP_IN_UPVAL_U_16 => Self::InsertUpvalueNonlocal16,
+            OP_IN_UPVAL_LOC => Self::InsertUpvalueLocal,
+            OP_IN_UPVAL_LOC_16 => Self::InsertUpvalueLocal16,
+            OP_IN_UPVAL_EXT => Self::InsertUpvalueExtern,
+            OP_IN_UPVAL_EXT_16 => Self::InsertUpvalueExtern16,
+            OP_ST_UPVAL => Self::StoreUpvalue,
+            OP_ST_UPVAL_16 => Self::StoreUpvalue16,
             OP_LD_UPVAL => Self::LoadUpvalue,
             OP_LD_UPVAL_16 => Self::LoadUpvalue16,
             
@@ -329,8 +335,8 @@ impl OpCode {
             
             Self::InsertUpvalueLocal      => 1 + size_of::<u8>(),
             Self::InsertUpvalueLocal16    => 1 + size_of::<u16>(),
-            Self::InsertUpvalueNonlocal   => 1 + size_of::<u8>(),
-            Self::InsertUpvalueNonlocal16 => 1 + size_of::<u16>(),
+            Self::InsertUpvalueExtern   => 1 + size_of::<u8>(),
+            Self::InsertUpvalueExtern16 => 1 + size_of::<u16>(),
             Self::LoadUpvalue    => 1 + size_of::<u8>(),
             Self::LoadUpvalue16  => 1 + size_of::<u16>(),
             
@@ -400,10 +406,12 @@ impl std::fmt::Display for OpCode {
             Self::LoadLocal16 => "LD_LOCAL_16",
             Self::DropLocals => "DP_LOCALS",
             
-            Self::InsertUpvalueLocal => "IN_UPVAL_L",
-            Self::InsertUpvalueLocal16 => "IN_UPVAL_L_16",
-            Self::InsertUpvalueNonlocal => "IN_UPVAL_U",
-            Self::InsertUpvalueNonlocal16 => "IN_UPVAL_U_16",
+            Self::InsertUpvalueLocal => "IN_UPVAL_LOC",
+            Self::InsertUpvalueLocal16 => "IN_UPVAL_LOC_16",
+            Self::InsertUpvalueExtern => "IN_UPVAL_EXT",
+            Self::InsertUpvalueExtern16 => "IN_UPVAL_EXT_16",
+            Self::StoreUpvalue => "ST_UPVAL",
+            Self::StoreUpvalue16 => "ST_UPVAL_16",
             Self::LoadUpvalue => "LD_UPVAL",
             Self::LoadUpvalue16 => "LD_UPVAL_16",
             

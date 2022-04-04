@@ -390,10 +390,10 @@ impl<'c> VMState<'c> {
             OpCode::InsertUpvalueLocal16 => {
                 unimplemented!()
             }
-            OpCode::InsertUpvalueNonlocal => {
+            OpCode::InsertUpvalueExtern => {
                 unimplemented!()
             }
-            OpCode::InsertUpvalueNonlocal16 => {
+            OpCode::InsertUpvalueExtern16 => {
                 unimplemented!()
             }
             OpCode::LoadUpvalue => {
