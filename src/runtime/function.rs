@@ -1,3 +1,4 @@
+use std::cell::{RefCell, Ref, RefMut};
 use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::Variant;
 use crate::runtime::module::{Module, Access};
@@ -32,8 +33,17 @@ pub trait Invoke {
 
 pub type UpvalueIndex = u16;
 
+#[derive(Debug, Clone)]
 pub struct Upvalue {
     index: usize,  // index into the value stack
+}
+
+impl Upvalue {
+    pub fn new(index: usize) -> Self {
+        Self { index }
+    }
+    
+    pub fn index(&self) -> usize { self.index }
 }
 
 
@@ -42,13 +52,31 @@ pub struct Function {
     signature: Signature,
     module: GC<Module>,
     chunk_id: ChunkID,
+    upvalues: RefCell<Vec<Upvalue>>,
 }
 
 impl GCTrace for Function { }
 
 impl Function {
     pub fn new(signature: Signature, module: GC<Module>, chunk_id :ChunkID) -> Self {
-        Self { signature, module, chunk_id }
+        Self { 
+            signature, 
+            module, 
+            chunk_id,
+            upvalues: RefCell::new(Vec::new()),
+        }
+    }
+    
+    pub fn upvalues(&self) -> Ref<[Upvalue]> {
+        Ref::map(self.upvalues.borrow(), |upvalues| upvalues.as_slice())
+    }
+    
+    pub fn upvalues_mut(&self) -> RefMut<[Upvalue]> {
+        RefMut::map(self.upvalues.borrow_mut(), |upvalues| upvalues.as_mut_slice())
+    }
+    
+    pub fn insert_upvalue(&self, upvalue: Upvalue) {
+        self.upvalues.borrow_mut().push(upvalue);
     }
 }
 

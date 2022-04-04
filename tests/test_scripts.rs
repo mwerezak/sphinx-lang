@@ -103,7 +103,8 @@ mod function_tests {
 }
 
 mod closure_tests {
-    // use super::*;
+    use super::*;
     
+    test_script!(assign_to_upvalue_unclosed, "tests/closure/assign_to_upvalue_unclosed.sph");
     // test_script!(nested_closure, "tests/closure/nested_closure.sph");
 }

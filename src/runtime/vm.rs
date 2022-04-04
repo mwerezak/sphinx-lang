@@ -3,7 +3,7 @@ use crate::codegen::{Program, ProgramData, Chunk, ChunkID, ConstID, Constant, Op
 use crate::runtime::Variant;
 use crate::runtime::gc::GC;
 use crate::runtime::ops;
-use crate::runtime::function::Call;
+use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -238,13 +238,24 @@ impl<'c> VMState<'c> {
         }
         panic!("invalid operand")
     }
+    
+    #[inline]
+    fn into_function(value: Variant) -> GC<Function> {
+        match value {
+            Variant::Function(fun) => fun,
+            _ => panic!("invalid operand")
+        }
+    }
 
     // convert a local variable index to an index into the value stack
     #[inline]
-    fn local_index(&self, local: LocalIndex) -> usize {
+    fn from_local_index(&self, local: LocalIndex) -> usize {
         self.frame + usize::from(local)
     }
     
+    
+    
+    #[inline]
     fn get_trace(&self, offset: usize) -> TraceSite {
         TraceSite::Chunk {
             offset,
@@ -267,6 +278,14 @@ impl<'c> VMState<'c> {
         
         self.exec_instruction(current_offset, opcode, data, stack)
             .map_err(|error| error.push_frame(self.get_trace(current_offset)))
+    }
+    
+    #[inline]
+    fn get_upvalues<'a>(&self, stack: &'a ValueStack) -> Option<impl std::ops::Deref<Target=[Upvalue]> + 'a> {
+        match stack.peek_at(self.from_local_index(0)) {
+            Variant::Function(fun) => Some(fun.upvalues()),
+            _ => None
+        }
     }
     
     #[inline(always)]
@@ -349,32 +368,32 @@ impl<'c> VMState<'c> {
             
             OpCode::InsertLocal => {
                 let value = stack.peek().clone();
-                stack.insert(self.local_index(self.locals), value);
+                stack.insert(self.from_local_index(self.locals), value);
                 self.locals += 1;
             },
             OpCode::StoreLocal => {
                 let index = LocalIndex::from(data[0]);
-                stack.replace_at(self.local_index(index), stack.peek().clone());
+                stack.replace_at(self.from_local_index(index), stack.peek().clone());
             },
             OpCode::StoreLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
-                stack.replace_at(self.local_index(index), stack.peek().clone());
+                stack.replace_at(self.from_local_index(index), stack.peek().clone());
             },
             OpCode::LoadLocal => {
                 let index = LocalIndex::from(data[0]);
                 debug_assert!(index < self.locals);
-                stack.push(stack.peek_at(self.local_index(index)).clone());
+                stack.push(stack.peek_at(self.from_local_index(index)).clone());
             },
             OpCode::LoadLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
                 debug_assert!(index < self.locals.into());
-                stack.push(stack.peek_at(self.local_index(index)).clone());
+                stack.push(stack.peek_at(self.from_local_index(index)).clone());
             },
             OpCode::DropLocals => {
                 let count = LocalIndex::from(data[0]);
                 debug_assert!(count <= self.locals);
                 
-                let locals_end_index = self.local_index(self.locals);
+                let locals_end_index = self.from_local_index(self.locals);
                 if stack.len() == locals_end_index {
                     stack.discard(usize::from(count));
                 } else {
@@ -385,28 +404,86 @@ impl<'c> VMState<'c> {
             },
             
             OpCode::InsertUpvalueLocal => {
-                unimplemented!()
+                let index = LocalIndex::from(data[0]);
+                debug_assert!(index < self.locals);
+                
+                let upval = Upvalue::new(self.from_local_index(index));
+                
+                let fun = Self::into_function(*stack.peek());
+                fun.insert_upvalue(upval);
             }
             OpCode::InsertUpvalueLocal16 => {
-                unimplemented!()
+                let index = LocalIndex::from(read_le_bytes!(u16, data));
+                debug_assert!(index < self.locals);
+                
+                let upval = Upvalue::new(self.from_local_index(index));
+                
+                let fun = Self::into_function(*stack.peek());
+                fun.insert_upvalue(upval);
             }
             OpCode::InsertUpvalueExtern => {
-                unimplemented!()
+                let index = UpvalueIndex::from(data[0]);
+                
+                let upval = self.get_upvalues(stack).expect("export upvalue from non-function callee")
+                    .get(usize::from(index)).expect("invalid upvalue index")
+                    .clone();
+                
+                let fun = Self::into_function(*stack.peek());
+                fun.insert_upvalue(upval);
             }
             OpCode::InsertUpvalueExtern16 => {
-                unimplemented!()
+                let index = UpvalueIndex::from(read_le_bytes!(u16, data));
+                
+                let upval = self.get_upvalues(stack).expect("export upvalue from non-function callee")
+                    .get(usize::from(index)).expect("invalid upvalue index")
+                    .clone();
+                
+                let fun = Self::into_function(*stack.peek());
+                fun.insert_upvalue(upval);
             }
             OpCode::StoreUpvalue => {
-                unimplemented!()
+                let index = {
+                    let index = UpvalueIndex::from(data[0]);
+                    
+                    self.get_upvalues(stack).expect("store upvalue on non-function callee")
+                        .get(usize::from(index)).expect("invalid upvalue index")
+                        .index()
+                };
+                
+                stack.replace_at(index, stack.peek().clone());
             }
             OpCode::StoreUpvalue16 => {
-                unimplemented!()
+                let index = {
+                    let index = UpvalueIndex::from(read_le_bytes!(u16, data));
+                    
+                    self.get_upvalues(stack).expect("store upvalue on non-function callee")
+                        .get(usize::from(index)).expect("invalid upvalue index")
+                        .index()
+                };
+                
+                stack.replace_at(index, stack.peek().clone());
             }
             OpCode::LoadUpvalue => {
-                unimplemented!()
+                let index = {
+                    let index = UpvalueIndex::from(data[0]);
+                    
+                    self.get_upvalues(stack).expect("load upvalue from non-function callee")
+                        .get(usize::from(index)).expect("invalid upvalue index")
+                        .index()
+                };
+                    
+                stack.push(stack.peek_at(index).clone());
             }
             OpCode::LoadUpvalue16 => {
-                unimplemented!()
+                let index = {
+                    let index = UpvalueIndex::from(read_le_bytes!(u16, data));
+                    
+                    self.get_upvalues(stack).expect("load upvalue from non-function callee")
+                        .get(usize::from(index)).expect("invalid upvalue index")
+                        .index()
+                };
+                    
+                stack.push(stack.peek_at(index).clone());
             }
             
             OpCode::Nil => stack.push(Variant::Nil),
