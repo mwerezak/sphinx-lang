@@ -129,13 +129,18 @@ impl<'c, 's> Disassembler<'c, 's> {
                 },
                 
                 OpCode::StoreLocal | OpCode::LoadLocal => {
-                    let offset = instr[1];
-                    write!(line, "{:16} {: >4}    ", opcode, offset)?;
+                    let index = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
                 },
                 OpCode::StoreLocal16 | OpCode::LoadLocal16 => {
-                    let offset =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
-                    write!(line, "{:16} {: >4}    ", opcode, offset)?;
+                    let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
                 },
+                
+                OpCode::LoadUpvalue => {
+                    let index = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
                 
                 OpCode::Tuple => {
                     let len = instr[1];

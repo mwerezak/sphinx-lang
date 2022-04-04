@@ -384,6 +384,10 @@ impl<'c> VMState<'c> {
                 self.locals -= count;
             },
             
+            OpCode::LoadUpvalue => {
+                unimplemented!()
+            }
+            
             OpCode::Nil => stack.push(Variant::Nil),
             OpCode::True => stack.push(Variant::BoolTrue),
             OpCode::False => stack.push(Variant::BoolFalse),

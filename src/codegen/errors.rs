@@ -15,6 +15,7 @@ pub enum ErrorKind {
     ArgCountLimit,
     TupleLengthLimit,
     LocalVariableLimit,
+    UpvalueLimit,
     CalcJumpOffsetFailed,
     CantAssignImmutable,
     CantAssignNonLocal,
@@ -77,6 +78,7 @@ impl fmt::Display for CompileError {
             ErrorKind::ArgCountLimit => "argument limit exceeded",
             ErrorKind::TupleLengthLimit => "tuple length limit exceeded",
             ErrorKind::LocalVariableLimit => "local variable limit reached",
+            ErrorKind::UpvalueLimit => "upvalue limit reached",
             ErrorKind::CalcJumpOffsetFailed => "could not calculate jump offset",
             
             // Actual user errors

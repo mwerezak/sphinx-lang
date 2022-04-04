@@ -427,6 +427,20 @@ impl CodeGenerator<'_> {
         }
     }
     
+    fn try_emit_load_upval(&mut self, symbol: Option<&DebugSymbol>, name: &LocalName) -> CompileResult<Option<u16>> {
+        if let Some(index) = self.scope_mut().resolve_or_create_upval(name)?.map(|upval| upval.index()) {
+            if let Ok(index) = u8::try_from(index) {
+                self.emit_instr_byte(symbol, OpCode::LoadUpvalue, index);
+            } else {
+                unimplemented!();
+            }
+            
+            Ok(Some(index))
+        } else {
+            Ok(None)
+        }
+    }
+    
     ///////// Statements /////////
     
     fn compile_stmt_with_symbol(&mut self, stmt: &StmtMeta) -> CompileResult<()> {
@@ -631,15 +645,21 @@ impl CodeGenerator<'_> {
     }
     
     fn compile_name_lookup(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol) -> CompileResult<()> {
+        let local_name = LocalName::Symbol(*name);
         
         // Try loading a Local variable
-        if self.try_emit_load_local(symbol, &LocalName::Symbol(*name)).is_none() {
-            
-            // Otherwise, it must be a Global variable
-            self.emit_load_const(symbol, Constant::from(*name))?;
-            self.emit_instr(symbol, OpCode::LoadGlobal);
+        if self.try_emit_load_local(symbol, &local_name).is_some() {
+            return Ok(());
         }
         
+        // Next, try loading an upvalue
+        if self.try_emit_load_upval(symbol, &local_name)?.is_some() {
+            return Ok(());
+        }
+        
+        // Otherwise, it must be a Global variable
+        self.emit_load_const(symbol, Constant::from(*name))?;
+        self.emit_instr(symbol, OpCode::LoadGlobal);
         Ok(())
     }
     
@@ -1049,11 +1069,14 @@ impl CodeGenerator<'_> {
         
         // end the function scope
         // don't need to emit end scope instructions, will be handled by return
-        chunk_gen.scope_mut().pop_frame();
+        let frame = chunk_gen.scope_mut().pop_frame();
         chunk_gen.finish();
         
         // load the function object as the expression result
         self.emit_load_const(symbol, Constant::Function(chunk_id, function_id))?;
+        
+        // compile upvalues
+        unimplemented!();
         
         Ok(())
     }

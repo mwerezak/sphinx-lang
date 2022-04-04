@@ -8,6 +8,7 @@ use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
 use crate::parser::fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
 use crate::runtime::vm::LocalIndex;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
+use crate::runtime::function::UpvalueIndex;
 use crate::runtime::strings::{StringInterner};
 use crate::debug::symbol::{DebugSymbol, ChunkSymbols, DebugSymbolTable};
 use crate::codegen::chunk::Chunk;
@@ -93,13 +94,12 @@ impl Scope {
 }
 
 
-// TODO: better name
 #[derive(Debug)]
-struct Scopes {
+struct NestedScopes {
     scopes: Vec<Scope>,
 }
 
-impl Scopes {
+impl NestedScopes {
     fn new() -> Self {
         Self { scopes: Vec::new() }
     }
@@ -132,28 +132,42 @@ impl Scopes {
         self.scopes.pop().expect("pop empty scope")
     }
     
-    // find the nearest local in scopes that allow nonlocal assignment
-    fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
+    fn iter(&self) -> impl Iterator<Item=&Scope> {
         self.scopes.iter().rev()
-            .find_map(|scope| scope.find_local(name))
     }
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Upvalue {
-    
+    decl: DeclType,
+    name: LocalName,
+    index: UpvalueIndex,
+    target: UpvalueTarget,
 }
 
+#[derive(Debug, Clone)]
+enum UpvalueTarget {
+    Local(LocalIndex),
+    Upvalue(UpvalueIndex),
+}
+
+impl Upvalue {
+    pub fn decl(&self) -> DeclType { self.decl }
+    pub fn name(&self) -> LocalName { self.name }
+    pub fn index(&self) -> LocalIndex { self.index }
+}
+
+
 #[derive(Debug)]
-struct CallFrame {
-    scopes: Scopes,
+pub struct ScopeFrame {
+    scopes: NestedScopes,
     upvalues: Vec<Upvalue>,
 }
 
-impl CallFrame {
+impl ScopeFrame {
     fn new(symbol: Option<&DebugSymbol>) -> Self {
-        let mut scopes = Scopes::new();
+        let mut scopes = NestedScopes::new();
         scopes.push_scope(symbol);
         
         Self {
@@ -162,22 +176,60 @@ impl CallFrame {
         }
     }
     
-    fn scopes(&self) -> &Scopes { &self.scopes }
+    pub fn upvalues(&self) -> &[Upvalue] { self.upvalues.as_slice() }
     
-    fn scopes_mut(&mut self) -> &mut Scopes { &mut self.scopes }
+    fn scopes(&self) -> &NestedScopes { &self.scopes }
+    
+    fn scopes_mut(&mut self) -> &mut NestedScopes { &mut self.scopes }
+    
+    fn find_upval(&self, name: &LocalName) -> Option<&Upvalue> {
+        self.upvalues.iter().find(|upval| upval.name == *name)
+    }
+    
+    fn create_upval_for_local(&mut self, local: &Local) -> CompileResult<&Upvalue> {
+        let index = UpvalueIndex::try_from(self.upvalues.len())
+            .map_err(|_| CompileError::from(ErrorKind::UpvalueLimit))?;
+        
+        let upval = Upvalue {
+            index,
+            decl: local.decl,
+            name: local.name,
+            target: UpvalueTarget::Local(local.index),
+        };
+        
+        self.upvalues.push(upval);
+        
+        Ok(self.upvalues.last().unwrap())
+    }
+    
+    fn create_upval_for_upval(&mut self, upval: &Upvalue) -> CompileResult<&Upvalue> {
+        let index = UpvalueIndex::try_from(self.upvalues.len())
+            .map_err(|_| CompileError::from(ErrorKind::UpvalueLimit))?;
+        
+        let upval = Upvalue {
+            index,
+            decl: upval.decl,
+            name: upval.name,
+            target: UpvalueTarget::Upvalue(upval.index),
+        };
+        
+        self.upvalues.push(upval);
+        
+        Ok(self.upvalues.last().unwrap())
+    }
 }
 
 
 #[derive(Debug)]
 pub struct ScopeTracker {
-    scopes: Scopes,
-    frames: Vec<CallFrame>,
+    scopes: NestedScopes,
+    frames: Vec<ScopeFrame>,
 }
 
 impl ScopeTracker {
     pub fn new() -> Self {
         Self {
-            scopes: Scopes::new(),
+            scopes: NestedScopes::new(),
             frames: Vec::new(),
         }
     }
@@ -186,24 +238,20 @@ impl ScopeTracker {
         self.frames.is_empty() && self.scopes.is_empty()
     }
     
-    fn current_frame(&self) -> Option<&CallFrame> {
-        self.frames.last()
-    }
-    
     pub fn push_frame(&mut self, symbol: Option<&DebugSymbol>) {
-        self.frames.push(CallFrame::new(symbol))
+        self.frames.push(ScopeFrame::new(symbol))
     }
     
-    pub fn pop_frame(&mut self) {
-        self.frames.pop().expect("pop empty frames");
+    pub fn pop_frame(&mut self) -> ScopeFrame {
+        self.frames.pop().expect("pop empty frames")
     }
     
-    fn current_scope(&self) -> &Scopes {
+    fn current_scope(&self) -> &NestedScopes {
         self.frames.last()
             .map_or(&self.scopes, |frame| frame.scopes())
     }
     
-    fn current_scope_mut(&mut self) -> &mut Scopes {
+    fn current_scope_mut(&mut self) -> &mut NestedScopes {
         self.frames.last_mut()
             .map_or(&mut self.scopes, |frame| frame.scopes_mut())
     }
@@ -229,8 +277,49 @@ impl ScopeTracker {
     
     // find the nearest local in scopes that allow nonlocal assignment
     pub fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
-        self.current_scope().resolve_local(name)
+        self.current_scope()
+            .iter().find_map(|scope| scope.find_local(name))
     }
+    
+    pub fn resolve_or_create_upval(&mut self, name: &LocalName) -> CompileResult<Option<Upvalue>> {
+        if self.frames.is_empty() {
+            return Ok(None);
+        }
+        
+        let current_idx = self.frames.len() - 1;
+        self.resolve_upval_helper(name, current_idx)
+    }
+    
+    fn resolve_upval_helper(&mut self, name: &LocalName, frame_idx: usize) -> CompileResult<Option<Upvalue>> {
+        {
+            let (frames, _) = self.frames.split_at_mut(frame_idx + 1);
+            let (current_frame, frames) = frames.split_last_mut().unwrap();
+            let enclosing_frame = frames.split_last_mut().map(|(last, _)| last);
+            
+            // check if the upvalue already exists in the current frame
+            let upval = current_frame.find_upval(name);
+            if upval.is_some() {
+                return Ok(upval.cloned());
+            }
+            
+            // check if the local name exists in the enclosing scope
+            let enclosing = enclosing_frame.map_or(&self.scopes, |frame| frame.scopes());
+            if let Some(local) = enclosing.iter().find_map(|scope| scope.find_local(name)) {
+                return Ok(Some(current_frame.create_upval_for_local(local)?.clone()));
+            }
+        }
+        
+        // check if an upvalue can be created in the enclosing scope to a local further down
+        if frame_idx > 0 {
+            if let Some(upval) = self.resolve_upval_helper(name, frame_idx-1)? {
+                let current_frame = &mut self.frames[frame_idx];
+                return Ok(Some(current_frame.create_upval_for_upval(&upval)?.clone()));
+            }
+        }
+        
+        Ok(None)
+    }
+    
     
     // without the nonlocal keyword, that is
     pub fn can_assign_nonlocal(&self) -> bool {

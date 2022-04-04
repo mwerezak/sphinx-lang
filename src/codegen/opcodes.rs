@@ -50,7 +50,9 @@ const OP_ST_LOCAL_16:   u8 = 0x22;  // (u16); [ value ] => [ value ]
 const OP_LD_LOCAL:      u8 = 0x24;  // (u8);  _ => [ value ]
 const OP_LD_LOCAL_16:   u8 = 0x25;  // (u16); _ => [ value ]
 // const OP_LD_LOCAL_32:   u8 = 0x27;  // (u32); _ => [ value ]
-const OP_DP_LOCALS:     u8 = 0x26;  // (u8); [ ... local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
+const OP_DP_LOCALS:     u8 = 0x28;  // (u8); [ ... local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
+
+const OP_LD_UPVAL:      u8 = 0x29;
 
 // const OP_LD_NAME:       u8 = 0x28;
 // const OP_LD_INDEX:      u8 = 0x29;
@@ -161,6 +163,8 @@ pub enum OpCode {
     LoadLocal16 = OP_LD_LOCAL_16,
     DropLocals = OP_DP_LOCALS,
     
+    LoadUpvalue = OP_LD_UPVAL,
+    
     Nil = OP_LD_NIL,
     True = OP_LD_TRUE,
     False = OP_LD_FALSE,
@@ -239,6 +243,8 @@ impl OpCode {
             OP_LD_LOCAL_16 => Self::LoadLocal16,
             OP_DP_LOCALS => Self::DropLocals,
             
+            OP_LD_UPVAL => Self::LoadUpvalue,
+            
             OP_LD_NIL => Self::Nil,
             OP_LD_TRUE => Self::True,
             OP_LD_FALSE => Self::False,
@@ -305,6 +311,8 @@ impl OpCode {
             Self::LoadLocal16    => 1 + size_of::<u16>(),
             Self::DropLocals     => 1 + size_of::<u8>(),
             
+            Self::LoadUpvalue    => 1 + size_of::<u8>(),
+            
             Self::Tuple          => 1 + size_of::<u8>(),
             Self::UInt8          => 1 + size_of::<u8>(),
             Self::Int8           => 1 + size_of::<i8>(),
@@ -370,6 +378,8 @@ impl std::fmt::Display for OpCode {
             Self::LoadLocal => "LD_LOCAL",
             Self::LoadLocal16 => "LD_LOCAL_16",
             Self::DropLocals => "DP_LOCALS",
+            
+            Self::LoadUpvalue => "LD_UPVAL",
             
             Self::Nil => "LD_NIL",
             Self::True => "LD_TRUE",
