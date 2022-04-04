@@ -925,7 +925,8 @@ impl CodeGenerator<'_> {
                 return Ok(());
             }
             
-            if !assign.nonlocal {
+            // nonlocal keyword is not required in the global frame
+            if !assign.nonlocal && !self.scope().is_global_frame() {
                 return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
             }
             
