@@ -396,6 +396,12 @@ impl<'c> VMState<'c> {
             OpCode::InsertUpvalueExtern16 => {
                 unimplemented!()
             }
+            OpCode::StoreUpvalue => {
+                unimplemented!()
+            }
+            OpCode::StoreUpvalue16 => {
+                unimplemented!()
+            }
             OpCode::LoadUpvalue => {
                 unimplemented!()
             }

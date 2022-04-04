@@ -333,10 +333,12 @@ impl OpCode {
             Self::LoadLocal16    => 1 + size_of::<u16>(),
             Self::DropLocals     => 1 + size_of::<u8>(),
             
-            Self::InsertUpvalueLocal      => 1 + size_of::<u8>(),
-            Self::InsertUpvalueLocal16    => 1 + size_of::<u16>(),
+            Self::InsertUpvalueLocal    => 1 + size_of::<u8>(),
+            Self::InsertUpvalueLocal16  => 1 + size_of::<u16>(),
             Self::InsertUpvalueExtern   => 1 + size_of::<u8>(),
             Self::InsertUpvalueExtern16 => 1 + size_of::<u16>(),
+            Self::StoreUpvalue   => 1 + size_of::<u8>(),
+            Self::StoreUpvalue16 => 1 + size_of::<u16>(),
             Self::LoadUpvalue    => 1 + size_of::<u8>(),
             Self::LoadUpvalue16  => 1 + size_of::<u16>(),
             
