@@ -121,6 +121,7 @@ impl GCTrace for GlobalEnv { }
 #[derive(Debug)]
 pub struct Module {
     ident: ModuleIdent,
+    display: String,
     source: Option<ModuleSource>,
     data: ProgramData,
     globals: GC<GlobalEnv>,
@@ -139,8 +140,11 @@ impl Module {
             if let Some(source) = source.as_ref() { ModuleIdent::from(source) }
             else { ModuleIdent::from(globals) };
         
+        let display = ident.to_string();
+        
         let module = Self {
             ident,
+            display,
             source,
             data,
             globals,
@@ -174,6 +178,12 @@ impl Module {
                 Variant::from(function)
             }
         }
+    }
+}
+
+impl fmt::Display for Module {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.write_str(&self.display)
     }
 }
 
@@ -220,7 +230,8 @@ impl fmt::Display for ModuleIdent {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SourcePath(path) => {
-                let prefix = std::env::current_dir().ok();
+                let prefix = std::env::current_dir().ok()
+                    .map(|pwd| pwd.canonicalize().ok()).flatten();
                 
                 let path = prefix.map(|prefix| path.strip_prefix(prefix).ok()).flatten()
                     .unwrap_or(path);

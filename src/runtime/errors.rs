@@ -91,7 +91,7 @@ impl fmt::Display for RuntimeError {
             ErrorKind::Other => String::new(),
         };
         
-        utils::format_error(fmt, "Runtime error", Some(message.as_str()), self.source())
+        utils::format_error(fmt, "Runtime error", Some(&message), self.source())
     }
 }
 

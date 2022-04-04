@@ -622,7 +622,7 @@ impl From<&VMState<'_>> for VMStateSnapshot {
             ));
         
         Self {
-            module: state.module.ident().to_string(),
+            module: state.module.to_string(),
             chunk_id: state.chunk_id,
             frame: state.frame,
             locals: state.locals,

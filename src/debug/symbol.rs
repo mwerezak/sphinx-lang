@@ -98,7 +98,7 @@ impl ResolvedSymbol {
                 let end = self.end - *cur_line_start;
                 result = &line[..end];
             } else {
-                result = line.as_str();
+                result = &line;
             };
             
             *cur_line_start = cur_line_end;
