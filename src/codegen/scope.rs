@@ -282,40 +282,52 @@ impl ScopeTracker {
             .iter().find_map(|scope| scope.find_local(name))
     }
     
-    pub fn resolve_or_create_upval(&mut self, name: &LocalName) -> CompileResult<Option<Upvalue>> {
+    pub fn resolve_or_create_upval(&mut self, name: &LocalName) -> CompileResult<Option<&Upvalue>> {
         if self.frames.is_empty() {
             return Ok(None);
         }
         
-        let current_idx = self.frames.len() - 1;
-        self.resolve_upval_helper(name, current_idx)
+        let frame_idx = self.frames.len() - 1;
+        let upval = self.resolve_upval_helper(name, frame_idx)?
+            .map(|idx| &self.frames.last().unwrap().upvalues[usize::from(idx)]);
+        
+        Ok(upval)
+    }
+    
+    // helper to get a frame by index and its enclosing frame
+    fn get_frames_mut(frames: &mut [ScopeFrame], frame_idx: usize) -> (&mut ScopeFrame, Option<&mut ScopeFrame>) {
+        let (frames, _) = frames.split_at_mut(frame_idx + 1);
+        let (current_frame, frames) = frames.split_last_mut().unwrap();
+        let enclosing_frame = frames.split_last_mut().map(|(last, _)| last);
+        (current_frame, enclosing_frame)
     }
     
     // recursive helper
-    fn resolve_upval_helper(&mut self, name: &LocalName, frame_idx: usize) -> CompileResult<Option<Upvalue>> {
+    fn resolve_upval_helper(&mut self, name: &LocalName, frame_idx: usize) -> CompileResult<Option<UpvalueIndex>> {
         {
-            let (frames, _) = self.frames.split_at_mut(frame_idx + 1);
-            let (current_frame, frames) = frames.split_last_mut().unwrap();
-            let enclosing_frame = frames.split_last_mut().map(|(last, _)| last);
+            let (current_frame, enclosing_frame) = Self::get_frames_mut(&mut self.frames, frame_idx);
             
             // check if the upvalue already exists in the current frame
-            let upval = current_frame.find_upval(name);
-            if upval.is_some() {
-                return Ok(upval.cloned());
+            if let Some(upval) = current_frame.find_upval(name) {
+                return Ok(Some(upval.index));
             }
             
             // check if the local name exists in the enclosing scope
             let enclosing = enclosing_frame.map_or(&self.scopes, |frame| frame.scopes());
             if let Some(local) = enclosing.iter().find_map(|scope| scope.find_local(name)) {
-                return Ok(Some(current_frame.create_upval_for_local(local)?.clone()));
+                return Ok(Some(current_frame.create_upval_for_local(local)?.index));
             }
         }
         
         // check if an upvalue can be created in the enclosing scope to a local further down
         if frame_idx > 0 {
-            if let Some(upval) = self.resolve_upval_helper(name, frame_idx-1)? {
-                let current_frame = &mut self.frames[frame_idx];
-                return Ok(Some(current_frame.create_upval_for_upval(&upval)?.clone()));
+            if let Some(upval_idx) = self.resolve_upval_helper(name, frame_idx-1)? {
+                let (current_frame, enclosing_frame) = Self::get_frames_mut(&mut self.frames, frame_idx);
+                if let Some(enclosing_frame) = enclosing_frame {
+                    let upval = &enclosing_frame.upvalues()[usize::from(upval_idx)];
+                    
+                    return Ok(Some(current_frame.create_upval_for_upval(upval)?.index));
+                }
             }
         }
         
