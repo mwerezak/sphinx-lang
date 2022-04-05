@@ -1,4 +1,4 @@
-use std::cell::{RefCell, Ref, RefMut};
+use std::cell::{RefCell, Ref, RefMut, Cell};
 use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::Variant;
 use crate::runtime::module::{Module, Access};
@@ -30,22 +30,6 @@ pub trait Invoke {
 
 
 // Compiled Functions
-
-pub type UpvalueIndex = u16;
-
-#[derive(Debug, Clone)]
-pub struct Upvalue {
-    index: usize,  // index into the value stack
-}
-
-impl Upvalue {
-    pub fn new(index: usize) -> Self {
-        Self { index }
-    }
-    
-    pub fn index(&self) -> usize { self.index }
-}
-
 
 #[derive(Debug)]
 pub struct Function {
@@ -87,6 +71,63 @@ impl Invoke for Function {
         Call::Chunk(self.module, self.chunk_id)
     }
 }
+
+
+// Closures
+
+pub type UpvalueIndex = u16;
+
+#[derive(Debug, Clone, Copy)]
+pub enum Closure {
+    Open(usize),
+    Closed(GC<Cell<Variant>>),
+}
+
+
+// note: the indirection is necessary because otherwise
+// we would have to heap allocate upvalues and store them behind an Rc,
+// or we would have to track every copy that was made from an upvalue
+#[derive(Debug, Clone)]
+pub enum Upvalue {
+    Local(Cell<Closure>),
+    Extern(GC<Function>, UpvalueIndex), 
+}
+
+impl Upvalue {
+    pub fn new_local(index: usize) -> Self {
+        Self::Local(Cell::new(Closure::Open(index)))
+    }
+    
+    pub fn new_extern(owner: GC<Function>, index: UpvalueIndex) -> Self {
+        Self::Extern(owner, index)
+    }
+    
+    /// Retrieve the closure for this upvalue, dereferencing Externs as needed
+    #[inline]
+    pub fn closure(&self) -> Closure {
+        match self {
+            Upvalue::Local(closure) => 
+                return closure.get(),
+            
+            // TODO non-recursive implementation?
+            Upvalue::Extern(fun, idx) => 
+                return fun.upvalues()[usize::from(*idx)].closure(),
+        }
+    }
+    
+    #[inline]
+    pub fn close(&self, value: Variant) {
+        match self {
+            Upvalue::Extern(..) => panic!("close extern upvalue"),
+            
+            Upvalue::Local(closure) => {
+                let cell = GC::allocate(Cell::new(value));
+                closure.set(Closure::Closed(cell));
+            }
+        }
+    }
+}
+
 
 
 // Native Functions

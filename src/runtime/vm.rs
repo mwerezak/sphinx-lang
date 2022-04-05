@@ -3,7 +3,7 @@ use crate::codegen::{Program, ProgramData, Chunk, ChunkID, ConstID, Constant, Op
 use crate::runtime::Variant;
 use crate::runtime::gc::GC;
 use crate::runtime::ops;
-use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex};
+use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -407,7 +407,7 @@ impl<'c> VMState<'c> {
                 let index = LocalIndex::from(data[0]);
                 debug_assert!(index < self.locals);
                 
-                let upval = Upvalue::new(self.from_local_index(index));
+                let upval = Upvalue::new_local(self.from_local_index(index));
                 
                 let fun = Self::into_function(*stack.peek());
                 fun.insert_upvalue(upval);
@@ -416,74 +416,56 @@ impl<'c> VMState<'c> {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
                 debug_assert!(index < self.locals);
                 
-                let upval = Upvalue::new(self.from_local_index(index));
+                let upval = Upvalue::new_local(self.from_local_index(index));
                 
                 let fun = Self::into_function(*stack.peek());
                 fun.insert_upvalue(upval);
             }
             OpCode::InsertUpvalueExtern => {
                 let index = UpvalueIndex::from(data[0]);
-                
-                let upval = self.get_upvalues(stack).expect("export upvalue from non-function callee")
-                    .get(usize::from(index)).expect("invalid upvalue index")
-                    .clone();
-                
                 let fun = Self::into_function(*stack.peek());
+                debug_assert!(usize::from(index) < fun.upvalues().len());
+                let upval = Upvalue::new_extern(fun, index);
                 fun.insert_upvalue(upval);
             }
             OpCode::InsertUpvalueExtern16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                
-                let upval = self.get_upvalues(stack).expect("export upvalue from non-function callee")
-                    .get(usize::from(index)).expect("invalid upvalue index")
-                    .clone();
-                
                 let fun = Self::into_function(*stack.peek());
+                debug_assert!(usize::from(index) < fun.upvalues().len());
+                let upval = Upvalue::new_extern(fun, index);
                 fun.insert_upvalue(upval);
             }
             OpCode::StoreUpvalue => {
-                let index = {
-                    let index = UpvalueIndex::from(data[0]);
-                    
-                    self.get_upvalues(stack).expect("store upvalue on non-function callee")
-                        .get(usize::from(index)).expect("invalid upvalue index")
-                        .index()
-                };
+                let index = UpvalueIndex::from(data[0]);
+                let closure = self.get_upvalues(stack).expect("store upvalue on non-function callee")
+                    .get(usize::from(index)).expect("invalid upvalue index")
+                    .closure();
                 
-                stack.replace_at(index, stack.peek().clone());
+                stack.set_closure(&closure, stack.peek().clone());
             }
             OpCode::StoreUpvalue16 => {
-                let index = {
-                    let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                    
-                    self.get_upvalues(stack).expect("store upvalue on non-function callee")
-                        .get(usize::from(index)).expect("invalid upvalue index")
-                        .index()
-                };
+                let index = UpvalueIndex::from(read_le_bytes!(u16, data));
+                let closure = self.get_upvalues(stack).expect("store upvalue on non-function callee")
+                    .get(usize::from(index)).expect("invalid upvalue index")
+                    .closure();
                 
-                stack.replace_at(index, stack.peek().clone());
+                stack.set_closure(&closure, stack.peek().clone());
             }
             OpCode::LoadUpvalue => {
-                let index = {
-                    let index = UpvalueIndex::from(data[0]);
+                let index = UpvalueIndex::from(data[0]);
+                let closure = self.get_upvalues(stack).expect("load upvalue from non-function callee")
+                    .get(usize::from(index)).expect("invalid upvalue index")
+                    .closure();
                     
-                    self.get_upvalues(stack).expect("load upvalue from non-function callee")
-                        .get(usize::from(index)).expect("invalid upvalue index")
-                        .index()
-                };
-                    
-                stack.push(stack.peek_at(index).clone());
+                stack.push(stack.get_closure(&closure));
             }
             OpCode::LoadUpvalue16 => {
-                let index = {
-                    let index = UpvalueIndex::from(read_le_bytes!(u16, data));
+                let index = UpvalueIndex::from(read_le_bytes!(u16, data));
+                let closure = self.get_upvalues(stack).expect("load upvalue from non-function callee")
+                    .get(usize::from(index)).expect("invalid upvalue index")
+                    .closure();
                     
-                    self.get_upvalues(stack).expect("load upvalue from non-function callee")
-                        .get(usize::from(index)).expect("invalid upvalue index")
-                        .index()
-                };
-                    
-                stack.push(stack.peek_at(index).clone());
+                stack.push(stack.get_closure(&closure));
             }
             
             OpCode::Nil => stack.push(Variant::Nil),
@@ -677,6 +659,21 @@ impl ValueStack {
         peek
     }
     
+    #[inline]
+    fn get_closure(&self, closure: &Closure) -> Variant {
+        match closure {
+            Closure::Open(index) => self.peek_at(*index).clone(),
+            Closure::Closed(cell) => cell.get(),
+        }
+    }
+    
+    #[inline]
+    fn set_closure(&mut self, closure: &Closure, value: Variant) {
+        match closure {
+            Closure::Open(index) => self.replace_at(*index, value),
+            Closure::Closed(cell) => cell.set(value),
+        }
+    }
 }
 
 

@@ -1,5 +1,6 @@
 use std::fmt;
 use std::rc::Rc;
+use std::cell::Cell;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use crate::language::{IntType, FloatType};
@@ -147,6 +148,9 @@ impl From<NativeFunction> for Variant {
 }
 
 impl GCTrace for Variant { }
+
+impl GCTrace for Cell<Variant> { }
+
 
 // extract the GC handle for GC'd types
 impl TryFrom<Variant> for GC<dyn GCTrace> {

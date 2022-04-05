@@ -105,6 +105,7 @@ mod function_tests {
 mod closure_tests {
     use super::*;
     
-    test_script!(assign_to_upvalue_unclosed, "tests/closure/assign_to_upvalue_unclosed.sph");
+    test_script!(open_closure_in_function, "tests/closure/open_closure_in_function.sph");
+    // test_script!(assign_to_upvalue, "tests/closure/assign_to_upvalue.sph");
     // test_script!(nested_closure, "tests/closure/nested_closure.sph");
 }
