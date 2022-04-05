@@ -26,6 +26,33 @@ enum Control {
     Exit,
 }
 
+/*
+    Note: value stack segmentation
+    
+    Each `VMCallFrame` has a starting position in the stack that is tracked by `VMCallFrame::frame_idx`
+    The first section of the frame is the local variables, and the length of this section is tracked by `VMCallFrame::locals`
+    Everything after (until the start of the next frame) are temporaries.
+    
+    With the execption of frame #0,
+    The first local (index 0) is always the callable that is being invoked in that frame
+    The second local (index 1) is always the number of arguments (nargs)
+    The following N locals (N=nargs) are the argument values for the invoked callable.
+    
+    When inserting new locals, any temporaries at the end of the value stack will get shifted.
+    It is expected that the number of temporaries at the end of the last frame will always be small
+    (in fact, unless a declaration occurs inside an expression there will only be a single temporary)
+    so the performance impact will be negligible.
+    
+    Example:
+    
+    L = locals
+    T = temporaries
+    
+     |--frame #0---|-------frame #1--------|-------frame #2------|
+     |----L----|-T-|-------L-------|---T---|--L--|-------T-------|
+    [ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 ]
+*/
+
 
 // Stack-based Virtual Machine
 #[derive(Debug)]
@@ -205,8 +232,8 @@ struct VMCallFrame<'c> {
     module: GC<Module>,
     chunk: &'c [u8],
     chunk_id: Chunk,
-    frame_idx: usize,        // start index for locals belonging to this frame
-    locals: LocalIndex,  // local variable count
+    frame_idx: usize,   // start index for this frame in the value stack
+    locals: LocalIndex, // local variable count
     pc: usize,
 }
 
