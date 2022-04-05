@@ -52,12 +52,21 @@ impl Function {
         }
     }
     
+    pub fn upvalue_len(&self) -> usize {
+        self.upvalues.borrow().len()
+    }
+    
     pub fn get_upvalue(&self, index: UpvalueIndex) -> Ref<Upvalue> {
         Ref::map(self.upvalues.borrow(), |upvals| &upvals[usize::from(index)])
     }
     
-    pub fn insert_upvalue(&self, upvalue: Upvalue) {
+    pub fn insert_upvalue(&self, upvalue: Upvalue) -> UpvalueIndex {
+        let upvalues = self.upvalues.borrow_mut();
+        let index = UpvalueIndex::try_from(upvalues.len())
+            .expect("upvalue index overflow");
+        
         self.upvalues.borrow_mut().push(upvalue);
+        index
     }
 }
 
@@ -70,30 +79,6 @@ impl Invoke for Function {
     }
 }
 
-/// References an upvalue in a GC'd function
-#[derive(Debug, Clone, Copy)]
-pub struct UpvalueRef {
-    fun: GC<Function>,
-    index: UpvalueIndex,
-}
-
-impl UpvalueRef {
-    #[inline(always)]
-    pub fn borrow(&self) -> Ref<Upvalue> {
-        self.fun.get_upvalue(self.index)
-    }
-}
-
-impl GC<Function> {
-    #[inline]
-    pub fn ref_upvalue(self, index: UpvalueIndex) -> UpvalueRef {
-        UpvalueRef {
-            fun: self,
-            index
-        }
-    }
-}
-
 
 // Closures
 
@@ -103,6 +88,11 @@ pub type UpvalueIndex = u16;
 pub enum Closure {
     Open(usize),
     Closed(GC<Cell<Variant>>),
+}
+
+impl Closure {
+    pub fn is_open(&self) -> bool { matches!(self, Self::Open(..)) }
+    pub fn is_closed(&self) -> bool { matches!(self, Self::Closed(..)) }
 }
 
 

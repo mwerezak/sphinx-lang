@@ -1,15 +1,16 @@
 use crate::language::{IntType, FloatType};
 use crate::codegen::{Program, ProgramData, Chunk, ChunkID, ConstID, Constant, OpCode};
-use crate::runtime::{Variant, HashMap, DefaultBuildHasher};
+use crate::runtime::{Variant, HashMap};
 use crate::runtime::gc::GC;
 use crate::runtime::ops;
-use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, UpvalueRef, Closure};
+use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::{VMSnapshot, VMFrameSnapshot};
 
+// Helpers
 
 // data used to set up a new call
 struct CallInfo {
@@ -25,6 +26,40 @@ enum Control {
     Return,
     Exit,
 }
+
+
+#[derive(Debug, Clone, Copy)]
+struct UpvalueRef {
+    // TODO weak reference
+    fun: GC<Function>,
+    index: UpvalueIndex,
+}
+
+impl UpvalueRef {
+    #[inline(always)]
+    fn borrow(&self) -> impl std::ops::Deref<Target=Upvalue> + '_ {
+        self.fun.get_upvalue(self.index)
+    }
+}
+
+impl GC<Function> {
+    #[inline(always)]
+    fn ref_upvalue(self, index: UpvalueIndex) -> UpvalueRef {
+        UpvalueRef {
+            fun: self,
+            index
+        }
+    }
+    
+    #[inline(always)]
+    fn ref_insert_upvalue(self, upvalue: Upvalue) -> UpvalueRef {
+        let idx = self.insert_upvalue(upvalue);
+        self.ref_upvalue(idx)
+    }
+}
+
+// struct UpvalueWeakRef
+
 
 /*
     Note: value stack segmentation
@@ -62,6 +97,7 @@ pub struct VirtualMachine<'c> {
     frame: VMCallFrame<'c>,  // the active call frame
     calls: Vec<VMCallFrame<'c>>,
     values: ValueStack,
+    upvalues: OpenUpvalues,
 }
 
 impl<'c> VirtualMachine<'c> {
@@ -72,6 +108,7 @@ impl<'c> VirtualMachine<'c> {
             calls: Vec::new(),
             values: ValueStack::new(),
             frame: VMCallFrame::main_chunk(main_module, main_chunk),
+            upvalues: OpenUpvalues::new(),
         }
     }
     
@@ -86,7 +123,7 @@ impl<'c> VirtualMachine<'c> {
     
     #[inline]
     fn exec_next(&mut self) -> ExecResult<bool> {
-        let control = self.frame.exec_next(&mut self.values)
+        let control = self.frame.exec_next(&mut self.values, &mut self.upvalues)
             .map_err(|error| error.extend_trace(self.traceback.iter().rev().cloned()))?;
         
         match control {
@@ -294,7 +331,7 @@ impl<'c> VMCallFrame<'c> {
     }
 
     #[inline(always)]
-    fn exec_next(&mut self, stack: &mut ValueStack) -> ExecResult<Control> {
+    fn exec_next(&mut self, stack: &mut ValueStack, upvalues: &mut OpenUpvalues) -> ExecResult<Control> {
         let op_byte = self.chunk.get(self.pc).expect("pc out of bounds");
         let opcode = OpCode::from_byte(*op_byte)
             .unwrap_or_else(|| panic!("invalid instruction: {:x}", op_byte));
@@ -305,7 +342,7 @@ impl<'c> VMCallFrame<'c> {
         
         let data = self.chunk.get(data_slice).expect("truncated instruction");
         
-        self.exec_instruction(current_offset, opcode, data, stack)
+        self.exec_instruction(current_offset, opcode, data, stack, upvalues)
             .map_err(|error| error.push_frame(self.get_trace(current_offset)))
     }
     
@@ -317,7 +354,7 @@ impl<'c> VMCallFrame<'c> {
     
     // TODO create a temporary struct for all of these values that can't be stored in the VMCallFrame
     #[inline(always)]
-    fn exec_instruction(&mut self, current_offset: usize, opcode: OpCode, data: &[u8], stack: &mut ValueStack) -> ExecResult<Control> {
+    fn exec_instruction(&mut self, current_offset: usize, opcode: OpCode, data: &[u8], stack: &mut ValueStack, upvalues: &mut OpenUpvalues) -> ExecResult<Control> {
         match opcode {
             OpCode::Nop => { },
             
@@ -436,28 +473,30 @@ impl<'c> VMCallFrame<'c> {
                 let upval = Upvalue::new(self.from_local_index(index));
                 
                 let fun = into_function(*stack.peek());
-                fun.insert_upvalue(upval);
+                upvalues.insert_ref(fun.ref_insert_upvalue(upval));
             }
             OpCode::InsertUpvalueLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
                 let upval = Upvalue::new(self.from_local_index(index));
                 
                 let fun = into_function(*stack.peek());
-                fun.insert_upvalue(upval);
+                upvalues.insert_ref(fun.ref_insert_upvalue(upval));
             }
             OpCode::InsertUpvalueExtern => {
                 let index = UpvalueIndex::from(data[0]);
                 let upval = self.get_upvalue(stack, index);
                 
                 let fun = into_function(*stack.peek());
-                fun.insert_upvalue(upval.borrow().clone());
+                let upval_ref = fun.ref_insert_upvalue(upval.borrow().clone());
+                upvalues.insert_ref(upval_ref)
             }
             OpCode::InsertUpvalueExtern16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
                 let upval = self.get_upvalue(stack, index);
                 
                 let fun = into_function(*stack.peek());
-                fun.insert_upvalue(upval.borrow().clone());
+                let upval_ref = fun.ref_insert_upvalue(upval.borrow().clone());
+                upvalues.insert_ref(upval_ref)
             }
             OpCode::StoreUpvalue => {
                 let index = UpvalueIndex::from(data[0]);
@@ -695,9 +734,40 @@ impl ValueStack {
     }
 }
 
+// Tracking open upvalues
+
+#[derive(Debug)]
+struct OpenUpvalues {
+    upvalues: HashMap<usize, Vec<UpvalueRef>>,
+}
+
+impl OpenUpvalues {
+    fn new() -> Self {
+        Self {
+            upvalues: HashMap::with_hasher(Default::default())
+        }
+    }
+    
+    fn insert_ref(&mut self, upval_ref: UpvalueRef) {
+        // let weak_ref = upval_ref.into()  // TODO use weak references
+        
+        let index = match upval_ref.borrow().value() {
+            Closure::Open(index) => index,
+            _ => panic!("insert non-open upvalue"),
+        };
+        
+        self.upvalues.entry(index)
+            .and_modify(|refs| refs.push(upval_ref))
+            .or_insert(vec![ upval_ref ]);
+    }
+    
+    fn close_upvalues(&mut self, _value: usize) {
+        unimplemented!()
+    }
+}
+
 
 // For debugging
-
 
 
 impl From<&VirtualMachine<'_>> for VMSnapshot {
