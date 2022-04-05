@@ -8,7 +8,7 @@ use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 use crate::debug::traceback::TraceSite;
-use crate::debug::snapshot::{VMSnapshot, VMStateSnapshot};
+use crate::debug::snapshot::{VMSnapshot, VMFrameSnapshot};
 
 
 // data used to set up a new call
@@ -32,10 +32,9 @@ enum Control {
 pub struct VirtualMachine<'c> {
     traceback: Vec<TraceSite>,
     
-    calls: Vec<VMState<'c>>,
-    upvalues: HashMap<LocalIndex, UpvalueRef>,
+    frame: VMCallFrame<'c>,  // the active call frame
+    calls: Vec<VMCallFrame<'c>>,
     values: ValueStack,
-    state: VMState<'c>,
 }
 
 impl<'c> VirtualMachine<'c> {
@@ -44,9 +43,8 @@ impl<'c> VirtualMachine<'c> {
         Self {
             traceback: Vec::new(),
             calls: Vec::new(),
-            upvalues: HashMap::with_hasher(DefaultBuildHasher::default()),
             values: ValueStack::new(),
-            state: VMState::main_chunk(main_module, main_chunk),
+            frame: VMCallFrame::main_chunk(main_module, main_chunk),
         }
     }
     
@@ -61,7 +59,7 @@ impl<'c> VirtualMachine<'c> {
     
     #[inline]
     fn exec_next(&mut self) -> ExecResult<bool> {
-        let control = self.state.exec_next(&mut self.values)
+        let control = self.frame.exec_next(&mut self.values)
             .map_err(|error| error.extend_trace(self.traceback.iter().rev().cloned()))?;
         
         match control {
@@ -92,11 +90,11 @@ impl<'c> VirtualMachine<'c> {
                 let locals = LocalIndex::try_from(self.values.len() - call.frame)
                     .expect("local index overflow");
                 
-                let mut state = VMState::call_frame(module, chunk_id, call.frame, locals);
-                std::mem::swap(&mut self.state, &mut state);
-                self.calls.push(state);
+                let mut frame = VMCallFrame::call_frame(module, chunk_id, call.frame, locals);
+                std::mem::swap(&mut self.frame, &mut frame);
+                self.calls.push(frame);
                 
-                log::debug!("Setup call: {{ frame: {}, locals: {} }}", self.state.frame, self.state.locals);
+                log::debug!("Setup call: {{ frame: {}, locals: {} }}", self.frame.frame_idx, self.frame.locals);
                 log::debug!("Stack: {:?}", self.values);
             },
         }
@@ -105,17 +103,17 @@ impl<'c> VirtualMachine<'c> {
     }
     
     fn return_call(&mut self) {
-        let frame = self.state.frame;
+        let frame_idx = self.frame.frame_idx;
         
-        let mut state = self.calls.pop().expect("empty call stack");
-        std::mem::swap(&mut self.state, &mut state);
+        let mut frame = self.calls.pop().expect("empty call stack");
+        std::mem::swap(&mut self.frame, &mut frame);
         
         let retval = self.values.pop();
-        self.values.truncate(frame.into());
+        self.values.truncate(frame_idx.into());
         self.values.push(retval);
         self.traceback.pop();
         
-        log::debug!("Return call: {{ frame: {}, locals: {} }}", self.state.frame, self.state.locals);
+        log::debug!("Return call: {{ frame: {}, locals: {} }}", self.frame.frame_idx, self.frame.locals);
         log::debug!("Stack: {:?}", self.values);
     }
 }
@@ -203,23 +201,23 @@ macro_rules! cond_jump {
 pub type LocalIndex = u16;
 
 #[derive(Debug)]
-struct VMState<'c> {
+struct VMCallFrame<'c> {
     module: GC<Module>,
     chunk: &'c [u8],
     chunk_id: Chunk,
-    frame: usize,        // start index for locals belonging to this frame
+    frame_idx: usize,        // start index for locals belonging to this frame
     locals: LocalIndex,  // local variable count
     pc: usize,
 }
 
-impl<'c> VMState<'c> {
-    fn call_frame(module: GC<Module>, chunk_id: ChunkID, frame: usize, locals: LocalIndex) -> Self {
+impl<'c> VMCallFrame<'c> {
+    fn call_frame(module: GC<Module>, chunk_id: ChunkID, frame_idx: usize, locals: LocalIndex) -> Self {
         
         // This hack allows us to get around the self-referentiality of storing both "module" and "chunk"
         // in the same struct. The alternative would be to store "chunk" as an `Option<Box<[u8]>>` and call 
         // `module.data().get_chunk()` before every single instruction, but I want to avoid the overhead of that.
-        // SAFETY: This is safe because "module" is rooted as long as this VMState is in the call stack, 
-        // and VMStates are never stored outside of a VirtualMachine's call stack.
+        // SAFETY: This is safe because "module" is rooted as long as this VMCallFrame is in the call stack, 
+        // and VMCallFrames are never stored outside of a VirtualMachine's call stack.
         let chunk: *const [u8] = module.data().get_chunk(chunk_id);
         let chunk = unsafe { chunk.as_ref::<'c>().unwrap() };
         
@@ -227,7 +225,7 @@ impl<'c> VMState<'c> {
             module,
             chunk,
             chunk_id: Chunk::ChunkID(chunk_id),
-            frame,
+            frame_idx,
             locals,
             pc: 0,
         }
@@ -238,7 +236,7 @@ impl<'c> VMState<'c> {
             module,
             chunk,
             chunk_id: Chunk::Main,
-            frame: 0,
+            frame_idx: 0,
             locals: 0,
             pc: 0,
         }
@@ -256,7 +254,7 @@ impl<'c> VMState<'c> {
     // convert a local variable index to an index into the value stack
     #[inline]
     fn from_local_index(&self, local: LocalIndex) -> usize {
-        self.frame + usize::from(local)
+        self.frame_idx + usize::from(local)
     }
     
     #[inline]
@@ -290,7 +288,7 @@ impl<'c> VMState<'c> {
         fun.ref_upvalue(index)
     }
     
-    // TODO create a temporary struct for all of these values that can't be stored in the VMState
+    // TODO create a temporary struct for all of these values that can't be stored in the VMCallFrame
     #[inline(always)]
     fn exec_instruction(&mut self, current_offset: usize, opcode: OpCode, data: &[u8], stack: &mut ValueStack) -> ExecResult<Control> {
         match opcode {
@@ -678,17 +676,17 @@ impl ValueStack {
 impl From<&VirtualMachine<'_>> for VMSnapshot {
     fn from (vm: &VirtualMachine) -> Self {
         Self {
-            calls: vm.calls.iter().map(VMStateSnapshot::from).collect(),
+            calls: vm.calls.iter().map(VMFrameSnapshot::from).collect(),
             values: vm.values.stack.clone(),
-            state: (&vm.state).into(),
+            frame: (&vm.frame).into(),
         }
     }
 }
 
 
 
-impl From<&VMState<'_>> for VMStateSnapshot {
-    fn from(state: &VMState) -> Self {
+impl From<&VMCallFrame<'_>> for VMFrameSnapshot {
+    fn from(state: &VMCallFrame) -> Self {
         let next_instr = state.chunk.get(state.pc)
             .map(|byte| OpCode::try_from(*byte).map_or_else(
                 |byte| vec![ byte ],
@@ -698,7 +696,7 @@ impl From<&VMState<'_>> for VMStateSnapshot {
         Self {
             module: state.module.to_string(),
             chunk_id: state.chunk_id,
-            frame: state.frame,
+            frame_idx: state.frame_idx,
             locals: state.locals,
             pc: state.pc,
             next_instr,

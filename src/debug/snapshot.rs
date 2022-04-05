@@ -7,9 +7,9 @@ use crate::runtime::module::Chunk;
 
 
 pub struct VMSnapshot {
-    pub calls: Vec<VMStateSnapshot>,
+    pub calls: Vec<VMFrameSnapshot>,
+    pub frame: VMFrameSnapshot,
     pub values: Vec<Variant>,
-    pub state: VMStateSnapshot,
 }
 
 impl Display for VMSnapshot {
@@ -20,12 +20,12 @@ impl Display for VMSnapshot {
         for (idx, state) in self.calls.iter().enumerate() {
             write!(fmt, "{: >4}: Module: {}, Chunk: ", idx, state.module)?;
             format_chunk_id(fmt,state.chunk_id)?;
-            writeln!(fmt, ", Frame: {}, Locals: {}", state.frame, state.locals)?;
+            writeln!(fmt, ", Frame: {}, Locals: {}", state.frame_idx, state.locals)?;
         }
         
-        write!(fmt, "{: >4}: Module: {}, Chunk: ", self.calls.len(), self.state.module)?;
-        format_chunk_id(fmt, self.state.chunk_id)?;
-        writeln!(fmt, ", Frame: {}, Locals: {}", self.state.frame, self.state.locals)?;
+        write!(fmt, "{: >4}: Module: {}, Chunk: ", self.calls.len(), self.frame.module)?;
+        format_chunk_id(fmt, self.frame.chunk_id)?;
+        writeln!(fmt, ", Frame: {}, Locals: {}", self.frame.frame_idx, self.frame.locals)?;
         
         writeln!(fmt, "\n== Value Stack ==")?;
         for (idx, chunk) in self.values.chunks(10).enumerate() {
@@ -36,31 +36,31 @@ impl Display for VMSnapshot {
             writeln!(fmt, "{}", items)?;
         }
         
-        writeln!(fmt, "\n== State ==")?;
-        writeln!(fmt, "{}", self.state)?;
+        writeln!(fmt, "\n== Active Frame ==")?;
+        writeln!(fmt, "{}", self.frame)?;
         
         Ok(())
     }
 }
 
 
-pub struct VMStateSnapshot {
+pub struct VMFrameSnapshot {
     pub module: String,
     pub chunk_id: Chunk,
-    pub frame: usize,
+    pub frame_idx: usize,
     pub locals: LocalIndex,
     pub pc: usize,
     pub next_instr: Option<Vec<u8>>,
 }
 
-impl Display for VMStateSnapshot {
+impl Display for VMFrameSnapshot {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result {
         
         write!(fmt, "Module: {}, Chunk: ", self.module)?;
         format_chunk_id(fmt, self.chunk_id)?;
         writeln!(fmt)?;
         
-        writeln!(fmt, "Frame: {}, Locals: {}", self.frame, self.locals)?;
+        writeln!(fmt, "Frame: {}, Locals: {}", self.frame_idx, self.locals)?;
         
         write!(fmt, "PC: {:#X}", self.pc)?;
         if let Some(instr) = self.next_instr.as_ref() {
