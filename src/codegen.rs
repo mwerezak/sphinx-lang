@@ -428,7 +428,7 @@ impl CodeGenerator<'_> {
             if let Ok(index) = u8::try_from(index) {
                 self.emit_instr_byte(symbol, OpCode::LoadUpvalue, index);
             } else {
-                unimplemented!();
+                self.emit_instr_data(symbol, OpCode::LoadUpvalue16, &index.to_le_bytes());
             }
             
             Ok(Some(index))
