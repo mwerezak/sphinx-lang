@@ -60,9 +60,11 @@ const OP_ST_UPVAL_16:      u8 = 0x2D;  // (u16); [ value ] => [ value ]
 const OP_LD_UPVAL:         u8 = 0x2E;  // (u8);  _ => [ value ]
 const OP_LD_UPVAL_16:      u8 = 0x2F;  // (u16); _ => [ value ]
 
+const OP_CLOSE_UPVAL:      u8 = 0x30;  // (u8);
+const OP_CLOSE_UPVAL_16:   u8 = 0x31;  // (u16);
 
-// const OP_LD_NAME:       u8 = 0x30;
-// const OP_LD_INDEX:      u8 = 0x31;
+// const OP_LD_NAME:       u8 = 0x38;
+// const OP_LD_INDEX:      u8 = 0x39;
 
 
 // Dynamic Insert/Store
@@ -180,6 +182,9 @@ pub enum OpCode {
     LoadUpvalue = OP_LD_UPVAL,
     LoadUpvalue16 = OP_LD_UPVAL_16,
     
+    CloseUpvalue = OP_CLOSE_UPVAL,
+    CloseUpvalue16 = OP_CLOSE_UPVAL_16,
+    
     Nil = OP_LD_NIL,
     True = OP_LD_TRUE,
     False = OP_LD_FALSE,
@@ -267,6 +272,9 @@ impl OpCode {
             OP_LD_UPVAL => Self::LoadUpvalue,
             OP_LD_UPVAL_16 => Self::LoadUpvalue16,
             
+            OP_CLOSE_UPVAL => Self::CloseUpvalue,
+            OP_CLOSE_UPVAL_16 => Self::CloseUpvalue16,
+            
             OP_LD_NIL => Self::Nil,
             OP_LD_TRUE => Self::True,
             OP_LD_FALSE => Self::False,
@@ -342,6 +350,9 @@ impl OpCode {
             Self::LoadUpvalue    => 1 + size_of::<u8>(),
             Self::LoadUpvalue16  => 1 + size_of::<u16>(),
             
+            Self::CloseUpvalue    => 1 + size_of::<u8>(),
+            Self::CloseUpvalue16  => 1 + size_of::<u16>(),
+            
             Self::Tuple          => 1 + size_of::<u8>(),
             Self::UInt8          => 1 + size_of::<u8>(),
             Self::Int8           => 1 + size_of::<i8>(),
@@ -416,6 +427,9 @@ impl std::fmt::Display for OpCode {
             Self::StoreUpvalue16 => "ST_UPVAL_16",
             Self::LoadUpvalue => "LD_UPVAL",
             Self::LoadUpvalue16 => "LD_UPVAL_16",
+            
+            Self::CloseUpvalue => "CLOSE_UPVAL",
+            Self::CloseUpvalue16 => "CLOSE_UPVAL_16",
             
             Self::Nil => "LD_NIL",
             Self::True => "LD_TRUE",

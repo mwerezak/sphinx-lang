@@ -137,11 +137,29 @@ impl<'c, 's> Disassembler<'c, 's> {
                     write!(line, "{:16} {: >4}    ", opcode, index)?;
                 },
                 
-                OpCode::InsertUpvalueLocal | OpCode::InsertUpvalueExtern | OpCode::StoreUpvalue | OpCode::LoadUpvalue => {
+                OpCode::InsertUpvalueLocal | OpCode::InsertUpvalueExtern => {
                     let index = instr[1];
                     write!(line, "{:16} {: >4}    ", opcode, index)?;
                 }
-                OpCode::InsertUpvalueLocal16 | OpCode::InsertUpvalueExtern16 | OpCode::StoreUpvalue16 | OpCode::LoadUpvalue16 => {
+                OpCode::InsertUpvalueLocal16 | OpCode::InsertUpvalueExtern16 => {
+                    let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
+                
+                OpCode::StoreUpvalue | OpCode::LoadUpvalue => {
+                    let index = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
+                OpCode::StoreUpvalue16 | OpCode::LoadUpvalue16 => {
+                    let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
+                
+                OpCode::CloseUpvalue => {
+                    let index = instr[1];
+                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                }
+                OpCode::CloseUpvalue16 => {
                     let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
                     write!(line, "{:16} {: >4}    ", opcode, index)?;
                 }

@@ -468,6 +468,13 @@ impl<'c> VMState<'c> {
                 stack.push(stack.get_closure(&closure));
             }
             
+            OpCode::CloseUpvalue => {
+                unimplemented!()
+            }
+            OpCode::CloseUpvalue16 => {
+                unimplemented!()
+            }
+            
             OpCode::Nil => stack.push(Variant::Nil),
             OpCode::True => stack.push(Variant::BoolTrue),
             OpCode::False => stack.push(Variant::BoolFalse),
