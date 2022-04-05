@@ -1,13 +1,11 @@
 // Symbol Resolution
 
-use std::fmt;
 use std::io;
 use std::cmp;
 use std::iter;
 use std::rc::Rc;
 use std::collections::{BinaryHeap, HashMap};
 
-use crate::utils;
 use crate::source::{ModuleSource, SourceText};
 use crate::debug::symbol::{DebugSymbol, ResolvedSymbol, TokenIndex};
 use crate::debug::symbol::errors::{SymbolResolutionError, ErrorKind};

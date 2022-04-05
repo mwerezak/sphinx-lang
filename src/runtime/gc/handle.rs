@@ -1,11 +1,11 @@
 use std::fmt;
 use std::rc::Rc;
 use std::ops::Deref;
-use std::ptr::{self, NonNull};
+use std::ptr::NonNull;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
-use crate::runtime::gc::{GCBox, GCArray, GC_STATE, deref_safe, GCTrace};
+use crate::runtime::gc::{GCBox, GC_STATE, deref_safe, GCTrace};
 
 
 pub struct GC<T> where T: GCTrace + ?Sized + 'static {

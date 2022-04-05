@@ -1,5 +1,4 @@
 use std::fmt;
-use std::rc::Rc;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
@@ -8,7 +7,7 @@ use crate::runtime::types::Type;
 use crate::runtime::types::metatable::Metatable;
 use crate::runtime::function::{Function, NativeFunction, Call, Invoke};
 use crate::runtime::types::primitive::*;
-use crate::runtime::strings::{StringSymbol, STRING_TABLE};
+use crate::runtime::strings::StringSymbol;
 use crate::runtime::gc::{GC, GCArray, GCTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 

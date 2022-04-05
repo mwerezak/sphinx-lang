@@ -1,7 +1,6 @@
 use std::fmt;
 use std::cmp;
-use std::cell::{RefCell, Ref};
-use std::ops::{Deref, DerefMut};
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use string_interner::{self, DefaultBackend};
 use string_interner::symbol::Symbol;

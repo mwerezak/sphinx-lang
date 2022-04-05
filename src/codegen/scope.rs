@@ -1,17 +1,10 @@
 // Scope Tracking
 
-use crate::language::{IntType, FloatType, InternSymbol};
-use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
-use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
-use crate::parser::primary::{Atom, Primary, AccessItem};
-use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
-use crate::parser::fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
+use crate::language::InternSymbol;
+use crate::parser::lvalue::DeclType;
 use crate::runtime::vm::LocalIndex;
-use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::function::UpvalueIndex;
-use crate::runtime::strings::{StringInterner};
-use crate::debug::symbol::{DebugSymbol, ChunkSymbols, DebugSymbolTable};
-use crate::codegen::chunk::Chunk;
+use crate::debug::symbol::DebugSymbol;
 use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
 
 

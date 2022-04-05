@@ -1,7 +1,6 @@
 use crate::runtime::Variant;
-use crate::runtime::ops::eval_not;
 use crate::runtime::function::Call;
-use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
+use crate::runtime::errors::ExecResult;
 
 
 type Method0<R> = fn(&Variant) -> ExecResult<R>;

@@ -1,15 +1,12 @@
 #![allow(unused_variables)]
 
-use log;
 use std::iter;
-use std::mem;
-
 use crate::language::{IntType, FloatType, InternSymbol};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary, AccessItem};
 use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
-use crate::parser::fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
+use crate::parser::fundefs::{FunctionDef, SignatureDef};
 use crate::runtime::vm::LocalIndex;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::strings::{StringInterner};
@@ -27,8 +24,7 @@ pub use chunk::{UnloadedProgram, Program, ProgramData, Chunk, ChunkID};
 pub use consts::{ConstID, Constant};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
-use opcodes::*;
-use scope::{ScopeTracker, LocalName, Upvalue, UpvalueTarget};
+use scope::{ScopeTracker, LocalName, UpvalueTarget};
 use chunk::{ChunkBuilder, ChunkInfo, ChunkBuf};
 use consts::{UnloadedSignature, UnloadedParam};
 

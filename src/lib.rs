@@ -28,7 +28,7 @@ pub mod debug;
 use source::{SourceText, ModuleSource, ParseContext};
 use parser::ParserError;
 use parser::stmt::StmtMeta;
-use codegen::{CompiledProgram, Compiler, UnloadedProgram, CompileError};
+use codegen::{CompiledProgram, Compiler, CompileError};
 use runtime::strings::StringInterner;
 
 #[derive(Debug)]

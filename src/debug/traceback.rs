@@ -1,11 +1,8 @@
 use std::fmt;
 use crate::source::ModuleSource;
 use crate::codegen::chunk::ChunkInfo;
-use crate::runtime::HashMap;
 use crate::runtime::gc::GC;
-use crate::runtime::module::{Module, ModuleIdent, Chunk};
-use crate::runtime::function::{Function, NativeFunction};
-use crate::debug::symbol::ResolvedSymbol;
+use crate::runtime::module::{Module, Chunk};
 
 
 /// Traceback information

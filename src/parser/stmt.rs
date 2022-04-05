@@ -1,6 +1,6 @@
 use crate::language::InternSymbol;
 use crate::debug::DebugSymbol;
-use crate::parser::expr::{Expr, ExprMeta};
+use crate::parser::expr::Expr;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

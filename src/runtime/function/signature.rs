@@ -2,7 +2,7 @@ use std::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::runtime::Variant;
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
-use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
+use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
 #[derive(Clone, Debug)]

@@ -4,7 +4,7 @@ use std::error::Error;
 use crate::utils;
 use crate::lexer::{TokenMeta, LexerError};
 use crate::debug::SourceError;
-use crate::debug::symbol::{DebugSymbol, TokenIndex};
+use crate::debug::symbol::DebugSymbol;
 
 
 pub type ParseResult<T> = Result<T, ParserError>;

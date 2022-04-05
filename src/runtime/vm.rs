@@ -1,12 +1,8 @@
-use crate::language::{IntType, FloatType};
-use crate::codegen::{Program, ProgramData, Chunk, ChunkID, ConstID, Constant, OpCode};
 use crate::runtime::{Variant, HashMap};
 use crate::runtime::gc::GC;
-use crate::runtime::ops;
 use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
-use crate::runtime::strings::StringSymbol;
-use crate::runtime::module::{Module, Access, GlobalEnv};
-use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
+use crate::runtime::module::Module;
+use crate::runtime::errors::ExecResult;
 use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::{VMSnapshot, VMFrameSnapshot};
 

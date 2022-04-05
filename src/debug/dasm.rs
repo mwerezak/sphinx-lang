@@ -1,12 +1,11 @@
 use std::fmt;
 use std::fmt::{Write, Formatter};
 use std::iter;
-use std::collections::HashMap;
 use string_interner::Symbol as _;
 
 use crate::language::FloatType;
 use crate::codegen::OpCode;
-use crate::codegen::chunk::{UnloadedProgram, Chunk, ChunkID};
+use crate::codegen::chunk::{UnloadedProgram, Chunk};
 use crate::codegen::consts::{Constant, ConstID};
 use crate::debug::symbol::{DebugSymbol, DebugSymbolTable, ResolvedSymbol, ResolvedSymbolTable, ChunkSymbols};
 use crate::debug::symbol::errors::SymbolResolutionError;

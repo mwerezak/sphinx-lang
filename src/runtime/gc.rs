@@ -1,10 +1,8 @@
 /// Partial clone of rust-gc's mark and sweep implementation
 
 use std::mem;
-use std::any::Any;
 use std::ptr::{self, NonNull};
 use std::cell::{Cell, RefCell};
-use log;
 
 mod handle;
 mod array;

@@ -1,8 +1,7 @@
-use std::cell::{RefCell, Ref, RefMut, Cell};
-use std::ops::Deref;
-use crate::codegen::{ChunkID, ConstID};
+use std::cell::{RefCell, Ref, Cell};
+use crate::codegen::{ChunkID};
 use crate::runtime::Variant;
-use crate::runtime::module::{Module, Access};
+use crate::runtime::module::Module;
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::errors::ExecResult;
 

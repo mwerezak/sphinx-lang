@@ -1,5 +1,4 @@
 use std::fmt::{Display, Formatter, Result};
-use crate::source::ModuleSource;
 use crate::codegen::opcodes::OpCode;
 use crate::runtime::Variant;
 use crate::runtime::vm::LocalIndex;

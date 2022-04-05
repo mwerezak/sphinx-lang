@@ -3,7 +3,6 @@ use std::error::Error;
 
 use crate::utils;
 use crate::runtime::Variant;
-use crate::runtime::strings::StringSymbol;
 use crate::runtime::function::Signature;
 use crate::debug::traceback::{TraceSite, Traceback};
 

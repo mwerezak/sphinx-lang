@@ -1,7 +1,7 @@
 ///! Metamethod definitions for builtin types
 
-use crate::runtime::{Variant, STRING_TABLE};
-use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
+use crate::runtime::Variant;
+use crate::runtime::errors::ExecResult;
 
 use crate::runtime::types::metatable::*;
 
