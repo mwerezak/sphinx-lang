@@ -60,11 +60,11 @@ impl Function {
     }
     
     pub fn insert_upvalue(&self, upvalue: Upvalue) -> UpvalueIndex {
-        let upvalues = self.upvalues.borrow_mut();
+        let mut upvalues = self.upvalues.borrow_mut();
+        
         let index = UpvalueIndex::try_from(upvalues.len())
             .expect("upvalue index overflow");
-        
-        self.upvalues.borrow_mut().push(upvalue);
+        upvalues.push(upvalue);
         index
     }
 }

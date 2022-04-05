@@ -337,29 +337,29 @@ impl<'c> VMCallFrame<'c> {
                 let upval = Upvalue::new(self.from_local_index(index));
                 
                 let fun = into_function(*stack.peek());
-                upvalues.insert_ref(fun.ref_insert_upvalue(upval));
+                upvalues.insert_ref(fun.make_upvalue_ref(upval));
             }
             OpCode::InsertUpvalueLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
                 let upval = Upvalue::new(self.from_local_index(index));
                 
                 let fun = into_function(*stack.peek());
-                upvalues.insert_ref(fun.ref_insert_upvalue(upval));
+                upvalues.insert_ref(fun.make_upvalue_ref(upval));
             }
             OpCode::InsertUpvalueExtern => {
                 let index = UpvalueIndex::from(data[0]);
-                let upval = self.get_upvalue(stack, index);
+                let upval = self.get_upvalue(stack, index).borrow().clone();
                 
                 let fun = into_function(*stack.peek());
-                let upval_ref = fun.ref_insert_upvalue(upval.borrow().clone());
+                let upval_ref = fun.make_upvalue_ref(upval);
                 upvalues.insert_ref(upval_ref)
             }
             OpCode::InsertUpvalueExtern16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let upval = self.get_upvalue(stack, index);
+                let upval = self.get_upvalue(stack, index).borrow().clone();
                 
                 let fun = into_function(*stack.peek());
-                let upval_ref = fun.ref_insert_upvalue(upval.borrow().clone());
+                let upval_ref = fun.make_upvalue_ref(upval);
                 upvalues.insert_ref(upval_ref)
             }
             OpCode::StoreUpvalue => {

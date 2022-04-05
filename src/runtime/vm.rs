@@ -52,8 +52,9 @@ impl GC<Function> {
         }
     }
     
+    // Inserts an upvalue into a GC'd function, creating an UpvalueRef
     #[inline(always)]
-    fn ref_insert_upvalue(self, upvalue: Upvalue) -> UpvalueRef {
+    fn make_upvalue_ref(self, upvalue: Upvalue) -> UpvalueRef {
         let idx = self.insert_upvalue(upvalue);
         self.ref_upvalue(idx)
     }
