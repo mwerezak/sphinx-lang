@@ -1,4 +1,5 @@
 use std::cell::{RefCell, Ref, RefMut, Cell};
+use std::ops::Deref;
 use crate::codegen::{ChunkID, ConstID};
 use crate::runtime::Variant;
 use crate::runtime::module::{Module, Access};
@@ -51,12 +52,8 @@ impl Function {
         }
     }
     
-    pub fn upvalues(&self) -> Ref<[Upvalue]> {
-        Ref::map(self.upvalues.borrow(), |upvalues| upvalues.as_slice())
-    }
-    
-    pub fn upvalues_mut(&self) -> RefMut<[Upvalue]> {
-        RefMut::map(self.upvalues.borrow_mut(), |upvalues| upvalues.as_mut_slice())
+    pub fn get_upvalue(&self, index: UpvalueIndex) -> Ref<Upvalue> {
+        Ref::map(self.upvalues.borrow(), |upvals| &upvals[usize::from(index)])
     }
     
     pub fn insert_upvalue(&self, upvalue: Upvalue) {
@@ -67,8 +64,33 @@ impl Function {
 impl Invoke for Function {
     fn signature(&self) -> &Signature { &self.signature }
     
+    #[inline]
     fn as_call(&self) -> Call {
         Call::Chunk(self.module, self.chunk_id)
+    }
+}
+
+/// References an upvalue in a GC'd function
+#[derive(Debug, Clone, Copy)]
+pub struct UpvalueRef {
+    fun: GC<Function>,
+    index: UpvalueIndex,
+}
+
+impl UpvalueRef {
+    #[inline(always)]
+    pub fn borrow(&self) -> Ref<Upvalue> {
+        self.fun.get_upvalue(self.index)
+    }
+}
+
+impl GC<Function> {
+    #[inline]
+    pub fn ref_upvalue(self, index: UpvalueIndex) -> UpvalueRef {
+        UpvalueRef {
+            fun: self,
+            index
+        }
     }
 }
 
@@ -84,47 +106,24 @@ pub enum Closure {
 }
 
 
-// note: the indirection is necessary because otherwise
-// we would have to heap allocate upvalues and store them behind an Rc,
-// or we would have to track every copy that was made from an upvalue
 #[derive(Debug, Clone)]
-pub enum Upvalue {
-    Local(Cell<Closure>),
-    Extern(GC<Function>, UpvalueIndex), 
+pub struct Upvalue {
+    value: Cell<Closure>,
 }
 
 impl Upvalue {
-    pub fn new_local(index: usize) -> Self {
-        Self::Local(Cell::new(Closure::Open(index)))
-    }
-    
-    pub fn new_extern(owner: GC<Function>, index: UpvalueIndex) -> Self {
-        Self::Extern(owner, index)
-    }
-    
-    /// Retrieve the closure for this upvalue, dereferencing Externs as needed
-    #[inline]
-    pub fn closure(&self) -> Closure {
-        match self {
-            Upvalue::Local(closure) => 
-                return closure.get(),
-            
-            // TODO non-recursive implementation?
-            Upvalue::Extern(fun, idx) => 
-                return fun.upvalues()[usize::from(*idx)].closure(),
+    pub fn new(index: usize) -> Self {
+        Self {
+            value: Cell::new(Closure::Open(index)),
         }
     }
     
     #[inline]
-    pub fn close(&self, value: Variant) {
-        match self {
-            Upvalue::Extern(..) => panic!("close extern upvalue"),
-            
-            Upvalue::Local(closure) => {
-                let cell = GC::allocate(Cell::new(value));
-                closure.set(Closure::Closed(cell));
-            }
-        }
+    pub fn value(&self) -> Closure { self.value.get() }
+    
+    #[inline]
+    pub fn close(&self, value_cell: GC<Cell<Variant>>) {
+        self.value.set(Closure::Closed(value_cell))
     }
 }
 
@@ -164,6 +163,7 @@ impl NativeFunction {
 impl Invoke for GC<NativeFunction> {
     fn signature(&self) -> &Signature { &self.signature }
     
+    #[inline]
     fn as_call(&self) -> Call {
         Call::Native(*self)
     }

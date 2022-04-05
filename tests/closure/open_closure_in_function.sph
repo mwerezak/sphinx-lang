@@ -1,0 +1,7 @@
+begin
+    let local = "local"
+    fun f()
+        echo local
+    end
+    f()
+end

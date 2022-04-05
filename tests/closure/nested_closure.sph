@@ -1,22 +1,23 @@
 var f = nil
 
 fun f1()
-  let a = "a"
-  fun f2()
-    let b = "b"
-    fun f3()
-      let c = "c";
-      fun f4()
-        assert "a" == echo a
-        assert "b" == echo b
-        assert "c" == echo c
-      end
-      nonlocal f = f4;
+    let a = "a"
+    fun f2()
+        let b = "b"
+        fun f3()
+            let c = "c";
+            fun f4()
+                assert "a" == echo a
+                assert "b" == echo b
+                assert "c" == echo c
+            end
+            nonlocal f = f4;
+        end
+        f3()
     end
-    f3()
-  end
-  f2()
+    f2()
 end
+
 f1();
 
 f();

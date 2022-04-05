@@ -1,9 +1,9 @@
 use crate::language::{IntType, FloatType};
 use crate::codegen::{Program, ProgramData, Chunk, ChunkID, ConstID, Constant, OpCode};
-use crate::runtime::Variant;
+use crate::runtime::{Variant, HashMap, DefaultBuildHasher};
 use crate::runtime::gc::GC;
 use crate::runtime::ops;
-use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
+use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, UpvalueRef, Closure};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, Access, GlobalEnv};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -33,6 +33,7 @@ pub struct VirtualMachine<'c> {
     traceback: Vec<TraceSite>,
     
     calls: Vec<VMState<'c>>,
+    upvalues: HashMap<LocalIndex, UpvalueRef>,
     values: ValueStack,
     state: VMState<'c>,
 }
@@ -43,6 +44,7 @@ impl<'c> VirtualMachine<'c> {
         Self {
             traceback: Vec::new(),
             calls: Vec::new(),
+            upvalues: HashMap::with_hasher(DefaultBuildHasher::default()),
             values: ValueStack::new(),
             state: VMState::main_chunk(main_module, main_chunk),
         }
@@ -117,6 +119,36 @@ impl<'c> VirtualMachine<'c> {
         log::debug!("Stack: {:?}", self.values);
     }
 }
+
+
+// Operand casts
+
+#[inline]
+fn into_name(value: Variant) -> StringSymbol {
+    match value {
+        Variant::String(symbol) => symbol,
+        _ => panic!("invalid operand"),
+    }
+}
+
+#[inline]
+fn into_usize(value: Variant) -> usize {
+    if let Variant::Integer(value) = value {
+        if let Ok(value) = usize::try_from(value) {
+            return value;
+        }
+    }
+    panic!("invalid operand")
+}
+
+#[inline]
+fn into_function(value: Variant) -> GC<Function> {
+    match value {
+        Variant::Function(fun) => fun,
+        _ => panic!("invalid operand")
+    }
+}
+
 
 // Helper macros
 macro_rules! read_le_bytes {
@@ -220,40 +252,12 @@ impl<'c> VMState<'c> {
             usize::checked_sub(self.pc, offset.unsigned_abs())
         }
     }
-    
-    #[inline]
-    fn into_name(value: Variant) -> StringSymbol {
-        match value {
-            Variant::String(symbol) => symbol,
-            _ => panic!("invalid operand"),
-        }
-    }
-    
-    #[inline]
-    fn into_usize(value: Variant) -> usize {
-        if let Variant::Integer(value) = value {
-            if let Ok(value) = usize::try_from(value) {
-                return value;
-            }
-        }
-        panic!("invalid operand")
-    }
-    
-    #[inline]
-    fn into_function(value: Variant) -> GC<Function> {
-        match value {
-            Variant::Function(fun) => fun,
-            _ => panic!("invalid operand")
-        }
-    }
 
     // convert a local variable index to an index into the value stack
     #[inline]
     fn from_local_index(&self, local: LocalIndex) -> usize {
         self.frame + usize::from(local)
     }
-    
-    
     
     #[inline]
     fn get_trace(&self, offset: usize) -> TraceSite {
@@ -281,13 +285,12 @@ impl<'c> VMState<'c> {
     }
     
     #[inline]
-    fn get_upvalues<'a>(&self, stack: &'a ValueStack) -> Option<impl std::ops::Deref<Target=[Upvalue]> + 'a> {
-        match stack.peek_at(self.from_local_index(0)) {
-            Variant::Function(fun) => Some(fun.upvalues()),
-            _ => None
-        }
+    fn get_upvalue<'a>(&self, stack: &'a ValueStack, index: UpvalueIndex) -> UpvalueRef {
+        let fun = into_function(*stack.peek_at(self.from_local_index(0)));
+        fun.ref_upvalue(index)
     }
     
+    // TODO create a temporary struct for all of these values that can't be stored in the VMState
     #[inline(always)]
     fn exec_instruction(&mut self, current_offset: usize, opcode: OpCode, data: &[u8], stack: &mut ValueStack) -> ExecResult<Control> {
         match opcode {
@@ -298,7 +301,7 @@ impl<'c> VMState<'c> {
             OpCode::Call => {
                 const SYSTEM_ARGS: usize = 2; // [ callee, nargs, ... ]
                 
-                let nargs = Self::into_usize(stack.peek().clone());
+                let nargs = into_usize(stack.peek().clone());
                 let call_locals = SYSTEM_ARGS + nargs;
                 
                 stack.swap_last(stack.len() - call_locals + 1);
@@ -341,17 +344,17 @@ impl<'c> VMState<'c> {
             },
             
             OpCode::InsertGlobal => {
-                let name = Self::into_name(stack.pop());
+                let name = into_name(stack.pop());
                 let value = stack.peek().clone();
                 self.module.globals().borrow_mut().create(name, Access::ReadOnly, value);
             },
             OpCode::InsertGlobalMut => {
-                let name = Self::into_name(stack.pop());
+                let name = into_name(stack.pop());
                 let value = stack.peek().clone();
                 self.module.globals().borrow_mut().create(name, Access::ReadWrite, value);
             },
             OpCode::StoreGlobal => {
-                let name = Self::into_name(stack.pop());
+                let name = into_name(stack.pop());
                 let value = stack.peek().clone();
                 
                 let mut globals = self.module.globals().borrow_mut();
@@ -360,7 +363,7 @@ impl<'c> VMState<'c> {
             },
             OpCode::LoadGlobal => {
                 let value = {
-                    let name = Self::into_name(stack.peek().clone());
+                    let name = into_name(stack.peek().clone());
                     self.module.globals().borrow().lookup(&name)?.clone()
                 };
                 stack.replace(value);
@@ -405,66 +408,50 @@ impl<'c> VMState<'c> {
             
             OpCode::InsertUpvalueLocal => {
                 let index = LocalIndex::from(data[0]);
-                debug_assert!(index < self.locals);
+                let upval = Upvalue::new(self.from_local_index(index));
                 
-                let upval = Upvalue::new_local(self.from_local_index(index));
-                
-                let fun = Self::into_function(*stack.peek());
+                let fun = into_function(*stack.peek());
                 fun.insert_upvalue(upval);
             }
             OpCode::InsertUpvalueLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
-                debug_assert!(index < self.locals);
+                let upval = Upvalue::new(self.from_local_index(index));
                 
-                let upval = Upvalue::new_local(self.from_local_index(index));
-                
-                let fun = Self::into_function(*stack.peek());
+                let fun = into_function(*stack.peek());
                 fun.insert_upvalue(upval);
             }
             OpCode::InsertUpvalueExtern => {
                 let index = UpvalueIndex::from(data[0]);
-                let fun = Self::into_function(*stack.peek());
-                debug_assert!(usize::from(index) < fun.upvalues().len());
-                let upval = Upvalue::new_extern(fun, index);
-                fun.insert_upvalue(upval);
+                let upval = self.get_upvalue(stack, index);
+                
+                let fun = into_function(*stack.peek());
+                fun.insert_upvalue(upval.borrow().clone());
             }
             OpCode::InsertUpvalueExtern16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let fun = Self::into_function(*stack.peek());
-                debug_assert!(usize::from(index) < fun.upvalues().len());
-                let upval = Upvalue::new_extern(fun, index);
-                fun.insert_upvalue(upval);
+                let upval = self.get_upvalue(stack, index);
+                
+                let fun = into_function(*stack.peek());
+                fun.insert_upvalue(upval.borrow().clone());
             }
             OpCode::StoreUpvalue => {
                 let index = UpvalueIndex::from(data[0]);
-                let closure = self.get_upvalues(stack).expect("store upvalue on non-function callee")
-                    .get(usize::from(index)).expect("invalid upvalue index")
-                    .closure();
-                
+                let closure = self.get_upvalue(stack, index).borrow().value();
                 stack.set_closure(&closure, stack.peek().clone());
             }
             OpCode::StoreUpvalue16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let closure = self.get_upvalues(stack).expect("store upvalue on non-function callee")
-                    .get(usize::from(index)).expect("invalid upvalue index")
-                    .closure();
-                
+                let closure = self.get_upvalue(stack, index).borrow().value();
                 stack.set_closure(&closure, stack.peek().clone());
             }
             OpCode::LoadUpvalue => {
                 let index = UpvalueIndex::from(data[0]);
-                let closure = self.get_upvalues(stack).expect("load upvalue from non-function callee")
-                    .get(usize::from(index)).expect("invalid upvalue index")
-                    .closure();
-                    
+                let closure = self.get_upvalue(stack, index).borrow().value();
                 stack.push(stack.get_closure(&closure));
             }
             OpCode::LoadUpvalue16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let closure = self.get_upvalues(stack).expect("load upvalue from non-function callee")
-                    .get(usize::from(index)).expect("invalid upvalue index")
-                    .closure();
-                    
+                let closure = self.get_upvalue(stack, index).borrow().value();
                 stack.push(stack.get_closure(&closure));
             }
             
@@ -487,7 +474,7 @@ impl<'c> VMState<'c> {
                 stack.push(Variant::from(items));
             },
             OpCode::TupleN => {
-                let tuple_len = Self::into_usize(stack.pop());
+                let tuple_len = into_usize(stack.pop());
                 
                 let items = stack.pop_many(tuple_len).into_boxed_slice();
                 stack.push(Variant::from(items));

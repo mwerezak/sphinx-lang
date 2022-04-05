@@ -31,6 +31,7 @@ pub struct Local {
     decl: DeclType,
     name: LocalName,
     index: LocalIndex,
+    captured: bool, // tracks whether the local is being referenced by an upvalue
 }
 
 impl Local {
@@ -76,8 +77,10 @@ impl Scope {
         )?;
         
         let local = Local {
-            decl, name, index,
+            decl, name, index, 
+            captured: false,
         };
+        
         self.locals.push(local);
         Ok(self.locals.last().unwrap())
     }
@@ -136,6 +139,10 @@ impl NestedScopes {
     fn iter(&self) -> impl Iterator<Item=&Scope> {
         self.scopes.iter().rev()
     }
+    
+    fn iter_mut(&mut self) -> impl Iterator<Item=&mut Scope> {
+        self.scopes.iter_mut().rev()
+    }
 }
 
 
@@ -188,7 +195,7 @@ impl ScopeFrame {
         self.upvalues.iter().find(|upval| upval.name == *name)
     }
     
-    fn create_upval_for_local(&mut self, local: &Local) -> CompileResult<&Upvalue> {
+    fn create_upval_for_local(&mut self, local: &mut Local) -> CompileResult<&Upvalue> {
         let index = UpvalueIndex::try_from(self.upvalues.len())
             .map_err(|_| CompileError::from(ErrorKind::UpvalueLimit))?;
         
@@ -198,8 +205,9 @@ impl ScopeFrame {
             name: local.name,
             target: UpvalueTarget::Local(local.index),
         };
-        
         self.upvalues.push(upval);
+        
+        local.captured = true;
         
         Ok(self.upvalues.last().unwrap())
     }
@@ -309,8 +317,8 @@ impl ScopeTracker {
             }
             
             // check if the local name exists in the enclosing scope
-            let enclosing = enclosing_frame.map_or(&self.scopes, |frame| frame.scopes());
-            if let Some(local) = enclosing.iter().find_map(|scope| scope.find_local(name)) {
+            let enclosing = enclosing_frame.map_or(&mut self.scopes, |frame| frame.scopes_mut());
+            if let Some(local) = enclosing.iter_mut().find_map(|scope| scope.find_local_mut(name)) {
                 return Ok(Some(current_frame.create_upval_for_local(local)?.index));
             }
         }

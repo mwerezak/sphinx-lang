@@ -1,0 +1,27 @@
+var f = nil
+var g = nil
+
+begin
+    var local = "local"
+    fun f_()
+        echo local
+        nonlocal local = "after f"
+        echo local
+    end
+    f = f_
+    
+    fun g_()
+        echo local
+        nonlocal local = "after g"
+        echo local
+    end
+    g = g_
+end
+
+f()
+# expect: local
+# expect: after f
+
+g()
+# expect: after f
+# expect: after g
