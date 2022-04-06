@@ -396,6 +396,11 @@ impl CodeGenerator<'_> {
         let scope = self.scope_mut().pop_scope();
         let symbol = scope.debug_symbol();
         
+        // close all upvalues
+        for local in scope.locals().iter().filter(|local| local.captured()) {
+            self.emit_close_upvalue(symbol, local.index());
+        }
+        
         // discard all the locals from the stack
         let mut discard = scope.locals().len();
         while discard > u8::MAX.into() {
@@ -454,6 +459,14 @@ impl CodeGenerator<'_> {
                     self.emit_instr_data(symbol, OpCode::InsertUpvalueExtern16, &index.to_le_bytes());
                 }
             },
+        }
+    }
+    
+    fn emit_close_upvalue(&mut self, symbol: Option<&DebugSymbol>, index: LocalIndex) {
+        if let Ok(index) = u8::try_from(index) {
+            self.emit_instr_byte(symbol, OpCode::CloseUpvalue, index);
+        } else {
+            self.emit_instr_data(symbol, OpCode::CloseUpvalue16, &index.to_le_bytes());
         }
     }
     
@@ -1085,8 +1098,14 @@ impl CodeGenerator<'_> {
         }
         
         // end the function scope
-        // don't need to emit end scope instructions, will be handled by return
+        // don't need to drop locals explicitly, that will be done when the VMCallFrame returns
         let frame = chunk_gen.scope_mut().pop_frame();
+        
+        // however we do still need to close upvalues before we return
+        for local in frame.iter_locals().filter(|local| local.captured()) {
+            chunk_gen.emit_close_upvalue(None, local.index());
+        }
+        
         chunk_gen.finish();
         
         // load the function object as the expression result

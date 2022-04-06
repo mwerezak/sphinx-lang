@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use crate::runtime::{Variant, HashMap};
 use crate::runtime::gc::GC;
 use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
@@ -306,8 +307,13 @@ impl OpenUpvalues {
             .or_insert(vec![ upval_ref ]);
     }
     
-    fn close_upvalues(&mut self, _value: usize) {
-        unimplemented!()
+    fn close_upvalues(&mut self, index: usize, value: Variant) {
+        if let Some(upvalues) = self.upvalues.remove(&index) {
+            let gc_cell = GC::allocate(Cell::new(value));
+            for upvalue in upvalues.iter() {
+                upvalue.borrow().close(gc_cell)
+            }
+        }
     }
 }
 

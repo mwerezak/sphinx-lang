@@ -310,17 +310,14 @@ impl<'c> VMCallFrame<'c> {
             },
             OpCode::LoadLocal => {
                 let index = LocalIndex::from(data[0]);
-                debug_assert!(index < self.locals);
                 stack.push(stack.peek_at(self.from_local_index(index)).clone());
             },
             OpCode::LoadLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
-                debug_assert!(index < self.locals.into());
                 stack.push(stack.peek_at(self.from_local_index(index)).clone());
             },
             OpCode::DropLocals => {
                 let count = LocalIndex::from(data[0]);
-                debug_assert!(count <= self.locals);
                 
                 let locals_end_index = self.from_local_index(self.locals);
                 if stack.len() == locals_end_index {
@@ -384,10 +381,14 @@ impl<'c> VMCallFrame<'c> {
             }
             
             OpCode::CloseUpvalue => {
-                unimplemented!()
+                let local_index = LocalIndex::from(data[0]);
+                let index = self.from_local_index(local_index);
+                upvalues.close_upvalues(index, stack.peek_at(index).clone());
             }
             OpCode::CloseUpvalue16 => {
-                unimplemented!()
+                let local_index = LocalIndex::from(read_le_bytes!(u16, data));
+                let index = self.from_local_index(local_index);
+                upvalues.close_upvalues(index, stack.peek_at(index).clone());
             }
             
             OpCode::Nil => stack.push(Variant::Nil),

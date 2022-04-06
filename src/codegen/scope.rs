@@ -31,6 +31,7 @@ impl Local {
     pub fn decl(&self) -> DeclType { self.decl }
     pub fn name(&self) -> LocalName { self.name }
     pub fn index(&self) -> LocalIndex { self.index }
+    pub fn captured(&self) -> bool { self.captured }
 }
 
 
@@ -179,6 +180,10 @@ impl ScopeFrame {
     }
     
     pub fn upvalues(&self) -> &[Upvalue] { self.upvalues.as_slice() }
+    
+    pub fn iter_locals(&self) -> impl Iterator<Item=&Local> {
+        self.scopes().iter().flat_map(|scope| scope.locals().iter())
+    }
     
     fn scopes(&self) -> &NestedScopes { &self.scopes }
     

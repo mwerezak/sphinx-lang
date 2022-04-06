@@ -111,8 +111,8 @@ impl Upvalue {
     pub fn value(&self) -> Closure { self.value.get() }
     
     #[inline]
-    pub fn close(&self, value_cell: GC<Cell<Variant>>) {
-        self.value.set(Closure::Closed(value_cell))
+    pub fn close(&self, gc_cell: GC<Cell<Variant>>) {
+        self.value.set(Closure::Closed(gc_cell))
     }
 }
 
