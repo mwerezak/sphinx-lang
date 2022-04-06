@@ -103,7 +103,7 @@ impl GlobalEnv {
     }
     
     pub fn allocate() -> GC<Self> {
-        GC::allocate(Self::default())
+        GC::new(Self::default())
     }
     
     pub fn borrow(&self) -> Ref<Namespace> {
@@ -150,7 +150,7 @@ impl Module {
             globals,
         };
         
-        GC::allocate(module)
+        GC::new(module)
     }
     
     pub fn ident(&self) -> &ModuleIdent { &self.ident }

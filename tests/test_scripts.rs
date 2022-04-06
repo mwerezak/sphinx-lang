@@ -25,7 +25,7 @@ fn run_test_script(path: &Path) -> ExecResult<()> {
     
     let program = Program::load(build.program);
     
-    let main_env = GC::allocate(stdlib::prelude_env());
+    let main_env = GC::new(stdlib::prelude_env());
     let main_module = Module::with_env(Some(source), program.data, main_env);
     
     let vm = VirtualMachine::new(main_module, &program.main);

@@ -314,7 +314,7 @@ impl OpenUpvalues {
     
     fn close_upvalues(&mut self, index: usize, value: Variant) {
         if let Some(upvalues) = self.upvalues.remove(&index) {
-            let gc_cell = GC::allocate(Cell::new(value));
+            let gc_cell = GC::new(Cell::new(value));
             for upvalue in upvalues.iter() {
                 upvalue.close(gc_cell)
             }

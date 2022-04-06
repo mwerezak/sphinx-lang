@@ -13,6 +13,15 @@ pub struct GC<T> where T: GCTrace + ?Sized + 'static {
     _marker: PhantomData<Rc<GCBox<T>>>,
 }
 
+impl<T: GCTrace> GC<T> {
+    pub fn new(data: T) -> Self {
+        GC_STATE.with(|gc| {
+            let mut gc = gc.borrow_mut();
+            Self::from_raw(gc.allocate(data))
+        })
+    }
+}
+
 impl<T> GC<T> where T: GCTrace + ?Sized {
     pub(super) fn from_raw(ptr: NonNull<GCBox<T>>) -> Self {
         Self { ptr, _marker: PhantomData }
@@ -27,15 +36,6 @@ impl<T> GC<T> where T: GCTrace + ?Sized {
     
     pub fn ptr_eq(self_gc: &GC<T>, other_gc: &GC<T>) -> bool {
         self_gc.inner().ptr_eq(other_gc.inner())
-    }
-}
-
-impl<T: GCTrace> GC<T> {
-    pub fn allocate(data: T) -> Self {
-        GC_STATE.with(|gc| {
-            let mut gc = gc.borrow_mut();
-            Self::from_raw(gc.allocate(data))
-        })
     }
 }
 

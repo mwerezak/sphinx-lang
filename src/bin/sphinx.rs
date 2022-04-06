@@ -65,7 +65,7 @@ fn main() {
         source = ModuleSource::File(PathBuf::from(s));
         name = s;
     } else {
-        let repl_env = GC::allocate(stdlib::prelude_env());
+        let repl_env = GC::new(stdlib::prelude_env());
         Repl::new(version.to_string(), repl_env).run();
         
         return;
@@ -81,7 +81,7 @@ fn main() {
         if let Some(build) = build_program(&source) {
             let program = Program::load(build.program);
             
-            let repl_env = GC::allocate(stdlib::prelude_env());
+            let repl_env = GC::new(stdlib::prelude_env());
             let main_module = Module::with_env(Some(source), program.data, repl_env);
             
             let vm = VirtualMachine::new(main_module, &program.main);
@@ -99,7 +99,7 @@ fn main() {
     else if let Some(build) = build_program(&source) {
         let program = Program::load(build.program);
         
-        let main_env = GC::allocate(stdlib::prelude_env());
+        let main_env = GC::new(stdlib::prelude_env());
         let main_module = Module::with_env(Some(source), program.data, main_env);
         
         let vm = VirtualMachine::new(main_module, &program.main);

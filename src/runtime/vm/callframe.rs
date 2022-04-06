@@ -269,14 +269,14 @@ impl<'c> VMCallFrame<'c> {
             OpCode::LoadFunction => {
                 let fun_id = FunctionID::from(data[0]);
                 let proto = self.module.get_function(fun_id);
-                let function = GC::allocate(self.make_function(stack, proto));
+                let function = GC::new(self.make_function(stack, proto));
                 upvalues.register(function);
                 stack.push(Variant::Function(function));
             }
             OpCode::LoadFunction16 => {
                 let fun_id = FunctionID::from(read_le_bytes!(u16, data));
                 let proto = self.module.get_function(fun_id);
-                let function = GC::allocate(self.make_function(stack, proto));
+                let function = GC::new(self.make_function(stack, proto));
                 upvalues.register(function);
                 stack.push(Variant::Function(function));
             }

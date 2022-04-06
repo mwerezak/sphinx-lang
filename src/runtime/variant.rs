@@ -136,13 +136,13 @@ impl From<Box<[Variant]>> for Variant {
 
 impl From<Function> for Variant {
     fn from(func: Function) -> Self {
-        Self::Function(GC::allocate(func))
+        Self::Function(GC::new(func))
     }
 }
 
 impl From<NativeFunction> for Variant {
     fn from(func: NativeFunction) -> Self {
-        Self::NativeFunction(GC::allocate(func))
+        Self::NativeFunction(GC::new(func))
     }
 }
 
