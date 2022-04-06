@@ -3,7 +3,7 @@ name = "sphinx-lang"
 version = "0.2.0"
 edition = "2021"
 license = "MIT"
-description = "An intepreter for a dynamic language inspired by Lua and Python, implemented in Rust"
+description = "An intepreter for a dynamic language implemented in Rust"
 readme = "README.md"
 repository = "https://github.com/mwerezak/sphinx-lang"
 categories = ["compilers", "development-tools", "parser-implementations"]
@@ -20,9 +20,10 @@ name = "sphinx-dasm"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/maniefrust.html
 
 [dependencies]
-clap = "3.1.6"
-lazy_static = "1.4"
-string-interner = "0.14"
 ahash = "0.7.6"
+string-interner = "0.14"
+lazy_static = "1.4"
+static_assertions = "1.1.0"
 log = { version = "0.4.0", features = ["release_max_level_off"] }
 env_logger = "0.8.4"
+clap = "3.1.6"

@@ -5,10 +5,7 @@ use std::ptr::{self, NonNull};
 use std::cell::{Cell, RefCell};
 
 mod handle;
-mod array;
-
 pub use handle::GC;
-pub use array::GCArray;
 
 
 /// TODO store GCBoxes in linear chunks instead of individual linked nodes
@@ -27,7 +24,7 @@ impl<T> GCBox<T> where T: GCTrace + ?Sized {
     }
     
     fn ptr_eq(&self, other: &GCBox<T>) -> bool {
-        // in case T is a trait object, work around for https://github.com/rust-lang/rust/issues/46139
+        // in case T is a trait object, work around for <https://github.com/rust-lang/rust/issues/46139>
         ptr::eq(
             ptr::addr_of!(self.marked),
             ptr::addr_of!(other.marked),
@@ -36,7 +33,10 @@ impl<T> GCBox<T> where T: GCTrace + ?Sized {
 }
 
 pub trait GCTrace {
-    /// if the GC'd data owns any allocations, this should return the extra allocated size
+    /// If the GC'd data owns any allocations, this should return the extra allocated size.
+    /// This is only called once when ownership is taken by the GC, and again when dropped,
+    /// so consistency is more important than accuracy when dealing with mutable data that
+    /// can grow in size.
     #[inline]
     fn size_hint(&self) -> usize { 0 }
 }

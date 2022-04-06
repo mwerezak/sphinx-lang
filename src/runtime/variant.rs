@@ -2,15 +2,18 @@ use std::fmt;
 use std::cell::Cell;
 use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
+use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
 use crate::runtime::types::Type;
 use crate::runtime::types::metatable::Metatable;
 use crate::runtime::function::{Function, NativeFunction, Call, Invoke};
 use crate::runtime::types::primitive::*;
 use crate::runtime::strings::StringSymbol;
-use crate::runtime::gc::{GC, GCArray, GCTrace};
+use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
+#[cfg(target_arch = "x86_64")]
+assert_eq_size!(Variant, [u8; 16]);
 
 // Fundamental data value type
 #[derive(Clone, Copy)]
@@ -24,7 +27,7 @@ pub enum Variant {
     Float(FloatType),
     String(StringSymbol),
     
-    Tuple(GCArray<Variant>),
+    Tuple(GC<Box<[Variant]>>), // TODO: stop using Box when DST support is stabilized
     Function(GC<Function>),
     NativeFunction(GC<NativeFunction>),
 }
@@ -130,7 +133,7 @@ impl From<&str> for Variant {
 
 impl From<Box<[Variant]>> for Variant {
     fn from(items: Box<[Variant]>) -> Self {
-        Self::Tuple(GCArray::from_boxed_slice(items))
+        Self::Tuple(GC::new(items))
     }
 }
 
@@ -150,6 +153,8 @@ impl GCTrace for Variant { }
 
 impl GCTrace for Cell<Variant> { }
 
+impl GCTrace for Box<[Variant]> { }
+
 
 // extract the GC handle for GC'd types
 impl TryFrom<Variant> for GC<dyn GCTrace> {
@@ -157,7 +162,7 @@ impl TryFrom<Variant> for GC<dyn GCTrace> {
     
     fn try_from(value: Variant) -> Result<Self, Self::Error> {
         match value {
-            Variant::Tuple(tuple) => Ok(tuple.handle()),
+            Variant::Tuple(tuple) => Ok(tuple.into()),
             Variant::Function(fun) => Ok(fun.into()),
             Variant::NativeFunction(fun) => Ok(fun.into()),
             _ => Err(value),
