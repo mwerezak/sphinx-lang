@@ -1,5 +1,5 @@
 use crate::language::{IntType, FloatType};
-use crate::codegen::{Chunk, ChunkID, ConstID, OpCode};
+use crate::codegen::{OpCode, LocalIndex, UpvalueTarget};
 use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::VMFrameSnapshot;
 use crate::runtime::Variant;
@@ -7,10 +7,9 @@ use crate::runtime::gc::GC;
 use crate::runtime::ops;
 use crate::runtime::function::{Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
-use crate::runtime::module::{Module, Access};
+use crate::runtime::module::{Module, Access, Chunk, ConstID, FunctionID, FunctionProto};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control};
-
 
 /*
     Note: value stack segmentation
@@ -120,8 +119,6 @@ macro_rules! cond_jump {
 }
 
 
-pub type LocalIndex = u16;
-
 #[derive(Debug)]
 pub struct VMCallFrame<'c> {
     module: GC<Module>,
@@ -133,20 +130,20 @@ pub struct VMCallFrame<'c> {
 }
 
 impl<'c> VMCallFrame<'c> {
-    pub fn call_frame(module: GC<Module>, chunk_id: ChunkID, frame_idx: usize, locals: LocalIndex) -> Self {
+    pub fn call_frame(module: GC<Module>, fun_id: FunctionID, frame_idx: usize, locals: LocalIndex) -> Self {
         
         // This hack allows us to get around the self-referentiality of storing both "module" and "chunk"
         // in the same struct. The alternative would be to store "chunk" as an `Option<Box<[u8]>>` and call 
         // `module.data().get_chunk()` before every single instruction, but I want to avoid the overhead of that.
         // SAFETY: This is safe because "module" is rooted as long as this VMCallFrame is in the call stack, 
         // and VMCallFrames are never stored outside of a VirtualMachine's call stack.
-        let chunk: *const [u8] = module.data().get_chunk(chunk_id);
+        let chunk: *const [u8] = module.data().get_chunk(fun_id);
         let chunk = unsafe { chunk.as_ref::<'c>().unwrap() };
         
         Self {
             module,
             chunk,
-            chunk_id: Chunk::ChunkID(chunk_id),
+            chunk_id: Chunk::Function(fun_id),
             frame_idx,
             locals,
             pc: 0,
@@ -211,9 +208,25 @@ impl<'c> VMCallFrame<'c> {
     }
     
     #[inline]
-    fn get_upvalue<'a>(&self, stack: &'a ValueStack, index: UpvalueIndex) -> UpvalueRef {
+    fn get_upvalue(&self, stack: &ValueStack, index: UpvalueIndex) -> UpvalueRef {
         let fun = into_function(*stack.peek_at(self.from_local_index(0)));
         fun.ref_upvalue(index)
+    }
+    
+    fn make_function(&self, stack: &ValueStack, proto: &FunctionProto) -> Function {
+        let upvalues = proto.upvalues.iter().map(|upval| match upval {
+                UpvalueTarget::Local(index) => Upvalue::new(self.from_local_index(*index)),
+                UpvalueTarget::Upvalue(index) => (*self.get_upvalue(stack, *index)).clone(),
+            })
+            .collect::<Vec<Upvalue>>()
+            .into_boxed_slice();
+        
+        Function::new(
+            proto.signature.clone(),
+            self.module,
+            proto.fun_id,
+            upvalues,
+        )
     }
     
     // TODO create a temporary struct for all of these values that can't be stored in the VMCallFrame
@@ -258,14 +271,29 @@ impl<'c> VMCallFrame<'c> {
                 stack.push(stack.peek().clone());
             }
             
+            OpCode::LoadFunction => {
+                let fun_id = FunctionID::from(data[0]);
+                let proto = self.module.get_function(fun_id);
+                let function = GC::allocate(self.make_function(stack, proto));
+                upvalues.register(function);
+                stack.push(Variant::Function(function));
+            }
+            OpCode::LoadFunction16 => {
+                let fun_id = FunctionID::from(read_le_bytes!(u16, data));
+                let proto = self.module.get_function(fun_id);
+                let function = GC::allocate(self.make_function(stack, proto));
+                upvalues.register(function);
+                stack.push(Variant::Function(function));
+            }
+            
             OpCode::LoadConst => {
                 let cid = ConstID::from(data[0]);
-                let value = Module::get_const(self.module, cid);
+                let value = self.module.get_const(cid);
                 stack.push(value);
             },
             OpCode::LoadConst16 => {
                 let cid = ConstID::from(read_le_bytes!(u16, data));
-                let value = Module::get_const(self.module, cid);
+                let value = self.module.get_const(cid);
                 stack.push(value);
             },
             
@@ -329,54 +357,54 @@ impl<'c> VMCallFrame<'c> {
                 self.locals -= count;
             },
             
-            OpCode::InsertUpvalueLocal => {
-                let index = LocalIndex::from(data[0]);
-                let upval = Upvalue::new(self.from_local_index(index));
+            // OpCode::InsertUpvalueLocal => {
+            //     let index = LocalIndex::from(data[0]);
+            //     let upval = Upvalue::new(self.from_local_index(index));
                 
-                let fun = into_function(*stack.peek());
-                upvalues.insert_ref(fun.make_upvalue_ref(upval));
-            }
-            OpCode::InsertUpvalueLocal16 => {
-                let index = LocalIndex::from(read_le_bytes!(u16, data));
-                let upval = Upvalue::new(self.from_local_index(index));
+            //     let fun = into_function(*stack.peek());
+            //     upvalues.insert_ref(fun.make_upvalue_ref(upval));
+            // }
+            // OpCode::InsertUpvalueLocal16 => {
+            //     let index = LocalIndex::from(read_le_bytes!(u16, data));
+            //     let upval = Upvalue::new(self.from_local_index(index));
                 
-                let fun = into_function(*stack.peek());
-                upvalues.insert_ref(fun.make_upvalue_ref(upval));
-            }
-            OpCode::InsertUpvalueExtern => {
-                let index = UpvalueIndex::from(data[0]);
-                let upval = self.get_upvalue(stack, index).borrow().clone();
+            //     let fun = into_function(*stack.peek());
+            //     upvalues.insert_ref(fun.make_upvalue_ref(upval));
+            // }
+            // OpCode::InsertUpvalueExtern => {
+            //     let index = UpvalueIndex::from(data[0]);
+            //     let upval = self.get_upvalue(stack, index).borrow().clone();
                 
-                let fun = into_function(*stack.peek());
-                let upval_ref = fun.make_upvalue_ref(upval);
-                upvalues.insert_ref(upval_ref)
-            }
-            OpCode::InsertUpvalueExtern16 => {
-                let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let upval = self.get_upvalue(stack, index).borrow().clone();
+            //     let fun = into_function(*stack.peek());
+            //     let upval_ref = fun.make_upvalue_ref(upval);
+            //     upvalues.insert_ref(upval_ref)
+            // }
+            // OpCode::InsertUpvalueExtern16 => {
+            //     let index = UpvalueIndex::from(read_le_bytes!(u16, data));
+            //     let upval = self.get_upvalue(stack, index).borrow().clone();
                 
-                let fun = into_function(*stack.peek());
-                let upval_ref = fun.make_upvalue_ref(upval);
-                upvalues.insert_ref(upval_ref)
-            }
+            //     let fun = into_function(*stack.peek());
+            //     let upval_ref = fun.make_upvalue_ref(upval);
+            //     upvalues.insert_ref(upval_ref)
+            // }
             OpCode::StoreUpvalue => {
                 let index = UpvalueIndex::from(data[0]);
-                let closure = self.get_upvalue(stack, index).borrow().value();
+                let closure = self.get_upvalue(stack, index).value();
                 stack.set_closure(&closure, stack.peek().clone());
             }
             OpCode::StoreUpvalue16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let closure = self.get_upvalue(stack, index).borrow().value();
+                let closure = self.get_upvalue(stack, index).value();
                 stack.set_closure(&closure, stack.peek().clone());
             }
             OpCode::LoadUpvalue => {
                 let index = UpvalueIndex::from(data[0]);
-                let closure = self.get_upvalue(stack, index).borrow().value();
+                let closure = self.get_upvalue(stack, index).value();
                 stack.push(stack.get_closure(&closure));
             }
             OpCode::LoadUpvalue16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let closure = self.get_upvalue(stack, index).borrow().value();
+                let closure = self.get_upvalue(stack, index).value();
                 stack.push(stack.get_closure(&closure));
             }
             

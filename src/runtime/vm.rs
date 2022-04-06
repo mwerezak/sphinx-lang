@@ -1,4 +1,6 @@
 use std::cell::Cell;
+use std::ops::Deref;
+use crate::codegen::LocalIndex;
 use crate::runtime::{Variant, HashMap};
 use crate::runtime::gc::GC;
 use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
@@ -8,7 +10,6 @@ use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::{VMSnapshot, VMFrameSnapshot};
 
 mod callframe;
-pub use callframe::LocalIndex;
 
 use callframe::{VMCallFrame};
 
@@ -37,10 +38,12 @@ struct UpvalueRef {
     index: UpvalueIndex,
 }
 
-impl UpvalueRef {
+impl Deref for UpvalueRef {
+    type Target = Upvalue;
+    
     #[inline(always)]
-    fn borrow(&self) -> impl std::ops::Deref<Target=Upvalue> + '_ {
-        self.fun.get_upvalue(self.index)
+    fn deref(&self) -> &Self::Target {
+        &self.fun.upvalues()[usize::from(self.index)]
     }
 }
 
@@ -51,13 +54,6 @@ impl GC<Function> {
             fun: self,
             index
         }
-    }
-    
-    // Inserts an upvalue into a GC'd function, creating an UpvalueRef
-    #[inline(always)]
-    fn make_upvalue_ref(self, upvalue: Upvalue) -> UpvalueRef {
-        let idx = self.insert_upvalue(upvalue);
-        self.ref_upvalue(idx)
     }
 }
 
@@ -294,10 +290,19 @@ impl OpenUpvalues {
         }
     }
     
+    fn register(&mut self, function: GC<Function>) {
+        for (index, upval) in function.upvalues().iter().enumerate() {
+            if upval.value().is_open() {
+                let upval_ref = function.ref_upvalue(index.try_into().unwrap());
+                self.insert_ref(upval_ref);
+            }
+        }
+    }
+    
     fn insert_ref(&mut self, upval_ref: UpvalueRef) {
         // let weak_ref = upval_ref.into()  // TODO use weak references
         
-        let index = match upval_ref.borrow().value() {
+        let index = match upval_ref.value() {
             Closure::Open(index) => index,
             _ => panic!("insert non-open upvalue"),
         };
@@ -311,7 +316,7 @@ impl OpenUpvalues {
         if let Some(upvalues) = self.upvalues.remove(&index) {
             let gc_cell = GC::allocate(Cell::new(value));
             for upvalue in upvalues.iter() {
-                upvalue.borrow().close(gc_cell)
+                upvalue.close(gc_cell)
             }
         }
     }

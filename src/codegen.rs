@@ -7,7 +7,6 @@ use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary, AccessItem};
 use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
 use crate::parser::fundefs::{FunctionDef, SignatureDef};
-use crate::runtime::vm::LocalIndex;
 use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
 use crate::runtime::strings::{StringInterner};
 use crate::debug::symbol::{DebugSymbol, ChunkSymbols, DebugSymbolTable};
@@ -16,17 +15,19 @@ mod scope;
 
 pub mod chunk;
 pub mod consts;
+pub mod funproto;
 pub mod opcodes;
 pub mod errors;
 
-pub use opcodes::OpCode;
-pub use chunk::{UnloadedProgram, Program, ProgramData, Chunk, ChunkID};
+pub use opcodes::{OpCode, LocalIndex};
+pub use chunk::{UnloadedProgram, Program, ProgramData, Chunk};
 pub use consts::{ConstID, Constant};
+pub use funproto::{FunctionID, FunctionProto, UpvalueTarget};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
-use scope::{ScopeTracker, LocalName, UpvalueTarget};
+use scope::{ScopeTracker, LocalName};
 use chunk::{ChunkBuilder, ChunkInfo, ChunkBuf};
-use consts::{UnloadedSignature, UnloadedParam};
+use funproto::{UnloadedFunction, UnloadedSignature, UnloadedParam};
 
 
 // Helpers
@@ -310,6 +311,21 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
+    fn make_function(&mut self, symbol: Option<&DebugSymbol>, function: UnloadedFunction) -> CompileResult<FunctionID> {
+        self.builder_mut().insert_function(function)
+    }
+    
+    fn emit_load_function(&mut self, symbol: Option<&DebugSymbol>, function: UnloadedFunction) -> CompileResult<()> {
+        let fun_id = self.make_function(symbol, function)?;
+        
+        if fun_id <= u8::MAX.into() {
+            self.emit_instr_byte(symbol, OpCode::LoadFunction, u8::try_from(fun_id).unwrap());
+        } else {
+            self.emit_instr_data(symbol, OpCode::LoadFunction16, &fun_id.to_le_bytes());
+        }
+        Ok(())
+    }
+    
     ///////// Jumps /////////
     
     fn emit_jump_instr(&mut self, symbol: Option<&DebugSymbol>, jump: Jump, target: usize) -> CompileResult<()> {
@@ -439,26 +455,6 @@ impl CodeGenerator<'_> {
             Ok(Some(index))
         } else {
             Ok(None)
-        }
-    }
-    
-    fn emit_upvalue(&mut self, symbol: Option<&DebugSymbol>, target: UpvalueTarget) {
-        match target {
-            UpvalueTarget::Local(index) => {
-                if let Ok(index) = u8::try_from(index) {
-                    self.emit_instr_byte(symbol, OpCode::InsertUpvalueLocal, index);
-                } else {
-                    self.emit_instr_data(symbol, OpCode::InsertUpvalueLocal16, &index.to_le_bytes());
-                }
-            },
-            
-            UpvalueTarget::Upvalue(index) => {
-                if let Ok(index) = u8::try_from(index) {
-                    self.emit_instr_byte(symbol, OpCode::InsertUpvalueExtern, index);
-                } else {
-                    self.emit_instr_data(symbol, OpCode::InsertUpvalueExtern16, &index.to_le_bytes());
-                }
-            },
         }
     }
     
@@ -1058,22 +1054,17 @@ impl CodeGenerator<'_> {
     ///////// Function Definitions /////////
     
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
-        // compile the function signature
-        let signature = self.compile_function_signature(symbol, &fundef.signature)?;
-        let function_id = self.builder_mut().push_function(signature);
-        
         // create a new chunk for the function
         let info = ChunkInfo::Function {
-            id: function_id,
             symbol: symbol.map(|symbol| *symbol),
         };
 
         let mut chunk_gen = self.create_chunk(info)?;
         
-        let chunk = chunk_gen.chunk_id();
-        let chunk_id = match chunk {
-            Chunk::ChunkID(chunk_id) => chunk_id,
-            _ => panic!("chunk {:?} is not valid for function", chunk),
+        let chunk_id = chunk_gen.chunk_id();
+        let fun_id = match chunk_id {
+            Chunk::Function(fun_id) => fun_id,
+            _ => panic!("chunk {:?} is not valid for function", chunk_id),
         };
         
         // and a new local scope
@@ -1108,13 +1099,21 @@ impl CodeGenerator<'_> {
         
         chunk_gen.finish();
         
-        // load the function object as the expression result
-        self.emit_load_const(symbol, Constant::Function(chunk_id, function_id))?;
+        // compile the function signature
+        let signature = self.compile_function_signature(symbol, &fundef.signature)?;
         
         // compile upvalues
-        for upvalue in frame.upvalues().iter() {
-            self.emit_upvalue(symbol, upvalue.target());
-        }
+        let upvalues = frame.upvalues().iter()
+            .map(|upval| upval.target())
+            .collect::<Vec<UpvalueTarget>>()
+            .into_boxed_slice();
+        
+        let function = UnloadedFunction {
+            signature, upvalues, fun_id,
+        };
+        
+        // load the function object as the expression result
+        self.emit_load_function(symbol, function)?;
         
         Ok(())
     }

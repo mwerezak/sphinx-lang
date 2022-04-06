@@ -18,7 +18,7 @@ use crate::runtime::function::Function;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
-pub use crate::codegen::{ProgramData, Constant, ConstID, Chunk, ChunkID};
+pub use crate::codegen::{ProgramData, Constant, Chunk, FunctionProto, ConstID, FunctionID};
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,20 +164,19 @@ impl Module {
     pub fn globals(&self) -> &GlobalEnv { &self.globals }
     
     #[inline]
-    pub fn get_const(self_module: GC<Self>, cid: ConstID) -> Variant {
-        match *self_module.data.get_const(cid) {
-            Constant::Integer(value) => Variant::from(value),
+    pub fn get_const(&self, cid: ConstID) -> Variant {
+        match self.data.get_const(cid) {
+            Constant::Integer(value) => Variant::from(*value),
             
-            Constant::Float(bytes) => FloatType::from_le_bytes(bytes).into(),
+            Constant::Float(bytes) => FloatType::from_le_bytes(*bytes).into(),
             
-            Constant::String(idx) => Variant::from(*self_module.data.get_string(idx)),
-            
-            Constant::Function(chunk_id, function_id) => {
-                let signature = self_module.data.get_signature(function_id);
-                let function = Function::new(signature.clone(), self_module, chunk_id);
-                Variant::from(function)
-            }
+            Constant::String(idx) => Variant::from(*self.data.get_string(*idx)),
         }
+    }
+    
+    #[inline]
+    pub fn get_function(&self, fun_id: FunctionID) -> &FunctionProto {
+        self.data.get_function(fun_id)
     }
 }
 

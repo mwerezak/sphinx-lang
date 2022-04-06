@@ -2,9 +2,9 @@
 
 use crate::language::InternSymbol;
 use crate::parser::lvalue::DeclType;
-use crate::runtime::vm::LocalIndex;
-use crate::runtime::function::UpvalueIndex;
 use crate::debug::symbol::DebugSymbol;
+use crate::codegen::opcodes::{LocalIndex, UpvalueIndex};
+use crate::codegen::funproto::UpvalueTarget;
 use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
 
 
@@ -146,12 +146,6 @@ pub struct Upvalue {
     name: LocalName,
     index: UpvalueIndex,
     target: UpvalueTarget,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum UpvalueTarget {
-    Local(LocalIndex),
-    Upvalue(UpvalueIndex),
 }
 
 impl Upvalue {

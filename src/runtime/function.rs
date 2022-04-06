@@ -1,5 +1,5 @@
 use std::cell::{RefCell, Ref, Cell};
-use crate::codegen::{ChunkID};
+use crate::codegen::FunctionID;
 use crate::runtime::Variant;
 use crate::runtime::module::Module;
 use crate::runtime::gc::{GC, GCTrace};
@@ -8,13 +8,14 @@ use crate::runtime::errors::ExecResult;
 mod signature;
 
 pub use signature::{Signature, Parameter};
+pub use crate::codegen::opcodes::UpvalueIndex;
 
 
 /// Call directive
 
 
 pub enum Call {
-    Chunk(GC<Module>, ChunkID),
+    Chunk(GC<Module>, FunctionID),
     Native(GC<NativeFunction>),
 }
 
@@ -35,38 +36,23 @@ pub trait Invoke {
 pub struct Function {
     signature: Signature,
     module: GC<Module>,
-    chunk_id: ChunkID,
-    upvalues: RefCell<Vec<Upvalue>>,
+    fun_id: FunctionID,
+    upvalues: Box<[Upvalue]>,
 }
 
 impl GCTrace for Function { }
 
 impl Function {
-    pub fn new(signature: Signature, module: GC<Module>, chunk_id :ChunkID) -> Self {
+    pub fn new(signature: Signature, module: GC<Module>, fun_id: FunctionID, upvalues: Box<[Upvalue]>) -> Self {
         Self { 
             signature, 
             module, 
-            chunk_id,
-            upvalues: RefCell::new(Vec::new()),
+            fun_id,
+            upvalues,
         }
     }
     
-    pub fn upvalue_len(&self) -> usize {
-        self.upvalues.borrow().len()
-    }
-    
-    pub fn get_upvalue(&self, index: UpvalueIndex) -> Ref<Upvalue> {
-        Ref::map(self.upvalues.borrow(), |upvals| &upvals[usize::from(index)])
-    }
-    
-    pub fn insert_upvalue(&self, upvalue: Upvalue) -> UpvalueIndex {
-        let mut upvalues = self.upvalues.borrow_mut();
-        
-        let index = UpvalueIndex::try_from(upvalues.len())
-            .expect("upvalue index overflow");
-        upvalues.push(upvalue);
-        index
-    }
+    pub fn upvalues(&self) -> &[Upvalue] { &self.upvalues }
 }
 
 impl Invoke for Function {
@@ -74,14 +60,12 @@ impl Invoke for Function {
     
     #[inline]
     fn as_call(&self) -> Call {
-        Call::Chunk(self.module, self.chunk_id)
+        Call::Chunk(self.module, self.fun_id)
     }
 }
 
 
 // Closures
-
-pub type UpvalueIndex = u16;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Closure {

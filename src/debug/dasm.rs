@@ -7,6 +7,7 @@ use crate::language::FloatType;
 use crate::codegen::OpCode;
 use crate::codegen::chunk::{UnloadedProgram, Chunk};
 use crate::codegen::consts::{Constant, ConstID};
+use crate::codegen::funproto::{UnloadedFunction, FunctionID};
 use crate::debug::symbol::{DebugSymbol, DebugSymbolTable, ResolvedSymbol, ResolvedSymbolTable, ChunkSymbols};
 use crate::debug::symbol::errors::SymbolResolutionError;
 
@@ -46,9 +47,26 @@ impl<'c, 's> Disassembler<'c, 's> {
         self.decode_chunk(fmt, self.program.main(), symbols)?;
         
         for (chunk_id, chunk) in self.program.iter_chunks() {
-            writeln!(fmt, "\n\nchunk {}:\n", chunk_id)?;
+            match chunk_id {
+                Chunk::Function(fun_id) => {
+                    let function = self.program.get_function(fun_id);
+                    let name = function.signature.name
+                        .and_then(|cid| self.try_get_string(cid));
+                    
+                    if let Some(name) = name {
+                        writeln!(fmt, "\n\nchunk {} ({}):\n", fun_id, name)?;
+                    } else {
+                        
+                        writeln!(fmt, "\n\nchunk {}:\n", fun_id)?;
+                    }
+                },
+                
+                _ => {
+                    writeln!(fmt, "\n\nchunk:\n")?;
+                }
+            }
             
-            let symbols = self.symbols.map(|symbols| symbols.get(&Chunk::ChunkID(chunk_id))).flatten();
+            let symbols = self.symbols.map(|symbols| symbols.get(&chunk_id)).flatten();
             self.decode_chunk(fmt, chunk, symbols)?;
         }
         
@@ -116,7 +134,7 @@ impl<'c, 's> Disassembler<'c, 's> {
                 }
                 
                 OpCode::LoadConst => {
-                    let cid = instr[1];
+                    let cid = ConstID::from(instr[1]);
                     write!(line, "{:16} {: >4}    ", opcode, cid)?;
                     self.write_const(&mut line, self.program.get_const(cid))?;
                 },
@@ -127,45 +145,48 @@ impl<'c, 's> Disassembler<'c, 's> {
                     self.write_const(&mut line, self.program.get_const(cid))?;
                 },
                 
+                OpCode::LoadFunction => {
+                    let fun_id = FunctionID::from(instr[1]);
+                    write!(line, "{:16} {: >4}    ", opcode, fun_id)?;
+                    self.write_function(&mut line, self.program.get_function(fun_id))?;
+                },
+                
+                OpCode::LoadFunction16 => {
+                    let fun_id = FunctionID::from_le_bytes(instr[1..=2].try_into().unwrap());
+                    write!(line, "{:16} {: >4}    ", opcode, fun_id)?;
+                    self.write_function(&mut line, self.program.get_function(fun_id))?;
+                },
+                
                 OpCode::StoreLocal | OpCode::LoadLocal => {
                     let index = instr[1];
-                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                    write!(line, "{:16} {: >4}", opcode, index)?;
                 },
                 OpCode::StoreLocal16 | OpCode::LoadLocal16 => {
                     let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
-                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                    write!(line, "{:16} {: >4}", opcode, index)?;
                 },
-                
-                OpCode::InsertUpvalueLocal | OpCode::InsertUpvalueExtern => {
-                    let index = instr[1];
-                    write!(line, "{:16} {: >4}    ", opcode, index)?;
-                }
-                OpCode::InsertUpvalueLocal16 | OpCode::InsertUpvalueExtern16 => {
-                    let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
-                    write!(line, "{:16} {: >4}    ", opcode, index)?;
-                }
                 
                 OpCode::StoreUpvalue | OpCode::LoadUpvalue => {
                     let index = instr[1];
-                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                    write!(line, "{:16} {: >4}", opcode, index)?;
                 }
                 OpCode::StoreUpvalue16 | OpCode::LoadUpvalue16 => {
                     let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
-                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                    write!(line, "{:16} {: >4}", opcode, index)?;
                 }
                 
                 OpCode::CloseUpvalue => {
                     let index = instr[1];
-                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                    write!(line, "{:16} {: >4}", opcode, index)?;
                 }
                 OpCode::CloseUpvalue16 => {
                     let index =  u16::from_le_bytes(instr[1..=2].try_into().unwrap());
-                    write!(line, "{:16} {: >4}    ", opcode, index)?;
+                    write!(line, "{:16} {: >4}", opcode, index)?;
                 }
                 
                 OpCode::Tuple => {
                     let len = instr[1];
-                    write!(line, "{:16} {: >4}    ", opcode, len)?;
+                    write!(line, "{:16} {: >4}", opcode, len)?;
                 }
                 
                 OpCode::UInt8 => {
@@ -269,6 +290,21 @@ impl<'c, 's> Disassembler<'c, 's> {
         
         write!(fmt, "{}", value)
     }
+    
+    fn write_function(&self, fmt: &mut impl fmt::Write, function: &UnloadedFunction) -> fmt::Result {
+        if let Some(name) = function.signature.name.and_then(|cid| self.try_get_string(cid)) {
+            write!(fmt, "'fun {}()'", name)
+        } else {
+            write!(fmt, "'fun()'")
+        }
+    }
+    
+    fn try_get_string(&self, cid: ConstID) -> Option<&str> {
+        match self.program.get_const(cid) {
+            Constant::String(index) => Some(self.program.get_string(*index)),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Disassembler<'_, '_> {
@@ -284,8 +320,12 @@ impl fmt::Display for Constant {
             Self::Integer(value) => write!(fmt, "'{}'", value),
             Self::Float(bytes) => write!(fmt, "'{:.6}'", FloatType::from_le_bytes(*bytes)),
             Self::String(symbol) => write!(fmt, "${}", symbol.to_usize() + 1),
-            Self::Function(chunk_id, _) => write!(fmt, "fun #{}", chunk_id),
         }
     }
 }
 
+impl fmt::Display for UnloadedFunction {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        write!(fmt, "chunk {}", self.fun_id)
+    }
+}

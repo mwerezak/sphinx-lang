@@ -6,23 +6,22 @@ use crate::language::InternSymbol;
 use crate::runtime::{DefaultBuildHasher, STRING_TABLE};
 use crate::runtime::strings::{StringInterner, StringSymbol};
 use crate::runtime::function::{Signature, Parameter};
-use crate::codegen::consts::{Constant, ConstID, StringID, FunctionID, UnloadedSignature, UnloadedParam};
+use crate::codegen::consts::{Constant, ConstID, StringID};
+use crate::codegen::funproto::{FunctionProto, UnloadedFunction, UnloadedSignature, UnloadedParam, FunctionID};
 use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
 use crate::debug::DebugSymbol;
 
 
-// these are limited to u16 right now because they are loaded by opcodes
-pub type ChunkID = u16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Chunk {
     Main,
-    ChunkID(ChunkID),
+    Function(FunctionID),
 }
 
-impl From<ChunkID> for Chunk {
-    fn from(chunk_id: ChunkID) -> Self {
-        Self::ChunkID(chunk_id)
+impl From<FunctionID> for Chunk {
+    fn from(fun_id: FunctionID) -> Self {
+        Self::Function(fun_id)
     }
 }
 
@@ -31,7 +30,6 @@ impl From<ChunkID> for Chunk {
 pub enum ChunkInfo {
     ModuleMain,
     Function {
-        id: FunctionID,
         symbol: Option<DebugSymbol>,
     },
 }
@@ -97,7 +95,7 @@ pub struct ChunkBuilder {
     main: ChunkBuf,
     chunks: Vec<ChunkBuf>,
     consts: Vec<Constant>,
-    functions: Vec<UnloadedSignature>,
+    functions: Vec<UnloadedFunction>,
     dedup: HashMap<Constant, ConstID, DefaultBuildHasher>,
     strings: StringInterner,
 }
@@ -127,7 +125,7 @@ impl ChunkBuilder {
     // Bytecode
     
     pub fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<Chunk> {
-        let chunk_id = ChunkID::try_from(self.chunks.len())
+        let chunk_id = FunctionID::try_from(self.chunks.len())
             .map_err(|_| CompileError::from(ErrorKind::ChunkCountLimit))?;
         
         self.chunks.push(ChunkBuf::new(info));
@@ -138,14 +136,14 @@ impl ChunkBuilder {
     pub fn chunk(&self, chunk_id: Chunk) -> &ChunkBuf {
         match chunk_id {
             Chunk::Main => &self.main,
-            Chunk::ChunkID(id) => &self.chunks[usize::from(id)],
+            Chunk::Function(id) => &self.chunks[usize::from(id)],
         }
     }
     
     pub fn chunk_mut(&mut self, chunk_id: Chunk) -> &mut ChunkBuf { 
         match chunk_id {
             Chunk::Main => &mut self.main,
-            Chunk::ChunkID(id) => &mut self.chunks[usize::from(id)],
+            Chunk::Function(id) => &mut self.chunks[usize::from(id)],
         }
     }
     
@@ -161,7 +159,7 @@ impl ChunkBuilder {
             Ok(*cid)
         } else {
             let cid = ConstID::try_from(self.consts.len())
-                .map_err(|_| CompileError::from(ErrorKind::ConstPoolLimit))?;
+                .map_err(|_| CompileError::new("constant pool limit reached"))?;
             self.consts.push(value);
             self.dedup.insert(value, cid);
             Ok(cid)
@@ -173,10 +171,12 @@ impl ChunkBuilder {
         self.get_or_insert_const(Constant::String(symbol.to_usize()))
     }
     
-    pub fn push_function(&mut self, signature: UnloadedSignature) -> FunctionID {
-        let function_id = FunctionID::from(self.functions.len());
-        self.functions.push(signature);
-        function_id
+    pub fn insert_function(&mut self, fun_proto: UnloadedFunction) -> CompileResult<FunctionID> {
+        let fun_id = FunctionID::try_from(self.functions.len())
+            .map_err(|_| CompileError::new("function limit reached"))?;
+        
+        self.functions.push(fun_proto);
+        Ok(fun_id)
     }
     
     // Output
@@ -270,7 +270,7 @@ pub struct UnloadedProgram {
     strings: Box<[u8]>,
     string_index: Box<[StringIndex]>,
     consts: Box<[Constant]>,
-    functions: Box<[UnloadedSignature]>,
+    functions: Box<[UnloadedFunction]>,
 }
 
 impl UnloadedProgram {
@@ -278,21 +278,21 @@ impl UnloadedProgram {
         &self.main
     }
     
-    pub fn get_chunk(&self, chunk_id: ChunkID) -> &[u8] {
-        let chunk_idx = &self.chunk_index[usize::from(chunk_id)];
+    pub fn get_chunk(&self, fun_id: FunctionID) -> &[u8] {
+        let chunk_idx = &self.chunk_index[usize::from(fun_id)];
         &self.chunks[chunk_idx.as_range()]
     }
     
-    pub fn chunk_info(&self, chunk_id: ChunkID) -> &ChunkInfo {
-        let chunk_idx = &self.chunk_index[usize::from(chunk_id)];
+    pub fn chunk_info(&self, fun_id: FunctionID) -> &ChunkInfo {
+        let chunk_idx = &self.chunk_index[usize::from(fun_id)];
         chunk_idx.info()
     }
     
-    pub fn iter_chunks(&self) -> impl Iterator<Item=(ChunkID, &[u8])> {
+    pub fn iter_chunks(&self) -> impl Iterator<Item=(Chunk, &[u8])> {
         self.chunk_index.iter()
             .map(|index| &self.chunks[index.as_range()])
             .enumerate()
-            .map(|(chunk_id, chunk)| (ChunkID::try_from(chunk_id).unwrap(), chunk))
+            .map(|(fun_id, chunk)| (Chunk::Function(fun_id.try_into().unwrap()), chunk))
     }
     
     pub fn get_string(&self, string_id: StringID) -> &str {
@@ -307,8 +307,12 @@ impl UnloadedProgram {
             .enumerate()
     }
     
-    pub fn get_const(&self, index: impl Into<ConstID>) -> &Constant {
-        &self.consts[usize::from(index.into())]
+    pub fn get_const(&self, index: ConstID) -> &Constant {
+        &self.consts[usize::from(index)]
+    }
+    
+    pub fn get_function(&self, index: FunctionID) -> &UnloadedFunction {
+        &self.functions[usize::from(index)]
     }
 }
 
@@ -320,19 +324,19 @@ pub struct ProgramData {
     chunk_index: Box<[ChunkIndex]>,
     strings: Box<[StringSymbol]>,
     consts: Box<[Constant]>,
-    functions: Box<[Signature]>,
+    functions: Box<[FunctionProto]>,
 }
 
 impl ProgramData {
 
     #[inline(always)]
-    pub fn get_chunk(&self, chunk_id: ChunkID) -> &[u8] {
-        let index = &self.chunk_index[usize::from(chunk_id)];
+    pub fn get_chunk(&self, fun_id: FunctionID) -> &[u8] {
+        let index = &self.chunk_index[usize::from(fun_id)];
         &self.chunks[index.as_range()]
     }
     
-    pub fn chunk_info(&self, chunk_id: ChunkID) -> &ChunkInfo {
-        let index = &self.chunk_index[usize::from(chunk_id)];
+    pub fn chunk_info(&self, fun_id: FunctionID) -> &ChunkInfo {
+        let index = &self.chunk_index[usize::from(fun_id)];
         &index.info
     }
     
@@ -344,7 +348,7 @@ impl ProgramData {
         &self.strings[usize::from(index)]
     }
     
-    pub fn get_signature(&self, index: FunctionID) -> &Signature {
+    pub fn get_function(&self, index: FunctionID) -> &FunctionProto {
         &self.functions[usize::from(index)]
     }
     
@@ -372,8 +376,8 @@ impl Program {
             strings
         });
         
-        let functions: Vec<Signature> = program.functions.into_vec().into_iter()
-            .map(|signature| Self::load_signature(signature, &program.consts, &strings))
+        let functions: Vec<FunctionProto> = program.functions.into_vec().into_iter()
+            .map(|function| Self::load_function(function, &program.consts, &strings))
             .collect();
         
         Self {
@@ -388,10 +392,12 @@ impl Program {
         }
     }
     
-    fn load_parameter(param: UnloadedParam, consts: &[Constant], strings: &[StringSymbol]) -> Parameter {
-        let string_id = consts[usize::from(param.name)].try_into_string_id().unwrap();
-        let name = strings[usize::from(string_id)];
-        Parameter::new(name, param.decl)
+    fn load_function(function: UnloadedFunction, consts: &[Constant], strings: &[StringSymbol]) -> FunctionProto {
+        FunctionProto {
+            signature: Self::load_signature(function.signature, consts, strings),
+            upvalues: function.upvalues,
+            fun_id: function.fun_id,
+        }
     }
     
     fn load_signature(signature: UnloadedSignature, consts: &[Constant], strings: &[StringSymbol]) -> Signature {
@@ -410,6 +416,12 @@ impl Program {
             .map(|param| Self::load_parameter(param, consts, strings));
         
         Signature::new(name, required, default, variadic)
+    }
+    
+    fn load_parameter(param: UnloadedParam, consts: &[Constant], strings: &[StringSymbol]) -> Parameter {
+        let string_id = consts[usize::from(param.name)].try_into_string_id().unwrap();
+        let name = strings[usize::from(string_id)];
+        Parameter::new(name, param.decl)
     }
 }
 

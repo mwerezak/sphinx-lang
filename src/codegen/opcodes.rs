@@ -1,5 +1,10 @@
 use std::mem::size_of;
 
+
+pub type LocalIndex = u16;
+pub type UpvalueIndex = u16;
+
+
 // Opcodes
 
 // Rust enums are not like C enums! They're more like unions.
@@ -34,34 +39,33 @@ const OP_CLONE:            u8 = 0x12;  // [ value ] => [ value value ]
 const OP_TUPLE:            u8 = 0x13;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
 const OP_TUPLEN:           u8 = 0x14;  // [ item[0] ... item[N] N ] => [ tuple ]
 
-const OP_LD_CONST:         u8 = 0x15;  // (u8); _ => [ value ]
-const OP_LD_CONST_16:      u8 = 0x16;  // (u16); _ => [ value ]
-// const OP_LD_CONST_32:   u8 = 0x17;  // (u32); _ => [ value ]
+const OP_LD_FUN:           u8 = 0x18;  // (u8);  _ => [ function ]
+const OP_LD_FUN_16:        u8 = 0x19;  // (u16); _ => [ function ]
 
-const OP_IN_GLOBAL_IM:     u8 = 0x18;  // [ value name ] => [ value ]
-const OP_IN_GLOBAL_MUT:    u8 = 0x19;  // [ value name ] => [ value ]
-const OP_ST_GLOBAL:        u8 = 0x1A;  // [ value name ] => [ value ]
-const OP_LD_GLOBAL:        u8 = 0x1B;  // [ name ] => [ value ]
-const OP_DP_GLOBAL:        u8 = 0x1C;  // [ name ] => []
+const OP_LD_CONST:         u8 = 0x1A;  // (u8);  _ => [ value ]
+const OP_LD_CONST_16:      u8 = 0x1B;  // (u16); _ => [ value ]
+// const OP_LD_CONST_32:   u8 = 0x1C;  // (u32); _ => [ value ]
 
-const OP_IN_LOCAL:         u8 = 0x20;  // [ value ] => [ value ]; vm.locals += 1
-const OP_ST_LOCAL:         u8 = 0x21;  // (u8);  [ value ] => [ value ]
-const OP_ST_LOCAL_16:      u8 = 0x22;  // (u16); [ value ] => [ value ]
-const OP_LD_LOCAL:         u8 = 0x23;  // (u8);  _ => [ value ]
-const OP_LD_LOCAL_16:      u8 = 0x24;  // (u16); _ => [ value ]
-const OP_DP_LOCALS:        u8 = 0x25;  // (u8); [ local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
+const OP_IN_GLOBAL_IM:     u8 = 0x1D;  // [ value name ] => [ value ]
+const OP_IN_GLOBAL_MUT:    u8 = 0x1E;  // [ value name ] => [ value ]
+const OP_ST_GLOBAL:        u8 = 0x1F;  // [ value name ] => [ value ]
+const OP_LD_GLOBAL:        u8 = 0x20;  // [ name ] => [ value ]
+const OP_DP_GLOBAL:        u8 = 0x21;  // [ name ] => []
 
-const OP_IN_UPVAL_LOC:     u8 = 0x28;  // (u8);  [ function ] => [ function ]
-const OP_IN_UPVAL_LOC_16:  u8 = 0x29;  // (u16); [ function ] => [ function ]
-const OP_IN_UPVAL_EXT:     u8 = 0x2A;  // (u8);  [ function ] => [ function ]
-const OP_IN_UPVAL_EXT_16:  u8 = 0x2B;  // (u16); [ function ] => [ function ]
-const OP_ST_UPVAL:         u8 = 0x2C;  // (u8);  [ value ] => [ value ]
-const OP_ST_UPVAL_16:      u8 = 0x2D;  // (u16); [ value ] => [ value ]
-const OP_LD_UPVAL:         u8 = 0x2E;  // (u8);  _ => [ value ]
-const OP_LD_UPVAL_16:      u8 = 0x2F;  // (u16); _ => [ value ]
+const OP_IN_LOCAL:         u8 = 0x22;  // [ value ] => [ value ]; vm.locals += 1
+const OP_ST_LOCAL:         u8 = 0x23;  // (u8);  [ value ] => [ value ]
+const OP_ST_LOCAL_16:      u8 = 0x24;  // (u16); [ value ] => [ value ]
+const OP_LD_LOCAL:         u8 = 0x25;  // (u8);  _ => [ value ]
+const OP_LD_LOCAL_16:      u8 = 0x26;  // (u16); _ => [ value ]
+const OP_DP_LOCALS:        u8 = 0x27;  // (u8); [ local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
 
-const OP_CLOSE_UPVAL:      u8 = 0x30;  // (u8);
-const OP_CLOSE_UPVAL_16:   u8 = 0x31;  // (u16);
+const OP_ST_UPVAL:         u8 = 0x28;  // (u8);  [ value ] => [ value ]
+const OP_ST_UPVAL_16:      u8 = 0x29;  // (u16); [ value ] => [ value ]
+const OP_LD_UPVAL:         u8 = 0x2A;  // (u8);  _ => [ value ]
+const OP_LD_UPVAL_16:      u8 = 0x2B;  // (u16); _ => [ value ]
+
+const OP_CLOSE_UPVAL:      u8 = 0x2C;  // (u8);
+const OP_CLOSE_UPVAL_16:   u8 = 0x2E;  // (u16);
 
 // const OP_LD_NAME:       u8 = 0x38;
 // const OP_LD_INDEX:      u8 = 0x39;
@@ -158,6 +162,9 @@ pub enum OpCode {
     Tuple = OP_TUPLE,
     TupleN = OP_TUPLEN,
     
+    LoadFunction = OP_LD_FUN,
+    LoadFunction16 = OP_LD_FUN_16,
+    
     LoadConst  = OP_LD_CONST,
     LoadConst16 = OP_LD_CONST_16,
     
@@ -173,10 +180,6 @@ pub enum OpCode {
     LoadLocal16 = OP_LD_LOCAL_16,
     DropLocals = OP_DP_LOCALS,
     
-    InsertUpvalueLocal = OP_IN_UPVAL_LOC,
-    InsertUpvalueLocal16 = OP_IN_UPVAL_LOC_16,
-    InsertUpvalueExtern = OP_IN_UPVAL_EXT,
-    InsertUpvalueExtern16 = OP_IN_UPVAL_EXT_16,
     StoreUpvalue = OP_ST_UPVAL,
     StoreUpvalue16 = OP_ST_UPVAL_16,
     LoadUpvalue = OP_LD_UPVAL,
@@ -248,6 +251,9 @@ impl OpCode {
             OP_TUPLE => Self::Tuple,
             OP_TUPLEN => Self::TupleN,
             
+            OP_LD_FUN => Self::LoadFunction,
+            OP_LD_FUN_16 => Self::LoadFunction16,
+            
             OP_LD_CONST => Self::LoadConst,
             OP_LD_CONST_16 => Self::LoadConst16,
             
@@ -263,10 +269,6 @@ impl OpCode {
             OP_LD_LOCAL_16 => Self::LoadLocal16,
             OP_DP_LOCALS => Self::DropLocals,
             
-            OP_IN_UPVAL_LOC => Self::InsertUpvalueLocal,
-            OP_IN_UPVAL_LOC_16 => Self::InsertUpvalueLocal16,
-            OP_IN_UPVAL_EXT => Self::InsertUpvalueExtern,
-            OP_IN_UPVAL_EXT_16 => Self::InsertUpvalueExtern16,
             OP_ST_UPVAL => Self::StoreUpvalue,
             OP_ST_UPVAL_16 => Self::StoreUpvalue16,
             OP_LD_UPVAL => Self::LoadUpvalue,
@@ -332,6 +334,9 @@ impl OpCode {
 
             Self::Drop           => 1 + size_of::<u8>(),
             
+            Self::LoadFunction   => 1 + size_of::<u8>(),
+            Self::LoadFunction16 => 1 + size_of::<u16>(),
+            
             Self::LoadConst      => 1 + size_of::<u8>(),
             Self::LoadConst16    => 1 + size_of::<u16>(),
             
@@ -341,17 +346,13 @@ impl OpCode {
             Self::LoadLocal16    => 1 + size_of::<u16>(),
             Self::DropLocals     => 1 + size_of::<u8>(),
             
-            Self::InsertUpvalueLocal    => 1 + size_of::<u8>(),
-            Self::InsertUpvalueLocal16  => 1 + size_of::<u16>(),
-            Self::InsertUpvalueExtern   => 1 + size_of::<u8>(),
-            Self::InsertUpvalueExtern16 => 1 + size_of::<u16>(),
             Self::StoreUpvalue   => 1 + size_of::<u8>(),
             Self::StoreUpvalue16 => 1 + size_of::<u16>(),
             Self::LoadUpvalue    => 1 + size_of::<u8>(),
             Self::LoadUpvalue16  => 1 + size_of::<u16>(),
             
-            Self::CloseUpvalue    => 1 + size_of::<u8>(),
-            Self::CloseUpvalue16  => 1 + size_of::<u16>(),
+            Self::CloseUpvalue   => 1 + size_of::<u8>(),
+            Self::CloseUpvalue16 => 1 + size_of::<u16>(),
             
             Self::Tuple          => 1 + size_of::<u8>(),
             Self::UInt8          => 1 + size_of::<u8>(),
@@ -404,6 +405,9 @@ impl std::fmt::Display for OpCode {
             Self::Tuple => "TUPLE",
             Self::TupleN => "TUPLEN",
             
+            Self::LoadFunction => "OP_LD_FUN",
+            Self::LoadFunction16 => "OP_LD_FUN_16",
+            
             Self::LoadConst => "LD_CONST",
             Self::LoadConst16 => "LD_CONST_16",
             
@@ -419,10 +423,6 @@ impl std::fmt::Display for OpCode {
             Self::LoadLocal16 => "LD_LOCAL_16",
             Self::DropLocals => "DP_LOCALS",
             
-            Self::InsertUpvalueLocal => "IN_UPVAL_LOC",
-            Self::InsertUpvalueLocal16 => "IN_UPVAL_LOC_16",
-            Self::InsertUpvalueExtern => "IN_UPVAL_EXT",
-            Self::InsertUpvalueExtern16 => "IN_UPVAL_EXT_16",
             Self::StoreUpvalue => "ST_UPVAL",
             Self::StoreUpvalue16 => "ST_UPVAL_16",
             Self::LoadUpvalue => "LD_UPVAL",

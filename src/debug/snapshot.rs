@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter, Result};
+use crate::codegen::LocalIndex;
 use crate::codegen::opcodes::OpCode;
 use crate::runtime::Variant;
-use crate::runtime::vm::LocalIndex;
 use crate::runtime::module::Chunk;
 
 
@@ -82,7 +82,7 @@ impl Display for VMFrameSnapshot {
 fn format_chunk_id(fmt: &mut Formatter<'_>, chunk_id: Chunk) -> Result {
     match chunk_id {
         Chunk::Main => fmt.write_str("<main>"),
-        Chunk::ChunkID(chunk_id) => write!(fmt, "{}", chunk_id),
+        Chunk::Function(fun_id) => write!(fmt, "{}", fun_id),
     }
 }
 

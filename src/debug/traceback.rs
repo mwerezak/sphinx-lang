@@ -50,13 +50,9 @@ fn chunk_desc(module: &Module, chunk_id: &Chunk) -> String {
     match chunk_id {
         Chunk::Main => "<module>".to_string(),
         
-        Chunk::ChunkID(chunk_id) => match module.data().chunk_info(*chunk_id) {
-            ChunkInfo::ModuleMain => "<module>".to_string(),
-            
-            ChunkInfo::Function { id, .. } => {
-                let signature = module.data().get_signature(*id);
-                format!("{}", signature)
-            },
+        Chunk::Function(fun_id) => {
+            let function = module.data().get_function(*fun_id);
+            format!("{}", function.signature)
         },
     }
 }

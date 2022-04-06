@@ -3,13 +3,10 @@
 use std::mem;
 use string_interner::Symbol;
 use crate::language::{IntType, FloatType, InternSymbol};
-use crate::parser::lvalue::DeclType;
-use crate::codegen::chunk::ChunkID;
 
 
 pub type ConstID = u16;
 pub type StringID = usize;
-pub type FunctionID = usize;
 
 
 // Constants
@@ -19,7 +16,6 @@ pub enum Constant {
     Integer(IntType),
     Float([u8; mem::size_of::<FloatType>()]),  // we might store redundant floats, that's fine
     String(StringID),
-    Function(ChunkID, FunctionID),  // signatures are stored separately to save memory - referenced by "FunctionID"
 }
 
 impl From<IntType> for Constant {
@@ -57,18 +53,3 @@ impl Constant {
     }
 }
 
-
-
-#[derive(Clone, Debug)]
-pub struct UnloadedSignature {
-    pub name: Option<ConstID>,
-    pub required: Box<[UnloadedParam]>,
-    pub default: Box<[UnloadedParam]>,
-    pub variadic: Option<UnloadedParam>,
-}
-
-#[derive(Clone, Debug)]
-pub struct UnloadedParam {
-    pub name: ConstID,
-    pub decl: DeclType,
-}
