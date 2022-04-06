@@ -1,6 +1,6 @@
 [package]
 name = "sphinx-lang"
-version = "0.1.17"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 description = "An intepreter for a dynamic language inspired by Lua and Python, implemented in Rust"

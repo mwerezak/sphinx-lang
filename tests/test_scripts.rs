@@ -90,6 +90,7 @@ mod variable_tests {
     test_script!(in_middle_of_block, "tests/variable/in_middle_of_block.sph");
     test_script!(in_nested_block, "tests/variable/in_nested_block.sph");
     test_script!(redeclare_global, "tests/variable/redeclare_global.sph");
+    test_script!(assign_to_outer_block, "tests/variable/assign_to_outer_block.sph");
 }
 
 mod function_tests {
@@ -106,6 +107,6 @@ mod closure_tests {
     use super::*;
     
     test_script!(open_closure_in_function, "tests/closure/open_closure_in_function.sph");
-    // test_script!(assign_to_upvalue, "tests/closure/assign_to_upvalue.sph");
-    // test_script!(nested_closure, "tests/closure/nested_closure.sph");
+    test_script!(assign_to_upvalue, "tests/closure/assign_to_upvalue.sph");
+    test_script!(nested_closure, "tests/closure/nested_closure.sph");
 }
