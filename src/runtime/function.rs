@@ -1,5 +1,5 @@
 use std::cell::{RefCell, Ref, Cell};
-use crate::codegen::FunctionID;
+use crate::codegen::{FunctionID, FunctionProto};
 use crate::runtime::Variant;
 use crate::runtime::module::Module;
 use crate::runtime::gc::{GC, GCTrace};
@@ -34,29 +34,29 @@ pub trait Invoke {
 
 #[derive(Debug)]
 pub struct Function {
-    signature: Signature,
-    module: GC<Module>,
     fun_id: FunctionID,
+    module: GC<Module>,
     upvalues: Box<[Upvalue]>,
 }
 
 impl GCTrace for Function { }
 
 impl Function {
-    pub fn new(signature: Signature, module: GC<Module>, fun_id: FunctionID, upvalues: Box<[Upvalue]>) -> Self {
-        Self { 
-            signature, 
-            module, 
-            fun_id,
-            upvalues,
-        }
+    pub fn new(fun_id: FunctionID, module: GC<Module>, upvalues: Box<[Upvalue]>) -> Self {
+        Self { fun_id, module, upvalues }
     }
     
     pub fn upvalues(&self) -> &[Upvalue] { &self.upvalues }
+    
+    pub fn proto(&self) -> &FunctionProto {
+        self.module.data().get_function(self.fun_id)
+    }
 }
 
 impl Invoke for Function {
-    fn signature(&self) -> &Signature { &self.signature }
+    fn signature(&self) -> &Signature {
+        &self.proto().signature()
+    }
     
     #[inline]
     fn as_call(&self) -> Call {

@@ -377,7 +377,10 @@ impl Program {
         });
         
         let functions: Vec<FunctionProto> = program.functions.into_vec().into_iter()
-            .map(|function| Self::load_function(function, &program.consts, &strings))
+            .map(|function| {
+                let signature = Self::load_signature(function.signature, &program.consts, &strings);
+                FunctionProto::new(function.fun_id, signature, function.upvalues)
+            })
             .collect();
         
         Self {
@@ -389,14 +392,6 @@ impl Program {
                 functions: functions.into_boxed_slice(),
                 strings: strings.into_boxed_slice(),
             },
-        }
-    }
-    
-    fn load_function(function: UnloadedFunction, consts: &[Constant], strings: &[StringSymbol]) -> FunctionProto {
-        FunctionProto {
-            signature: Self::load_signature(function.signature, consts, strings),
-            upvalues: function.upvalues,
-            fun_id: function.fun_id,
         }
     }
     

@@ -52,7 +52,7 @@ fn chunk_desc(module: &Module, chunk_id: &Chunk) -> String {
         
         Chunk::Function(fun_id) => {
             let function = module.data().get_function(*fun_id);
-            format!("{}", function.signature)
+            format!("{}", function.signature())
         },
     }
 }

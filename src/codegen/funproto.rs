@@ -8,17 +8,23 @@ pub type FunctionID = u16;
 
 #[derive(Debug)]
 pub struct FunctionProto {
-    pub signature: Signature,
-    pub upvalues: Box<[UpvalueTarget]>,
-    pub fun_id: FunctionID,
+    signature: Signature,
+    upvalues: Box<[UpvalueTarget]>,
+    fun_id: FunctionID,
 }
 
-
-#[derive(Debug, Clone)]
-pub struct UnloadedFunction {
-    pub signature: UnloadedSignature,
-    pub upvalues: Box<[UpvalueTarget]>,
-    pub fun_id: FunctionID,
+impl FunctionProto {
+    pub(super) fn new(fun_id: FunctionID, signature: Signature, upvalues: Box<[UpvalueTarget]>) -> Self {
+        Self {
+            fun_id,
+            signature,
+            upvalues,
+        }
+    }
+    
+    pub fn fun_id(&self) -> FunctionID { self.fun_id }
+    pub fn signature(&self) -> &Signature { &self.signature }
+    pub fn upvalues(&self) -> &[UpvalueTarget] { &self.upvalues }
 }
 
 
@@ -28,6 +34,13 @@ pub enum UpvalueTarget {
     Upvalue(UpvalueIndex),
 }
 
+
+#[derive(Debug, Clone)]
+pub struct UnloadedFunction {
+    pub signature: UnloadedSignature,
+    pub upvalues: Box<[UpvalueTarget]>,
+    pub fun_id: FunctionID,
+}
 
 #[derive(Clone, Debug)]
 pub struct UnloadedSignature {
