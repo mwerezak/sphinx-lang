@@ -496,7 +496,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             ctx.push_continuation(ContextTag::AssignmentExpr, None);
             ctx.set_end(&self.advance().unwrap());
             
-            if let Some(ref token) = optional_token {
+            if let Some(token) = optional_token.as_ref() {
                 ctx.set_start(token);
             }
             
@@ -514,10 +514,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             let op = op.map(|op| op.into());
             
-            let nonlocal = match optional_token.map(|tok| tok.token) {
-                Some(Token::NonLocal) => true,
-                _ => false,
-            };
+            let nonlocal = matches!(optional_token.map(|tok| tok.token), Some(Token::NonLocal));
             
             let assign = Box::new(Assignment { lhs, op, rhs, nonlocal });
             return Ok(Expr::Assignment(assign));

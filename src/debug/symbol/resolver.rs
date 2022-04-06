@@ -97,7 +97,7 @@ fn resolve_debug_symbols<'s>(source: impl Iterator<Item=io::Result<char>>, symbo
     
     let mut lineno = 1;  // count lines
     let mut current_line = String::new();
-    for (char_result, index) in source.zip((0 as TokenIndex)..) {
+    for (char_result, index) in source.zip(0..) {
         // check for io::Errors 
         let c = match char_result {
             Ok(c) => c,

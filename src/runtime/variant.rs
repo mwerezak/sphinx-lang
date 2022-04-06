@@ -85,7 +85,7 @@ impl Variant {
             Self::Function(fun) => fun.invoke(args),
             Self::NativeFunction(fun) => fun.invoke(args),
             
-            _ => Err(ErrorKind::NotCallable(self.clone()).into())
+            _ => Err(ErrorKind::NotCallable(*self).into())
         }
     }
     
@@ -207,7 +207,7 @@ impl<'a> TryFrom<&'a Variant> for VariantKey<'a> {
     type Error = RuntimeError;
     fn try_from(value: &'a Variant) -> ExecResult<Self> {
         if !value.can_hash() {
-            return Err(ErrorKind::UnhashableValue(value.clone()).into());
+            return Err(ErrorKind::UnhashableValue(*value).into());
         }
         Ok(Self(value))
     }
@@ -244,7 +244,6 @@ impl<'s> PartialEq for VariantKey<'_> {
     }
 }
 impl Eq for VariantKey<'_> { }
-
 
 impl fmt::Debug for Variant {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

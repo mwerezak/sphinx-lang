@@ -116,7 +116,7 @@ impl<'c> VirtualMachine<'c> {
             Call::Native(func) => {
                 let args = self.values.peek_many(call.nargs);
                 let retval = func.invoke(args)?;
-                self.values.truncate(call.frame.into());
+                self.values.truncate(call.frame);
                 self.values.push(retval);
                 self.traceback.pop();
             },
@@ -144,7 +144,7 @@ impl<'c> VirtualMachine<'c> {
         std::mem::swap(&mut self.frame, &mut frame);
         
         let retval = self.values.pop();
-        self.values.truncate(frame_idx.into());
+        self.values.truncate(frame_idx);
         self.values.push(retval);
         self.traceback.pop();
         
@@ -262,7 +262,7 @@ impl ValueStack {
     #[inline]
     fn get_closure(&self, closure: &Closure) -> Variant {
         match closure {
-            Closure::Open(index) => self.peek_at(*index).clone(),
+            Closure::Open(index) => *self.peek_at(*index),
             Closure::Closed(cell) => cell.get(),
         }
     }
@@ -309,7 +309,7 @@ impl OpenUpvalues {
         
         self.upvalues.entry(index)
             .and_modify(|refs| refs.push(upval_ref))
-            .or_insert(vec![ upval_ref ]);
+            .or_insert_with(|| vec![ upval_ref ]);
     }
     
     fn close_upvalues(&mut self, index: usize, value: Variant) {

@@ -235,7 +235,7 @@ impl<'c> VMCallFrame<'c> {
             OpCode::Call => {
                 const SYSTEM_ARGS: usize = 2; // [ callee, nargs, ... ]
                 
-                let nargs = into_usize(stack.peek().clone());
+                let nargs = into_usize(*stack.peek());
                 let call_locals = SYSTEM_ARGS + nargs;
                 
                 stack.swap_last(stack.len() - call_locals + 1);
@@ -263,7 +263,7 @@ impl<'c> VMCallFrame<'c> {
                 stack.discard(count); 
             }
             OpCode::Clone => {
-                stack.push(stack.peek().clone());
+                stack.push(*stack.peek());
             }
             
             OpCode::LoadFunction => {
@@ -294,17 +294,17 @@ impl<'c> VMCallFrame<'c> {
             
             OpCode::InsertGlobal => {
                 let name = into_name(stack.pop());
-                let value = stack.peek().clone();
+                let value = *stack.peek();
                 self.module.globals().borrow_mut().create(name, Access::ReadOnly, value);
             },
             OpCode::InsertGlobalMut => {
                 let name = into_name(stack.pop());
-                let value = stack.peek().clone();
+                let value = *stack.peek();
                 self.module.globals().borrow_mut().create(name, Access::ReadWrite, value);
             },
             OpCode::StoreGlobal => {
                 let name = into_name(stack.pop());
-                let value = stack.peek().clone();
+                let value = *stack.peek();
                 
                 let mut globals = self.module.globals().borrow_mut();
                 let store = globals.lookup_mut(&name)?;
@@ -312,14 +312,14 @@ impl<'c> VMCallFrame<'c> {
             },
             OpCode::LoadGlobal => {
                 let value = {
-                    let name = into_name(stack.peek().clone());
-                    self.module.globals().borrow().lookup(&name)?.clone()
+                    let name = into_name(*stack.peek());
+                    *self.module.globals().borrow().lookup(&name)?
                 };
                 stack.replace(value);
             },
             
             OpCode::InsertLocal => {
-                let value = stack.peek().clone();
+                let value = *stack.peek();
                 stack.insert(self.from_local_index(self.locals), value);
                 self.locals += 1;
             },

@@ -27,7 +27,7 @@ pub fn is_bitwise_primitive(value: &Variant) -> bool {
 #[inline]
 fn eval_meta_unary(tag: UnaryTag, operand: &Variant) -> ExecResult<Variant> {
     let op_func = operand.metatable().op_unary(tag)
-        .ok_or_else(|| ErrorKind::InvalidUnaryOperand(operand.clone()))?;
+        .ok_or_else(|| ErrorKind::InvalidUnaryOperand(*operand))?;
     
     op_func(operand)
 }
@@ -43,7 +43,7 @@ fn eval_meta_binary(tag: BinaryTag, lhs: &Variant, rhs: &Variant) -> ExecResult<
     }
     
     let reflected_func = rhs.metatable().op_binary_reflected(tag)
-        .ok_or_else(|| ErrorKind::InvalidBinaryOperand(lhs.clone(), rhs.clone()))?;
+        .ok_or_else(|| ErrorKind::InvalidBinaryOperand(*lhs, *rhs))?;
     
     reflected_func(rhs, lhs)
 }
@@ -81,7 +81,7 @@ fn eval_meta_comparison(tag: CompareTag, lhs: &Variant, rhs: &Variant) -> ExecRe
             Ok(result)
         }, 
         
-        _ => Err(ErrorKind::InvalidBinaryOperand(lhs.clone(), rhs.clone()).into()),
+        _ => Err(ErrorKind::InvalidBinaryOperand(*lhs, *rhs).into()),
     }
 }
 

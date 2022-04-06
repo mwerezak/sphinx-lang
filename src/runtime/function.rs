@@ -55,7 +55,7 @@ impl Function {
 
 impl Invoke for Function {
     fn signature(&self) -> &Signature {
-        &self.proto().signature()
+        self.proto().signature()
     }
     
     #[inline]

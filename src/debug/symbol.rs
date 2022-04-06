@@ -44,6 +44,7 @@ impl DebugSymbol {
     pub fn start(&self) -> TokenIndex { self.start }
     pub fn end(&self) -> TokenIndex { self.start + TokenIndex::from(self.length) }
     pub fn len(&self) -> TokenLength { self.length }
+    pub fn is_empty(&self) -> bool { self.length == 0 } // ok clippy, sure.
 }
 
 

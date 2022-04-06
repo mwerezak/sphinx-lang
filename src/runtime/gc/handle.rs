@@ -66,7 +66,7 @@ impl<T> Deref for GC<T> where T: GCTrace + ?Sized {
 impl<T> Clone for GC<T> where T: GCTrace + ?Sized {
     fn clone(&self) -> Self {
         Self {
-            ptr: self.ptr.clone(),
+            ptr: self.ptr,
             _marker: PhantomData,
         }
     }

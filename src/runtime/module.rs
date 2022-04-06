@@ -80,7 +80,7 @@ impl Namespace {
     
     pub fn extend(&mut self, other: &Namespace) {
         for (name, variable) in other.store.iter() {
-            self.create(*name, variable.access, variable.value.clone())
+            self.create(*name, variable.access, variable.value)
         }
     }
 }

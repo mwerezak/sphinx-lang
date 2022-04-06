@@ -1056,7 +1056,7 @@ impl CodeGenerator<'_> {
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
         // create a new chunk for the function
         let info = ChunkInfo::Function {
-            symbol: symbol.map(|symbol| *symbol),
+            symbol: symbol.copied(),
         };
 
         let mut chunk_gen = self.create_chunk(info)?;
