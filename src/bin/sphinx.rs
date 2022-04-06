@@ -87,10 +87,8 @@ fn main() {
             let vm = VirtualMachine::new(main_module, &program.main);
             if args.is_present("debug") {
                 run_debugger(vm);
-            } else {
-                if let Err(error) = vm.run() {
-                    println!("{}{}", error.traceback(), error);
-                }
+            } else if let Err(error) = vm.run() {
+                println!("{}{}", error.traceback(), error);
             }
             
             Repl::new(version.to_string(), repl_env).run()
@@ -105,10 +103,8 @@ fn main() {
         let vm = VirtualMachine::new(main_module, &program.main);
         if args.is_present("debug") {
             run_debugger(vm);
-        } else {
-            if let Err(error) = vm.run() {
-                println!("{}{}", error.traceback(), error);
-            }
+        } else if let Err(error) = vm.run() {
+            println!("{}{}", error.traceback(), error);
         }
     }
 }

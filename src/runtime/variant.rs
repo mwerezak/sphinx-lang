@@ -80,16 +80,6 @@ impl Variant {
         Some(value)
     }
     
-    pub fn can_hash(&self) -> bool {
-        match self {
-            Self::Float(..) => false,
-            Self::Tuple(items) => items.iter().all(|item| item.can_hash()),
-            // TODO Objects - check metatabale for __hash
-            _ => true
-        }
-        
-    }
-    
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
         match self {
             Self::Function(fun) => fun.invoke(args),
@@ -171,8 +161,45 @@ impl TryFrom<Variant> for GC<dyn GCTrace> {
 }
 
 
-// Not all Variants are hashable, so there is a separate type to handle that
+// Not all Variants are hashable
+impl Variant {
+    pub fn can_hash(&self) -> bool {
+        struct DummyHasher();
+        impl Hasher for DummyHasher {
+            fn finish(&self) -> u64 { 0 }
+            fn write(&mut self, _: &[u8]) { }
+        }
+        self.try_hash(&mut DummyHasher()).is_ok()
+    }
+    
+    fn try_hash<H: Hasher>(&self, state: &mut H) -> ExecResult<()> {
+        let disc = std::mem::discriminant(self);
+        
+        match self {
+            Self::Nil | Self::BoolTrue | Self::BoolFalse | Self::EmptyTuple 
+                => disc.hash(state),
+            
+            Self::Integer(value) => (disc, value).hash(state),
+            Self::String(value) => (disc, value).hash(state),
+            Self::Function(fun) => (disc, fun).hash(state),
+            Self::NativeFunction(fun) => (disc, fun).hash(state),
+            Self::Tuple(items) => {
+                disc.hash(state);
+                for item in items.iter() {
+                    item.try_hash(state)?;
+                }
+                0xFF.hash(state); // to avoid prefix collisions
+            },
+            
+            _ => return Err(ErrorKind::UnhashableValue(*self).into()),
+        }
+        Ok(())
+    }
+    
+}
 
+
+/// Wrapper for variant that dynamically ensures hashability
 #[derive(Clone)]
 pub struct VariantKey<'a>(&'a Variant);
 
@@ -187,18 +214,8 @@ impl<'a> TryFrom<&'a Variant> for VariantKey<'a> {
 }
 
 impl Hash for VariantKey<'_> {
-    fn hash<H>(&self, state: &mut H) where H: Hasher {
-        debug_assert!(self.0.can_hash());
-        
-        let discriminant = std::mem::discriminant(self.0);
-        discriminant.hash(state);
-        
-        match self.0 {
-            Variant::Integer(value) => value.hash(state),
-            Variant::String(strkey) => strkey.hash(state),
-            // TODO objects - get the result of __hash and hash it
-            _ => { }
-        }
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.try_hash(state).unwrap()
     }
 }
 
@@ -219,13 +236,15 @@ impl<'s> PartialEq for VariantKey<'_> {
                 .all(|(a, b)| VariantKey(a) == VariantKey(b))
             },
             
-            // TODO objects, use __eq
+            (Variant::Function(a), Variant::Function(b)) => GC::ptr_eq(a, b),
+            (Variant::NativeFunction(a), Variant::NativeFunction(b)) => GC::ptr_eq(a, b),
             
             _ => false,
         }
     }
 }
 impl Eq for VariantKey<'_> { }
+
 
 impl fmt::Debug for Variant {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

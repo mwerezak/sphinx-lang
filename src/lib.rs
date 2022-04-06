@@ -91,12 +91,12 @@ pub fn print_build_errors(errors: &BuildErrors, source: &ModuleSource) {
         
         BuildErrors::Syntax(errors) => {
             println!("Errors in {}:\n", source);
-            frontend::print_source_errors(source, &errors);
+            frontend::print_source_errors(source, errors);
         }
         
         BuildErrors::Compile(errors) => {
             println!("Errors in {}:\n", source);
-            frontend::print_source_errors(source, &errors);
+            frontend::print_source_errors(source, errors);
         }
     }
     
