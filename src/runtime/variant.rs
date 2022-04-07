@@ -192,22 +192,21 @@ impl Variant {
     }
     
     fn try_hash<H: Hasher>(&self, state: &mut H) -> ExecResult<()> {
-        let disc = std::mem::discriminant(self);
+        let discr = std::mem::discriminant(self);
         
         match self {
             Self::Nil | Self::BoolTrue | Self::BoolFalse | Self::EmptyTuple 
-                => disc.hash(state),
+                => discr.hash(state),
             
-            Self::Integer(value) => (disc, value).hash(state),
-            Self::String(value) => (disc, value).hash(state),
-            Self::Function(fun) => (disc, fun).hash(state),
-            Self::NativeFunction(fun) => (disc, fun).hash(state),
+            Self::Integer(value) => (discr, value).hash(state),
+            Self::String(value) => (discr, value).hash(state),
+            Self::Function(fun) => (discr, fun).hash(state),
+            Self::NativeFunction(fun) => (discr, fun).hash(state),
             Self::Tuple(items) => {
-                disc.hash(state);
+                discr.hash(state); // also prevent prefix collisions
                 for item in items.iter() {
                     item.try_hash(state)?;
                 }
-                0xFF.hash(state); // to avoid prefix collisions
             },
             
             _ => return Err(ErrorKind::UnhashableValue(*self).into()),
