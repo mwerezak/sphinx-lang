@@ -80,7 +80,7 @@ struct GCConfig {
 impl Default for GCConfig {
     fn default() -> Self {
         Self {
-            threshold: 8*1024, // 8 kiB
+            threshold: 512, // Small because of stop-the-world. If we go incremental increase this to 8 kiB
             pause_factor: 200,
         }
     }
