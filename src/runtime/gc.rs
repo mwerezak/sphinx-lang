@@ -1,8 +1,10 @@
 /// Partial clone of rust-gc's mark and sweep implementation
 
+use std::fmt;
 use std::mem;
 use std::ptr::{self, NonNull};
 use std::cell::{Cell, RefCell};
+use log;
 
 mod handle;
 pub use handle::GC;
@@ -60,15 +62,33 @@ thread_local! {
     static GC_STATE: RefCell<GCState> = RefCell::new(GCState::default());
 }
 
+pub fn gc_cycle(roots: impl Iterator<Item=GC<dyn GCTrace>>) {
+    GC_STATE.with(|gc| {
+        let mut gc = gc.borrow_mut();
+        if gc.should_collect() {
+            gc.collect_garbage(roots)
+        }
+    })
+}
+
+pub fn gc_force(roots: impl Iterator<Item=GC<dyn GCTrace>>) {
+    GC_STATE.with(|gc| {
+        let mut gc = gc.borrow_mut();
+        gc.collect_garbage(roots)
+    })
+}
+
 struct GCState {
     stats: GCStats,
     config: GCConfig,
+    check: bool,
     boxes_start: Option<NonNull<GCBox<dyn GCTrace>>>,
 }
 
 #[derive(Debug)]
 struct GCStats {
     allocated: usize,
+    box_count: usize,
     cycle_count: usize,
 }
 
@@ -81,7 +101,7 @@ impl Default for GCConfig {
     fn default() -> Self {
         Self {
             threshold: 512, // Small because of stop-the-world. If we go incremental increase this to 8 kiB
-            pause_factor: 200,
+            pause_factor: 160,
         }
     }
 }
@@ -98,8 +118,10 @@ impl GCState {
             config,
             stats: GCStats {
                 allocated: 0,
+                box_count: 0,
                 cycle_count: 0,
             },
+            check: false,
             boxes_start: None,
         }
     }
@@ -120,23 +142,32 @@ impl GCState {
         });
 
         let size = gcbox.size();
+        let ptr = Box::into_raw(gcbox);
+        log::debug!("{:#X} allocate {}u", ptr as usize, size);
+        
         let ptr = unsafe {
-            NonNull::new_unchecked(Box::into_raw(gcbox))
+            NonNull::new_unchecked(ptr)
         };
         
         self.boxes_start = Some(ptr);
         self.stats.allocated += size;
+        self.stats.box_count += 1;
+        self.check = true;
         
         ptr
     }
     
     /// frees the GCBox, yielding it's next pointer
     fn free(&mut self, gcbox: NonNull<GCBox<dyn GCTrace>>) -> Option<NonNull<GCBox<dyn GCTrace>>> {
+        let ptr = gcbox.as_ptr();
+        
         // SAFETY: This is safe as long as we only ever free() GCBoxes that were created by allocate()
-        let gcbox = unsafe { Box::from_raw(gcbox.as_ptr()) };
+        let gcbox = unsafe { Box::from_raw(ptr) };
         
         let size = gcbox.size();
         self.stats.allocated -= size;
+        self.stats.box_count -= 1;
+        log::debug!("{:#X} free {}u", ptr as *const () as usize, size);
         
         gcbox.next
         
@@ -144,13 +175,30 @@ impl GCState {
     }
     
     fn collect_garbage(&mut self, roots: impl Iterator<Item=GC<dyn GCTrace>>) {
+        log::debug!("gc cycle begin ---");
+        
+        let allocated = self.stats.allocated;
+        let box_count = self.stats.box_count;
+        log::debug!("{}", self.stats);
+        
         // mark
+        let mut count = 0usize;
         for root in roots {
             root.mark_trace();
+            count += 1;
         }
+        log::debug!("{} roots", count);
         
         // sweep
         unsafe { self.sweep(); }
+        self.stats.cycle_count += 1;
+        
+        let freed = allocated - self.stats.allocated;
+        let dropped = box_count - self.stats.box_count;
+        log::debug!("freed {}u ({} allocations)", freed, dropped);
+        log::debug!("{}", self.stats);
+        
+        log::debug!("gc cycle end ---");
     }
     
     unsafe fn sweep(&mut self) {
@@ -201,4 +249,14 @@ impl Drop for DropGuard {
 
 fn deref_safe() -> bool {
     GC_SWEEP.with(|flag| !flag.get())
+}
+
+
+impl fmt::Display for GCStats {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            fmt, "Cycle {}: estimated usage {}u ({} allocations)", 
+            self.cycle_count, self.allocated, self.box_count
+        )
+    }
 }
