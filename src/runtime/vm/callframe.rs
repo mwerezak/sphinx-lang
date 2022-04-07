@@ -354,22 +354,22 @@ impl<'c> VMCallFrame<'c> {
             
             OpCode::StoreUpvalue => {
                 let index = UpvalueIndex::from(data[0]);
-                let closure = self.get_upvalue(stack, index).value();
+                let closure = self.get_upvalue(stack, index).closure();
                 stack.set_closure(&closure, *stack.peek());
             }
             OpCode::StoreUpvalue16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let closure = self.get_upvalue(stack, index).value();
+                let closure = self.get_upvalue(stack, index).closure();
                 stack.set_closure(&closure, *stack.peek());
             }
             OpCode::LoadUpvalue => {
                 let index = UpvalueIndex::from(data[0]);
-                let closure = self.get_upvalue(stack, index).value();
+                let closure = self.get_upvalue(stack, index).closure();
                 stack.push(stack.get_closure(&closure));
             }
             OpCode::LoadUpvalue16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let closure = self.get_upvalue(stack, index).value();
+                let closure = self.get_upvalue(stack, index).closure();
                 stack.push(stack.get_closure(&closure));
             }
             

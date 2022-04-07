@@ -49,6 +49,14 @@ impl Namespace {
         }
     }
     
+    fn names(&self) -> impl Iterator<Item=&StringSymbol> {
+        self.store.keys()
+    }
+    
+    fn values(&self) -> impl Iterator<Item=&Variant> {
+        self.store.values().map(|var| &var.value)
+    }
+    
     // if the variable already exists, it is overwritten
     pub fn create(&mut self, name: StringSymbol, access: Access, value: Variant) {
         self.store.insert(name, Variable { access, value });
@@ -115,7 +123,13 @@ impl GlobalEnv {
     }
 }
 
-impl GCTrace for GlobalEnv { }
+unsafe impl GCTrace for GlobalEnv {
+    fn trace(&self) {
+        for value in self.namespace.borrow().values() {
+            value.trace();
+        }
+    }
+}
 
 
 #[derive(Debug)]
@@ -127,7 +141,11 @@ pub struct Module {
     globals: GC<GlobalEnv>,
 }
 
-impl GCTrace for Module { }
+unsafe impl GCTrace for Module {
+    fn trace(&self) {
+        self.globals.mark_trace()
+    }
+}
 
 impl Module {
     pub fn allocate(source: Option<ModuleSource>, data: ProgramData) -> GC<Self> {

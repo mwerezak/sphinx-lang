@@ -292,7 +292,7 @@ impl OpenUpvalues {
     
     fn register(&mut self, function: GC<Function>) {
         for (index, upval) in function.upvalues().iter().enumerate() {
-            if upval.value().is_open() {
+            if upval.closure().is_open() {
                 let upval_ref = function.ref_upvalue(index.try_into().unwrap());
                 self.insert_ref(upval_ref);
             }
@@ -302,7 +302,7 @@ impl OpenUpvalues {
     fn insert_ref(&mut self, upval_ref: UpvalueRef) {
         // let weak_ref = upval_ref.into()  // TODO use weak references
         
-        let index = match upval_ref.value() {
+        let index = match upval_ref.closure() {
             Closure::Open(index) => index,
             _ => panic!("insert non-open upvalue"),
         };

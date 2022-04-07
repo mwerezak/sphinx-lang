@@ -139,11 +139,30 @@ impl From<NativeFunction> for Variant {
     }
 }
 
-impl GCTrace for Variant { }
+unsafe impl GCTrace for Variant {
+    fn trace(&self) {
+        match self {
+            Self::Tuple(items) => items.mark_trace(),
+            Self::Function(fun) => fun.mark_trace(),
+            Self::NativeFunction(fun) => fun.mark_trace(),
+            _ => { },
+        };
+    }
+}
 
-impl GCTrace for Cell<Variant> { }
+unsafe impl GCTrace for Cell<Variant> {
+    fn trace(&self) {
+        self.get().trace()
+    }
+}
 
-impl GCTrace for Box<[Variant]> { }
+unsafe impl GCTrace for Box<[Variant]> {
+    fn trace(&self) {
+        for item in self.iter() {
+            item.trace();
+        }
+    }
+}
 
 
 // extract the GC handle for GC'd types

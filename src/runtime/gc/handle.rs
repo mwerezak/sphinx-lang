@@ -29,14 +29,27 @@ impl<T> GC<T> where T: GCTrace + ?Sized {
     
     #[inline]
     pub(super) fn inner(&self) -> &GCBox<T> {
-        // must not deref during sweep. This should only be possible in a Drop impl
+        // must not deref during sweep. This should only be possible if called inside a Drop impl
         debug_assert!(deref_safe());
         unsafe { &*self.ptr.as_ptr() }
+    }
+    
+    #[inline]
+    fn inner_mut(&self) -> &mut GCBox<T> {
+        // must not deref during sweep. This should only be possible if called inside a Drop impl
+        debug_assert!(deref_safe());
+        unsafe { &mut *self.ptr.as_ptr() }
+    }
+    
+    pub fn mark_trace(&self) {
+        self.inner_mut().mark_trace()
     }
     
     pub fn ptr_eq(self_gc: &GC<T>, other_gc: &GC<T>) -> bool {
         self_gc.inner().ptr_eq(other_gc.inner())
     }
+    
+
 }
 
 impl<T> From<GC<T>> for GC<dyn GCTrace> where T: GCTrace {

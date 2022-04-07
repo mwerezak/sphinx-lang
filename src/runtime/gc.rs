@@ -30,9 +30,22 @@ impl<T> GCBox<T> where T: GCTrace + ?Sized {
             ptr::addr_of!(other.marked),
         )
     }
+    
+    fn mark_trace(&mut self) {
+        self.marked = true;
+        self.data.trace();
+    }
 }
 
-pub trait GCTrace {
+
+/// Unsafe because if the GCTrace::trace() implementation fails to mark any GC handles that it can reach, 
+/// the GC will not be able to mark them and will free memory that is still in use.
+/// SAFETY: Must not impl Drop
+pub unsafe trait GCTrace {
+    
+    /// SAFETY: Must call `GC::mark_trace()` on every reachable GC handle
+    fn trace(&self);
+    
     /// If the GC'd data owns any allocations, this should return the extra allocated size.
     /// This is only called once when ownership is taken by the GC, and again when dropped,
     /// so consistency is more important than accuracy when dealing with mutable data that

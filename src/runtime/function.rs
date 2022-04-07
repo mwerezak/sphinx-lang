@@ -39,8 +39,6 @@ pub struct Function {
     upvalues: Box<[Upvalue]>,
 }
 
-impl GCTrace for Function { }
-
 impl Function {
     pub fn new(fun_id: FunctionID, module: GC<Module>, upvalues: Box<[Upvalue]>) -> Self {
         Self { fun_id, module, upvalues }
@@ -61,6 +59,17 @@ impl Invoke for Function {
     #[inline]
     fn as_call(&self) -> Call {
         Call::Chunk(self.module, self.fun_id)
+    }
+}
+
+unsafe impl GCTrace for Function {
+    fn trace(&self) {
+        self.module.mark_trace();
+        for upval in self.upvalues.iter() {
+            if let Closure::Closed(gc_cell) = upval.closure() {
+                gc_cell.mark_trace();
+            }
+        }
     }
 }
 
@@ -92,7 +101,7 @@ impl Upvalue {
     }
     
     #[inline]
-    pub fn value(&self) -> Closure { self.value.get() }
+    pub fn closure(&self) -> Closure { self.value.get() }
     
     #[inline]
     pub fn close(&self, gc_cell: GC<Cell<Variant>>) {
@@ -111,8 +120,6 @@ pub struct NativeFunction {
     defaults: Option<Box<[Variant]>>,
     func: NativeFn,
 }
-
-impl GCTrace for NativeFunction { }
 
 impl NativeFunction {
     pub fn new(signature: Signature, defaults: Option<Box<[Variant]>>, func: NativeFn) -> Self {
@@ -142,4 +149,11 @@ impl Invoke for GC<NativeFunction> {
     }
 }
 
+unsafe impl GCTrace for NativeFunction {
+    fn trace(&self) {
+        if let Some(defaults) = self.defaults.as_ref() {
+            defaults.trace()
+        }
+    }
+}
 
