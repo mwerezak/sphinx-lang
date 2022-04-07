@@ -46,10 +46,9 @@ pub unsafe trait GCTrace {
     /// SAFETY: Must call `GC::mark_trace()` on every reachable GC handle
     fn trace(&self);
     
-    /// If the GC'd data owns any allocations, this should return the extra allocated size.
-    /// This is only called once when ownership is taken by the GC, and again when dropped,
-    /// so consistency is more important than accuracy when dealing with mutable data that
-    /// can grow in size.
+    /// If the GCTrace owns any allocations, this should return the extra allocated size.
+    /// If the allocation can change size, like a Vec<T>, then don't include it in the 
+    /// size hint, or return a const estimate of the average size.
     #[inline]
     fn size_hint(&self) -> usize { 0 }
 }

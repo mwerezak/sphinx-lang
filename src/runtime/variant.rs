@@ -162,6 +162,10 @@ unsafe impl GCTrace for Box<[Variant]> {
             item.trace();
         }
     }
+    
+    fn size_hint(&self) -> usize {
+        std::mem::size_of::<Variant>() * self.len()
+    }
 }
 
 

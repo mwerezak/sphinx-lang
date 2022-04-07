@@ -71,6 +71,10 @@ unsafe impl GCTrace for Function {
             }
         }
     }
+    
+    fn size_hint(&self) -> usize {
+        std::mem::size_of::<Upvalue>() * self.upvalues.len()
+    }
 }
 
 
@@ -154,6 +158,13 @@ unsafe impl GCTrace for NativeFunction {
         if let Some(defaults) = self.defaults.as_ref() {
             defaults.trace()
         }
+    }
+    
+    fn size_hint(&self) -> usize {
+        self.defaults.as_ref()
+        .map_or(0, |defaults| {
+            std::mem::size_of::<Variant>() * defaults.len()
+        })
     }
 }
 
