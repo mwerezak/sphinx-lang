@@ -13,6 +13,7 @@ pub enum LValue {
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
     Tuple(Box<[LValue]>),
+    // Unpack(Box<LValue>),
 }
 
 #[derive(Debug, Clone)]

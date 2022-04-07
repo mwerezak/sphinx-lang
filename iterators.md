@@ -4,7 +4,7 @@ Iterators are a mechanism used for producing sequences of values.
 They are used to support `for` loops and `...` argument unpacking syntax.
 
 An iterator is one of the following:
-- A 3-tuple: `(iterfunc, invariant, i0)`
+- A 3-tuple: `(iterfunc, i0, invariant)`
 - A callable that when invoked with no arguments creates a 3-tuple like the one above
 - An object that has the `__iter` metamethod which returns a 3-tuple like the one above
 

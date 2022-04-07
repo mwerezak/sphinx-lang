@@ -26,11 +26,11 @@ const OP_RETURN:           u8 = 0x01;  // [ ...call frame... ret_value ] => [ re
 // [ callee arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
 const OP_CALL:             u8 = 0x02;
 
-// This instruction is needed because when unpacking, the final nargs value needs to be computed dynamically.
-// [ callee arg[n] arg[0] ... arg[n-1] arg_seq nargs ] => [ ret_value ]  -- nargs does not include arg_seq! 
+// This instruction is needed because when unpacking, the final nargs value needs to be updated dynamically as we iterate.
+// [ callee arg[n] arg[0] ... arg[n-1] nargs arg_seq ] => [ ret_value ]  -- nargs does not include arg_seq! 
 const OP_CALL_UNPACK:      u8 = 0x03;
 
-// 0x10-40        Immediate Values
+// 0x10-17        Immediate Values
 
 const OP_POP:              u8 = 0x10;  // [ _ ] => []
 const OP_DROP:             u8 = 0x11;  // (u8); [ value[0] ... value[N] ] => []
@@ -39,106 +39,96 @@ const OP_CLONE:            u8 = 0x12;  // [ value ] => [ value value ]
 const OP_TUPLE:            u8 = 0x13;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
 const OP_TUPLEN:           u8 = 0x14;  // [ item[0] ... item[N] N ] => [ tuple ]
 
-const OP_LD_FUN:           u8 = 0x18;  // (u8);  _ => [ function ]
-const OP_LD_FUN_16:        u8 = 0x19;  // (u16); _ => [ function ]
+// 0x18-1F        Iteration
 
-const OP_LD_CONST:         u8 = 0x1A;  // (u8);  _ => [ value ]
-const OP_LD_CONST_16:      u8 = 0x1B;  // (u16); _ => [ value ]
-// const OP_LD_CONST_32:   u8 = 0x1C;  // (u32); _ => [ value ]
+const OP_ITER_INIT:        u8 = 0x18;  // [ iter ] => [ iter first_item ]
+const OP_ITER_NEXT:        u8 = 0x19;  // [ iter item ] => [ iter next_item ]
 
-const OP_IN_GLOBAL_IM:     u8 = 0x1D;  // [ value name ] => [ value ]
-const OP_IN_GLOBAL_MUT:    u8 = 0x1E;  // [ value name ] => [ value ]
-const OP_ST_GLOBAL:        u8 = 0x1F;  // [ value name ] => [ value ]
-const OP_LD_GLOBAL:        u8 = 0x20;  // [ name ] => [ value ]
-const OP_DP_GLOBAL:        u8 = 0x21;  // [ name ] => []
+// 0x40-5F        Load/Store
 
-const OP_IN_LOCAL:         u8 = 0x22;  // [ value ] => [ value ]; vm.locals += 1
-const OP_ST_LOCAL:         u8 = 0x23;  // (u8);  [ value ] => [ value ]
-const OP_ST_LOCAL_16:      u8 = 0x24;  // (u16); [ value ] => [ value ]
-const OP_LD_LOCAL:         u8 = 0x25;  // (u8);  _ => [ value ]
-const OP_LD_LOCAL_16:      u8 = 0x26;  // (u16); _ => [ value ]
-const OP_DP_LOCALS:        u8 = 0x27;  // (u8); [ local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
+const OP_LD_FUN:           u8 = 0x40;  // (u8);  _ => [ function ]
+const OP_LD_FUN_16:        u8 = 0x41;  // (u16); _ => [ function ]
 
-const OP_ST_UPVAL:         u8 = 0x28;  // (u8);  [ value ] => [ value ]
-const OP_ST_UPVAL_16:      u8 = 0x29;  // (u16); [ value ] => [ value ]
-const OP_LD_UPVAL:         u8 = 0x2A;  // (u8);  _ => [ value ]
-const OP_LD_UPVAL_16:      u8 = 0x2B;  // (u16); _ => [ value ]
+const OP_LD_CONST:         u8 = 0x42;  // (u8);  _ => [ value ]
+const OP_LD_CONST_16:      u8 = 0x43;  // (u16); _ => [ value ]
+// const OP_LD_CONST_32:   u8 = 0x44;  // (u32); _ => [ value ]
 
-const OP_CLOSE_UPVAL:      u8 = 0x2C;  // (u8);
-const OP_CLOSE_UPVAL_16:   u8 = 0x2E;  // (u16);
+const OP_IN_GLOBAL_IM:     u8 = 0x48;  // [ value name ] => [ value ]
+const OP_IN_GLOBAL_MUT:    u8 = 0x49;  // [ value name ] => [ value ]
+const OP_ST_GLOBAL:        u8 = 0x4A;  // [ value name ] => [ value ]
+const OP_LD_GLOBAL:        u8 = 0x4B;  // [ name ] => [ value ]
+const OP_DP_GLOBAL:        u8 = 0x4C;  // [ name ] => []
 
-// const OP_LD_NAME:       u8 = 0x38;
-// const OP_LD_INDEX:      u8 = 0x39;
+const OP_IN_LOCAL:         u8 = 0x50;  // [ value ] => [ value ]; vm.locals += 1
+const OP_ST_LOCAL:         u8 = 0x51;  // (u8);  [ value ] => [ value ]
+const OP_ST_LOCAL_16:      u8 = 0x52;  // (u16); [ value ] => [ value ]
+const OP_LD_LOCAL:         u8 = 0x53;  // (u8);  _ => [ value ]
+const OP_LD_LOCAL_16:      u8 = 0x54;  // (u16); _ => [ value ]
+const OP_DP_LOCALS:        u8 = 0x55;  // (u8); [ local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
 
+const OP_ST_UPVAL:         u8 = 0x58;  // (u8);  [ value ] => [ value ]
+const OP_ST_UPVAL_16:      u8 = 0x59;  // (u16); [ value ] => [ value ]
+const OP_LD_UPVAL:         u8 = 0x5A;  // (u8);  _ => [ value ]
+const OP_LD_UPVAL_16:      u8 = 0x5B;  // (u16); _ => [ value ]
 
-// Dynamic Insert/Store
+const OP_CLOSE_UPVAL:      u8 = 0x5C;  // (u8);
+const OP_CLOSE_UPVAL_16:   u8 = 0x5D;  // (u16);
 
-// These are used to implement tuple-destructuring assignment/declaration
-// const OP_IN_DYN         u8 = 0x38;  // [ value dyn_target bool ] => [] 
-// const OP_ST_DYN         u8 = 0x39;  // [ value dyn_target ] => []
+// 0x60-F      Values
 
-const OP_LD_NIL:           u8 = 0x40;  // _ => [ nil ]
-const OP_LD_FALSE:         u8 = 0x41;  // _ => [ false ]
-const OP_LD_TRUE:          u8 = 0x42;  // _ => [ true ]
-const OP_LD_EMPTY:         u8 = 0x43;  // _ => [ () ]
+const OP_LD_NIL:           u8 = 0x60;  // _ => [ nil ]
+const OP_LD_FALSE:         u8 = 0x61;  // _ => [ false ]
+const OP_LD_TRUE:          u8 = 0x62;  // _ => [ true ]
+const OP_LD_EMPTY:         u8 = 0x63;  // _ => [ () ]
 
 // small numbers
-const OP_LD_U8:            u8 = 0x44;  // (u8); _ => [ value ]
-const OP_LD_I8:            u8 = 0x45;  // (i8); _ => [ value ]
-const OP_LD_F8:            u8 = 0x46;  // (i8); _ => [ value ]
+const OP_LD_U8:            u8 = 0x64;  // (u8); _ => [ value ]
+const OP_LD_I8:            u8 = 0x65;  // (i8); _ => [ value ]
+const OP_LD_F8:            u8 = 0x66;  // (i8); _ => [ value ]
 
-// const OP_DYN_TARGET:    u8 = 0x48;  // (u8); [ ... ] => [ dyn_target ]
+// 0x70-77      Unary Operations
 
-// 0x50-57      Unary Operations
+const OP_NEG:              u8 = 0x70;  // [ operand ] => [ result ]
+const OP_POS:              u8 = 0x71;
+const OP_INV:              u8 = 0x72;
+const OP_NOT:              u8 = 0x73;
 
-const OP_NEG:              u8 = 0x50;  // [ operand ] => [ result ]
-const OP_POS:              u8 = 0x51;
-const OP_INV:              u8 = 0x52;
-const OP_NOT:              u8 = 0x53;
+// 0x78-8F      Binary Operations
 
-// 0x58-60      Binary Operations
+const OP_AND:              u8 = 0x78;  // [ lhs rhs ] => [ result ]
+const OP_XOR:              u8 = 0x79;
+const OP_OR:               u8 = 0x7A;
+const OP_SHL:              u8 = 0x7B;
+const OP_SHR:              u8 = 0x7C;
 
-const OP_AND:              u8 = 0x58;  // [ lhs rhs ] => [ result ]
-const OP_XOR:              u8 = 0x59;
-const OP_OR:               u8 = 0x5A;
-const OP_SHL:              u8 = 0x5B;
-const OP_SHR:              u8 = 0x5C;
+const OP_ADD:              u8 = 0x80;
+const OP_SUB:              u8 = 0x81;
+const OP_MUL:              u8 = 0x82;
+const OP_DIV:              u8 = 0x83;
+const OP_MOD:              u8 = 0x84;
 
-const OP_ADD:              u8 = 0x60;
-const OP_SUB:              u8 = 0x61;
-const OP_MUL:              u8 = 0x62;
-const OP_DIV:              u8 = 0x63;
-const OP_MOD:              u8 = 0x64;
+const OP_EQ:               u8 = 0x88;
+const OP_NE:               u8 = 0x89;
+const OP_LT:               u8 = 0x8A;
+const OP_LE:               u8 = 0x8B;
+const OP_GE:               u8 = 0x8C;
+const OP_GT:               u8 = 0x8D;
 
-const OP_EQ:               u8 = 0x68;
-const OP_NE:               u8 = 0x69;
-const OP_LT:               u8 = 0x6A;
-const OP_LE:               u8 = 0x6B;
-const OP_GE:               u8 = 0x6C;
-const OP_GT:               u8 = 0x6D;
+// 0x90-9F      Jumps
 
-// 0x70-7F      Jumps
+const OP_JUMP:             u8 = 0x90;  // (i16);
+const OP_JUMP_FALSE:       u8 = 0x91;  // (i16); [ cond ] => [ cond ]
+const OP_JUMP_TRUE:        u8 = 0x92;  // (i16); [ cond ] => [ cond ]
+const OP_PJMP_FALSE:       u8 = 0x93;  // (i16); [ cond ] => []
+const OP_PJMP_TRUE:        u8 = 0x94;  // (i16); [ cond ] => []
 
-const OP_JUMP:             u8 = 0x70;  // (i16);
-const OP_JUMP_FALSE:       u8 = 0x71;  // (i16); [ cond ] => [ cond ]
-const OP_JUMP_TRUE:        u8 = 0x72;  // (i16); [ cond ] => [ cond ]
-const OP_PJMP_FALSE:       u8 = 0x73;  // (i16); [ cond ] => []
-const OP_PJMP_TRUE:        u8 = 0x74;  // (i16); [ cond ] => []
+const OP_LJUMP:            u8 = 0x98;  // (i32);
+const OP_LJUMP_FALSE:      u8 = 0x99;  // (i32); [ cond ] => [ cond ]
+const OP_LJUMP_TRUE:       u8 = 0x9A;  // (i32); [ cond ] => [ cond ]
+const OP_PLJMP_FALSE:      u8 = 0x9B;  // (i32); [ cond ] => []
+const OP_PLJMP_TRUE:       u8 = 0x9C;  // (i32); [ cond ] => []
 
-const OP_LJUMP:            u8 = 0x75;  // (i32);
-const OP_LJUMP_FALSE:      u8 = 0x76;  // (i32); [ cond ] => [ cond ]
-const OP_LJUMP_TRUE:       u8 = 0x77;  // (i32); [ cond ] => [ cond ]
-const OP_PLJMP_FALSE:      u8 = 0x78;  // (i32); [ cond ] => []
-const OP_PLJMP_TRUE:       u8 = 0x79;  // (i32); [ cond ] => []
-
-// 0x80-8F      Iteration
-
-// const OP_IT_INIT   // replace value with iterator state
-// const OP_IT_NEXT   // replace iterator state with next state
-// const OP_UNPACK:   // [ seq ] => [ item_0 ... item_n N ] -- used by unpack syntax in function calls
-
-
-// 0xF0         Debugging/Tracing/Misc
+// 0xF0-FF      Debugging/Tracing/Misc
 
 const DBG_INSPECT:         u8 = 0xF0;
 const DBG_ASSERT:          u8 = 0xF1;

@@ -148,7 +148,7 @@ impl fmt::Display for ParserError {
         utils::format_error(fmt, "Syntax error", Some(message), self.source())
     }
 }
-
+// "unpacking may only be used once in an assignment or declaration"
 
 // Structures used by the parser for error handling and synchronization
 
