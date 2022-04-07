@@ -32,8 +32,10 @@ impl<T> GCBox<T> where T: GCTrace + ?Sized {
     }
     
     fn mark_trace(&mut self) {
-        self.marked = true;
-        self.data.trace();
+        if !self.marked {
+            self.marked = true;
+            self.data.trace();
+        }
     }
 }
 
@@ -128,7 +130,48 @@ impl GCState {
         ptr
     }
     
+    /// frees the GCBox, yielding it's next pointer
+    fn free(&mut self, gcbox: NonNull<GCBox<dyn GCTrace>>) -> Option<NonNull<GCBox<dyn GCTrace>>> {
+        // SAFETY: This is safe as long as we only ever free() GCBoxes that were created by allocate()
+        let gcbox = unsafe { Box::from_raw(gcbox.as_ptr()) };
+        
+        let size = gcbox.size();
+        self.stats.allocated -= size;
+        
+        gcbox.next
+        
+        // gcbox should get dropped here
+    }
     
+    fn collect_garbage(&mut self, roots: impl Iterator<Item=GC<dyn GCTrace>>) {
+        // mark
+        for root in roots {
+            root.mark_trace();
+        }
+        
+        // sweep
+        unsafe { self.sweep(); }
+    }
+    
+    unsafe fn sweep(&mut self) {
+        let _guard = DropGuard::new();
+        
+        //boxes_start: Option<NonNull<GCBox<dyn GCTrace>>>,
+        let mut prev_box = None;
+        let mut next_box = self.boxes_start;
+        while let Some(gcbox) = next_box {
+            let box_ptr = gcbox.as_ptr();
+            
+            if (*box_ptr).marked {
+                (*box_ptr).marked = false;
+                prev_box.replace(gcbox);
+                
+                next_box = (*box_ptr).next;
+            } else {
+                next_box = self.free(gcbox)
+            }
+        }
+    }
 }
 
 impl Drop for GCState {
