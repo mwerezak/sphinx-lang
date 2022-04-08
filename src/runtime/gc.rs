@@ -187,7 +187,7 @@ impl GCState {
         
         // sweep
         unsafe { self.sweep(); }
-        self.stats.cycle_count += 1;
+        self.stats.cycle_count = self.stats.cycle_count.wrapping_add(1);
         
         let freed = allocated - self.stats.allocated;
         let dropped = box_count - self.stats.box_count;

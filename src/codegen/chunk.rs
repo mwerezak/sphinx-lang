@@ -175,14 +175,15 @@ impl ChunkBuilder {
         let fun_id = FunctionID::try_from(self.functions.len())
             .map_err(|_| CompileError::new("function limit reached"))?;
         
-        self.functions.push(fun_proto);
+        self.functions.push(fun_proto); // TODO fix
         Ok(fun_id)
     }
     
     // Output
     
     pub fn build(self) -> UnloadedProgram {
-        let mut chunks = Vec::new();
+        let bytes_len = self.chunks.iter().map(|chunk| chunk.bytes.len()).sum();
+        let mut chunks = Vec::with_capacity(bytes_len);
         let mut chunk_index = Vec::with_capacity(self.chunks.len());
         
         for chunk in self.chunks.into_iter() {
@@ -197,7 +198,8 @@ impl ChunkBuilder {
             chunk_index.push(index);
         }
         
-        let mut strings = Vec::new();
+        let bytes_len = self.strings.into_iter().map(|(_, s)| s.len()).sum();
+        let mut strings = Vec::with_capacity(bytes_len);
         let mut string_index = Vec::new();
         string_index.resize_with(self.strings.len(), StringIndex::default);
         

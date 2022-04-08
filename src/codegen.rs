@@ -1,6 +1,7 @@
 #![allow(unused_variables)]
 
 use std::iter;
+use log;
 use crate::language::{IntType, FloatType, InternSymbol};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
@@ -1222,8 +1223,10 @@ impl CodeGenerator<'_> {
         
         // "variadic count" = NArgs - required_count - default_count
         self.try_emit_load_local(None, &LocalName::NArgs).unwrap();
-        self.emit_instr_byte(None, OpCode::UInt8, positional_count);
-        self.emit_instr(None, OpCode::Sub);
+        if positional_count != 0 {
+            self.emit_instr_byte(None, OpCode::UInt8, positional_count);
+            self.emit_instr(None, OpCode::Sub);
+        }
         
         // check if "variadic count" > 0
         self.emit_instr(None, OpCode::Clone);
