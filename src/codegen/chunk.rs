@@ -95,7 +95,7 @@ pub struct ChunkBuilder {
     main: ChunkBuf,
     chunks: Vec<ChunkBuf>,
     consts: Vec<Constant>,
-    functions: Vec<UnloadedFunction>,
+    functions: Vec<Option<UnloadedFunction>>,
     dedup: HashMap<Constant, ConstID, DefaultBuildHasher>,
     strings: StringInterner,
 }
@@ -126,9 +126,10 @@ impl ChunkBuilder {
     
     pub fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<Chunk> {
         let chunk_id = FunctionID::try_from(self.chunks.len())
-            .map_err(|_| CompileError::from(ErrorKind::ChunkCountLimit))?;
+            .map_err(|_| CompileError::new("function limit reached"))?;
         
         self.chunks.push(ChunkBuf::new(info));
+        self.functions.push(None);
         
         Ok(chunk_id.into())
     }
@@ -171,12 +172,13 @@ impl ChunkBuilder {
         self.get_or_insert_const(Constant::String(symbol.to_usize()))
     }
     
-    pub fn insert_function(&mut self, fun_proto: UnloadedFunction) -> CompileResult<FunctionID> {
-        let fun_id = FunctionID::try_from(self.functions.len())
-            .map_err(|_| CompileError::new("function limit reached"))?;
+    pub fn insert_function(&mut self, fun_proto: UnloadedFunction) {
+        let fun_index = usize::from(fun_proto.fun_id);
+        while self.functions.len() <= fun_index {
+            self.functions.resize(fun_index + 1, None);
+        }
         
-        self.functions.push(fun_proto); // TODO fix
-        Ok(fun_id)
+        self.functions[fun_index].replace(fun_proto);
     }
     
     // Output
@@ -215,6 +217,15 @@ impl ChunkBuilder {
             string_index.insert(symbol.to_usize(), index);
         }
         
+        // truncate trailing `None` values
+        let fun_len = self.functions.iter().enumerate().rev()
+            .find_map(|(idx, fun)| fun.as_ref().map(|_| idx + 1))
+            .unwrap_or(0);
+        
+        let functions = self.functions.into_iter().take(fun_len)
+            .map(|fun| fun.expect("function ids must be contiguous"))
+            .collect::<Vec<UnloadedFunction>>();
+        
         UnloadedProgram {
             main: self.main.bytes.into_boxed_slice(),
             chunks: chunks.into_boxed_slice(),
@@ -222,7 +233,7 @@ impl ChunkBuilder {
             strings: strings.into_boxed_slice(),
             string_index: string_index.into_boxed_slice(),
             consts: self.consts.into_boxed_slice(),
-            functions: self.functions.into_boxed_slice(),
+            functions: functions.into_boxed_slice(),
         }
     }
 }

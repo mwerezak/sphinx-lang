@@ -312,19 +312,16 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn make_function(&mut self, symbol: Option<&DebugSymbol>, function: UnloadedFunction) -> CompileResult<FunctionID> {
+    fn make_function(&mut self, function: UnloadedFunction) {
         self.builder_mut().insert_function(function)
     }
     
-    fn emit_load_function(&mut self, symbol: Option<&DebugSymbol>, function: UnloadedFunction) -> CompileResult<()> {
-        let fun_id = self.make_function(symbol, function)?;
-        
+    fn emit_load_function(&mut self, symbol: Option<&DebugSymbol>, fun_id: FunctionID) {
         if fun_id <= u8::MAX.into() {
             self.emit_instr_byte(symbol, OpCode::LoadFunction, u8::try_from(fun_id).unwrap());
         } else {
             self.emit_instr_data(symbol, OpCode::LoadFunction16, &fun_id.to_le_bytes());
         }
-        Ok(())
     }
     
     ///////// Jumps /////////
@@ -1114,7 +1111,8 @@ impl CodeGenerator<'_> {
         };
         
         // load the function object as the expression result
-        self.emit_load_function(symbol, function)?;
+        self.make_function(function);
+        self.emit_load_function(symbol, fun_id);
         
         Ok(())
     }
@@ -1164,8 +1162,10 @@ impl CodeGenerator<'_> {
         
         // "defaults passed" = NArgs - required_count
         self.try_emit_load_local(None, &LocalName::NArgs).unwrap();
-        self.emit_instr_byte(None, OpCode::UInt8, required_count);
-        self.emit_instr(None, OpCode::Sub);
+        if required_count != 0 {
+            self.emit_instr_byte(None, OpCode::UInt8, required_count);
+            self.emit_instr(None, OpCode::Sub);
+        }
         
         /*
             NArgs - required count:
