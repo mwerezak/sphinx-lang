@@ -211,11 +211,19 @@ impl GCState {
             
             if (*box_ptr).marked {
                 (*box_ptr).marked = false;
-                prev_box.replace(gcbox);
                 
                 next_box = (*box_ptr).next;
+                prev_box.replace(gcbox);
+                
             } else {
-                next_box = self.free(gcbox)
+                
+                next_box = self.free(gcbox);
+                if let Some(prev_box) = prev_box {
+                    (*prev_box.as_ptr()).next = next_box;
+                } else {
+                    self.boxes_start = next_box;
+                }
+                
             }
         }
     }
