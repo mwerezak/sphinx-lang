@@ -62,26 +62,26 @@ thread_local! {
     static GC_STATE: RefCell<GCState> = RefCell::new(GCState::default());
 }
 
-pub fn gc_cycle(roots: impl Iterator<Item=GC<dyn GCTrace>>) {
+pub fn gc_collect(root: &impl GCTrace) {
     GC_STATE.with(|gc| {
         let mut gc = gc.borrow_mut();
         if gc.should_collect() {
-            gc.collect_garbage(roots)
+            gc.collect_garbage(root)
         }
     })
 }
 
-pub fn gc_force(roots: impl Iterator<Item=GC<dyn GCTrace>>) {
+pub fn gc_force(root: &impl GCTrace) {
     GC_STATE.with(|gc| {
         let mut gc = gc.borrow_mut();
-        gc.collect_garbage(roots)
+        gc.collect_garbage(root)
     })
 }
 
 struct GCState {
     stats: GCStats,
     config: GCConfig,
-    check: bool,
+    threshold: usize,
     boxes_start: Option<NonNull<GCBox<dyn GCTrace>>>,
 }
 
@@ -114,26 +114,28 @@ impl Default for GCState {
 
 impl GCState {
     fn new(config: GCConfig) -> Self {
+        let threshold = config.threshold as usize;
+        
         Self {
             config,
+            threshold,
+            
             stats: GCStats {
                 allocated: 0,
                 box_count: 0,
                 cycle_count: 0,
             },
-            check: false,
+            
             boxes_start: None,
         }
     }
     
+    #[inline]
     fn should_collect(&self) -> bool {
-        false // TODO
+        self.stats.allocated > self.threshold
     }
     
     fn allocate<T: GCTrace>(&mut self, data: T) -> NonNull<GCBox<T>> {
-        if self.should_collect() {
-            unimplemented!()
-        }
         
         let gcbox = Box::new(GCBox {
             next: self.boxes_start.take(),
@@ -152,7 +154,6 @@ impl GCState {
         self.boxes_start = Some(ptr);
         self.stats.allocated += size;
         self.stats.box_count += 1;
-        self.check = true;
         
         ptr
     }
@@ -174,20 +175,15 @@ impl GCState {
         // gcbox should get dropped here
     }
     
-    fn collect_garbage(&mut self, roots: impl Iterator<Item=GC<dyn GCTrace>>) {
-        log::debug!("gc cycle begin ---");
+    fn collect_garbage(&mut self, root: &impl GCTrace) {
+        log::debug!("GC cycle begin ---");
         
         let allocated = self.stats.allocated;
         let box_count = self.stats.box_count;
         log::debug!("{}", self.stats);
         
         // mark
-        let mut count = 0usize;
-        for root in roots {
-            root.mark_trace();
-            count += 1;
-        }
-        log::debug!("{} roots", count);
+        root.trace();
         
         // sweep
         unsafe { self.sweep(); }
@@ -195,10 +191,13 @@ impl GCState {
         
         let freed = allocated - self.stats.allocated;
         let dropped = box_count - self.stats.box_count;
-        log::debug!("freed {}u ({} allocations)", freed, dropped);
+        log::debug!("Freed {}u ({} allocations)", freed, dropped);
         log::debug!("{}", self.stats);
         
-        log::debug!("gc cycle end ---");
+        self.threshold = (self.stats.allocated * self.config.pause_factor as usize) / 100;
+        log::debug!("Next collection at {}u", self.threshold);
+        
+        log::debug!("GC cycle end ---");
     }
     
     unsafe fn sweep(&mut self) {

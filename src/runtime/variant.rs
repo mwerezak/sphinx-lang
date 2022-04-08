@@ -140,6 +140,7 @@ impl From<NativeFunction> for Variant {
 }
 
 unsafe impl GCTrace for Variant {
+    #[inline]
     fn trace(&self) {
         match self {
             Self::Tuple(items) => items.mark_trace(),

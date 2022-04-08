@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::ops::Deref;
 use crate::codegen::LocalIndex;
 use crate::runtime::{Variant, HashMap};
-use crate::runtime::gc::GC;
+use crate::runtime::gc::{GC, GCTrace, gc_collect};
 use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
 use crate::runtime::module::Module;
 use crate::runtime::errors::ExecResult;
@@ -106,6 +106,8 @@ impl<'c> VirtualMachine<'c> {
             Control::Continue => { }
         }
         
+        gc_collect(self);
+        
         Ok(false)
     }
     
@@ -150,6 +152,32 @@ impl<'c> VirtualMachine<'c> {
         
         log::debug!("Return call: {{ frame: {}, locals: {} }}", self.frame.start_index(), self.frame.locals());
         log::debug!("Stack: {:?}", self.values);
+    }
+}
+
+// trace through all GC roots
+unsafe impl GCTrace for VirtualMachine<'_> {
+    fn trace(&self) {
+        // trace through the value stack
+        for value in self.values.stack.iter() {
+            value.trace();
+        }
+        
+        // trace through the active frame and all calls
+        self.frame.trace();
+        for frame in self.calls.iter() {
+            frame.trace();
+        }
+        
+        // traceback
+        for site in self.traceback.iter() {
+            site.trace();
+        }
+        
+        // open upvalues
+        for upval_ref in self.upvalues.iter_refs() {
+            upval_ref.fun.mark_trace();
+        }
     }
 }
 
@@ -288,6 +316,10 @@ impl OpenUpvalues {
         Self {
             upvalues: HashMap::with_hasher(Default::default())
         }
+    }
+    
+    fn iter_refs(&self) -> impl Iterator<Item=&UpvalueRef> {
+        self.upvalues.values().flat_map(|refs| refs.iter())
     }
     
     fn register(&mut self, function: GC<Function>) {

@@ -3,7 +3,7 @@ use crate::codegen::{OpCode, LocalIndex, UpvalueTarget};
 use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::VMFrameSnapshot;
 use crate::runtime::Variant;
-use crate::runtime::gc::GC;
+use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::ops;
 use crate::runtime::function::{Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
@@ -127,6 +127,12 @@ pub struct VMCallFrame<'c> {
     frame_idx: usize,   // start index for this frame in the value stack
     locals: LocalIndex, // local variable count
     pc: usize,
+}
+
+unsafe impl GCTrace for VMCallFrame<'_> {
+    fn trace(&self) {
+        self.module.mark_trace();
+    }
 }
 
 impl<'c> VMCallFrame<'c> {
