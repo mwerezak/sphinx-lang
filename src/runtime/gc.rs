@@ -145,7 +145,7 @@ impl GCState {
 
         let size = gcbox.size();
         let ptr = Box::into_raw(gcbox);
-        log::debug!("{:#X} allocate {}u", ptr as usize, size);
+        log::debug!("{:#X} allocate {} bytes", ptr as usize, size);
         
         let ptr = unsafe {
             NonNull::new_unchecked(ptr)
@@ -168,7 +168,7 @@ impl GCState {
         let size = gcbox.size();
         self.stats.allocated -= size;
         self.stats.box_count -= 1;
-        log::debug!("{:#X} free {}u", ptr as *const () as usize, size);
+        log::debug!("{:#X} free {} bytes", ptr as *const () as usize, size);
         
         gcbox.next
         
@@ -191,11 +191,11 @@ impl GCState {
         
         let freed = allocated - self.stats.allocated;
         let dropped = box_count - self.stats.box_count;
-        log::debug!("Freed {}u ({} allocations)", freed, dropped);
+        log::debug!("Freed {} bytes ({} allocations)", freed, dropped);
         log::debug!("{}", self.stats);
         
         self.threshold = (self.stats.allocated * self.config.pause_factor as usize) / 100;
-        log::debug!("Next collection at {}u", self.threshold);
+        log::debug!("Next collection at {} bytes", self.threshold);
         
         log::debug!("GC cycle end ---");
     }
