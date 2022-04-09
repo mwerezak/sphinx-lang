@@ -68,6 +68,9 @@ unsafe impl GCTrace for RuntimeError {
         for site in self.traceback.iter() {
             site.trace();
         }
+        if let Some(error) = self.cause.as_ref() {
+            error.trace();
+        }
     }
 }
 
