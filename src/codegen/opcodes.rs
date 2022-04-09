@@ -84,7 +84,7 @@ const OP_LD_EMPTY:         u8 = 0x63;  // _ => [ () ]
 // small numbers
 const OP_LD_U8:            u8 = 0x64;  // (u8); _ => [ value ]
 const OP_LD_I8:            u8 = 0x65;  // (i8); _ => [ value ]
-const OP_LD_F8:            u8 = 0x66;  // (i8); _ => [ value ]
+const OP_LD_I16:           u8 = 0x66;  // (i16); _ => [ value ]
 
 // 0x70-77      Unary Operations
 
@@ -185,7 +185,7 @@ pub enum OpCode {
     
     UInt8 = OP_LD_U8,
     Int8 = OP_LD_I8,
-    Float8 = OP_LD_F8,
+    Int16 = OP_LD_I16,
     
     Neg = OP_NEG,
     Pos = OP_POS,
@@ -273,7 +273,7 @@ impl OpCode {
             OP_LD_EMPTY => Self::Empty,
             OP_LD_U8 => Self::UInt8,
             OP_LD_I8 => Self::Int8,
-            OP_LD_F8 => Self::Float8,
+            OP_LD_I16 => Self::Int16,
             
             OP_NEG => Self::Neg,
             OP_POS => Self::Pos,
@@ -347,7 +347,7 @@ impl OpCode {
             Self::Tuple          => 1 + size_of::<u8>(),
             Self::UInt8          => 1 + size_of::<u8>(),
             Self::Int8           => 1 + size_of::<i8>(),
-            Self::Float8         => 1 + size_of::<i8>(),
+            Self::Int16          => 1 + size_of::<i16>(),
             
             Self::Jump           => 1 + size_of::<i16>(),
             Self::JumpIfFalse    => 1 + size_of::<i16>(),
@@ -427,7 +427,7 @@ impl std::fmt::Display for OpCode {
             Self::Empty => "LD_EMPTY",
             Self::UInt8 => "LD_U8",
             Self::Int8 => "LD_I8",
-            Self::Float8 => "LD_F8",
+            Self::Int16 => "LD_I16",
             
             Self::Neg => "NEG",
             Self::Pos => "POS",

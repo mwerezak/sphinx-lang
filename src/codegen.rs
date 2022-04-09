@@ -625,15 +625,7 @@ impl CodeGenerator<'_> {
             Atom::BooleanLiteral(false) => self.emit_instr(symbol, OpCode::False),
             
             Atom::IntegerLiteral(value) => self.compile_integer(symbol, *value)?,
-            
-            Atom::FloatLiteral(value) => {
-                if FloatType::from(i8::MIN) <= *value && *value <= FloatType::from(i8::MAX) {
-                    let value = *value as i8;
-                    self.emit_instr_byte(symbol, OpCode::Float8, value.to_le_bytes()[0]);
-                } else {
-                    self.emit_load_const(symbol, Constant::from(*value))?;
-                }
-            },
+            Atom::FloatLiteral(value) => self.compile_float(symbol, *value)?,
             
             Atom::StringLiteral(value) => self.emit_load_const(symbol, Constant::from(*value))?,
             Atom::Identifier(name) => self.compile_name_lookup(symbol, name)?,
@@ -651,6 +643,8 @@ impl CodeGenerator<'_> {
             self.emit_instr_byte(symbol, OpCode::UInt8, value);
         } else if let Ok(value) = i8::try_from(value) {
             self.emit_instr_byte(symbol, OpCode::Int8, value.to_le_bytes()[0]);
+        } else if let Ok(value) = i16::try_from(value) {
+            self.emit_instr_data(symbol, OpCode::Int16, &value.to_le_bytes());
         } else {
             self.emit_load_const(symbol, Constant::from(value))?;
         }
@@ -658,13 +652,7 @@ impl CodeGenerator<'_> {
     }
     
     fn compile_float(&mut self, symbol: Option<&DebugSymbol>, value: FloatType) -> CompileResult<()> {
-        if FloatType::from(i8::MIN) <= value && value <= FloatType::from(i8::MAX) {
-            let value = value as i8;
-            self.emit_instr_byte(symbol, OpCode::Float8, value.to_le_bytes()[0]);
-        } else {
-            self.emit_load_const(symbol, Constant::from(value))?;
-        }
-        Ok(())
+        self.emit_load_const(symbol, Constant::from(value))
     }
     
     fn compile_name_lookup(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol) -> CompileResult<()> {

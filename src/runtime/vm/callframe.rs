@@ -416,9 +416,9 @@ impl<'c> VMCallFrame<'c> {
                 let value = i8::from_le_bytes([data[0]]);
                 stack.push(Variant::Integer(IntType::from(value)))
             }
-            OpCode::Float8 => {
-                let value = i8::from_le_bytes([data[0]]);
-                stack.push(Variant::Float(FloatType::from(value)))
+            OpCode::Int16 => {
+                let value = i16::from_le_bytes([data[0], data[1]]);
+                stack.push(Variant::Integer(IntType::from(value)))
             }
             
             OpCode::Neg => eval_unary_op!(stack, eval_neg),
