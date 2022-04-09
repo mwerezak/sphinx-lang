@@ -1,4 +1,5 @@
 use string_interner::DefaultSymbol;
+use once_cell::sync::OnceCell;
 
 use crate::lexer::{LexerBuilder, Token};
 use crate::lexer::rules::{SingleCharRule, MultiCharRule};
@@ -15,24 +16,28 @@ pub static COMMENT_CHAR: char = '#';
 pub static NESTED_COMMENT_START: &str = "#{";
 pub static NESTED_COMMENT_END:   &str = "}#";
 
-// string literal escape sequences - lazy initialized
-lazy_static! {
-    pub static ref ESCAPE_SEQUENCES: Vec<Box<dyn EscapeSequence>> = { 
-        let escapes: Vec<Box<dyn EscapeSequence>> = vec![
+static ESCAPE_SEQUENCES: OnceCell<Vec<Box<dyn EscapeSequence>>> = OnceCell::new();
+
+pub fn all_escape_sequences() -> impl Iterator<Item=&'static dyn EscapeSequence> {
+    ESCAPE_SEQUENCES.get_or_init(|| {
             
-            Box::new(CharMapEscape::new('0', "\x00")),
-            Box::new(CharMapEscape::new('\\', "\\")),
-            Box::new(CharMapEscape::new('\'', "\'")),
-            Box::new(CharMapEscape::new('\"', "\"")),
+            let escapes: Vec<Box<dyn EscapeSequence>> = vec![
+                
+                Box::new(CharMapEscape::new('0', "\x00")),
+                Box::new(CharMapEscape::new('\\', "\\")),
+                Box::new(CharMapEscape::new('\'', "\'")),
+                Box::new(CharMapEscape::new('\"', "\"")),
+                
+                Box::new(CharMapEscape::new('t', "\t")),
+                Box::new(CharMapEscape::new('n', "\n")),
+                Box::new(CharMapEscape::new('r', "\r")),
+                Box::new(HexByteEscape::new()),
+            ];
             
-            Box::new(CharMapEscape::new('t', "\t")),
-            Box::new(CharMapEscape::new('n', "\n")),
-            Box::new(CharMapEscape::new('r', "\r")),
-            Box::new(HexByteEscape::new()),
-        ];
-        
-        escapes
-    };
+            escapes
+            
+        })
+        .iter().map(|esc| &**esc)
 }
 
 pub fn create_default_lexer_rules() -> LexerBuilder {
@@ -128,7 +133,7 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(IntegerLiteralRule::new())
     .add_rule(HexIntegerLiteralRule::new())
     .add_rule(FloatLiteralRule::new())
-    .add_rule(StringLiteralRule::new(ESCAPE_SEQUENCES.iter().map(|esc| esc.as_ref())))
+    .add_rule(StringLiteralRule::new(all_escape_sequences()))
     .add_rule(LabelRule::new("::"))
     
 }

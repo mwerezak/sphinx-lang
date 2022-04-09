@@ -1,9 +1,14 @@
 use std::fmt;
+use once_cell::sync::Lazy;
+
+use crate::runtime::Variant;
+use crate::runtime::errors::ExecResult;
 
 pub mod operator;
 pub mod metatable;
-pub mod primitive;
 
+pub use metatable::Metatable;
+use metatable::*;
 
 // Type tag for Sphinx's "primitive" types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -39,3 +44,22 @@ impl fmt::Display for Type {
         fmt.write_str(name)
     }
 }
+
+
+
+pub static METATABLE_DEFAULT: Lazy<Metatable> = Lazy::new(Metatable::default);
+
+pub static METATABLE_STRING: Lazy<Metatable> = Lazy::new(|| {
+    
+    fn string_add(lhs: &Variant, rhs: &Variant) -> ExecResult<Option<Variant>> {
+        if let (Variant::String(a), Variant::String(b)) = (lhs, rhs) {
+            Ok(Some(Variant::String(a.concat(b))))
+        } else {
+            Ok(None)
+        }
+    }
+    
+    let mut metatable = Metatable::default();
+    metatable.set_binary(BinaryTag::Add, string_add);
+    metatable
+});

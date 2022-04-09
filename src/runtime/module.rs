@@ -10,6 +10,7 @@ use std::fmt;
 use std::path::PathBuf;
 use std::cell::{RefCell, Ref, RefMut};
 use std::hash::{Hash, Hasher, BuildHasher};
+use once_cell::sync::Lazy;
 use crate::source::ModuleSource;
 use crate::language::FloatType;
 use crate::runtime::{Variant, HashMap, DefaultBuildHasher};
@@ -213,9 +214,9 @@ pub enum ModuleIdent {
     RefHash(u64),  // GC address of globals, for Native Modules
 }
 
-lazy_static! {
-    static ref IDENT_HASH: DefaultBuildHasher = DefaultBuildHasher::default();
-}
+
+// All module hashes must come from the same builder for consistency
+static MODULE_IDENT_HASH: Lazy<DefaultBuildHasher> = Lazy::new(DefaultBuildHasher::default);
 
 impl From<&ModuleSource> for ModuleIdent {
     fn from(source: &ModuleSource) -> Self {
@@ -225,7 +226,7 @@ impl From<&ModuleSource> for ModuleIdent {
             },
             
             ModuleSource::String(text) => {
-                let mut state = IDENT_HASH.build_hasher();
+                let mut state = MODULE_IDENT_HASH.build_hasher();
                 text.hash(&mut state);
                 let hash = state.finish();
                 Self::SourceHash(hash)
@@ -236,7 +237,7 @@ impl From<&ModuleSource> for ModuleIdent {
 
 impl From<GC<GlobalEnv>> for ModuleIdent {
     fn from(env: GC<GlobalEnv>) -> Self {
-        let mut state = IDENT_HASH.build_hasher();
+        let mut state = MODULE_IDENT_HASH.build_hasher();
         <GC<GlobalEnv> as Hash>::hash(&env, &mut state);
         let hash = state.finish();
         Self::RefHash(hash)

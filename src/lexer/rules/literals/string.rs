@@ -2,7 +2,7 @@ use crate::lexer::Token;
 use crate::lexer::rules::{MatchResult, LexerRule, TokenError};
 
 // supports escape sequences that consist of a single-character tag (e.g. \t) and an optional fixed-length argument (e.g. \u0FFE, \xFE)
-pub trait EscapeSequence: Sync {
+pub trait EscapeSequence: Send + Sync {
     fn tag(&self) -> char;
     fn arglen(&self) -> u8;
     
