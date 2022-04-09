@@ -227,7 +227,7 @@ impl Variant {
 pub struct VariantKey<'a>(&'a Variant);
 
 impl<'a> TryFrom<&'a Variant> for VariantKey<'a> {
-    type Error = RuntimeError;
+    type Error = Box<RuntimeError>;
     fn try_from(value: &'a Variant) -> ExecResult<Self> {
         if !value.can_hash() {
             return Err(ErrorKind::UnhashableValue(*value).into());

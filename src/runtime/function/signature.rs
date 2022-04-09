@@ -1,6 +1,7 @@
 use std::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::runtime::Variant;
+use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
@@ -12,6 +13,10 @@ pub struct Signature {
     required: Box<[Parameter]>,
     default: Box<[Parameter]>,
     variadic: Option<Parameter>,
+}
+
+unsafe impl GCTrace for Signature {
+    fn trace(&self) { }
 }
 
 impl Signature {
@@ -46,11 +51,17 @@ impl Signature {
     
     pub fn check_args(&self, args: &[Variant]) -> ExecResult<()> {
         if args.len() < self.required.len() {
-            return Err(ErrorKind::MissingArguments(args.len(), self.clone()).into())
+            return Err(ErrorKind::MissingArguments { 
+                callable: GC::new(self.clone()),
+                nargs: args.len() 
+            }.into())
         }
         
         if matches!(self.max_arity(), Some(max_arity) if args.len() > max_arity) {
-            return Err(ErrorKind::TooManyArguments(args.len(), self.clone()).into())
+            return Err(ErrorKind::TooManyArguments {
+                callable: GC::new(self.clone()),
+                nargs: args.len()
+            }.into())
         }
         
         Ok(())

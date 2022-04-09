@@ -4,10 +4,11 @@ use std::error::Error;
 use crate::utils;
 use crate::runtime::Variant;
 use crate::runtime::function::Signature;
+use crate::runtime::gc::{GC, GCTrace};
 use crate::debug::traceback::{TraceSite, Traceback};
 
 // TODO box error
-pub type ExecResult<T> = Result<T, RuntimeError>;
+pub type ExecResult<T> = Result<T, Box<RuntimeError>>;
 
 #[derive(Debug)]
 pub enum ErrorKind {
@@ -21,10 +22,9 @@ pub enum ErrorKind {
     CantAssignImmutable,  // can't assign to immutable global variable
     UnhashableValue(Variant),
     NotCallable(Variant),
-    MissingArguments(usize, Signature),
-    TooManyArguments(usize, Signature),
+    MissingArguments { callable: GC<Signature>, nargs: usize },
+    TooManyArguments { callable: GC<Signature>, nargs: usize },
     AssertFailed,
-    Other,
 }
 
 impl From<ErrorKind> for RuntimeError {
@@ -33,27 +33,54 @@ impl From<ErrorKind> for RuntimeError {
     }
 }
 
+impl From<ErrorKind> for Box<RuntimeError> {
+    fn from(kind: ErrorKind) -> Self {
+        Box::new(kind.into())
+    }
+}
+
+unsafe impl GCTrace for ErrorKind {
+    fn trace(&self) {
+        match self {
+            Self::InvalidUnaryOperand(op) => op.trace(),
+            Self::InvalidBinaryOperand(lhs, rhs) => { lhs.trace(); rhs.trace() },
+            Self::UnhashableValue(value) => value.trace(),
+            Self::NotCallable(value) => value.trace(),
+            Self::MissingArguments { callable, .. } => callable.mark_trace(),
+            Self::TooManyArguments { callable, .. } => callable.mark_trace(),
+            _ => { },
+        }
+    }
+}
+
+
+
 #[derive(Debug)]
 pub struct RuntimeError {
     kind: ErrorKind,
     traceback: Vec<TraceSite>,
-    cause: Option<Box<dyn Error>>,
+    cause: Option<Box<RuntimeError>>,
+}
+
+unsafe impl GCTrace for RuntimeError {
+    fn trace(&self) {
+        self.kind.trace();
+        for site in self.traceback.iter() {
+            site.trace();
+        }
+    }
 }
 
 impl RuntimeError {
-    pub fn new(error: impl Error + 'static) -> Self {
-        RuntimeError::from(ErrorKind::Other).caused_by(error)
+    pub fn caused_by(mut self: Box<Self>, cause: Box<RuntimeError>) -> Box<Self> {
+        self.cause.replace(cause); self
     }
     
-    pub fn caused_by(mut self, cause: impl Error + 'static) -> Self {
-        self.cause.replace(Box::new(cause)); self
-    }
-    
-    pub fn extend_trace(mut self, trace: impl Iterator<Item=TraceSite>) -> Self {
+    pub fn extend_trace(mut self: Box<Self>, trace: impl Iterator<Item=TraceSite>) -> Box<Self> {
         self.traceback.extend(trace); self
     }
     
-    pub fn push_frame(mut self, site: TraceSite) -> Self {
+    pub fn push_frame(mut self: Box<Self>, site: TraceSite) -> Box<Self> {
         self.traceback.push(site); self
     }
     
@@ -66,7 +93,9 @@ impl RuntimeError {
 
 impl Error for RuntimeError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.cause.as_ref().map(|o| o.as_ref())
+        self.cause.as_ref().map(
+            |error| &*error as &RuntimeError as &dyn Error
+        )
     }
 }
 
@@ -84,10 +113,9 @@ impl fmt::Display for RuntimeError {
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
             ErrorKind::UnhashableValue(..) => format!("unhashable value"),
             ErrorKind::NotCallable(..) => format!("'...' type is not callable"),
-            ErrorKind::MissingArguments(..) => format!("name() missing N required arguments: '...', '...', and '...'"),
-            ErrorKind::TooManyArguments(..) => format!("name() takes  N arguments but M were given"),
+            ErrorKind::MissingArguments { .. } => format!("<callable> missing N required arguments: '...', '...', and '...'"),
+            ErrorKind::TooManyArguments { .. } => format!("<callable> takes N arguments but M were given"),
             ErrorKind::AssertFailed => format!("assertion failed"),
-            ErrorKind::Other => String::new(),
         };
         
         utils::format_error(fmt, "Runtime error", Some(&message), self.source())
