@@ -126,7 +126,7 @@ impl ChunkBuilder {
     
     pub fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<Chunk> {
         let chunk_id = FunctionID::try_from(self.chunks.len())
-            .map_err(|_| CompileError::new("function limit reached"))?;
+            .map_err(|_| ErrorKind::InternalLimit("function count limit reached"))?;
         
         self.chunks.push(ChunkBuf::new(info));
         self.functions.push(None);
@@ -160,7 +160,7 @@ impl ChunkBuilder {
             Ok(*cid)
         } else {
             let cid = ConstID::try_from(self.consts.len())
-                .map_err(|_| CompileError::new("constant pool limit reached"))?;
+                .map_err(|_| ErrorKind::InternalLimit("constant pool limit reached"))?;
             self.consts.push(value);
             self.dedup.insert(value, cid);
             Ok(cid)

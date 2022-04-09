@@ -9,23 +9,11 @@ pub type CompileResult<T> = Result<T, CompileError>;
 
 #[derive(Debug)]
 pub enum ErrorKind {
-    ChunkCountLimit,
-    ConstPoolLimit,
-    ParamCountLimit,
-    ArgCountLimit,
-    TupleLengthLimit,
-    LocalVariableLimit,
-    UpvalueLimit,
-    CalcJumpOffsetFailed,
     CantAssignImmutable,
     CantAssignNonLocal,
-    Other(String),
-}
-
-impl<S> From<S> for ErrorKind where S: ToString {
-    fn from(message: S) -> Self {
-        ErrorKind::Other(message.to_string())
-    }
+    TupleLenMismatch,
+    CantUpdateAssignTuple,
+    InternalLimit(&'static str),
 }
 
 #[derive(Debug)]
@@ -36,8 +24,8 @@ pub struct CompileError {
 }
 
 impl CompileError {
-    pub fn new<S>(message: S) -> Self where S: ToString {
-        ErrorKind::from(message).into()
+    pub fn new(kind: ErrorKind) -> Self {
+        Self { kind, symbol: None, cause: None }
     }
     
     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
@@ -53,7 +41,7 @@ impl CompileError {
 
 impl From<ErrorKind> for CompileError {
     fn from(kind: ErrorKind) -> Self {
-        Self { kind, symbol: None, cause: None }
+        Self::new(kind)
     }
 }
 
@@ -71,20 +59,11 @@ impl fmt::Display for CompileError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         
         let message = match self.kind() {
-            // Limit exceeded errors
-            ErrorKind::ChunkCountLimit => "chunk count limit reached",
-            ErrorKind::ConstPoolLimit => "constant pool limit reached",
-            ErrorKind::ParamCountLimit => "parameter limit exceeded",
-            ErrorKind::ArgCountLimit => "argument limit exceeded",
-            ErrorKind::TupleLengthLimit => "tuple length limit exceeded",
-            ErrorKind::LocalVariableLimit => "local variable limit reached",
-            ErrorKind::UpvalueLimit => "upvalue limit reached",
-            ErrorKind::CalcJumpOffsetFailed => "could not calculate jump offset",
-            
-            // Actual user errors
             ErrorKind::CantAssignImmutable => "can't assign to immutable local variable",
             ErrorKind::CantAssignNonLocal => "can't assign to a non-local variable without the \"nonlocal\" keyword",
-            ErrorKind::Other(message) => message,
+            ErrorKind::TupleLenMismatch => "can't assign tuples of different lengths",
+            ErrorKind::CantUpdateAssignTuple => "can't use update-assigment when assigning to a tuple",
+            ErrorKind::InternalLimit(message) => message,
         };
         
         utils::format_error(fmt, "Compile error", Some(message), self.source())

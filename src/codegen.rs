@@ -341,7 +341,7 @@ impl CodeGenerator<'_> {
             
             // if we *still* don't have the right width, just abort
             if new_width != new_opcode.instr_len() {
-                return Err(ErrorKind::CalcJumpOffsetFailed.into());
+                return Err(ErrorKind::InternalLimit("could not calculate jump offset").into());
             }
             
             jump_offset = new_offset;
@@ -367,7 +367,7 @@ impl CodeGenerator<'_> {
             
             // if we *still* don't have the right width, just abort
             if new_width != new_opcode.instr_len() {
-                return Err(ErrorKind::CalcJumpOffsetFailed.into());
+                return Err(ErrorKind::InternalLimit("could not calculate jump offset").into());
             }
             
             jump_offset = new_offset;
@@ -396,7 +396,7 @@ impl CodeGenerator<'_> {
             return Ok(JumpOffset::Long(offset));
         }
         
-        Err(ErrorKind::CalcJumpOffsetFailed.into())
+        Err(ErrorKind::InternalLimit("could not calculate jump offset").into())
     }
     
     ///////// Scopes /////////
@@ -607,7 +607,7 @@ impl CodeGenerator<'_> {
     
     fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, expr_list: &[ExprMeta]) -> CompileResult<()> {
         let len = u8::try_from(expr_list.len())
-            .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
+            .map_err(|_| ErrorKind::InternalLimit("tuple length limit exceeded"))?;
         
         for expr in expr_list.iter() {
             self.compile_expr_with_symbol(expr)?;
@@ -715,7 +715,7 @@ impl CodeGenerator<'_> {
             }
             
             arg_len = u8::try_from(args.len() + 1)
-                .map_err(|_| CompileError::from(ErrorKind::ArgCountLimit))?;
+                .map_err(|_| ErrorKind::InternalLimit("argument count limit exceeded"))?;
             
         } else {
             
@@ -794,7 +794,7 @@ impl CodeGenerator<'_> {
                 
                 Expr::Tuple(init_list) => {
                     if target_list.len() != init_list.len() {
-                        return Err(CompileError::new("can't assign tuples of different lengths"))
+                        return Err(ErrorKind::TupleLenMismatch.into());
                     }
                     
                     for (inner_lhs, inner_expr) in target_list.iter().zip(init_list.iter()) {
@@ -813,7 +813,7 @@ impl CodeGenerator<'_> {
                     
                     // declarations are also expressions
                     let tuple_len = u8::try_from(init_list.len())
-                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
+                        .map_err(|_| ErrorKind::InternalLimit("max tuple length exceeded"))?;
                     self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
                     
                     Ok(())
@@ -854,14 +854,14 @@ impl CodeGenerator<'_> {
             LValue::Index(target) => unimplemented!(),
             
             LValue::Tuple(..) if assign.op.is_some() => {
-                Err(CompileError::new("can't use update-assigment when assigning to a tuple"))
+                Err(ErrorKind::CantUpdateAssignTuple.into())
             },
             
             LValue::Tuple(target_list) => match assign.rhs {
-
+                
                 Expr::Tuple(rhs_list) => {
                     if target_list.len() != rhs_list.len() {
-                        return Err(CompileError::new("can't assign tuples of different lengths"))
+                        return Err(ErrorKind::TupleLenMismatch.into())
                     }
                     
                     for (inner_lhs, inner_expr) in target_list.iter().zip(rhs_list.iter()) {
@@ -881,14 +881,14 @@ impl CodeGenerator<'_> {
                     
                     // assignments are also expressions
                     let tuple_len = u8::try_from(rhs_list.len())
-                        .map_err(|_| CompileError::from(ErrorKind::TupleLengthLimit))?;
+                        .map_err(|_| ErrorKind::InternalLimit("max tuple length exceeded"))?;
                     self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
                     
                     Ok(())
                 },
                 
                 _ => unimplemented!(), // dynamic declaration
-
+                
             },
         }
     }
@@ -1156,9 +1156,9 @@ impl CodeGenerator<'_> {
         
         // depending on the number of arguments, jump into the default argument sequence
         let required_count = u8::try_from(signature.required.len())
-            .map_err(|_| CompileError::from(ErrorKind::ParamCountLimit))?;
+            .map_err(|_| ErrorKind::InternalLimit("parameter count limit exceeded"))?;
         let default_count = u8::try_from(signature.default.len())
-            .map_err(|_| CompileError::from(ErrorKind::ParamCountLimit))?;
+            .map_err(|_| ErrorKind::InternalLimit("parameter count limit exceeded"))?;
         
         // "defaults passed" = NArgs - required_count
         self.try_emit_load_local(None, &LocalName::NArgs).unwrap();
@@ -1219,7 +1219,7 @@ impl CodeGenerator<'_> {
         debug_assert!(signature.variadic.is_some());
         
         let positional_count = u8::try_from(signature.required.len() + signature.default.len())
-            .map_err(|_| CompileError::from(ErrorKind::ParamCountLimit))?;
+            .map_err(|_| ErrorKind::InternalLimit("parameter count limit exceeded"))?;
         
         // "variadic count" = NArgs - required_count - default_count
         self.try_emit_load_local(None, &LocalName::NArgs).unwrap();

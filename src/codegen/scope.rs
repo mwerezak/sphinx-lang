@@ -67,7 +67,7 @@ impl Scope {
         let index = self.last_index().map_or(
             Ok(0),
             |index| index.checked_add(1)
-                .ok_or_else(|| CompileError::from(ErrorKind::LocalVariableLimit))
+                .ok_or_else(|| ErrorKind::InternalLimit("local variable limit reached"))
         )?;
         
         let local = Local {
@@ -189,7 +189,7 @@ impl ScopeFrame {
     
     fn create_upval_for_local(&mut self, local: &mut Local) -> CompileResult<&Upvalue> {
         let index = UpvalueIndex::try_from(self.upvalues.len())
-            .map_err(|_| CompileError::from(ErrorKind::UpvalueLimit))?;
+            .map_err(|_| ErrorKind::InternalLimit("upvalue limit reached"))?;
         
         let upval = Upvalue {
             index,
@@ -206,7 +206,7 @@ impl ScopeFrame {
     
     fn create_upval_for_upval(&mut self, upval: &Upvalue) -> CompileResult<&Upvalue> {
         let index = UpvalueIndex::try_from(self.upvalues.len())
-            .map_err(|_| CompileError::from(ErrorKind::UpvalueLimit))?;
+            .map_err(|_| ErrorKind::InternalLimit("upvalue limit reached"))?;
         
         let upval = Upvalue {
             index,
