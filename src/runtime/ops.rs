@@ -152,8 +152,8 @@ pub fn eval_eq(lhs: &Variant, rhs: &Variant) -> ExecResult<bool> {
         // numeric equality
         (Variant::Integer(a), Variant::Integer(b)) => *a == *b,
         (a, b) if is_arithmetic_primitive(a) && is_arithmetic_primitive(b) 
-            => a.float_value().unwrap() == b.float_value().unwrap(),
-
+            => a.as_float().unwrap() == b.as_float().unwrap(),
+        
         // tuple equality
         (Variant::Tuple(a), Variant::Tuple(b)) if a.len() == b.len() => {
             let a_items = a.iter();
@@ -189,14 +189,19 @@ macro_rules! eval_binary_arithmetic {
         
         #[inline]
         pub fn $name (lhs: &Variant, rhs: &Variant) -> ExecResult<Variant> {
-            let value = match (lhs, rhs) {
-                (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => $int_name (*lhs_value, *rhs_value)?,
-                _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) 
-                    => $float_name (lhs.float_value().unwrap(), rhs.float_value().unwrap())?,
-                
-                _ => return eval_meta_binary($tag, lhs, rhs),
-            };
-            Ok(value)
+            let lhs_value = lhs.as_int();
+            let rhs_value = rhs.as_int();
+            if lhs_value.and(rhs_value).is_some() {
+                return $int_name (lhs_value.unwrap(), rhs_value.unwrap());
+            }
+            
+            let lhs_value = lhs.as_float();
+            let rhs_value = rhs.as_float();
+            if lhs_value.and(rhs_value).is_some() {
+                return $float_name (lhs_value.unwrap(), rhs_value.unwrap());
+            }
+            
+            eval_meta_binary($tag, lhs, rhs)
         }
         
     };
@@ -244,14 +249,20 @@ macro_rules! eval_binary_comparison {
         
         #[inline]
         pub fn $name (lhs: &Variant, rhs: &Variant) -> ExecResult<bool> {
-            let value = match (lhs, rhs) {
-                (Variant::Integer(lhs_value), Variant::Integer(rhs_value)) => $int_name (*lhs_value, *rhs_value),
-                _ if is_arithmetic_primitive(lhs) && is_arithmetic_primitive(rhs) 
-                    => $float_name (lhs.float_value().unwrap(), rhs.float_value().unwrap()),
-                
-                _ => return eval_meta_comparison($tag, lhs, rhs),
-            };
-            Ok(value)
+            
+            let lhs_value = lhs.as_int();
+            let rhs_value = rhs.as_int();
+            if lhs_value.and(rhs_value).is_some() {
+                return Ok($int_name (lhs_value.unwrap(), rhs_value.unwrap()));
+            }
+            
+            let lhs_value = lhs.as_float();
+            let rhs_value = rhs.as_float();
+            if lhs_value.and(rhs_value).is_some() {
+                return Ok($float_name (lhs_value.unwrap(), rhs_value.unwrap()));
+            }
+            
+            eval_meta_comparison($tag, lhs, rhs)
         }
         
     };
@@ -282,17 +293,22 @@ macro_rules! eval_binary_bitwise {
         
         #[inline]
         pub fn $name (lhs: &Variant, rhs: &Variant) -> ExecResult<Variant> {
-            let value = match (lhs, rhs) {
-                (Variant::BoolTrue, Variant::BoolTrue) => $bool_name (true, true),
-                (Variant::BoolTrue, Variant::BoolFalse) => $bool_name (true, false),
-                (Variant::BoolFalse, Variant::BoolTrue) => $bool_name (false, true),
-                (Variant::BoolFalse, Variant::BoolFalse) => $bool_name (false, false),
-                _ if is_bitwise_primitive(lhs) && is_bitwise_primitive(rhs) 
-                    => $int_name (lhs.bit_value().unwrap(), rhs.bit_value().unwrap()),
+            match (lhs, rhs) {
+                (Variant::BoolTrue, Variant::BoolTrue) => Ok($bool_name (true, true)),
+                (Variant::BoolTrue, Variant::BoolFalse) => Ok($bool_name (true, false)),
+                (Variant::BoolFalse, Variant::BoolTrue) => Ok($bool_name (false, true)),
+                (Variant::BoolFalse, Variant::BoolFalse) => Ok($bool_name (false, false)),
                 
-                _ => return eval_meta_binary($tag, lhs, rhs),
-            };
-            Ok(value)
+                _ => {
+                    let lhs_value = lhs.as_bits();
+                    let rhs_value = rhs.as_bits();
+                    if lhs_value.and(rhs_value).is_some() {
+                        Ok($int_name (lhs_value.unwrap(), rhs_value.unwrap()))
+                    } else {
+                        eval_meta_binary($tag, lhs, rhs)
+                    }
+                },
+            }
         }
         
     };
@@ -319,13 +335,17 @@ macro_rules! eval_binary_shift {
         
         #[inline]
         pub fn $name (lhs: &Variant, rhs: &Variant) -> ExecResult<Variant> {
-            let value = match (lhs, rhs) {
-                (_, Variant::Integer(shift)) if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value().unwrap(), *shift)?,
-                (_, Variant::BoolTrue) if is_bitwise_primitive(lhs) => $int_name (lhs.bit_value().unwrap(), 1)?,
-                (_, Variant::BoolFalse) if is_bitwise_primitive(lhs) => lhs.clone(), // no-op, just copy the value to output
-                _ => return eval_meta_binary($tag, lhs, rhs),
-            };
-            Ok(value)
+            if let Some(bit_value) = lhs.as_bits() {
+                match rhs {
+                    Variant::BoolFalse => return Ok(*lhs), // no-op, just copy the value to output
+                    Variant::BoolTrue => return $int_name (bit_value, 1),
+                    _ => if let Some(shift_value) = rhs.as_int() {
+                        return $int_name (bit_value, shift_value)
+                    }
+                }
+            }
+            
+            eval_meta_binary($tag, lhs, rhs)
         }
         
     };

@@ -24,6 +24,9 @@ pub enum ErrorKind {
     NotCallable(Variant),
     MissingArguments { callable: GC<Signature>, nargs: usize },
     TooManyArguments { callable: GC<Signature>, nargs: usize },
+    CantInterpretAsBits(Variant),
+    CantInterpretAsInt(Variant),
+    CantInterpretAsFloat(Variant),
     AssertFailed,
 }
 
@@ -118,6 +121,9 @@ impl fmt::Display for RuntimeError {
             ErrorKind::NotCallable(..) => format!("'...' type is not callable"),
             ErrorKind::MissingArguments { .. } => format!("<callable> missing N required arguments: '...', '...', and '...'"),
             ErrorKind::TooManyArguments { .. } => format!("<callable> takes N arguments but M were given"),
+            ErrorKind::CantInterpretAsBits(..) => format!("can't interpret <value> as bitfield"),
+            ErrorKind::CantInterpretAsInt(..) => format!("can't interpret <value> as int"),
+            ErrorKind::CantInterpretAsFloat(..) => format!("can't interpret <value> as float"),
             ErrorKind::AssertFailed => format!("assertion failed"),
         };
         

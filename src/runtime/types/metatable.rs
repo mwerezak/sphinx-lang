@@ -1,4 +1,6 @@
+use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
+use crate::runtime::strings::StringSymbol;
 use crate::runtime::function::Call;
 use crate::runtime::errors::ExecResult;
 
@@ -17,6 +19,12 @@ pub type MethodCall = fn(&Variant, &[Variant]) -> Call;
 #[derive(Default)]
 pub struct Metatable {
     call: Option<MethodCall>,
+    
+    // Primitive coercions
+    to_bits: Option<Method0<IntType>>,   // __bits
+    to_int: Option<Method0<IntType>>,    // __int
+    to_float: Option<Method0<FloatType>>,  // __float
+    // to_string: Option<Method0<String>>,  // __tostring
     
     // Operator Overloads
     op_pos: Option<MethodUnary>,  // __pos

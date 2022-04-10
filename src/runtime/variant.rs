@@ -58,7 +58,8 @@ impl Variant {
         !matches!(self, Self::Nil | Self::BoolFalse)
     }
     
-    pub fn bit_value(&self) -> Option<IntType> {
+    #[inline]
+    pub fn as_bits(&self) -> Option<IntType> {
         let value = match self {
             Self::Integer(value) => *value,
             Self::BoolFalse => 0, // all 0s
@@ -68,7 +69,17 @@ impl Variant {
         Some(value)
     }
     
-    pub fn float_value(&self) -> Option<FloatType> {
+    #[inline]
+    pub fn as_int(&self) -> Option<IntType> {
+        let value = match self {
+            Self::Integer(value) => *value,
+            _ => return None,
+        };
+        Some(value)
+    }
+    
+    #[inline]
+    pub fn as_float(&self) -> Option<FloatType> {
         let value = match self {
             // it's okay if this is a lossy conversion
             Self::Integer(value) => (*value) as FloatType,
@@ -91,6 +102,7 @@ impl Variant {
         GC::<dyn GCTrace>::try_from(self).ok()
     }
 }
+
 
 impl From<bool> for Variant {
     fn from(value: bool) -> Self {
