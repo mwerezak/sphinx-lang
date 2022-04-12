@@ -27,10 +27,7 @@ impl<T> GCBox<T> where T: GCTrace + ?Sized {
     
     fn ptr_eq(&self, other: &GCBox<T>) -> bool {
         // in case T is a trait object, work around for <https://github.com/rust-lang/rust/issues/46139>
-        ptr::eq(
-            ptr::addr_of!(self.marked),
-            ptr::addr_of!(other.marked),
-        )
+        ptr::eq(&self.marked, &other.marked)
     }
     
     fn mark_trace(&mut self) {

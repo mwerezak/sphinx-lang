@@ -1,63 +1,68 @@
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
+use crate::runtime::gc::GCTrace;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::function::Call;
 use crate::runtime::errors::ExecResult;
 
 
-type Method0<R> = fn(&Variant) -> ExecResult<R>;
-type Method1<R> = fn(&Variant, &Variant) -> ExecResult<R>;
+type Method0<T, R> = fn(T) -> ExecResult<R>;
+type Method1<T, R> = fn(T, &Variant) -> ExecResult<R>;
 // type Method2<R> = fn(&Variant, &Variant, &Variant) -> ExecResult<R>;
 
-pub type MethodUnary = Method0<Variant>;
-pub type MethodBinary = Method1<Option<Variant>>; // a None result will cause the reflected version to be called
-pub type MethodBinaryReflected = Method1<Variant>;
-pub type MethodCompare = Method1<Option<bool>>;
+pub type MethodUnary<T> = Method0<T, Variant>;
+pub type MethodBinary<T> = Method1<T, Option<Variant>>; // a None result will cause the reflected version to be called
+pub type MethodBinaryReflected<T> = Method1<T, Variant>;
+pub type MethodCompare<T> = Method1<T, Option<bool>>;
 
-pub type MethodCall = fn(&Variant, &[Variant]) -> Call;
+pub type MethodCall<T> = fn(T, &[Variant]) -> Call;
 
-#[derive(Default)]
-pub struct Metatable {
-    call: Option<MethodCall>,
+pub struct Metatable<T> {
+    call: Option<MethodCall<T>>,
     
     // Primitive coercions
-    to_bits: Option<Method0<IntType>>,   // __bits
-    to_int: Option<Method0<IntType>>,    // __int
-    to_float: Option<Method0<FloatType>>,  // __float
+    to_bits: Option<Method0<T, IntType>>,   // __bits
+    to_int: Option<Method0<T, IntType>>,    // __int
+    to_float: Option<Method0<T, FloatType>>,  // __float
     // to_string: Option<Method0<String>>,  // __tostring
     
     // Operator Overloads
-    op_pos: Option<MethodUnary>,  // __pos
-    op_neg: Option<MethodUnary>,  // __neg
-    op_inv: Option<MethodUnary>,  // __inv
+    op_pos: Option<MethodUnary<T>>,  // __pos
+    op_neg: Option<MethodUnary<T>>,  // __neg
+    op_inv: Option<MethodUnary<T>>,  // __inv
     
-    op_add: Option<MethodBinary>, // __add
-    op_sub: Option<MethodBinary>, // __sub
-    op_mul: Option<MethodBinary>, // __mul
-    op_div: Option<MethodBinary>, // __div
-    op_mod: Option<MethodBinary>, // __mod
-    op_and: Option<MethodBinary>, // __and
-    op_xor: Option<MethodBinary>, // __xor
-    op_or:  Option<MethodBinary>, // __or
-    op_shl: Option<MethodBinary>, // __shl
-    op_shr: Option<MethodBinary>, // __shr
+    op_add: Option<MethodBinary<T>>, // __add
+    op_sub: Option<MethodBinary<T>>, // __sub
+    op_mul: Option<MethodBinary<T>>, // __mul
+    op_div: Option<MethodBinary<T>>, // __div
+    op_mod: Option<MethodBinary<T>>, // __mod
+    op_and: Option<MethodBinary<T>>, // __and
+    op_xor: Option<MethodBinary<T>>, // __xor
+    op_or:  Option<MethodBinary<T>>, // __or
+    op_shl: Option<MethodBinary<T>>, // __shl
+    op_shr: Option<MethodBinary<T>>, // __shr
     
-    op_radd: Option<MethodBinaryReflected>, // __radd
-    op_rsub: Option<MethodBinaryReflected>, // __rsub
-    op_rmul: Option<MethodBinaryReflected>, // __rmul
-    op_rdiv: Option<MethodBinaryReflected>, // __rdiv
-    op_rmod: Option<MethodBinaryReflected>, // __rmod
-    op_rand: Option<MethodBinaryReflected>, // __rand
-    op_rxor: Option<MethodBinaryReflected>, // __rxor
-    op_ror:  Option<MethodBinaryReflected>, // __ror
-    op_rshl: Option<MethodBinaryReflected>, // __rshl
-    op_rshr: Option<MethodBinaryReflected>, // __rshr
+    op_radd: Option<MethodBinaryReflected<T>>, // __radd
+    op_rsub: Option<MethodBinaryReflected<T>>, // __rsub
+    op_rmul: Option<MethodBinaryReflected<T>>, // __rmul
+    op_rdiv: Option<MethodBinaryReflected<T>>, // __rdiv
+    op_rmod: Option<MethodBinaryReflected<T>>, // __rmod
+    op_rand: Option<MethodBinaryReflected<T>>, // __rand
+    op_rxor: Option<MethodBinaryReflected<T>>, // __rxor
+    op_ror:  Option<MethodBinaryReflected<T>>, // __ror
+    op_rshl: Option<MethodBinaryReflected<T>>, // __rshl
+    op_rshr: Option<MethodBinaryReflected<T>>, // __rshr
     
-    cmp_lt: Option<MethodCompare>, // __lt
-    cmp_le: Option<MethodCompare>, // __le
-    cmp_eq: Option<MethodCompare>, // __eq
+    cmp_lt: Option<MethodCompare<T>>, // __lt
+    cmp_le: Option<MethodCompare<T>>, // __le
+    cmp_eq: Option<MethodCompare<T>>, // __eq
 }
 
+unsafe impl<T> GCTrace for Metatable<T> {
+    fn trace(&self) {
+        // don't need to do anything as the metatable only holds function pointers
+    }
+}
 
 // Metamethod Tags
 
@@ -81,9 +86,9 @@ pub enum CompareTag{
     LT, LE, EQ,
 }
 
-impl Metatable {
+impl<T> Metatable<T> {
     #[inline]
-    pub fn op_unary(&self, tag: UnaryTag) -> Option<&MethodUnary> {
+    pub fn op_unary(&self, tag: UnaryTag) -> Option<&MethodUnary<T>> {
         match tag {
             UnaryTag::Pos => self.op_pos.as_ref(),
             UnaryTag::Neg => self.op_neg.as_ref(),
@@ -91,7 +96,7 @@ impl Metatable {
         }
     }
     
-    pub fn set_unary(&mut self, tag: UnaryTag, method: MethodUnary) -> Option<MethodUnary> {
+    pub fn set_unary(&mut self, tag: UnaryTag, method: MethodUnary<T>) -> Option<MethodUnary<T>> {
         match tag {
             UnaryTag::Pos => self.op_pos.replace(method),
             UnaryTag::Neg => self.op_neg.replace(method),
@@ -99,7 +104,7 @@ impl Metatable {
         }
     }
     
-    pub fn take_unary(&mut self, tag: UnaryTag) -> Option<MethodUnary> {
+    pub fn take_unary(&mut self, tag: UnaryTag) -> Option<MethodUnary<T>> {
         match tag {
             UnaryTag::Pos => self.op_pos.take(),
             UnaryTag::Neg => self.op_neg.take(),
@@ -108,7 +113,7 @@ impl Metatable {
     }
     
     #[inline]
-    pub fn op_binary(&self, tag: BinaryTag) -> Option<&MethodBinary> {
+    pub fn op_binary(&self, tag: BinaryTag) -> Option<&MethodBinary<T>> {
         match tag {
             BinaryTag::Add => self.op_add.as_ref(),
             BinaryTag::Sub => self.op_sub.as_ref(),
@@ -123,7 +128,7 @@ impl Metatable {
         }
     }
     
-    pub fn set_binary(&mut self, tag: BinaryTag, method: MethodBinary) -> Option<MethodBinary> {
+    pub fn set_binary(&mut self, tag: BinaryTag, method: MethodBinary<T>) -> Option<MethodBinary<T>> {
         match tag {
             BinaryTag::Add => self.op_add.replace(method),
             BinaryTag::Sub => self.op_sub.replace(method),
@@ -138,7 +143,7 @@ impl Metatable {
         }
     }
     
-    pub fn take_binary(&mut self, tag: BinaryTag) -> Option<MethodBinary> {
+    pub fn take_binary(&mut self, tag: BinaryTag) -> Option<MethodBinary<T>> {
         match tag {
             BinaryTag::Add => self.op_add.take(),
             BinaryTag::Sub => self.op_sub.take(),
@@ -154,7 +159,7 @@ impl Metatable {
     }
     
     #[inline]
-    pub fn op_binary_reflected(&self, tag: BinaryTag) -> Option<&MethodBinaryReflected> {
+    pub fn op_binary_reflected(&self, tag: BinaryTag) -> Option<&MethodBinaryReflected<T>> {
         match tag {
             BinaryTag::Add => self.op_radd.as_ref(),
             BinaryTag::Sub => self.op_rsub.as_ref(),
@@ -169,7 +174,7 @@ impl Metatable {
         }
     }
     
-    pub fn set_binary_reflected(&mut self, tag: BinaryTag, method: MethodBinaryReflected) -> Option<MethodBinaryReflected> {
+    pub fn set_binary_reflected(&mut self, tag: BinaryTag, method: MethodBinaryReflected<T>) -> Option<MethodBinaryReflected<T>> {
         match tag {
             BinaryTag::Add => self.op_radd.replace(method),
             BinaryTag::Sub => self.op_rsub.replace(method),
@@ -184,7 +189,7 @@ impl Metatable {
         }
     }
     
-    pub fn take_binary_reflected(&mut self, tag: BinaryTag) -> Option<MethodBinaryReflected> {
+    pub fn take_binary_reflected(&mut self, tag: BinaryTag) -> Option<MethodBinaryReflected<T>> {
         match tag {
             BinaryTag::Add => self.op_radd.take(),
             BinaryTag::Sub => self.op_rsub.take(),
@@ -200,7 +205,7 @@ impl Metatable {
     }
     
     #[inline]
-    pub fn op_compare(&self, tag: CompareTag) -> Option<&MethodCompare> {
+    pub fn op_compare(&self, tag: CompareTag) -> Option<&MethodCompare<T>> {
         match tag {
             CompareTag::LT => self.cmp_lt.as_ref(),
             CompareTag::LE => self.cmp_le.as_ref(),
@@ -208,7 +213,7 @@ impl Metatable {
         }
     }
     
-    pub fn set_compare(&mut self, tag: CompareTag, method: MethodCompare) -> Option<MethodCompare> {
+    pub fn set_compare(&mut self, tag: CompareTag, method: MethodCompare<T>) -> Option<MethodCompare<T>> {
         match tag {
             CompareTag::LT => self.cmp_lt.replace(method),
             CompareTag::LE => self.cmp_le.replace(method),
@@ -216,7 +221,7 @@ impl Metatable {
         }
     }
     
-    pub fn take_compare(&mut self, tag: CompareTag) -> Option<MethodCompare> {
+    pub fn take_compare(&mut self, tag: CompareTag) -> Option<MethodCompare<T>> {
         match tag {
             CompareTag::LT => self.cmp_lt.take(),
             CompareTag::LE => self.cmp_le.take(),
@@ -225,4 +230,46 @@ impl Metatable {
     }
 }
 
-
+impl<T> Default for Metatable<T> {
+    fn default() -> Self {
+        Self {
+            call: None,
+            
+            to_bits: None,
+            to_int: None,
+            to_float: None,
+            
+            op_pos: None,
+            op_neg: None,
+            op_inv: None,
+            
+            op_add: None,
+            op_sub: None,
+            op_mul: None,
+            op_div: None,
+            op_mod: None,
+            
+            op_and: None,
+            op_xor: None,
+            op_or: None,
+            op_shl: None,
+            op_shr: None,
+            
+            op_radd: None,
+            op_rsub: None,
+            op_rmul: None,
+            op_rdiv: None,
+            
+            op_rmod: None,
+            op_rand: None,
+            op_rxor: None,
+            op_ror: None,
+            op_rshl: None,
+            op_rshr: None,
+            
+            cmp_lt: None,
+            cmp_le: None,
+            cmp_eq: None,
+        }
+    }
+}

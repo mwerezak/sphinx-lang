@@ -25,64 +25,67 @@ pub fn is_bitwise_primitive(value: &Variant) -> bool {
 // Metamethod Fallbacks
 
 #[inline]
-fn eval_meta_unary(tag: UnaryTag, operand: &Variant) -> ExecResult<Variant> {
-    let op_func = operand.metatable().op_unary(tag)
-        .ok_or_else(|| ErrorKind::InvalidUnaryOperand(*operand))?;
+fn eval_meta_unary(_tag: UnaryTag, operand: &Variant) -> ExecResult<Variant> {
+    Err(ErrorKind::InvalidUnaryOperand(*operand).into())
+    // let op_func = operand.metatable().op_unary(tag)
+    //     .ok_or_else(|| ErrorKind::InvalidUnaryOperand(*operand))?;
     
-    op_func(operand)
+    // op_func(operand)
 }
 
-fn eval_meta_binary(tag: BinaryTag, lhs: &Variant, rhs: &Variant) -> ExecResult<Variant> {
-    let result = lhs.metatable().op_binary(tag)
-        .map(|op_func| op_func(lhs, rhs));
+fn eval_meta_binary(_tag: BinaryTag, lhs: &Variant, rhs: &Variant) -> ExecResult<Variant> {
+    Err(ErrorKind::InvalidBinaryOperand(*lhs, *rhs).into())
+    // let result = lhs.metatable().op_binary(tag)
+    //     .map(|op_func| op_func(lhs, rhs));
     
-    match result {
-        Some(Err(error)) => return Err(error),
-        Some(Ok(Some(value))) => return Ok(value),
-        _ => { }
-    }
+    // match result {
+    //     Some(Err(error)) => return Err(error),
+    //     Some(Ok(Some(value))) => return Ok(value),
+    //     _ => { }
+    // }
     
-    let reflected_func = rhs.metatable().op_binary_reflected(tag)
-        .ok_or_else(|| ErrorKind::InvalidBinaryOperand(*lhs, *rhs))?;
+    // let reflected_func = rhs.metatable().op_binary_reflected(tag)
+    //     .ok_or_else(|| ErrorKind::InvalidBinaryOperand(*lhs, *rhs))?;
     
-    reflected_func(rhs, lhs)
+    // reflected_func(rhs, lhs)
 }
 
-fn eval_meta_comparison(tag: CompareTag, lhs: &Variant, rhs: &Variant) -> ExecResult<bool> {
-    let result = lhs.metatable().op_compare(tag)
-        .map(|op_func| op_func(lhs, rhs));
+fn eval_meta_comparison(_tag: CompareTag, lhs: &Variant, rhs: &Variant) -> ExecResult<bool> {
+    Err(ErrorKind::InvalidBinaryOperand(*lhs, *rhs).into())
+    // let result = lhs.metatable().op_compare(tag)
+    //     .map(|op_func| op_func(lhs, rhs));
     
-    match result {
-        Some(Err(error)) => return Err(error),
-        Some(Ok(Some(value))) => return Ok(value),
-        _ => { }
-    }
+    // match result {
+    //     Some(Err(error)) => return Err(error),
+    //     Some(Ok(Some(value))) => return Ok(value),
+    //     _ => { }
+    // }
     
-    let reflected_tag = match tag {
-        CompareTag::LT => CompareTag::LE,
-        CompareTag::LE => CompareTag::LT,
-        CompareTag::EQ => CompareTag::EQ,
-    };
+    // let reflected_tag = match tag {
+    //     CompareTag::LT => CompareTag::LE,
+    //     CompareTag::LE => CompareTag::LT,
+    //     CompareTag::EQ => CompareTag::EQ,
+    // };
     
-    let result = rhs.metatable().op_compare(reflected_tag)
-        .map(|op_func| op_func(rhs, lhs));
+    // let result = rhs.metatable().op_compare(reflected_tag)
+    //     .map(|op_func| op_func(rhs, lhs));
     
-    match result {
-        Some(Err(error)) => Err(error),
-        Some(Ok(Some(value))) => Ok(value),
+    // match result {
+    //     Some(Err(error)) => Err(error),
+    //     Some(Ok(Some(value))) => Ok(value),
         
-        // equality always succeeds
-        _ if tag == CompareTag::EQ => {
-            // fall back to reference equality for GC types
-            let result = lhs.as_gc()
-                .and_then(|lhs| rhs.as_gc().map(|rhs| (lhs, rhs)))
-                .map_or(false, |(lhs, rhs)| GC::ptr_eq(&lhs, &rhs));
+    //     // equality always succeeds
+    //     _ if tag == CompareTag::EQ => {
+    //         // fall back to reference equality for GC types
+    //         let result = lhs.as_gc()
+    //             .and_then(|lhs| rhs.as_gc().map(|rhs| (lhs, rhs)))
+    //             .map_or(false, |(lhs, rhs)| GC::ptr_eq(&lhs, &rhs));
             
-            Ok(result)
-        }, 
+    //         Ok(result)
+    //     }, 
         
-        _ => Err(ErrorKind::InvalidBinaryOperand(*lhs, *rhs).into()),
-    }
+    //     _ => Err(ErrorKind::InvalidBinaryOperand(*lhs, *rhs).into()),
+    // }
 }
 
 

@@ -44,22 +44,3 @@ impl fmt::Display for Type {
         fmt.write_str(name)
     }
 }
-
-
-
-pub static METATABLE_DEFAULT: Lazy<Metatable> = Lazy::new(Metatable::default);
-
-pub static METATABLE_STRING: Lazy<Metatable> = Lazy::new(|| {
-    
-    fn string_add(lhs: &Variant, rhs: &Variant) -> ExecResult<Option<Variant>> {
-        if let (Variant::String(a), Variant::String(b)) = (lhs, rhs) {
-            Ok(Some(Variant::String(a.concat(b))))
-        } else {
-            Ok(None)
-        }
-    }
-    
-    let mut metatable = Metatable::default();
-    metatable.set_binary(BinaryTag::Add, string_add);
-    metatable
-});

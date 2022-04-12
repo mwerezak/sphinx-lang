@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Type, Metatable, METATABLE_STRING, METATABLE_DEFAULT};
+use crate::runtime::types::{Type, Metatable};
 use crate::runtime::function::{Function, NativeFunction, Call, Invoke};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::gc::{GC, GCTrace};
@@ -43,13 +43,6 @@ impl Variant {
             Self::Tuple(..) => Type::Tuple,
             Self::Function(..) => Type::Function,
             Self::NativeFunction(..) => Type::Function,
-        }
-    }
-    
-    pub fn metatable(&self) -> &Metatable {
-        match self {
-            Self::String(..) => &METATABLE_STRING,
-            _ => &METATABLE_DEFAULT,
         }
     }
     
