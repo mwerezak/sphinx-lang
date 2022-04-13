@@ -15,10 +15,6 @@ pub struct Signature {
     variadic: Option<Parameter>,
 }
 
-unsafe impl GCTrace for Signature {
-    fn trace(&self) { }
-}
-
 impl Signature {
     pub fn new(name: Option<impl Into<StringSymbol>>, required: Vec<Parameter>, default: Vec<Parameter>, variadic: Option<Parameter>) -> Self {
         let name = name.map(|name| name.into());
@@ -52,14 +48,14 @@ impl Signature {
     pub fn check_args(&self, args: &[Variant]) -> ExecResult<()> {
         if args.len() < self.required.len() {
             return Err(ErrorKind::MissingArguments { 
-                callable: GC::new(self.clone()),
+                signature: Box::new(self.clone()),
                 nargs: args.len() 
             }.into())
         }
         
         if matches!(self.max_arity(), Some(max_arity) if args.len() > max_arity) {
             return Err(ErrorKind::TooManyArguments {
-                callable: GC::new(self.clone()),
+                signature: Box::new(self.clone()),
                 nargs: args.len()
             }.into())
         }

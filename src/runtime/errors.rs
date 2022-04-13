@@ -22,8 +22,8 @@ pub enum ErrorKind {
     CantAssignImmutable,  // can't assign to immutable global variable
     UnhashableValue(Variant),
     NotCallable(Variant),
-    MissingArguments { callable: GC<Signature>, nargs: usize },
-    TooManyArguments { callable: GC<Signature>, nargs: usize },
+    MissingArguments { signature: Box<Signature>, nargs: usize },
+    TooManyArguments { signature: Box<Signature>, nargs: usize },
     CantInterpretAsBits(Variant),
     CantInterpretAsInt(Variant),
     CantInterpretAsFloat(Variant),
@@ -49,9 +49,18 @@ unsafe impl GCTrace for ErrorKind {
             Self::InvalidBinaryOperand(lhs, rhs) => { lhs.trace(); rhs.trace() },
             Self::UnhashableValue(value) => value.trace(),
             Self::NotCallable(value) => value.trace(),
-            Self::MissingArguments { callable, .. } => callable.mark_trace(),
-            Self::TooManyArguments { callable, .. } => callable.mark_trace(),
+            Self::CantInterpretAsBits(value) => value.trace(),
+            Self::CantInterpretAsInt(value) => value.trace(),
+            Self::CantInterpretAsFloat(value) => value.trace(),
             _ => { },
+        }
+    }
+    
+    fn size_hint(&self) -> usize {
+        match self {
+            Self::MissingArguments { .. } => std::mem::size_of::<Signature>(),
+            Self::TooManyArguments { .. } => std::mem::size_of::<Signature>(),
+            _ => 0,
         }
     }
 }
@@ -110,17 +119,19 @@ impl fmt::Display for RuntimeError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let message = match self.kind() {
             // TODO
-            ErrorKind::InvalidUnaryOperand(..) => format!("unsupported operand for type '...'"),
-            ErrorKind::InvalidBinaryOperand(..) => format!("unsupported operand for type '...' and '...'"),
+            ErrorKind::InvalidUnaryOperand(operand) => format!("unsupported operand for type '{}'", operand.type_tag()),
+            ErrorKind::InvalidBinaryOperand(lhs, rhs) => format!("unsupported operand for type '{}' and '{}'", lhs.type_tag(), rhs.type_tag()),
             ErrorKind::DivideByZero => format!("divide by zero"),
             ErrorKind::OverflowError => format!("integer arithmetic overflow"),
             ErrorKind::NegativeShiftCount => format!("negative bitshift count"),
             ErrorKind::NameNotDefined(name) => format!("undefined variable \"{}\"", name),
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
             ErrorKind::UnhashableValue(..) => format!("unhashable value"),
-            ErrorKind::NotCallable(..) => format!("'...' type is not callable"),
+            ErrorKind::NotCallable(receiver) => format!("type '{}' is not callable", receiver.type_tag()),
             ErrorKind::MissingArguments { .. } => format!("<callable> missing N required arguments: '...', '...', and '...'"),
-            ErrorKind::TooManyArguments { .. } => format!("<callable> takes N arguments but M were given"),
+            ErrorKind::TooManyArguments { signature, nargs } => {
+                format!("<callable> takes N arguments but M were given")
+            },
             ErrorKind::CantInterpretAsBits(..) => format!("can't interpret <value> as bitfield"),
             ErrorKind::CantInterpretAsInt(..) => format!("can't interpret <value> as int"),
             ErrorKind::CantInterpretAsFloat(..) => format!("can't interpret <value> as float"),

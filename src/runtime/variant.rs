@@ -31,7 +31,7 @@ pub enum Variant {
 }
 
 impl Variant {
-    pub fn get_type(&self) -> Type {
+    pub fn type_tag(&self) -> Type {
         match self {
             Self::Nil => Type::Nil,
             Self::BoolTrue => Type::Boolean,
