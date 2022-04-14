@@ -77,21 +77,20 @@ macro_rules! read_le_bytes {
 }
 
 macro_rules! eval_unary_op {
-    ( $stack:expr, $eval_func:tt ) => {
+    ( $stack:expr, $apply_method:tt ) => {
         {
-            let result = ops::$eval_func($stack.peek())?;
+            let result = $stack.peek().$apply_method()?;
             $stack.replace(result);
         }
     }
 }
 
 macro_rules! eval_binary_op {
-    ( $stack:expr, $eval_func:tt ) => {
+    ( $stack:expr, $apply_method:tt ) => {
         {
-            // need to pop only after eval, to ensure operands stay rooted in GC
-            let operand = $stack.peek_many(2);
-            let result = ops::$eval_func(&operand[0], &operand[1])?;
-            $stack.pop();
+            let rhs = $stack.pop();
+            let lhs = $stack.peek();
+            let result = lhs.$apply_method(&rhs)?;
             $stack.replace(result);
         }
     };
@@ -421,28 +420,28 @@ impl<'c> VMCallFrame<'c> {
                 stack.push(Variant::Integer(IntType::from(value)))
             }
             
-            OpCode::Neg => eval_unary_op!(stack, eval_neg),
-            OpCode::Pos => eval_unary_op!(stack, eval_pos),
-            OpCode::Inv => eval_unary_op!(stack, eval_inv),
-            OpCode::Not => eval_unary_op!(stack, eval_not),
+            OpCode::Neg => eval_unary_op!(stack, apply_neg),
+            OpCode::Pos => eval_unary_op!(stack, apply_pos),
+            OpCode::Inv => eval_unary_op!(stack, apply_inv),
+            OpCode::Not => eval_unary_op!(stack, apply_not),
             
-            OpCode::And => eval_binary_op!(stack, eval_and),
-            OpCode::Xor => eval_binary_op!(stack, eval_xor),
-            OpCode::Or  => eval_binary_op!(stack, eval_or),
-            OpCode::Shl => eval_binary_op!(stack, eval_shl),
-            OpCode::Shr => eval_binary_op!(stack, eval_shr),
-            OpCode::Add => eval_binary_op!(stack, eval_add),
-            OpCode::Sub => eval_binary_op!(stack, eval_sub),
-            OpCode::Mul => eval_binary_op!(stack, eval_mul),
-            OpCode::Div => eval_binary_op!(stack, eval_div),
-            OpCode::Mod => eval_binary_op!(stack, eval_mod),
+            OpCode::And => unimplemented!(), //eval_binary_op!(stack, eval_and),
+            OpCode::Xor => unimplemented!(), //eval_binary_op!(stack, eval_xor),
+            OpCode::Or  => unimplemented!(), //eval_binary_op!(stack, eval_or),
+            OpCode::Shl => unimplemented!(), //eval_binary_op!(stack, eval_shl),
+            OpCode::Shr => unimplemented!(), //eval_binary_op!(stack, eval_shr),
+            OpCode::Add => eval_binary_op!(stack, apply_add),
+            OpCode::Sub => eval_binary_op!(stack, apply_sub),
+            OpCode::Mul => eval_binary_op!(stack, apply_mul),
+            OpCode::Div => eval_binary_op!(stack, apply_div),
+            OpCode::Mod => eval_binary_op!(stack, apply_mod),
             
-            OpCode::EQ => eval_cmp!(stack, eval_eq),
-            OpCode::NE => eval_cmp!(stack, eval_ne),
-            OpCode::LT => eval_cmp!(stack, eval_lt),
-            OpCode::LE => eval_cmp!(stack, eval_le),
-            OpCode::GE => eval_cmp!(stack, eval_ge),
-            OpCode::GT => eval_cmp!(stack, eval_gt),
+            OpCode::EQ => unimplemented!(), //eval_cmp!(stack, eval_eq),
+            OpCode::NE => unimplemented!(), //eval_cmp!(stack, eval_ne),
+            OpCode::LT => unimplemented!(), //eval_cmp!(stack, eval_lt),
+            OpCode::LE => unimplemented!(), //eval_cmp!(stack, eval_le),
+            OpCode::GE => unimplemented!(), //eval_cmp!(stack, eval_ge),
+            OpCode::GT => unimplemented!(), //eval_cmp!(stack, eval_gt),
             
             OpCode::Jump => {
                 let offset = isize::from(read_le_bytes!(i16, data));
@@ -453,19 +452,19 @@ impl<'c> VMCallFrame<'c> {
                 self.pc = self.offset_pc(offset).expect("pc overflow/underflow");
             }
             
-            OpCode::JumpIfFalse    => cond_jump!(self, !stack.peek().truth_value(), isize::from(read_le_bytes!(i16, data))),
-            OpCode::JumpIfTrue     => cond_jump!(self, stack.peek().truth_value(),  isize::from(read_le_bytes!(i16, data))),
-            OpCode::PopJumpIfFalse => cond_jump!(self, !stack.pop().truth_value(),  isize::from(read_le_bytes!(i16, data))),
-            OpCode::PopJumpIfTrue  => cond_jump!(self, stack.pop().truth_value(),   isize::from(read_le_bytes!(i16, data))),
+            OpCode::JumpIfFalse    => cond_jump!(self, !stack.peek().as_bool()?, isize::from(read_le_bytes!(i16, data))),
+            OpCode::JumpIfTrue     => cond_jump!(self, stack.peek().as_bool()?,  isize::from(read_le_bytes!(i16, data))),
+            OpCode::PopJumpIfFalse => cond_jump!(self, !stack.pop().as_bool()?,  isize::from(read_le_bytes!(i16, data))),
+            OpCode::PopJumpIfTrue  => cond_jump!(self, stack.pop().as_bool()?,   isize::from(read_le_bytes!(i16, data))),
             
-            OpCode::LongJumpIfFalse    => cond_jump!(self, !stack.peek().truth_value(), isize::try_from(read_le_bytes!(i32, data)).unwrap()),
-            OpCode::LongJumpIfTrue     => cond_jump!(self, stack.peek().truth_value(),  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
-            OpCode::PopLongJumpIfFalse => cond_jump!(self, !stack.pop().truth_value(),  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
-            OpCode::PopLongJumpIfTrue  => cond_jump!(self, stack.pop().truth_value(),   isize::try_from(read_le_bytes!(i32, data)).unwrap()),
+            OpCode::LongJumpIfFalse    => cond_jump!(self, !stack.peek().as_bool()?, isize::try_from(read_le_bytes!(i32, data)).unwrap()),
+            OpCode::LongJumpIfTrue     => cond_jump!(self, stack.peek().as_bool()?,  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
+            OpCode::PopLongJumpIfFalse => cond_jump!(self, !stack.pop().as_bool()?,  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
+            OpCode::PopLongJumpIfTrue  => cond_jump!(self, stack.pop().as_bool()?,   isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             
             OpCode::Inspect => println!("{:?}", stack.peek()),
             OpCode::Assert => {
-                if !stack.peek().truth_value() {
+                if !stack.peek().as_bool()? {
                     return Err(ErrorKind::AssertFailed.into());
                 }
             }

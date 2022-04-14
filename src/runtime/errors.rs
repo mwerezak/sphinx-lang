@@ -5,6 +5,7 @@ use crate::utils;
 use crate::runtime::Variant;
 use crate::runtime::function::Signature;
 use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::types::Type;
 use crate::debug::traceback::{TraceSite, Traceback};
 
 // TODO box error
@@ -13,8 +14,8 @@ pub type ExecResult<T> = Result<T, Box<RuntimeError>>;
 #[derive(Debug)]
 pub enum ErrorKind {
     // TODO replace variant with type name
-    InvalidUnaryOperand(Variant),  // unsupported operand for type
-    InvalidBinaryOperand(Variant, Variant),
+    InvalidUnaryOperand(Type),  // unsupported operand for type
+    InvalidBinaryOperand(Type, Type),
     OverflowError,
     DivideByZero,
     NegativeShiftCount,
@@ -45,8 +46,6 @@ impl From<ErrorKind> for Box<RuntimeError> {
 unsafe impl GCTrace for ErrorKind {
     fn trace(&self) {
         match self {
-            Self::InvalidUnaryOperand(op) => op.trace(),
-            Self::InvalidBinaryOperand(lhs, rhs) => { lhs.trace(); rhs.trace() },
             Self::UnhashableValue(value) => value.trace(),
             Self::NotCallable(value) => value.trace(),
             Self::CantInterpretAsBits(value) => value.trace(),
@@ -119,8 +118,8 @@ impl fmt::Display for RuntimeError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let message = match self.kind() {
             // TODO
-            ErrorKind::InvalidUnaryOperand(operand) => format!("unsupported operand for type '{}'", operand.type_tag()),
-            ErrorKind::InvalidBinaryOperand(lhs, rhs) => format!("unsupported operand for type '{}' and '{}'", lhs.type_tag(), rhs.type_tag()),
+            ErrorKind::InvalidUnaryOperand(operand) => format!("unsupported operand for type '{}'", operand),
+            ErrorKind::InvalidBinaryOperand(lhs, rhs) => format!("unsupported operand for type '{}' and '{}'", lhs, rhs),
             ErrorKind::DivideByZero => format!("divide by zero"),
             ErrorKind::OverflowError => format!("integer arithmetic overflow"),
             ErrorKind::NegativeShiftCount => format!("negative bitshift count"),

@@ -31,7 +31,7 @@ pub(super) fn create_prelude() -> Namespace {
             //     println!("{}", value);
             // }
             println!("{:?}", varargs);
-            ops::eval_add(a, b)
+            a.apply_add(b)
         });
     }
 }

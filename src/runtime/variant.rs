@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Type, Metatable};
+use crate::runtime::types::{Type};
 use crate::runtime::function::{Function, NativeFunction, Call, Invoke};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::gc::{GC, GCTrace};
@@ -47,40 +47,40 @@ impl Variant {
     }
     
     // Only "nil" and "false" have a truth value of false.
-    pub fn truth_value(&self) -> bool {
-        !matches!(self, Self::Nil | Self::BoolFalse)
-    }
+    // pub fn truth_value(&self) -> bool {
+    //     !matches!(self, Self::Nil | Self::BoolFalse)
+    // }
     
-    #[inline]
-    pub fn as_bits(&self) -> Option<IntType> {
-        let value = match self {
-            Self::Integer(value) => *value,
-            Self::BoolFalse => 0, // all 0s
-            Self::BoolTrue => !0, // all 1s
-            _ => return None,
-        };
-        Some(value)
-    }
+    // #[inline]
+    // pub fn as_bits(&self) -> Option<IntType> {
+    //     let value = match self {
+    //         Self::Integer(value) => *value,
+    //         Self::BoolFalse => 0, // all 0s
+    //         Self::BoolTrue => !0, // all 1s
+    //         _ => return None,
+    //     };
+    //     Some(value)
+    // }
     
-    #[inline]
-    pub fn as_int(&self) -> Option<IntType> {
-        let value = match self {
-            Self::Integer(value) => *value,
-            _ => return None,
-        };
-        Some(value)
-    }
+    // #[inline]
+    // pub fn as_int(&self) -> Option<IntType> {
+    //     let value = match self {
+    //         Self::Integer(value) => *value,
+    //         _ => return None,
+    //     };
+    //     Some(value)
+    // }
     
-    #[inline]
-    pub fn as_float(&self) -> Option<FloatType> {
-        let value = match self {
-            // it's okay if this is a lossy conversion
-            Self::Integer(value) => (*value) as FloatType,
-            Self::Float(value) => *value,
-            _ => return None,
-        };
-        Some(value)
-    }
+    // #[inline]
+    // pub fn as_float(&self) -> Option<FloatType> {
+    //     let value = match self {
+    //         // it's okay if this is a lossy conversion
+    //         Self::Integer(value) => (*value) as FloatType,
+    //         Self::Float(value) => *value,
+    //         _ => return None,
+    //     };
+    //     Some(value)
+    // }
     
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
         match self {
