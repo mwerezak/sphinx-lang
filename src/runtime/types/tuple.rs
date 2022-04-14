@@ -2,6 +2,7 @@ use std::fmt;
 use crate::runtime::Variant;
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::types::{Type, MetaObject};
+use crate::runtime::errors::ExecResult;
 
 #[derive(Clone, Copy)]
 pub enum Tuple {
@@ -92,4 +93,8 @@ impl fmt::Display for Tuple {
 
 impl MetaObject for Tuple {
     fn type_tag(&self) -> Type { Type::Tuple }
+    
+    fn len(&self) -> Option<ExecResult<usize>> {
+        Some(Ok(Tuple::len(self)))
+    }
 }

@@ -115,7 +115,7 @@ impl fmt::Display for RuntimeError {
             ErrorKind::InvalidUnaryOperand(operand) => format!("unsupported operand: '{}'", operand),
             ErrorKind::InvalidBinaryOperand(lhs, rhs) => format!("unsupported operands: '{}' and '{}'", lhs, rhs),
             ErrorKind::DivideByZero => format!("divide by zero"),
-            ErrorKind::OverflowError => format!("integer arithmetic overflow"),
+            ErrorKind::OverflowError => format!("integer overflow"),
             ErrorKind::NegativeShiftCount => format!("negative bitshift count"),
             ErrorKind::NameNotDefined(name) => format!("undefined variable \"{}\"", name),
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),

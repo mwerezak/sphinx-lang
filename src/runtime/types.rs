@@ -179,6 +179,14 @@ impl Variant {
         }
     }
     
+    pub fn len(&self) -> ExecResult<usize> {
+        match self {
+            Self::Tuple(tuple) => <Tuple as MetaObject>::len(tuple).unwrap(),
+            _ => self.as_meta().len()
+                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Len))?
+        }
+    }
+    
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
         match self {
             Self::Function(fun) => fun.checked_call(args),
