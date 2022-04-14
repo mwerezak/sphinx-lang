@@ -7,7 +7,6 @@ use crate::runtime::errors::{ExecResult, ErrorKind};
 
 pub mod operator;
 pub mod metatable;
-pub mod dispatch;
 pub mod numeric;
 
 
@@ -78,6 +77,17 @@ pub trait MetaObject {
     
     fn apply_sub(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
     fn apply_rsub(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    
+    // bitwise operators
+    fn apply_and(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn apply_rand(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    
+    fn apply_xor(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn apply_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    
+    fn apply_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn apply_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    
 }
 
 impl Variant {
@@ -107,6 +117,8 @@ impl Variant {
     
     pub fn as_bits(&self) -> ExecResult<IntType> {
         match self {
+            Self::BoolFalse => false.as_bits().unwrap(),
+            Self::BoolTrue => true.as_bits().unwrap(),
             Self::Integer(value) => Ok(*value),
             _ => self.as_meta().as_bits()
                 .ok_or_else(|| ErrorKind::CantInterpretAsBits(*self))?,
@@ -132,12 +144,14 @@ impl Variant {
 }
 
 
+// Nil
 impl MetaObject for () {
     fn type_tag(&self) -> Type { Type::Nil }
     
     fn as_bool(&self) -> ExecResult<bool> { Ok(false) }
 }
 
+// Booleans
 impl MetaObject for bool {
     fn type_tag(&self) -> Type { Type::Boolean }
     
@@ -150,5 +164,38 @@ impl MetaObject for bool {
     
     fn apply_inv(&self) -> Option<ExecResult<Variant>> { 
         Some(Ok(Variant::from(!(*self)))) 
+    }
+    
+    fn apply_and(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+        match rhs {
+            Variant::BoolFalse => Some(Ok(Variant::from(false))),
+            Variant::BoolTrue => Some(Ok(Variant::from(*self))),
+            _ => None,
+        }
+    }
+    fn apply_rand(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.apply_and(lhs)
+    }
+    
+    fn apply_xor(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+        match rhs {
+            Variant::BoolFalse => Some(Ok(Variant::from(*self))),
+            Variant::BoolTrue => Some(Ok(Variant::from(!(*self)))),
+            _ => None,
+        }
+    }
+    fn apply_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.apply_and(lhs)
+    }
+    
+    fn apply_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+        match rhs {
+            Variant::BoolFalse => Some(Ok(Variant::from(*self))),
+            Variant::BoolTrue => Some(Ok(Variant::from(true))),
+            _ => None,
+        }
+    }
+    fn apply_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.apply_or(lhs)
     }
 }

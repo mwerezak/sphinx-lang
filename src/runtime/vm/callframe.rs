@@ -425,9 +425,9 @@ impl<'c> VMCallFrame<'c> {
             OpCode::Inv => eval_unary_op!(stack, apply_inv),
             OpCode::Not => eval_unary_op!(stack, apply_not),
             
-            OpCode::And => unimplemented!(), //eval_binary_op!(stack, eval_and),
-            OpCode::Xor => unimplemented!(), //eval_binary_op!(stack, eval_xor),
-            OpCode::Or  => unimplemented!(), //eval_binary_op!(stack, eval_or),
+            OpCode::And => eval_binary_op!(stack, apply_and),
+            OpCode::Xor => eval_binary_op!(stack, apply_xor),
+            OpCode::Or  => eval_binary_op!(stack, apply_or),
             OpCode::Shl => unimplemented!(), //eval_binary_op!(stack, eval_shl),
             OpCode::Shr => unimplemented!(), //eval_binary_op!(stack, eval_shr),
             OpCode::Add => eval_binary_op!(stack, apply_add),

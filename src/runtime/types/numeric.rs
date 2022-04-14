@@ -92,6 +92,51 @@ impl MetaObject for IntType {
                 .map(|lhs| checked_int_math!(checked_sub, lhs?, *self))
         }
     }
+    
+    fn apply_and(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+        let lhs = self.as_bits().unwrap().unwrap();
+        match rhs {
+            Variant::BoolFalse => Some(Ok(Variant::from(lhs & false.as_bits().unwrap().unwrap()))),
+            Variant::BoolTrue => Some(Ok(Variant::from(lhs & true.as_bits().unwrap().unwrap()))),
+            Variant::Integer(rhs) => Some(Ok(Variant::from(lhs & rhs.as_bits().unwrap().unwrap()))),
+            _ => rhs.as_meta().as_bits()
+                .map(|rhs| Ok(Variant::from(lhs & rhs?)))
+        }
+    }
+    
+    fn apply_rand(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.apply_and(lhs)
+    }
+
+    fn apply_xor(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+        let lhs = self.as_bits().unwrap().unwrap();
+        match rhs {
+            Variant::BoolFalse => Some(Ok(Variant::from(lhs ^ false.as_bits().unwrap().unwrap()))),
+            Variant::BoolTrue => Some(Ok(Variant::from(lhs ^ true.as_bits().unwrap().unwrap()))),
+            Variant::Integer(rhs) => Some(Ok(Variant::from(lhs ^ rhs.as_bits().unwrap().unwrap()))),
+            _ => rhs.as_meta().as_bits()
+                .map(|rhs| Ok(Variant::from(lhs ^ rhs?)))
+        }
+    }
+    
+    fn apply_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.apply_xor(lhs)
+    }
+
+    fn apply_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+        let lhs = self.as_bits().unwrap().unwrap();
+        match rhs {
+            Variant::BoolFalse => Some(Ok(Variant::from(lhs | false.as_bits().unwrap().unwrap()))),
+            Variant::BoolTrue => Some(Ok(Variant::from(lhs | true.as_bits().unwrap().unwrap()))),
+            Variant::Integer(rhs) => Some(Ok(Variant::from(lhs | rhs.as_bits().unwrap().unwrap()))),
+            _ => rhs.as_meta().as_bits()
+                .map(|rhs| Ok(Variant::from(lhs | rhs?)))
+        }
+    }
+    
+    fn apply_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.apply_or(lhs)
+    }
 }
 
 

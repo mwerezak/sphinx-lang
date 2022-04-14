@@ -52,6 +52,8 @@ macro_rules! meta_eval_binary {
 
 impl Variant {
     
+    // Unary
+    
     #[inline(always)]
     pub fn apply_neg(&self) -> ExecResult<Variant> {
         match self {
@@ -89,6 +91,8 @@ impl Variant {
         }
     }
     
+    // Arithmetic
+    
     #[inline(always)]
     pub fn apply_mul(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
@@ -122,6 +126,30 @@ impl Variant {
             _ => meta_eval_binary!(self, rhs, apply_sub, apply_rsub),
         }
     }
+    
+    // Bitwise
+    
+    pub fn apply_and(&self, rhs: &Variant) -> ExecResult<Variant> {
+        match (self, rhs) {
+            (Self::Integer(lhs), rhs) => lhs.apply_and(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, apply_and, apply_rand),
+        }
+    }
+    
+    pub fn apply_xor(&self, rhs: &Variant) -> ExecResult<Variant> {
+        match (self, rhs) {
+            (Self::Integer(lhs), rhs) => lhs.apply_xor(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, apply_xor, apply_rxor),
+        }
+    }
+    
+    pub fn apply_or(&self, rhs: &Variant) -> ExecResult<Variant> {
+        match (self, rhs) {
+            (Self::Integer(lhs), rhs) => lhs.apply_or(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, apply_or, apply_ror),
+        }
+    }
+    
 }
 
 
