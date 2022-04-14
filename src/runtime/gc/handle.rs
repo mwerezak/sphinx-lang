@@ -1,6 +1,7 @@
 use std::fmt;
 use std::rc::Rc;
 use std::ops::Deref;
+use std::borrow::Borrow;
 use std::ptr::NonNull;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
@@ -66,6 +67,18 @@ impl<T> From<GC<T>> for GC<dyn GCTrace> where T: GCTrace {
 //         unimplemented!()
 //     }
 // }
+
+impl<T> AsRef<T> for GC<T> where T: GCTrace + ?Sized {
+    fn as_ref(&self) -> &T {
+        self.deref()
+    }
+}
+
+impl<T> Borrow<T> for GC<T> where T: GCTrace + ?Sized {
+    fn borrow(&self) -> &T {
+        self.deref()
+    }
+}
 
 impl<T> Deref for GC<T> where T: GCTrace + ?Sized {
     type Target = T;

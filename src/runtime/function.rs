@@ -13,10 +13,20 @@ pub use crate::codegen::opcodes::UpvalueIndex;
 
 /// Call directive
 
-
 pub enum Call {
     Chunk(GC<Module>, FunctionID),
     Native(GC<NativeFunction>),
+}
+
+pub trait Callable {
+    fn signature(&self) -> &Signature;
+    fn raw_call(&self, args: &[Variant]) -> Call;
+
+    fn checked_call(&self, args: &[Variant]) -> ExecResult<Call> {
+        self.signature().check_args(args)?;
+        Ok(self.raw_call(args))
+    }
+
 }
 
 // Compiled Functions
@@ -42,10 +52,23 @@ impl Function {
     pub fn signature(&self) -> &Signature {
         self.proto().signature()
     }
+}
+
+impl Callable for Function {
+    fn signature(&self) -> &Signature { self.proto().signature() }
     
-    pub fn checked_call(&self, args: &[Variant]) -> ExecResult<Call> {
-        self.signature().check_args(args)?;
-        Ok(Call::Chunk(self.module, self.fun_id))
+    fn raw_call(&self, _args: &[Variant]) -> Call {
+        Call::Chunk(self.module, self.fun_id)
+    }
+}
+
+impl Callable for GC<Function> {
+    fn signature(&self) -> &Signature {
+        <Function as Callable>::signature(self)
+    }
+    
+    fn raw_call(&self, args: &[Variant]) -> Call {
+        <Function as Callable>::raw_call(self, args)
     }
 }
 
@@ -132,10 +155,11 @@ impl NativeFunction {
     }
 }
 
-impl GC<NativeFunction> {
-    pub fn checked_call(&self, args: &[Variant]) -> ExecResult<Call> {
-        self.signature().check_args(args)?;
-        Ok(Call::Native(*self))
+impl Callable for GC<NativeFunction> {
+    fn signature(&self) -> &Signature { &self.signature }
+    
+    fn raw_call(&self, _args: &[Variant]) -> Call {
+        Call::Native(*self)
     }
 }
 

@@ -1,10 +1,12 @@
 use std::fmt;
+use std::convert::AsRef;
 use once_cell::sync::Lazy;
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::gc::{GC, GCTrace};
-use crate::runtime::function::{Call, Function, NativeFunction};
+use crate::runtime::function::{Call, Function, NativeFunction, Callable};
+use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 pub mod operator;
@@ -106,6 +108,7 @@ pub trait MetaObject {
     fn cmp_le(&self, other: &Variant) -> Option<ExecResult<bool>> { None }
 }
 
+
 impl Variant {
     pub fn as_meta(&self) -> &dyn MetaObject {
         match self {
@@ -114,9 +117,10 @@ impl Variant {
             Self::BoolFalse => &false,
             Self::Integer(value) => value,
             Self::Float(value) => value,
-            
-            Self::Function(fun) => fun,
-            Self::NativeFunction(fun) => fun,
+            Self::String(value) => value,
+            // Self::Tuple(items) => Tuple::NonEmpty(*items),
+            Self::Function(fun) => &*fun,
+            Self::NativeFunction(fun) => &*fun,
             _ => &(),
         }
     }
@@ -254,7 +258,7 @@ impl MetaObject for bool {
     }
 }
 
-impl MetaObject for GC<Function> {
+impl<F> MetaObject for GC<F> where F: GCTrace, GC<F>: Callable {
     fn type_tag(&self) -> Type { Type::Function }
     
     fn invoke(&self, args: &[Variant]) -> Option<ExecResult<Call>> {
