@@ -62,12 +62,6 @@ impl<T> From<GC<T>> for GC<dyn GCTrace> where T: GCTrace {
     }
 }
 
-// impl<T> From<Box<T>> for GC<T> where T: ?Sized {
-//     fn from(data: Box<T>) -> Self {
-//         unimplemented!()
-//     }
-// }
-
 impl<T> AsRef<T> for GC<T> where T: GCTrace + ?Sized {
     fn as_ref(&self) -> &T {
         self.deref()

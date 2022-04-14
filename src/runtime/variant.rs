@@ -4,7 +4,7 @@ use std::hash::{Hash, Hasher};
 use std::cmp::{PartialEq, Eq};
 use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Type};
+use crate::runtime::types::{Type, Tuple};
 use crate::runtime::function::{Function, NativeFunction, Call};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::gc::{GC, GCTrace};
@@ -17,7 +17,6 @@ assert_eq_size!(Variant, [u8; 16]);
 #[derive(Clone, Copy)]
 pub enum Variant {
     Nil,
-    EmptyTuple,
     BoolTrue,
     BoolFalse,
     
@@ -25,7 +24,7 @@ pub enum Variant {
     Float(FloatType),
     String(StringSymbol),
     
-    Tuple(GC<Box<[Variant]>>), // TODO: stop using Box when DST support is stabilized
+    Tuple(Tuple), // TODO: stop using Box when DST support is stabilized
     Function(GC<Function>),
     NativeFunction(GC<NativeFunction>),
 }
@@ -66,7 +65,7 @@ impl From<&str> for Variant {
 
 impl From<Box<[Variant]>> for Variant {
     fn from(items: Box<[Variant]>) -> Self {
-        Self::Tuple(GC::new(items))
+        Self::Tuple(items.into())
     }
 }
 
@@ -86,7 +85,7 @@ unsafe impl GCTrace for Variant {
     #[inline]
     fn trace(&self) {
         match self {
-            Self::Tuple(items) => items.mark_trace(),
+            Self::Tuple(tuple) => tuple.mark_trace(),
             Self::Function(fun) => fun.mark_trace(),
             Self::NativeFunction(fun) => fun.mark_trace(),
             _ => { },
@@ -119,7 +118,7 @@ impl TryFrom<Variant> for GC<dyn GCTrace> {
     
     fn try_from(value: Variant) -> Result<Self, Self::Error> {
         match value {
-            Variant::Tuple(tuple) => Ok(tuple.into()),
+            Variant::Tuple(tuple) => tuple.as_gc().ok_or(value),
             Variant::Function(fun) => Ok(fun.into()),
             Variant::NativeFunction(fun) => Ok(fun.into()),
             _ => Err(value),
@@ -143,7 +142,7 @@ impl Variant {
         let discr = std::mem::discriminant(self);
         
         match self {
-            Self::Nil | Self::BoolTrue | Self::BoolFalse | Self::EmptyTuple 
+            Self::Nil | Self::BoolTrue | Self::BoolFalse 
                 => discr.hash(state),
             
             Self::Integer(value) => (discr, value).hash(state),
@@ -152,7 +151,7 @@ impl Variant {
             Self::NativeFunction(fun) => (discr, fun).hash(state),
             Self::Tuple(items) => {
                 discr.hash(state); // also prevent prefix collisions
-                for item in items.iter() {
+                for item in items.as_ref().iter() {
                     item.try_hash(state)?;
                 }
             },
@@ -189,17 +188,18 @@ impl<'s> PartialEq for VariantKey<'_> {
     fn eq(&self, other: &VariantKey) -> bool {
         match (self.0, other.0) {
             (Variant::Nil, Variant::Nil) => true,
-            (Variant::EmptyTuple, Variant::EmptyTuple) => true,
             (Variant::BoolTrue, Variant::BoolTrue) => true,
             (Variant::BoolFalse, Variant::BoolFalse) => true,
             
             (Variant::Integer(a), Variant::Integer(b)) => a == b,
             (Variant::String(a), Variant::String(b)) => a == b,
             
-            (Variant::Tuple(a), Variant::Tuple(b)) if a.len() != b.len() => false,
+            (Variant::Tuple(a), Variant::Tuple(b)) if a.is_empty() && b.is_empty() => true,
             (Variant::Tuple(a), Variant::Tuple(b)) => {
-                a.iter().zip(b.iter())
-                .all(|(a, b)| VariantKey(a) == VariantKey(b))
+                a.len() == b.len() && (
+                    a.as_ref().iter().zip(b.as_ref().iter())
+                        .all(|(a, b)| VariantKey(a) == VariantKey(b))
+                )
             },
             
             (Variant::Function(a), Variant::Function(b)) => GC::ptr_eq(a, b),
@@ -215,7 +215,6 @@ impl fmt::Debug for Variant {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Nil => fmt.write_str("nil"),
-            Self::EmptyTuple => fmt.write_str("()"),
             Self::BoolTrue => fmt.write_str("true"),
             Self::BoolFalse => fmt.write_str("false"),
             
@@ -231,16 +230,7 @@ impl fmt::Debug for Variant {
             },
             
             Self::String(value) => write!(fmt, "\"{}\"", value),
-            
-            Self::Tuple(items) => {
-                let (last, rest) = items.split_last().unwrap(); // will never be empty
-                
-                write!(fmt, "(")?;
-                for item in rest.iter() {
-                    write!(fmt, "{:?}, ", item)?;
-                }
-                write!(fmt, "{:?})", last)
-            }
+            Self::Tuple(tuple) => write!(fmt, "{:?}", tuple),
             
             Self::Function(fun) => write!(fmt, "<{}>", fun.signature()),
             Self::NativeFunction(fun) => write!(fmt, "<built-in {}>", fun.signature()),
@@ -252,18 +242,7 @@ impl fmt::Display for Variant {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::String(value) => write!(fmt, "{}", value),
-            
-            Self::Tuple(items) => {
-                let (last, rest) = items.split_last().unwrap(); // will never be empty
-                
-                write!(fmt, "(")?;
-                for item in rest.iter() {
-                    write!(fmt, "{}, ", item)?;
-                }
-                write!(fmt, "{})", last)
-            }
-            
-            // Self::Object(handle) => // TODO invoke __tostring
+            Self::Tuple(tuple) => write!(fmt, "{}", tuple),
             
             _ => write!(fmt, "{}", self)
         }

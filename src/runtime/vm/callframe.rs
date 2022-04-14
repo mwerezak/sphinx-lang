@@ -392,7 +392,7 @@ impl<'c> VMCallFrame<'c> {
             OpCode::Nil => stack.push(Variant::Nil),
             OpCode::True => stack.push(Variant::BoolTrue),
             OpCode::False => stack.push(Variant::BoolFalse),
-            OpCode::Empty => stack.push(Variant::EmptyTuple),
+            OpCode::Empty => stack.push(Variant::Tuple(Default::default())),
             
             OpCode::Tuple => {
                 let tuple_len = usize::from(data[0]);

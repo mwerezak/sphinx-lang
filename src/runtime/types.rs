@@ -12,6 +12,9 @@ use crate::runtime::errors::{ExecResult, ErrorKind};
 pub mod operator;
 pub mod metatable;
 pub mod numeric;
+pub mod tuple;
+
+pub use tuple::Tuple;
 
 
 // Type tag for Sphinx's "primitive" types
@@ -118,10 +121,9 @@ impl Variant {
             Self::Integer(value) => value,
             Self::Float(value) => value,
             Self::String(value) => value,
-            // Self::Tuple(items) => Tuple::NonEmpty(*items),
+            Self::Tuple(tuple) => tuple,
             Self::Function(fun) => &*fun,
             Self::NativeFunction(fun) => &*fun,
-            _ => &(),
         }
     }
     
@@ -133,7 +135,6 @@ impl Variant {
             Self::Integer(..) => Type::Integer,
             Self::Float(..) => Type::Float,
             Self::String(..) => Type::String,
-            Self::EmptyTuple => Type::Tuple,
             Self::Tuple(..) => Type::Tuple,
             Self::Function(..) => Type::Function,
             Self::NativeFunction(..) => Type::Function,
@@ -270,14 +271,6 @@ impl<F> MetaObject for GC<F> where F: GCTrace, GC<F>: Callable {
     }
 }
 
-impl MetaObject for GC<NativeFunction> {
-    fn type_tag(&self) -> Type { Type::Function }
-    
-    fn invoke(&self, args: &[Variant]) -> Option<ExecResult<Call>> {
-        Some(self.checked_call(args))
-    }
-    
-    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
-        other.as_gc().map(|other| Ok(GC::ptr_eq(&(*self).into(), &other)))
-    }
+impl MetaObject for StringSymbol {
+    fn type_tag(&self) -> Type { Type::String }
 }

@@ -195,7 +195,6 @@ impl Variant {
     pub fn cmp_eq(&self, other: &Variant) -> ExecResult<bool> {
         match (self, other) {
             (Variant::Nil, Variant::Nil) => Ok(true),
-            (Variant::EmptyTuple, Variant::EmptyTuple) => Ok(true),
             
             (Variant::BoolTrue,  Variant::BoolTrue)  => Ok(true),
             (Variant::BoolFalse, Variant::BoolFalse) => Ok(true),
@@ -204,6 +203,10 @@ impl Variant {
             
             (Variant::String(a), Variant::String(b)) => Ok(*a == *b),
             (Variant::Integer(a), Variant::Integer(b)) => Ok(*a == *b),
+            
+            (Variant::Tuple(a), Variant::Tuple(b)) 
+                if a.is_empty() && b.is_empty() => Ok(true),
+            
             _ => {
                 if let Some(result) = self.as_meta().cmp_eq(other) {
                     return result;
