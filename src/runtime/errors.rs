@@ -118,8 +118,8 @@ impl fmt::Display for RuntimeError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let message = match self.kind() {
             // TODO
-            ErrorKind::InvalidUnaryOperand(operand) => format!("unsupported operand for type '{}'", operand),
-            ErrorKind::InvalidBinaryOperand(lhs, rhs) => format!("unsupported operand for type '{}' and '{}'", lhs, rhs),
+            ErrorKind::InvalidUnaryOperand(operand) => format!("unsupported operand: '{}'", operand),
+            ErrorKind::InvalidBinaryOperand(lhs, rhs) => format!("unsupported operands: '{}' and '{}'", lhs, rhs),
             ErrorKind::DivideByZero => format!("divide by zero"),
             ErrorKind::OverflowError => format!("integer arithmetic overflow"),
             ErrorKind::NegativeShiftCount => format!("negative bitshift count"),

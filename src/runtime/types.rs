@@ -94,6 +94,11 @@ pub trait MetaObject {
     fn apply_shr(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
     fn apply_rshr(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
+    // comparisons
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> { None }
+    fn cmp_lt(&self, other: &Variant) -> Option<ExecResult<bool>> { None }
+    fn cmp_le(&self, other: &Variant) -> Option<ExecResult<bool>> { None }
 }
 
 impl Variant {
@@ -166,6 +171,13 @@ impl MetaObject for () {
     fn type_tag(&self) -> Type { Type::Nil }
     
     fn as_bool(&self) -> ExecResult<bool> { Ok(false) }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        match other {
+            Variant::Nil => Some(Ok(true)),
+            _ => None,
+        }
+    }
 }
 
 // Booleans
@@ -214,5 +226,13 @@ impl MetaObject for bool {
     }
     fn apply_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         self.apply_or(lhs)
+    }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        match other {
+            Variant::BoolFalse => Some(Ok(!(*self))),
+            Variant::BoolTrue => Some(Ok(*self)),
+            _ => None,
+        }
     }
 }

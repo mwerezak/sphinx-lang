@@ -201,6 +201,30 @@ impl MetaObject for IntType {
             return checked_int_math!(checked_shr, lhs.unwrap(), (*self).try_into().unwrap());
         })
     }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        match other {
+            Variant::Integer(other) => Some(Ok(*self == *other)),
+            _ => other.as_meta().as_int()
+                .map(|other| Ok(*self == other?))
+        }
+    }
+    
+    fn cmp_lt(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        match other {
+            Variant::Integer(other) => Some(Ok(*self < *other)),
+            _ => other.as_meta().as_int()
+                .map(|other| Ok(*self < other?))
+        }
+    }
+    
+    fn cmp_le(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        match other {
+            Variant::Integer(other) => Some(Ok(*self <= *other)),
+            _ => other.as_meta().as_int()
+                .map(|other| Ok(*self <= other?))
+        }
+    }
 }
 
 
@@ -250,6 +274,18 @@ impl MetaObject for FloatType {
     
     fn apply_rsub(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_float().map(|lhs| Ok(Variant::from(lhs? - *self)))
+    }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        other.as_meta().as_float().map(|other| Ok(*self == other?))
+    }
+    
+    fn cmp_lt(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        other.as_meta().as_float().map(|other| Ok(*self < other?))
+    }
+    
+    fn cmp_le(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        other.as_meta().as_float().map(|other| Ok(*self <= other?))
     }
 }
 

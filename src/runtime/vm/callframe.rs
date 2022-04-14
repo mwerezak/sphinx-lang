@@ -97,11 +97,11 @@ macro_rules! eval_binary_op {
 }
 
 macro_rules! eval_cmp {
-    ( $stack:expr, $eval_func:tt ) => {
+    ( $stack:expr, $cmp_method:tt ) => {
         {
-            let operand = $stack.peek_many(2);
-            let result = ops::$eval_func(&operand[0], &operand[1])?;
-            $stack.pop();
+            let rhs = $stack.pop();
+            let lhs = $stack.peek();
+            let result = lhs.$cmp_method(&rhs)?;
             $stack.replace(Variant::from(result));
         }
     };
@@ -436,12 +436,12 @@ impl<'c> VMCallFrame<'c> {
             OpCode::Div => eval_binary_op!(stack, apply_div),
             OpCode::Mod => eval_binary_op!(stack, apply_mod),
             
-            OpCode::EQ => unimplemented!(), //eval_cmp!(stack, eval_eq),
-            OpCode::NE => unimplemented!(), //eval_cmp!(stack, eval_ne),
-            OpCode::LT => unimplemented!(), //eval_cmp!(stack, eval_lt),
-            OpCode::LE => unimplemented!(), //eval_cmp!(stack, eval_le),
-            OpCode::GE => unimplemented!(), //eval_cmp!(stack, eval_ge),
-            OpCode::GT => unimplemented!(), //eval_cmp!(stack, eval_gt),
+            OpCode::EQ => eval_cmp!(stack, cmp_eq),
+            OpCode::NE => eval_cmp!(stack, cmp_ne),
+            OpCode::LT => eval_cmp!(stack, cmp_lt),
+            OpCode::LE => eval_cmp!(stack, cmp_le),
+            OpCode::GE => eval_cmp!(stack, cmp_ge),
+            OpCode::GT => eval_cmp!(stack, cmp_gt),
             
             OpCode::Jump => {
                 let offset = isize::from(read_le_bytes!(i16, data));

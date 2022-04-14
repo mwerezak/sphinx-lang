@@ -50,6 +50,24 @@ macro_rules! meta_eval_binary {
     };
 }
 
+macro_rules! meta_eval_inequality {
+    ( $lhs:expr, $rhs:expr, $compare_method:tt, $reflected_method:tt) => {
+        {
+            if let Some(result) = $lhs.as_meta().$compare_method($rhs) {
+                return result;
+            }
+            
+            if $lhs.type_tag() != $rhs.type_tag() {
+                if let Some(result) = $rhs.as_meta().$reflected_method($lhs) {
+                    return result.map(|cmp| !cmp);
+                }
+            }
+            
+            Err(ErrorKind::InvalidBinaryOperand($lhs.type_tag(), $rhs.type_tag()).into())
+        }
+    };
+}
+
 impl Variant {
     
     // Unary
@@ -156,6 +174,8 @@ impl Variant {
         }
     }
     
+    // Shifts
+    
     pub fn apply_shl(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
             (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_shl(rhs).unwrap(),
@@ -168,6 +188,65 @@ impl Variant {
             (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_shr(rhs).unwrap(),
             _ => meta_eval_binary!(self, rhs, apply_shr, apply_rshr),
         }
+    }
+
+    // Comparison
+    
+    pub fn cmp_eq(&self, other: &Variant) -> ExecResult<bool> {
+        match (self, other) {
+            (Variant::Nil, Variant::Nil) => Ok(true),
+            (Variant::EmptyTuple, Variant::EmptyTuple) => Ok(true),
+            
+            (Variant::BoolTrue,  Variant::BoolTrue)  => Ok(true),
+            (Variant::BoolFalse, Variant::BoolFalse) => Ok(true),
+            (Variant::BoolTrue,  Variant::BoolFalse) => Ok(false),
+            (Variant::BoolFalse, Variant::BoolTrue)  => Ok(false),
+            
+            (Variant::String(a), Variant::String(b)) => Ok(*a == *b),
+            (Variant::Integer(a), Variant::Integer(b)) => Ok(*a == *b),
+            _ => {
+                if let Some(result) = self.as_meta().cmp_eq(other) {
+                    return result;
+                }
+                
+                if self.type_tag() != other.type_tag() {
+                    if let Some(result) = other.as_meta().cmp_eq(self) {
+                        return result;
+                    }
+                }
+                
+                Ok(false)
+            }
+        }
+        
+    }
+    
+    pub fn cmp_ne(&self, other: &Variant) -> ExecResult<bool> {
+        self.cmp_eq(other).map(|cmp| !cmp)
+    }
+    
+    pub fn cmp_lt(&self, other: &Variant) -> ExecResult<bool> {
+        match (self, other) {
+            (Self::Integer(this), Self::Integer(..)) => this.cmp_lt(other).unwrap(),
+            (Self::Float(this), Self::Float(..)) => this.cmp_lt(other).unwrap(),
+            _ => meta_eval_inequality!(self, other, cmp_lt, cmp_le)
+        }
+    }
+    
+    pub fn cmp_le(&self, other: &Variant) -> ExecResult<bool> {
+        match (self, other) {
+            (Self::Integer(this), Self::Integer(..)) => this.cmp_le(other).unwrap(),
+            (Self::Float(this), Self::Float(..)) => this.cmp_le(other).unwrap(),
+            _ => meta_eval_inequality!(self, other, cmp_le, cmp_lt)
+        }
+    }
+    
+    pub fn cmp_gt(&self, other: &Variant) -> ExecResult<bool> {
+        self.cmp_le(other).map(|cmp| !cmp)
+    }
+
+    pub fn cmp_ge(&self, other: &Variant) -> ExecResult<bool> {
+        self.cmp_lt(other).map(|cmp| !cmp)
     }
 }
 
