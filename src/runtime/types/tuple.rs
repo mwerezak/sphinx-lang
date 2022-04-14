@@ -10,6 +10,18 @@ pub enum Tuple {
     NonEmpty(GC<Box<[Variant]>>),
 }
 
+unsafe impl GCTrace for Box<[Variant]> {
+    fn trace(&self) {
+        for item in self.iter() {
+            item.trace();
+        }
+    }
+    
+    fn size_hint(&self) -> usize {
+        std::mem::size_of::<Variant>() * self.len()
+    }
+}
+
 impl Default for Tuple {
     fn default() -> Self {
         Self::Empty
@@ -36,7 +48,7 @@ impl AsRef<[Variant]> for Tuple {
 }
 
 impl Tuple {
-    pub fn mark_trace(&self) {
+    pub fn trace(&self) {
         if let Self::NonEmpty(gc_items) = self {
             gc_items.mark_trace()
         }

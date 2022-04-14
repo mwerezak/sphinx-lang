@@ -85,29 +85,11 @@ unsafe impl GCTrace for Variant {
     #[inline]
     fn trace(&self) {
         match self {
-            Self::Tuple(tuple) => tuple.mark_trace(),
+            Self::Tuple(tuple) => tuple.trace(),
             Self::Function(fun) => fun.mark_trace(),
             Self::NativeFunction(fun) => fun.mark_trace(),
             _ => { },
         };
-    }
-}
-
-unsafe impl GCTrace for Cell<Variant> {
-    fn trace(&self) {
-        self.get().trace()
-    }
-}
-
-unsafe impl GCTrace for Box<[Variant]> {
-    fn trace(&self) {
-        for item in self.iter() {
-            item.trace();
-        }
-    }
-    
-    fn size_hint(&self) -> usize {
-        std::mem::size_of::<Variant>() * self.len()
     }
 }
 
