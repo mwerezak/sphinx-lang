@@ -97,22 +97,37 @@ impl Variant {
     // }
     
     pub fn as_bool(&self) -> ExecResult<bool> { 
-        self.as_meta().as_bool()
+        match self {
+            Self::Nil => Ok(false),
+            Self::BoolFalse => Ok(false),
+            Self::BoolTrue => Ok(true),
+            _ => self.as_meta().as_bool(),
+        }
     }
     
     pub fn as_bits(&self) -> ExecResult<IntType> {
-        self.as_meta().as_bits()
-            .ok_or_else(|| ErrorKind::CantInterpretAsBits(*self))?
+        match self {
+            Self::Integer(value) => Ok(*value),
+            _ => self.as_meta().as_bits()
+                .ok_or_else(|| ErrorKind::CantInterpretAsBits(*self))?,
+        }
     }
     
     pub fn as_int(&self) -> ExecResult<IntType> {
-        self.as_meta().as_int()
-            .ok_or_else(|| ErrorKind::CantInterpretAsInt(*self))?
+        match self {
+            Self::Integer(value) => Ok(*value),
+            _ => self.as_meta().as_int()
+                .ok_or_else(|| ErrorKind::CantInterpretAsInt(*self))?
+        }
     }
     
     pub fn as_float(&self) -> ExecResult<FloatType> {
-        self.as_meta().as_float()
-            .ok_or_else(|| ErrorKind::CantInterpretAsFloat(*self))?
+        match self {
+            Self::Float(value) => Ok(*value),
+            Self::Integer(value) => Ok(*value as FloatType),
+            _ => self.as_meta().as_float()
+                .ok_or_else(|| ErrorKind::CantInterpretAsFloat(*self))?
+        }
     }
 }
 

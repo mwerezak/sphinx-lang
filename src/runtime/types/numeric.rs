@@ -25,7 +25,11 @@ impl MetaObject for IntType {
     fn apply_inv(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(!(*self)))) }
     
     fn apply_mul(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
-        rhs.as_meta().as_int().map(|rhs| checked_int_math!(checked_mul, *self, rhs?))
+        match rhs {
+            Variant::Integer(rhs) => Some(checked_int_math!(checked_mul, *self, *rhs)),
+            _ => rhs.as_meta().as_int()
+                .map(|rhs| checked_int_math!(checked_mul, *self, rhs?))
+        }
     }
     
     fn apply_rmul(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
@@ -62,7 +66,11 @@ impl MetaObject for IntType {
     }
     
     fn apply_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
-        rhs.as_meta().as_int().map(|rhs| checked_int_math!(checked_add, *self, rhs?))
+        match rhs {
+            Variant::Integer(rhs) => Some(checked_int_math!(checked_add, *self, *rhs)),
+            _ => rhs.as_meta().as_int()
+                .map(|rhs| checked_int_math!(checked_add, *self, rhs?))
+        }
     }
     
     fn apply_radd(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
@@ -70,11 +78,19 @@ impl MetaObject for IntType {
     }
     
     fn apply_sub(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
-        rhs.as_meta().as_int().map(|rhs| checked_int_math!(checked_sub, *self, rhs?))
+        match rhs {
+            Variant::Integer(rhs) => Some(checked_int_math!(checked_sub, *self, *rhs)),
+            _ => rhs.as_meta().as_int()
+                .map(|rhs| checked_int_math!(checked_sub, *self, rhs?))
+        }
     }
     
     fn apply_rsub(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        lhs.as_meta().as_int().map(|lhs| checked_int_math!(checked_sub, lhs?, *self))
+        match lhs {
+            Variant::Integer(lhs) => Some(checked_int_math!(checked_sub, *lhs, *self)),
+            _ => lhs.as_meta().as_int()
+                .map(|lhs| checked_int_math!(checked_sub, lhs?, *self))
+        }
     }
 }
 
