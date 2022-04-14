@@ -54,6 +54,28 @@ impl Display for TitleCase<'_> {
     }
 }
 
+pub fn fmt_join<'a>(sep: impl Display + 'a, items: &'a [impl Display]) -> impl Display + 'a {
+    DisplayJoin { sep, items }
+}
+
+struct DisplayJoin<'a, S, D> where S: Display, D: Display {
+    sep: S,
+    items: &'a [D],
+}
+
+impl<S, D> Display for DisplayJoin<'_, S, D> where S: Display, D: Display {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+        for item in self.items.iter().take(self.items.len() - 1) {
+            item.fmt(fmt)?;
+            self.sep.fmt(fmt)?;
+        }
+        if let Some(item) = self.items.last() {
+            item.fmt(fmt)?;
+        }
+        Ok(())
+    }
+}
+
 
 // This struct is born out of a desire to read a file into unicode characters 
 // without pulling the entire file into a buffer

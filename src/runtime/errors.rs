@@ -6,6 +6,7 @@ use crate::runtime::Variant;
 use crate::runtime::function::Signature;
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::types::Type;
+use crate::runtime::strings::StringSymbol;
 use crate::debug::traceback::{TraceSite, Traceback};
 
 // TODO box error
@@ -127,14 +128,45 @@ impl fmt::Display for RuntimeError {
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
             ErrorKind::UnhashableValue(..) => format!("unhashable value"),
             ErrorKind::NotCallable(receiver) => format!("type '{}' is not callable", receiver.type_tag()),
-            ErrorKind::MissingArguments { .. } => format!("<callable> missing N required arguments: '...', '...', and '...'"),
-            ErrorKind::TooManyArguments { signature, nargs } => {
-                format!("<callable> takes N arguments but M were given")
-            },
             ErrorKind::CantInterpretAsBits(..) => format!("can't interpret <value> as bitfield"),
             ErrorKind::CantInterpretAsInt(..) => format!("can't interpret <value> as int"),
             ErrorKind::CantInterpretAsFloat(..) => format!("can't interpret <value> as float"),
             ErrorKind::AssertFailed => format!("assertion failed"),
+            
+            ErrorKind::MissingArguments { signature, nargs } => {
+                let name = signature.name().map_or_else(
+                    || "anonymous function".to_string(),
+                    |name| format!("{}()", name)
+                );
+                
+                let missing = signature.required().iter()
+                    .skip(*nargs)
+                    .map(|param| *param.name())
+                    .collect::<Vec<StringSymbol>>();
+                
+                let count = signature.min_arity() - nargs;
+                
+                format!(
+                    "{} missing {} required {}: {}",
+                    name, count, 
+                    if count == 1 { "argument" }
+                    else { "arguments" },
+                    utils::fmt_join(", ", &missing)
+                )
+            },
+            
+            ErrorKind::TooManyArguments { signature, nargs } => {
+                let name = signature.name().map_or_else(
+                    || "anonymous function".to_string(),
+                    |name| format!("{}()", name)
+                );
+                
+                format!(
+                    "{} takes {} arguments but {} were given", 
+                    name, signature.max_arity().unwrap(), nargs
+                )
+            },
+
         };
         
         utils::format_error(fmt, "Runtime error", Some(&message), self.source())

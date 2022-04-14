@@ -3,6 +3,8 @@ use once_cell::sync::Lazy;
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
+use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::function::{Call, Function, NativeFunction};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 pub mod operator;
@@ -57,6 +59,9 @@ pub trait MetaObject {
     fn as_int(&self) -> Option<ExecResult<IntType>> { None }
     fn as_float(&self) -> Option<ExecResult<FloatType>> { None }
     
+    // misc
+    fn invoke(&self, args: &[Variant]) -> Option<ExecResult<Call>> { None }
+    
     // unary operators
     fn apply_neg(&self) -> Option<ExecResult<Variant>> { None }
     fn apply_pos(&self) -> Option<ExecResult<Variant>> { None }
@@ -109,6 +114,9 @@ impl Variant {
             Self::BoolFalse => &false,
             Self::Integer(value) => value,
             Self::Float(value) => value,
+            
+            Self::Function(fun) => fun,
+            Self::NativeFunction(fun) => fun,
             _ => &(),
         }
     }
@@ -161,6 +169,15 @@ impl Variant {
             Self::Integer(value) => Ok(*value as FloatType),
             _ => self.as_meta().as_float()
                 .ok_or_else(|| ErrorKind::CantInterpretAsFloat(*self))?
+        }
+    }
+    
+    pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
+        match self {
+            Self::Function(fun) => fun.checked_call(args),
+            Self::NativeFunction(fun) => fun.checked_call(args),
+            _ => self.as_meta().invoke(args)
+                .ok_or_else(|| ErrorKind::NotCallable(*self))?
         }
     }
 }
@@ -234,5 +251,29 @@ impl MetaObject for bool {
             Variant::BoolTrue => Some(Ok(*self)),
             _ => None,
         }
+    }
+}
+
+impl MetaObject for GC<Function> {
+    fn type_tag(&self) -> Type { Type::Function }
+    
+    fn invoke(&self, args: &[Variant]) -> Option<ExecResult<Call>> {
+        Some(self.checked_call(args))
+    }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        other.as_gc().map(|other| Ok(GC::ptr_eq(&(*self).into(), &other)))
+    }
+}
+
+impl MetaObject for GC<NativeFunction> {
+    fn type_tag(&self) -> Type { Type::Function }
+    
+    fn invoke(&self, args: &[Variant]) -> Option<ExecResult<Call>> {
+        Some(self.checked_call(args))
+    }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        other.as_gc().map(|other| Ok(GC::ptr_eq(&(*self).into(), &other)))
     }
 }

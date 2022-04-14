@@ -19,17 +19,6 @@ pub enum Call {
     Native(GC<NativeFunction>),
 }
 
-pub trait Invoke {
-    fn signature(&self) -> &Signature;
-    fn as_call(&self) -> Call;
-    
-    fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
-        self.signature().check_args(args)?;
-        Ok(self.as_call())
-    }
-}
-
-
 // Compiled Functions
 
 #[derive(Debug)]
@@ -49,16 +38,14 @@ impl Function {
     pub fn proto(&self) -> &FunctionProto {
         self.module.data().get_function(self.fun_id)
     }
-}
-
-impl Invoke for Function {
-    fn signature(&self) -> &Signature {
+    
+    pub fn signature(&self) -> &Signature {
         self.proto().signature()
     }
     
-    #[inline]
-    fn as_call(&self) -> Call {
-        Call::Chunk(self.module, self.fun_id)
+    pub fn checked_call(&self, args: &[Variant]) -> ExecResult<Call> {
+        self.signature().check_args(args)?;
+        Ok(Call::Chunk(self.module, self.fun_id))
     }
 }
 
@@ -140,16 +127,15 @@ impl NativeFunction {
     }
     
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Variant> {
+        self.signature().check_args(args)?;
         (self.func)(self, args)
     }
 }
 
-impl Invoke for GC<NativeFunction> {
-    fn signature(&self) -> &Signature { &self.signature }
-    
-    #[inline]
-    fn as_call(&self) -> Call {
-        Call::Native(*self)
+impl GC<NativeFunction> {
+    pub fn checked_call(&self, args: &[Variant]) -> ExecResult<Call> {
+        self.signature().check_args(args)?;
+        Ok(Call::Native(*self))
     }
 }
 
