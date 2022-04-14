@@ -129,15 +129,15 @@ impl Variant {
     
     pub fn type_tag(&self) -> Type {
         match self {
-            Self::Nil => Type::Nil,
-            Self::BoolTrue => Type::Boolean,
-            Self::BoolFalse => Type::Boolean,
-            Self::Integer(..) => Type::Integer,
-            Self::Float(..) => Type::Float,
-            Self::String(..) => Type::String,
-            Self::Tuple(..) => Type::Tuple,
-            Self::Function(..) => Type::Function,
-            Self::NativeFunction(..) => Type::Function,
+            Self::Nil => ().type_tag(),
+            Self::BoolTrue => true.type_tag(),
+            Self::BoolFalse => false.type_tag(),
+            Self::Integer(value) => value.type_tag(),
+            Self::Float(value) => value.type_tag(),
+            Self::String(value) => value.type_tag(),
+            Self::Tuple(tuple) => tuple.type_tag(),
+            Self::Function(fun) => fun.type_tag(),
+            Self::NativeFunction(fun) => fun.type_tag(),
         }
     }
     
