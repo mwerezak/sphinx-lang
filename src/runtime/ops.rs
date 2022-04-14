@@ -103,12 +103,18 @@ impl Variant {
     
     #[inline(always)]
     pub fn apply_div(&self, rhs: &Variant) -> ExecResult<Variant> {
-        meta_eval_binary!(self, rhs, apply_div, apply_rdiv)
+        match (self, rhs) {
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_div(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, apply_div, apply_rdiv),
+        }
     }
     
     #[inline(always)]
     pub fn apply_mod(&self, rhs: &Variant) -> ExecResult<Variant> {
-        meta_eval_binary!(self, rhs, apply_mod, apply_rmod)
+        match (self, rhs) {
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_mod(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, apply_mod, apply_rmod),
+        }
     }
     
     #[inline(always)]
