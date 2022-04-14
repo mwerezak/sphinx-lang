@@ -95,7 +95,7 @@ impl<T> Clone for GC<T> where T: GCTrace + ?Sized {
 impl<T> Copy for GC<T> where T: GCTrace + ?Sized { }
 
 impl<T> Hash for GC<T> where T: GCTrace {
-    fn hash<H>(&self, state: &mut H) where H: Hasher {
+    fn hash<H>(self: &Self, state: &mut H) where H: Hasher {
         <NonNull<GCBox<T>> as Hash>::hash(&self.ptr, state)
     }
 }

@@ -8,6 +8,7 @@ use std::mem;
 use std::ptr;
 use std::str;
 use std::fmt;
+use std::borrow::Borrow;
 
 
 // TODO evaluate what size makes the most sense for the StringValue struct
@@ -107,6 +108,13 @@ impl<const N: usize> std::ops::Deref for InlineStr<N> {
     }
 }
 
+impl<const N: usize> AsRef<str> for InlineStr<N> {
+    fn as_ref(&self) -> &str { &*self }
+}
+
+impl<const N: usize> Borrow<str> for InlineStr<N> {
+    fn borrow(&self) -> &str { &*self }
+}
 
 impl<const N: usize> fmt::Debug for InlineStr<N> {
     #[inline]

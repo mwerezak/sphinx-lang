@@ -36,15 +36,10 @@ impl StringSymbol {
         STRING_TABLE.with(|string_table| string_table.borrow_mut().get_or_intern(string))
     }
     
-    pub fn concat(&self, other: &StringSymbol) -> StringSymbol {
-        STRING_TABLE.with(|string_table| {
-            let mut string_table = string_table.borrow_mut();
-            
-            let mut buf = String::new();
-            buf.push_str(string_table.resolve(self));
-            buf.push_str(string_table.resolve(other));
-            string_table.get_or_intern(buf.as_str())
-        })
+    pub fn write(&self, buf: &mut impl fmt::Write) -> fmt::Result {
+        STRING_TABLE.with(|string_table| buf.write_str(
+            string_table.borrow().resolve(self)
+        ))
     }
 }
 
@@ -105,9 +100,7 @@ impl fmt::Debug for StringSymbol {
 
 impl fmt::Display for StringSymbol {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        STRING_TABLE.with(|string_table| fmt.write_str(
-            string_table.borrow().resolve(self)
-        ))
+        self.write(fmt)
     }
 }
 
