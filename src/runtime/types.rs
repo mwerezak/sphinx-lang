@@ -88,6 +88,12 @@ pub trait MetaObject {
     fn apply_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
     fn apply_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
+    fn apply_shl(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn apply_rshl(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    
+    fn apply_shr(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn apply_rshr(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    
 }
 
 impl Variant {
@@ -102,9 +108,20 @@ impl Variant {
         }
     }
     
-    // pub fn type_tag(&self) -> Type {
-    //     self.as_meta().type_tag()
-    // }
+    pub fn type_tag(&self) -> Type {
+        match self {
+            Self::Nil => Type::Nil,
+            Self::BoolTrue => Type::Boolean,
+            Self::BoolFalse => Type::Boolean,
+            Self::Integer(..) => Type::Integer,
+            Self::Float(..) => Type::Float,
+            Self::String(..) => Type::String,
+            Self::EmptyTuple => Type::Tuple,
+            Self::Tuple(..) => Type::Tuple,
+            Self::Function(..) => Type::Function,
+            Self::NativeFunction(..) => Type::Function,
+        }
+    }
     
     pub fn as_bool(&self) -> ExecResult<bool> { 
         match self {

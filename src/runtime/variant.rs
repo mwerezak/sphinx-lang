@@ -31,21 +31,6 @@ pub enum Variant {
 }
 
 impl Variant {
-    pub fn type_tag(&self) -> Type {
-        match self {
-            Self::Nil => Type::Nil,
-            Self::BoolTrue => Type::Boolean,
-            Self::BoolFalse => Type::Boolean,
-            Self::Integer(..) => Type::Integer,
-            Self::Float(..) => Type::Float,
-            Self::String(..) => Type::String,
-            Self::EmptyTuple => Type::Tuple,
-            Self::Tuple(..) => Type::Tuple,
-            Self::Function(..) => Type::Function,
-            Self::NativeFunction(..) => Type::Function,
-        }
-    }
-    
     // Only "nil" and "false" have a truth value of false.
     // pub fn truth_value(&self) -> bool {
     //     !matches!(self, Self::Nil | Self::BoolFalse)

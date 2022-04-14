@@ -137,6 +137,70 @@ impl MetaObject for IntType {
     fn apply_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         self.apply_or(lhs)
     }
+    
+    fn apply_shl(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+        let rhs = match rhs {
+            Variant::BoolFalse => Some(0),
+            Variant::BoolTrue => Some(1),
+            Variant::Integer(rhs) => Some(*rhs),
+            _ => match rhs.as_meta().as_int() {
+                Some(Ok(rhs)) => Some(rhs),
+                Some(Err(error)) => return Some(Err(error)),
+                None => None,
+            },
+        };
+        
+        rhs.map(|rhs| {
+            if rhs < 0 {
+                return Err(ErrorKind::NegativeShiftCount.into());
+            }
+            return checked_int_math!(checked_shl, *self, rhs.try_into().unwrap());
+        })
+    }
+    
+    fn apply_rshl(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        lhs.as_meta().as_bits().map(|lhs| {
+            if lhs.is_err() {
+                return Err(lhs.unwrap_err());
+            }
+            if *self < 0 {
+                return Err(ErrorKind::NegativeShiftCount.into());
+            }
+            return checked_int_math!(checked_shl, lhs.unwrap(), (*self).try_into().unwrap());
+        })
+    }
+    
+    fn apply_shr(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+        let rhs = match rhs {
+            Variant::BoolFalse => Some(0),
+            Variant::BoolTrue => Some(1),
+            Variant::Integer(rhs) => Some(*rhs),
+            _ => match rhs.as_meta().as_int() {
+                Some(Ok(rhs)) => Some(rhs),
+                Some(Err(error)) => return Some(Err(error)),
+                None => None,
+            },
+        };
+        
+        rhs.map(|rhs| {
+            if rhs < 0 {
+                return Err(ErrorKind::NegativeShiftCount.into());
+            }
+            return checked_int_math!(checked_shr, *self, rhs.try_into().unwrap());
+        })
+    }
+    
+    fn apply_rshr(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        lhs.as_meta().as_bits().map(|lhs| {
+            if lhs.is_err() {
+                return Err(lhs.unwrap_err());
+            }
+            if *self < 0 {
+                return Err(ErrorKind::NegativeShiftCount.into());
+            }
+            return checked_int_math!(checked_shr, lhs.unwrap(), (*self).try_into().unwrap());
+        })
+    }
 }
 
 
