@@ -52,19 +52,21 @@ impl fmt::Display for Type {
     }
 }
 
-
-
 #[allow(unused_variables)]
 pub trait MetaObject {
     fn type_tag(&self) -> Type;
     
     // primitive coercions
     fn as_bool(&self) -> ExecResult<bool> { Ok(true) }
-    fn as_bits(&self) -> Option<ExecResult<IntType>> { None }
+    fn as_bits(&self) -> Option<ExecResult<IntType>> { self.as_int() }
     fn as_int(&self) -> Option<ExecResult<IntType>> { None }
     fn as_float(&self) -> Option<ExecResult<FloatType>> { None }
     
-    // misc
+    // data
+    fn len(&self) -> Option<ExecResult<usize>> { None }
+    //fn get_item(&self, item: &Variant) -> Option<ExecResult<Variant>> { None }
+    
+    // callable
     fn invoke(&self, args: &[Variant]) -> Option<ExecResult<Call>> { None }
     
     // unary operators
@@ -156,7 +158,7 @@ impl Variant {
             Self::BoolTrue => true.as_bits().unwrap(),
             Self::Integer(value) => Ok(*value),
             _ => self.as_meta().as_bits()
-                .ok_or_else(|| ErrorKind::CantInterpretAsBits(*self))?,
+                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsBits))?,
         }
     }
     
@@ -164,7 +166,7 @@ impl Variant {
         match self {
             Self::Integer(value) => Ok(*value),
             _ => self.as_meta().as_int()
-                .ok_or_else(|| ErrorKind::CantInterpretAsInt(*self))?
+                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsInt))?
         }
     }
     
@@ -173,7 +175,7 @@ impl Variant {
             Self::Float(value) => Ok(*value),
             Self::Integer(value) => Ok(*value as FloatType),
             _ => self.as_meta().as_float()
-                .ok_or_else(|| ErrorKind::CantInterpretAsFloat(*self))?
+                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsFloat))?
         }
     }
     
@@ -182,7 +184,7 @@ impl Variant {
             Self::Function(fun) => fun.checked_call(args),
             Self::NativeFunction(fun) => fun.checked_call(args),
             _ => self.as_meta().invoke(args)
-                .ok_or_else(|| ErrorKind::NotCallable(*self))?
+                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Invoke))?
         }
     }
 }
@@ -273,4 +275,34 @@ impl<F> MetaObject for GC<F> where F: GCTrace, GC<F>: Callable {
 
 impl MetaObject for StringSymbol {
     fn type_tag(&self) -> Type { Type::String }
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MethodTag {
+    Invoke,
+    Len,
+    AsBool,
+    AsBits,
+    AsInt,
+    AsFloat,
+}
+
+impl MethodTag {
+    pub fn method_name(&self) -> &'static str {
+        match self {
+            Self::Invoke => "__call",
+            Self::Len => "__len",
+            Self::AsBool => "__bool",
+            Self::AsBits => "__bits",
+            Self::AsInt => "__int",
+            Self::AsFloat => "__float",
+        }
+    }
+}
+
+impl fmt::Display for MethodTag {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        fmt.write_str(self.method_name())
+    }
 }

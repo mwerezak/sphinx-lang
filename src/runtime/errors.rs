@@ -5,7 +5,7 @@ use crate::utils;
 use crate::runtime::Variant;
 use crate::runtime::function::Signature;
 use crate::runtime::gc::{GC, GCTrace};
-use crate::runtime::types::Type;
+use crate::runtime::types::{Type, MethodTag};
 use crate::runtime::strings::StringSymbol;
 use crate::debug::traceback::{TraceSite, Traceback};
 
@@ -23,12 +23,9 @@ pub enum ErrorKind {
     NameNotDefined(String),
     CantAssignImmutable,  // can't assign to immutable global variable
     UnhashableValue(Variant),
-    NotCallable(Variant),
     MissingArguments { signature: Box<Signature>, nargs: usize },
     TooManyArguments { signature: Box<Signature>, nargs: usize },
-    CantInterpretAsBits(Variant),
-    CantInterpretAsInt(Variant),
-    CantInterpretAsFloat(Variant),
+    MethodNotSupported(Type, MethodTag),
     AssertFailed,
 }
 
@@ -48,10 +45,6 @@ unsafe impl GCTrace for ErrorKind {
     fn trace(&self) {
         match self {
             Self::UnhashableValue(value) => value.trace(),
-            Self::NotCallable(value) => value.trace(),
-            Self::CantInterpretAsBits(value) => value.trace(),
-            Self::CantInterpretAsInt(value) => value.trace(),
-            Self::CantInterpretAsFloat(value) => value.trace(),
             _ => { },
         }
     }
@@ -126,12 +119,18 @@ impl fmt::Display for RuntimeError {
             ErrorKind::NegativeShiftCount => format!("negative bitshift count"),
             ErrorKind::NameNotDefined(name) => format!("undefined variable \"{}\"", name),
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
-            ErrorKind::UnhashableValue(..) => format!("unhashable value"),
-            ErrorKind::NotCallable(receiver) => format!("type '{}' is not callable", receiver.type_tag()),
-            ErrorKind::CantInterpretAsBits(..) => format!("can't interpret <value> as bitfield"),
-            ErrorKind::CantInterpretAsInt(..) => format!("can't interpret <value> as int"),
-            ErrorKind::CantInterpretAsFloat(..) => format!("can't interpret <value> as float"),
+            ErrorKind::UnhashableValue(value) => format!("'{:?}' is not hashable", value),
             ErrorKind::AssertFailed => format!("assertion failed"),
+            
+            ErrorKind::MethodNotSupported(receiver, method) => {
+                match method {
+                    MethodTag::AsBits => format!("can't interpret '{}' as bitfield", receiver),
+                    MethodTag::AsInt => format!("can't interpret '{}' as int", receiver),
+                    MethodTag::AsFloat => format!("can't interpret '{}' as float", receiver),
+                    MethodTag::Invoke => format!("type '{}' is not callable", receiver),
+                    _ => format!("type '{}' does not support '{}'", receiver, method),
+                }
+            }
             
             ErrorKind::MissingArguments { signature, nargs } => {
                 let name = signature.name().map_or_else(
