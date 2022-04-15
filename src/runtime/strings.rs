@@ -130,15 +130,15 @@ impl StringValue {
 impl Hash for StringValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
         STRING_TABLE.with(|string_table| match self {
-            Self::Intern(symbol) => {
-                string_table.borrow().lookup_hash(symbol).hash(state);
-            }
-            Self::Inline(inline) => {
-                string_table.borrow().hash_str(&*inline).hash(state);
-            }
-            Self::GC(gc_str) => {
-                string_table.borrow().hash_str(&**gc_str).hash(state);
-            }
+            Self::Intern(symbol) =>
+                string_table.borrow().lookup_hash(symbol).hash(state),
+            
+            Self::Inline(inline) =>
+                string_table.borrow().hash_str(&*inline).hash(state),
+            
+            Self::GC(gc_str) => 
+                string_table.borrow().hash_str(&**gc_str).hash(state),
+            
         })
     }
 }
