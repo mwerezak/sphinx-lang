@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 use clap::{Command, Arg};
 
-use sphinx_lang::frontend;
-use sphinx_lang::{BuildErrors, build_module};
-use sphinx_lang::source::ModuleSource;
-use sphinx_lang::debug::symbol::DebugSymbolResolver;
-use sphinx_lang::debug::dasm::Disassembler;
+use sphinx::frontend;
+use sphinx::{BuildErrors, build_module};
+use sphinx::source::ModuleSource;
+use sphinx::debug::symbol::DebugSymbolResolver;
+use sphinx::debug::dasm::Disassembler;
 
 fn main() {
     env_logger::init();

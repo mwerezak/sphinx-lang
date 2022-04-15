@@ -2,16 +2,16 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use clap::{Command, Arg, ArgMatches};
 
-use sphinx_lang::frontend;
-use sphinx_lang::source::{ModuleSource, SourceText};
-use sphinx_lang::parser::expr::Expr;
-use sphinx_lang::parser::stmt::{Stmt, StmtMeta};
-use sphinx_lang::codegen::{Program, CompiledProgram};
-use sphinx_lang::runtime::{Module, VirtualMachine, GC};
-use sphinx_lang::runtime::module::GlobalEnv;
-use sphinx_lang::runtime::strings::StringInterner;
-use sphinx_lang::debug::symbol::resolver::BufferedResolver;
-use sphinx_lang::stdlib;
+use sphinx::frontend;
+use sphinx::source::{ModuleSource, SourceText};
+use sphinx::parser::expr::Expr;
+use sphinx::parser::stmt::{Stmt, StmtMeta};
+use sphinx::codegen::{Program, CompiledProgram};
+use sphinx::runtime::{Module, VirtualMachine, GC};
+use sphinx::runtime::module::GlobalEnv;
+use sphinx::runtime::strings::StringInterner;
+use sphinx::debug::symbol::resolver::BufferedResolver;
+use sphinx::stdlib;
 
 fn main() {
     env_logger::init();
@@ -111,9 +111,9 @@ fn main() {
 
 
 fn build_program(source: &ModuleSource) -> Option<CompiledProgram> {
-    match sphinx_lang::build_module(source) {
+    match sphinx::build_module(source) {
         Err(errors) => {
-            sphinx_lang::print_build_errors(&errors, source);
+            sphinx::print_build_errors(&errors, source);
             None
         },
         
@@ -152,7 +152,7 @@ fn parse_and_print_ast(_args: &ArgMatches, name: &str, source: &ModuleSource) {
     };
     
     let mut interner = StringInterner::new();
-    let parse_result = sphinx_lang::parse_source(&mut interner, source_text);
+    let parse_result = sphinx::parse_source(&mut interner, source_text);
     
     match parse_result {
         Err(errors) => {
@@ -244,7 +244,7 @@ impl Repl {
                         
                         // If we can't parse the input without errors, then we assume we need to continue
                         let source_text = SourceText::from(input.clone());
-                        if let Ok(ast) = sphinx_lang::parse_source(&mut interner, source_text) {
+                        if let Ok(ast) = sphinx::parse_source(&mut interner, source_text) {
                             parse_result.replace(ast);
                             break
                         }
@@ -258,7 +258,7 @@ impl Repl {
                 if let Some(ast) = parse_result { Ok(ast) }
                 else { 
                     let source_text = SourceText::from(input.clone());
-                    sphinx_lang::parse_source(&mut interner, source_text) 
+                    sphinx::parse_source(&mut interner, source_text) 
                 };
             
             let mut ast = match parse_result {
@@ -280,7 +280,7 @@ impl Repl {
                 ast.push(StmtMeta::new(stmt, symbol))
             }
             
-            let build = match sphinx_lang::compile_ast(interner, ast) {
+            let build = match sphinx::compile_ast(interner, ast) {
                 Ok(build) => build,
                 
                 Err(errors) => {

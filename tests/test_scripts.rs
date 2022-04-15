@@ -1,17 +1,17 @@
 use std::path::Path;
 
-use sphinx_lang;
-use sphinx_lang::stdlib;
-use sphinx_lang::source::ModuleSource;
-use sphinx_lang::codegen::{Program, CompiledProgram};
-use sphinx_lang::runtime::{Module, VirtualMachine, GC};
-use sphinx_lang::runtime::errors::{ExecResult, ErrorKind};
+use sphinx;
+use sphinx::stdlib;
+use sphinx::source::ModuleSource;
+use sphinx::codegen::{Program, CompiledProgram};
+use sphinx::runtime::{Module, VirtualMachine, GC};
+use sphinx::runtime::errors::{ExecResult, ErrorKind};
 
 
 fn build_program(source: &ModuleSource) -> Option<CompiledProgram> {
-    match sphinx_lang::build_module(source) {
+    match sphinx::build_module(source) {
         Err(errors) => {
-            sphinx_lang::print_build_errors(&errors, source);
+            sphinx::print_build_errors(&errors, source);
             None
         },
         

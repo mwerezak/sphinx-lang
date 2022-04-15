@@ -9,6 +9,7 @@ repository = "https://github.com/mwerezak/sphinx-lang"
 categories = ["compilers", "development-tools", "parser-implementations"]
 
 [lib]
+name = "sphinx"
 crate-type = ["lib"]
 
 [[bin]]
