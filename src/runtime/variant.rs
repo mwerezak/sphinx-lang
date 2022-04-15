@@ -14,7 +14,7 @@ use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 assert_eq_size!(Variant, [u8; 24]);
 
 // Fundamental data value type
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Variant {
     Nil,
     BoolTrue,
@@ -30,8 +30,12 @@ pub enum Variant {
 }
 
 impl Variant {
-    pub fn as_gc(self) -> Option<GC<dyn GCTrace>> {
+    pub fn as_gc(&self) -> Option<GC<dyn GCTrace>> {
         GC::<dyn GCTrace>::try_from(self).ok()
+    }
+    
+    pub fn echo(&self) -> impl fmt::Display + '_ {
+        EchoDisplay(self)
     }
 }
 
@@ -101,15 +105,15 @@ unsafe impl GCTrace for Variant {
 
 
 // extract the GC handle for GC'd types
-impl TryFrom<Variant> for GC<dyn GCTrace> {
-    type Error = Variant;
+impl TryFrom<&Variant> for GC<dyn GCTrace> {
+    type Error = ();
     
-    fn try_from(value: Variant) -> Result<Self, Self::Error> {
+    fn try_from(value: &Variant) -> Result<Self, Self::Error> {
         match value {
-            Variant::Tuple(tuple) => tuple.as_gc().ok_or(value),
-            Variant::Function(fun) => Ok(fun.into()),
-            Variant::NativeFunction(fun) => Ok(fun.into()),
-            _ => Err(value),
+            Variant::Tuple(tuple) => tuple.as_gc().ok_or(()),
+            Variant::Function(fun) => Ok((*fun).into()),
+            Variant::NativeFunction(fun) => Ok((*fun).into()),
+            _ => Err(()),
         }
     }
 }
@@ -199,12 +203,15 @@ impl<'s> PartialEq for VariantKey<'_> {
 }
 impl Eq for VariantKey<'_> { }
 
-impl fmt::Debug for Variant {
+impl fmt::Display for Variant {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Nil => fmt.write_str("nil"),
             Self::BoolTrue => fmt.write_str("true"),
             Self::BoolFalse => fmt.write_str("false"),
+            
+            Self::String(value) => write!(fmt, "{}", value),
+            Self::Tuple(tuple) => write!(fmt, "{}", tuple),
             
             Self::Integer(value) => write!(fmt, "{}", *value),
             Self::Float(value) => {
@@ -217,26 +224,21 @@ impl fmt::Debug for Variant {
                 }
             },
             
-            Self::String(value) => write!(fmt, "\"{}\"", value),
-            Self::Tuple(tuple) => write!(fmt, "{:?}", tuple),
-            
-            Self::Function(fun) => write!(fmt, "<{}>", fun.signature()),
-            Self::NativeFunction(fun) => write!(fmt, "<built-in {}>", fun.signature()),
+            Self::Function(fun) => write!(fmt, "<{} at {:#X}>", fun.signature(), GC::as_id(fun)),
+            Self::NativeFunction(fun) => write!(fmt, "<built-in {} at {:#X}>", fun.signature(), GC::as_id(fun)),
         }
     }
 }
 
-impl fmt::Display for Variant {
+
+/// Alternative display for Variant, kind of like repr() vs str() in Python
+struct EchoDisplay<'a>(&'a Variant);
+
+impl fmt::Display for EchoDisplay<'_> {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::String(value) => write!(fmt, "{}", value),
-            Self::Tuple(tuple) => write!(fmt, "{}", tuple),
-            
-            _ => write!(fmt, "{}", self)
+        match self.0 {
+            Variant::String(value) => write!(fmt, "\"{}\"", value),
+            _ => write!(fmt, "{}", self.0),
         }
     }
 }
-
-
-
-

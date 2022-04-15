@@ -50,6 +50,11 @@ impl<T> GC<T> where T: GCTrace + ?Sized {
         self_gc.inner().ptr_eq(other_gc.inner())
     }
     
+    /// Casts the inner pointer to a usize. 
+    /// This is intended for identifying the GC, and should not be cast back to a pointer.
+    pub fn as_id(self_gc: &GC<T>) -> usize {
+        self_gc.ptr.as_ptr() as *const () as usize
+    }
 
 }
 
@@ -99,7 +104,6 @@ impl<T> Hash for GC<T> where T: GCTrace {
         <NonNull<GCBox<T>> as Hash>::hash(&self.ptr, state)
     }
 }
-
 
 impl<T> fmt::Debug for GC<T> where T: GCTrace + ?Sized {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
