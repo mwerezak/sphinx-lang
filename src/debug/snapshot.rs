@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter, Result};
+use core::fmt::{Display, Formatter, Result};
 use crate::codegen::LocalIndex;
 use crate::codegen::opcodes::OpCode;
 use crate::runtime::Variant;

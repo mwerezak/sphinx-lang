@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use std::iter;
+use core::iter;
 use log;
 use crate::language::{IntType, FloatType, InternSymbol};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};

@@ -1,4 +1,4 @@
-use std::path::Path;
+use core::path::Path;
 
 use sphinx;
 use sphinx::stdlib;

@@ -15,7 +15,7 @@ use crate::runtime::ops;
 
 pub(super) fn create_prelude() -> Namespace {
     namespace! {
-        let PI = std::f64::consts::PI;
+        let PI = core::f64::consts::PI;
         
         fun _ = native_function!(time => {
             let time = SystemTime::UNIX_EPOCH

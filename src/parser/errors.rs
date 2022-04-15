@@ -1,5 +1,5 @@
 use log;
-use std::fmt;
+use core::fmt;
 use std::error::Error;
 use crate::utils;
 use crate::lexer::{TokenMeta, LexerError};

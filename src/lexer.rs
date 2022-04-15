@@ -1,5 +1,5 @@
 use std::io;
-use std::iter::{Iterator, Peekable};
+use core::iter::{Iterator, Peekable};
 use crate::language;
 use crate::debug::{DebugSymbol, TokenIndex, TokenLength};
 

@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
 
 pub type LocalIndex = u16;
@@ -380,8 +380,8 @@ impl PartialEq<u8> for OpCode {
 }
 
 // For disassembly/debugging
-impl std::fmt::Display for OpCode {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for OpCode {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mnemonic = match *self {
             Self::Nop => "NOP",
             Self::Return => "RETURN",

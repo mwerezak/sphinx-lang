@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 use crate::runtime::types::operator;
 use crate::runtime::types::operator::{Arithmetic, Bitwise, Shift, Comparison, Logical};
 

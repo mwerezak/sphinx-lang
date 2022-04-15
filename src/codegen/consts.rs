@@ -1,6 +1,6 @@
 /// Data structures for constant values that are compiled with chunks
 
-use std::mem;
+use core::mem;
 use string_interner::Symbol;
 use crate::language::{IntType, FloatType, InternSymbol};
 

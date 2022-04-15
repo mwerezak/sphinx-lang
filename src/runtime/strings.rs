@@ -1,7 +1,7 @@
-use std::fmt;
-use std::cmp;
-use std::ops::Deref;
-use std::hash::{Hash, Hasher};
+use core::fmt;
+use core::cmp;
+use core::ops::Deref;
+use core::hash::{Hash, Hasher};
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 

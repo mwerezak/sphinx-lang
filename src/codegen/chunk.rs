@@ -1,5 +1,5 @@
-use std::str;
-use std::ops::Range;
+use core::str;
+use core::ops::Range;
 use std::collections::HashMap;
 use string_interner::Symbol as _;
 use crate::language::InternSymbol;
@@ -85,7 +85,7 @@ impl ChunkBuf {
     /// anything previously inside the patch is overwritten
     pub fn resize_patch(&mut self, offset: usize, from_len: usize, to_len: usize) {
         let patch_range = offset..(offset + from_len);
-        let patch = std::iter::repeat(u8::default()).take(to_len);
+        let patch = core::iter::repeat(u8::default()).take(to_len);
         self.bytes.splice(patch_range, patch);
     }
 }

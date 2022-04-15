@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 use crate::runtime::Variant;
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::types::{Type, MetaObject};
@@ -18,7 +18,7 @@ unsafe impl GCTrace for Box<[Variant]> {
     }
     
     fn size_hint(&self) -> usize {
-        std::mem::size_of::<Variant>() * self.len()
+        core::mem::size_of::<Variant>() * self.len()
     }
 }
 
@@ -77,7 +77,7 @@ impl Tuple {
 }
 
 impl fmt::Debug for Tuple {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut tuple = fmt.debug_tuple("");
         for item in self.as_ref().iter() {
             tuple.field(item);
@@ -87,7 +87,7 @@ impl fmt::Debug for Tuple {
 }
 
 impl fmt::Display for Tuple {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Empty => fmt.write_str("()"),
             Self::NonEmpty(items) => {

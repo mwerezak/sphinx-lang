@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 use std::error::Error;
 use crate::debug::DebugSymbol;
 

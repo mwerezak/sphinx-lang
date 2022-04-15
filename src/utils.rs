@@ -1,4 +1,4 @@
-use std::fmt::{Display, Write, Formatter, self};
+use core::fmt::{Display, Write, Formatter, self};
 use std::io;
 use std::io::BufRead;
 use std::collections::VecDeque;
@@ -140,7 +140,7 @@ struct FnFormatter<F> where F: Fn(&mut fmt::Formatter<'_>) -> fmt::Result {
 }
 
 impl<F> fmt::Display for FnFormatter<F> where F: Fn(&mut fmt::Formatter<'_>) -> fmt::Result {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         (self.fmt_func)(fmt)
     }
 }

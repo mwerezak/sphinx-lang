@@ -1,4 +1,4 @@
-use std::str::Chars;
+use core::str::Chars;
 use std::collections::VecDeque;
 
 use crate::lexer::rules::MatchResult;

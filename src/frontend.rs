@@ -1,8 +1,8 @@
 //! output/error reporting and formatting
 
-use std::iter;
+use core::iter;
+use core::fmt::{self, Formatter};
 use std::error::Error;
-use std::fmt::{self, Formatter};
 
 use crate::utils;
 use crate::debug::SourceError;

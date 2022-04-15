@@ -1,7 +1,7 @@
+use core::fmt;
 use std::fs;
 use std::path::{PathBuf, Path};
 use std::io;
-use std::fmt;
 use crate::utils::{self, ReadChars};
 
 use crate::lexer::LexerBuilder;

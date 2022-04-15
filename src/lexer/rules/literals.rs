@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use core::str::FromStr;
 use crate::language;
 use crate::lexer::Token;
 use crate::lexer::rules::{MatchResult, LexerRule, WordChar, TokenError};

@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use std::hash::{Hasher, BuildHasher};
+use core::hash::{Hasher, BuildHasher};
 use crate::runtime::DefaultBuildHasher;
 
 #[test]

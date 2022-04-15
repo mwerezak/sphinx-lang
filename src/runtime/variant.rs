@@ -1,7 +1,7 @@
-use std::fmt;
-use std::cell::Cell;
-use std::hash::{Hash, Hasher};
-use std::cmp::{PartialEq, Eq};
+use core::fmt;
+use core::cell::Cell;
+use core::hash::{Hash, Hasher};
+use core::cmp::{PartialEq, Eq};
 use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
 use crate::runtime::types::{Type, Tuple};
@@ -131,7 +131,7 @@ impl Variant {
     }
     
     fn try_hash<H: Hasher>(&self, state: &mut H) -> ExecResult<()> {
-        let discr = std::mem::discriminant(self);
+        let discr = core::mem::discriminant(self);
         
         match self {
             Self::Nil | Self::BoolTrue | Self::BoolFalse 
@@ -204,7 +204,7 @@ impl<'s> PartialEq for VariantKey<'_> {
 impl Eq for VariantKey<'_> { }
 
 impl fmt::Display for Variant {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Nil => fmt.write_str("nil"),
             Self::BoolTrue => fmt.write_str("true"),
@@ -244,7 +244,7 @@ impl fmt::Display for Variant {
 struct EchoDisplay<'a>(&'a Variant);
 
 impl fmt::Display for EchoDisplay<'_> {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self.0 {
             Variant::String(value) => write!(fmt, "\"{}\"", value),
             _ => write!(fmt, "{}", self.0),

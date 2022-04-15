@@ -1,10 +1,10 @@
-use std::fmt;
+use core::fmt;
+use core::ops::Deref;
+use core::borrow::Borrow;
+use core::ptr::NonNull;
+use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
 use std::rc::Rc;
-use std::ops::Deref;
-use std::borrow::Borrow;
-use std::ptr::NonNull;
-use std::hash::{Hash, Hasher};
-use std::marker::PhantomData;
 
 use crate::runtime::gc::{GCBox, GC_STATE, deref_safe, GCTrace};
 

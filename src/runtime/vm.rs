@@ -1,5 +1,5 @@
-use std::cell::Cell;
-use std::ops::Deref;
+use core::cell::Cell;
+use core::ops::Deref;
 use crate::codegen::LocalIndex;
 use crate::runtime::{Variant, HashMap};
 use crate::runtime::gc::{GC, GCTrace, gc_collect};
@@ -128,7 +128,7 @@ impl<'c> VirtualMachine<'c> {
                     .expect("local index overflow");
                 
                 let mut frame = VMCallFrame::call_frame(module, chunk_id, call.frame, locals);
-                std::mem::swap(&mut self.frame, &mut frame);
+                core::mem::swap(&mut self.frame, &mut frame);
                 self.calls.push(frame);
                 
                 log::debug!("Setup call: {{ frame: {}, locals: {} }}", self.frame.start_index(), self.frame.locals());
@@ -143,7 +143,7 @@ impl<'c> VirtualMachine<'c> {
         let frame_idx = self.frame.start_index();
         
         let mut frame = self.calls.pop().expect("empty call stack");
-        std::mem::swap(&mut self.frame, &mut frame);
+        core::mem::swap(&mut self.frame, &mut frame);
         
         let retval = self.values.pop();
         self.values.truncate(frame_idx);
@@ -233,7 +233,7 @@ impl ValueStack {
     #[inline(always)]
     fn discard_at(&mut self, index: usize, count: usize) {
         let discard_range = index..(index + count);
-        self.stack.splice(discard_range, std::iter::empty());
+        self.stack.splice(discard_range, core::iter::empty());
     }
     
     #[inline(always)]
@@ -254,7 +254,7 @@ impl ValueStack {
     #[inline(always)]
     fn replace_many(&mut self, count: usize, value: Variant) {
         let replace_range = (self.stack.len()-count).. ;
-        self.stack.splice(replace_range, std::iter::once(value));
+        self.stack.splice(replace_range, core::iter::once(value));
     }
     
     #[inline(always)]

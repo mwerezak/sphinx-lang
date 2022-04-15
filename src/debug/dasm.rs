@@ -1,6 +1,6 @@
-use std::fmt;
-use std::fmt::{Write, Formatter};
-use std::iter;
+use core::fmt;
+use core::fmt::{Write, Formatter};
+use core::iter;
 use string_interner::Symbol as _;
 
 use crate::language::FloatType;

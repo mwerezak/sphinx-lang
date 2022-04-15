@@ -1,8 +1,9 @@
 // Symbol Resolution
 
+use core::cmp;
+use core::iter;
+
 use std::io;
-use std::cmp;
-use std::iter;
 use std::rc::Rc;
 use std::collections::{BinaryHeap, HashMap};
 

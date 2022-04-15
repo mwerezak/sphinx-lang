@@ -4,11 +4,11 @@
     <https://github.com/nu11ptr/flexstr/blob/be94d3647bad6a626aa40c1e20290a71c1ee8a74/src/inline.rs>
 */
 
-use std::mem;
-use std::ptr;
-use std::str;
-use std::fmt;
-use std::borrow::Borrow;
+use core::mem;
+use core::ptr;
+use core::str;
+use core::fmt;
+use core::borrow::Borrow;
 
 
 // TODO evaluate what size makes the most sense for the StringValue struct
@@ -92,7 +92,7 @@ impl<const N: usize> InlineStr<N> {
 }
 
 
-impl<const N: usize> std::ops::Deref for InlineStr<N> {
+impl<const N: usize> core::ops::Deref for InlineStr<N> {
     type Target = str;
 
     #[inline]

@@ -1,8 +1,8 @@
-use std::fmt;
-use std::cmp;
-use std::cell::RefCell;
-use std::marker::PhantomData;
-use std::hash::{Hash, Hasher, BuildHasher};
+use core::fmt;
+use core::cmp;
+use core::cell::RefCell;
+use core::marker::PhantomData;
+use core::hash::{Hash, Hasher, BuildHasher};
 use string_interner::{self, DefaultBackend};
 use string_interner::symbol::Symbol;
 

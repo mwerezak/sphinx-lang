@@ -14,11 +14,11 @@ Because Sphinx is (mostly) implemented in Safe Rust, it should be possible to pr
 
 Example of how Rust's macro system is used to make exporting functions and values easy:
 ```rust
-use std::time::{SystemTime, Duration};
+use core::time::{SystemTime, Duration};
 use crate::runtime::ops;
 
 namespace! {
-    let PI = std::f64::consts::PI;
+    let PI = core::f64::consts::PI;
     
     fun _ = native_function!(time => {
         let time = SystemTime::UNIX_EPOCH

@@ -6,10 +6,10 @@
 ///! Importing a Sphinx module simply means executing a Sphinx sub-program and binding the
 ///! resulting module to a name.
 
-use std::fmt;
+use core::fmt;
+use core::cell::{RefCell, Ref, RefMut};
+use core::hash::{Hash, Hasher, BuildHasher};
 use std::path::PathBuf;
-use std::cell::{RefCell, Ref, RefMut};
-use std::hash::{Hash, Hasher, BuildHasher};
 use once_cell::sync::Lazy;
 use crate::source::ModuleSource;
 use crate::language::FloatType;

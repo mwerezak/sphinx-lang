@@ -1,4 +1,4 @@
-use std::cell::{RefCell, Ref, Cell};
+use core::cell::{RefCell, Ref, Cell};
 use crate::codegen::{FunctionID, FunctionProto};
 use crate::runtime::Variant;
 use crate::runtime::module::Module;
@@ -83,7 +83,7 @@ unsafe impl GCTrace for Function {
     }
     
     fn size_hint(&self) -> usize {
-        std::mem::size_of::<Upvalue>() * self.upvalues.len()
+        core::mem::size_of::<Upvalue>() * self.upvalues.len()
     }
 }
 
@@ -179,7 +179,7 @@ unsafe impl GCTrace for NativeFunction {
     fn size_hint(&self) -> usize {
         self.defaults.as_ref()
         .map_or(0, |defaults| {
-            std::mem::size_of::<Variant>() * defaults.len()
+            core::mem::size_of::<Variant>() * defaults.len()
         })
     }
 }

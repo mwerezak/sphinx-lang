@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use core::cmp::Ordering;
 use std::collections::HashMap;
 use crate::codegen::Chunk;
 use crate::debug::symbol::DebugSymbol;

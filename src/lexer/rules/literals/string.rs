@@ -74,7 +74,7 @@ struct ActiveEscape {
     argbuf: String,
 }
 
-impl std::ops::Deref for ActiveEscape {
+impl core::ops::Deref for ActiveEscape {
     type Target = dyn EscapeSequence;
     fn deref(&self) -> &'static Self::Target { self.escape }
 }
@@ -266,8 +266,8 @@ impl StringEscapeError {
 
 impl std::error::Error for StringEscapeError { }
 
-impl std::fmt::Display for StringEscapeError { 
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for StringEscapeError { 
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let render_escape = format!("{}{}{}", 
             ESCAPE_CHAR, self.tag, self.arg.as_ref().map_or("", |arg| arg.as_str())
         );

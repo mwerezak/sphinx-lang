@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 use std::error::Error;
 
 use crate::utils;
@@ -52,8 +52,8 @@ unsafe impl GCTrace for ErrorKind {
     
     fn size_hint(&self) -> usize {
         match self {
-            Self::MissingArguments { .. } => std::mem::size_of::<Signature>(),
-            Self::TooManyArguments { .. } => std::mem::size_of::<Signature>(),
+            Self::MissingArguments { .. } => core::mem::size_of::<Signature>(),
+            Self::TooManyArguments { .. } => core::mem::size_of::<Signature>(),
             _ => 0,
         }
     }

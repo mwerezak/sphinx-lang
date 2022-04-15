@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::runtime::Variant;
 use crate::runtime::gc::{GC, GCTrace};

@@ -1,4 +1,4 @@
-use std::fmt;
+use core::fmt;
 use crate::source::ModuleSource;
 use crate::codegen::chunk::ChunkInfo;
 use crate::runtime::gc::{GC, GCTrace};

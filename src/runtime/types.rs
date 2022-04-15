@@ -1,5 +1,5 @@
-use std::fmt;
-use std::convert::AsRef;
+use core::fmt;
+use core::convert::AsRef;
 use once_cell::sync::Lazy;
 
 use crate::language::{IntType, FloatType};
