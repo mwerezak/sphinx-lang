@@ -135,11 +135,6 @@ impl fmt::Display for RuntimeError {
             }
             
             ErrorKind::MissingArguments { signature, nargs } => {
-                let name = signature.name().map_or_else(
-                    || "anonymous function".to_string(),
-                    |name| format!("{}()", name)
-                );
-                
                 let missing = signature.required().iter()
                     .skip(*nargs)
                     .map(|param| *param.name())
@@ -149,22 +144,20 @@ impl fmt::Display for RuntimeError {
                 
                 format!(
                     "{} missing {} required {}: {}",
-                    name, count, 
+                    signature.display_short(), 
+                    count, 
                     if count == 1 { "argument" }
                     else { "arguments" },
-                    utils::fmt_join(", ", &missing)
+                    utils::fmt_join(", ", &missing),
                 )
             },
             
             ErrorKind::TooManyArguments { signature, nargs } => {
-                let name = signature.name().map_or_else(
-                    || "anonymous function".to_string(),
-                    |name| format!("{}()", name)
-                );
-                
                 format!(
                     "{} takes {} arguments but {} were given", 
-                    name, signature.max_arity().unwrap(), nargs
+                    signature.display_short(), 
+                    signature.max_arity().unwrap(), 
+                    nargs,
                 )
             },
 

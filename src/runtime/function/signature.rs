@@ -32,6 +32,10 @@ impl Signature {
     }
     
     pub fn name(&self) -> Option<StringSymbol> { self.name }
+    pub fn display_short(&self) -> impl fmt::Display + '_ {
+        ShortDisplay(self)
+    }
+    
     pub fn required(&self) -> &[Parameter] { &self.required }
     pub fn default(&self) -> &[Parameter] { &self.default }
     pub fn variadic(&self) -> Option<&Parameter> { self.variadic.as_ref() }
@@ -166,4 +170,18 @@ fn format_signature(name: Option<&StringSymbol>, required: &[Parameter], default
         
         format!("fun {}({})", name.unwrap_or(""), parameters.join(", "))
     })
+}
+
+
+// short-form display for Signature
+struct ShortDisplay<'a>(&'a Signature);
+
+impl fmt::Display for ShortDisplay<'_> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(name) = self.0.name {
+            write!(fmt, "{}()", name)
+        } else {
+            fmt.write_str("anonymous function")
+        }
+    }
 }

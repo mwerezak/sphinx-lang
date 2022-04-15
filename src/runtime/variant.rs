@@ -224,8 +224,17 @@ impl fmt::Display for Variant {
                 }
             },
             
-            Self::Function(fun) => write!(fmt, "<{} at {:#X}>", fun.signature(), GC::as_id(fun)),
-            Self::NativeFunction(fun) => write!(fmt, "<built-in {} at {:#X}>", fun.signature(), GC::as_id(fun)),
+            Self::Function(fun) => write!(
+                fmt, "<{} at {:#X}>",
+                fun.signature().display_short(), 
+                GC::as_id(fun),
+            ),
+            
+            Self::NativeFunction(fun) => write!(
+                fmt, "<built-in {} at {:#X}>",
+                fun.signature().display_short(),
+                GC::as_id(fun),
+            ),
         }
     }
 }
