@@ -3,6 +3,7 @@ use std::cmp;
 use std::ops::Deref;
 use std::hash::{Hash, Hasher};
 use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::errors::{ExecResult, ErrorKind};
 
 pub mod intern;
 pub mod inline;
@@ -100,6 +101,18 @@ impl StringValue {
             Self::GC(gc_str) => Some(&**gc_str),
             _ => None,
         }
+    }
+    
+    pub fn concat(&self, other: &StringValue) -> ExecResult<StringValue> {
+        let mut buf = String::new();
+        
+        self.write(&mut buf)
+            .map_err(|error| ErrorKind::Other(format!("{}", error)))?;
+            
+        other.write(&mut buf)
+            .map_err(|error| ErrorKind::Other(format!("{}", error)))?;
+        
+        Ok(StringValue::from(buf.as_str()))
     }
 }
 
