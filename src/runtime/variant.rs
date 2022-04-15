@@ -6,12 +6,12 @@ use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
 use crate::runtime::types::{Type, Tuple};
 use crate::runtime::function::{Function, NativeFunction, Call};
-use crate::runtime::strings::StringSymbol;
+use crate::runtime::strings::{StringValue, StringSymbol};
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 #[cfg(target_arch = "x86_64")]
-assert_eq_size!(Variant, [u8; 16]);
+assert_eq_size!(Variant, [u8; 24]);
 
 // Fundamental data value type
 #[derive(Clone, Copy)]
@@ -22,7 +22,7 @@ pub enum Variant {
     
     Integer(IntType),
     Float(FloatType),
-    String(StringSymbol),
+    String(StringValue),
     
     Tuple(Tuple), // TODO: stop using Box when DST support is stabilized
     Function(GC<Function>),
@@ -53,8 +53,14 @@ impl From<FloatType> for Variant {
     fn from(value: FloatType) -> Self { Self::Float(value) }
 }
 
+impl From<StringValue> for Variant {
+    fn from(value: StringValue) -> Self { Self::String(value) }
+}
+
 impl From<StringSymbol> for Variant {
-    fn from(value: StringSymbol) -> Self { Self::String(value) }
+    fn from(symbol: StringSymbol) -> Self {
+        Self::String(symbol.into())
+    }
 }
 
 impl From<&str> for Variant {

@@ -28,6 +28,30 @@ unsafe impl GCTrace for Box<str> {
     }
 }
 
+const INTERN_THRESHOLD: usize = 40;
+
+impl From<&str> for StringValue {
+    fn from(string: &str) -> Self {
+        // first, try inlining
+        if let Ok(inline) = InlineStr::try_new(string) {
+            return Self::Inline(inline);
+        }
+        
+        // always intern short-ish strings
+        if string.len() <= INTERN_THRESHOLD {
+            return Self::Intern(StringSymbol::intern(string))
+        }
+        
+        Self::GC(GC::new(string.to_string().into_boxed_str()))
+    }
+}
+
+impl From<StringSymbol> for StringValue {
+    fn from(symbol: StringSymbol) -> Self {
+        StringValue::Intern(symbol)
+    }
+}
+
 impl StringValue {
     pub fn trace(&self) {
         if let Self::GC(gc_str) = self {
@@ -41,6 +65,21 @@ impl StringValue {
             Self::Inline(inline) => buf.write_str(&*inline),
             Self::GC(gc_str) => buf.write_str(&**gc_str),
         }
+    }
+    
+    /// Interns the string, producing a StringSymbol
+    pub fn as_intern(&self) -> StringSymbol {
+        match self {
+            Self::Intern(symbol) => *symbol,
+            Self::Inline(inline) => StringSymbol::intern(&*inline),
+            Self::GC(gc_str) => StringSymbol::intern(&**gc_str),
+        }
+    }
+    
+    /// Interns the string *in place*.
+    pub fn intern(&mut self) {
+        let symbol = self.as_intern();
+        *self = Self::Intern(symbol)
     }
     
     fn is_intern(&self) -> bool {
@@ -141,7 +180,6 @@ impl Ord for StringValue {
         })
     }
 }
-
 
 impl fmt::Display for StringValue {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {

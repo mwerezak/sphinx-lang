@@ -60,7 +60,7 @@ impl From<InternSymbol> for StringSymbol {
 
 impl From<&str> for StringSymbol {
     fn from(string: &str) -> Self {
-        STRING_TABLE.with(|string_table| string_table.borrow_mut().get_or_intern(string))
+        Self::intern(string)
     }
 }
 

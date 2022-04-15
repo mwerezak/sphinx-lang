@@ -12,6 +12,7 @@ use crate::runtime::errors::{ExecResult, ErrorKind};
 pub mod operator;
 pub mod metatable;
 pub mod numeric;
+pub mod string;
 pub mod tuple;
 
 pub use tuple::Tuple;
@@ -280,11 +281,6 @@ impl<F> MetaObject for GC<F> where F: GCTrace, GC<F>: Callable {
         other.as_gc().map(|other| Ok(GC::ptr_eq(&(*self).into(), &other)))
     }
 }
-
-impl MetaObject for StringSymbol {
-    fn type_tag(&self) -> Type { Type::String }
-}
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MethodTag {
