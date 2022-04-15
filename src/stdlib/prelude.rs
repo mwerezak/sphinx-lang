@@ -26,7 +26,11 @@ pub(super) fn create_prelude() -> Namespace {
         });
         
         // Contrived example to show handling of default values and variadics is supported
-        fun _ = native_function!(add_example: a; defaults: b = 1; ...varargs; => {
+        fun _ = native_function!(add_example {
+            params { a }
+            defaults { b = 1 }
+            variadic { varargs }
+        } => {
             // for value in varargs.iter() {
             //     println!("{}", value);
             // }

@@ -66,33 +66,34 @@ macro_rules! __defaults {
 macro_rules! native_function {
     
     // with default params
-    ( $func_name:tt $( : $( $required:tt ),+ ; )? $( defaults: $( $default:tt = $default_value:expr ),+ ; )? $( ... $variadic:tt ; )? => $body:expr ) => {
+    ( $func_name:tt $( { $( params { $( $required:tt ),+ } )? $( defaults { $( $default:tt = $default_value:expr ),+ } )? $( variadic { $variadic:tt } )? } )? => $body:expr ) => {
         {
             let signature = Signature::new(
                 Some(stringify!($func_name)),
-                vec![ $( $( Parameter::new_var(stringify!($required)) ),+ )? ],
-                vec![ $( $( Parameter::new_var(stringify!($default)) ),+ )? ],
-                __variadic!( $( $variadic )? ),
+                vec![ $( $( $( Parameter::new_var(stringify!($required)) ),+ )? )? ],
+                vec![ $( $( $( Parameter::new_var(stringify!($default)) ),+ )? )? ],
+                __variadic!( $( $( $variadic )? )? ),
             );
             
-            let defaults = __defaults!( $( $( $default_value )+ )? );
+            let defaults = __defaults!( $( $( $( $default_value )+ )? )? );
             
             fn body(self_fun: &NativeFunction, args: &[Variant]) -> ExecResult<Variant> {
-                const _ARGC: usize = __count!( $( $( $required )+ )? $( $( $default )+ )? );
+                const _ARGC: usize = __count!( $( $( $( $required )+ )? $( $( $default )+ )? )? );
                 
                 let mut _argbuf = [Variant::Nil; _ARGC];
                 let _bound = self_fun.signature().bind_args(args, self_fun.defaults(), &mut _argbuf);
                 let _rest = _bound.args;
                 
-                $( $( let ($required, _rest) = _rest.split_first().unwrap(); )+ )?
-                $( $( let ($default, _rest) = _rest.split_first().unwrap(); )+ )?
-                
-                $( let $variadic = _bound.varargs; )?
+                $(
+                    $( $( let ($required, _rest) = _rest.split_first().unwrap(); )+ )?
+                    $( $( let ($default, _rest) = _rest.split_first().unwrap(); )+ )?
+                    $( let $variadic = _bound.varargs; )?
+                )?
                 
                 $body
             }
             
-            NativeFunction::new(signature, defaults, body)
+            NativeFunction::new(signature, defaults, None, body)
         }
     };
 
