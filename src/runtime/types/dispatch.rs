@@ -10,97 +10,42 @@ use crate::runtime::errors::{ExecResult, ErrorKind};
 use crate::runtime::types::{Type, MetaObject, Tuple};
 
 
+/// Newtype wrapper for `Variant` that impls `MetaObject` using enum-based static dispatch.
+struct MetaDispatch<'a>(&'a Variant);
+
 impl Variant {
-    
     #[inline]
-    pub fn as_meta(&self) -> impl MetaObject {
-        MetaDispatch::from(*self)
+    pub fn as_meta(&self) -> impl MetaObject + '_ {
+        MetaDispatch(self)
     }
     
     pub fn type_tag(&self) -> Type {
-        match self {
-            Self::Nil => ().type_tag(),
-            Self::BoolTrue => true.type_tag(),
-            Self::BoolFalse => false.type_tag(),
-            Self::Integer(value) => value.type_tag(),
-            Self::Float(value) => value.type_tag(),
-            
-            Self::InternStr(symbol) => StringValue::from(*symbol).type_tag(),
-            Self::InlineStr(inline) => StringValue::from(*inline).type_tag(),
-            Self::GCStr(gc_str) => StringValue::from(*gc_str).type_tag(),
-            
-            Self::Tuple(tuple) => tuple.type_tag(),
-            Self::Function(fun) => fun.type_tag(),
-            Self::NativeFunction(fun) => fun.type_tag(),
-        }
-    }
-}
-
-
-// allows Variant to store types that don't impl MetaObject, 
-// but can be converted into one (e.g. string types)
-enum MetaDispatch {
-    Nil,
-    Boolean(bool),
-    Integer(IntType),
-    Float(FloatType),
-    String(StringValue),
-    Tuple(Tuple),
-    Function(GC<Function>),
-    NativeFunction(GC<NativeFunction>),
-}
-
-impl From<Variant> for MetaDispatch {
-    fn from(value: Variant) -> Self {
-        match value {
-            Variant::Nil => Self::Nil,
-            Variant::BoolTrue => Self::Boolean(true),
-            Variant::BoolFalse => Self::Boolean(false),
-            Variant::Integer(value) => Self::Integer(value),
-            Variant::Float(value) => Self::Float(value),
-            Variant::InternStr(symbol) => Self::String(symbol.into()),
-            Variant::InlineStr(inline) => Self::String(inline.into()),
-            Variant::GCStr(gc_str) => Self::String(gc_str.into()),
-            Variant::Tuple(tuple) => Self::Tuple(tuple),
-            Variant::Function(fun) => Self::Function(fun),
-            Variant::NativeFunction(fun) => Self::NativeFunction(fun),
-        }
-    }
-}
-
-impl MetaDispatch {
-    fn as_dyn(&self) -> &dyn MetaObject {
-        match self {
-            Self::Nil => &(),
-            Self::Boolean(value) => value,
-            Self::Integer(value) => value,
-            Self::Float(value) => value,
-            Self::String(value) => value,
-            Self::Tuple(value) => value,
-            Self::Function(fun) => &*fun,
-            Self::NativeFunction(fun) => &*fun,
-        }
+        self.as_meta().type_tag()
     }
 }
 
 macro_rules! static_dispatch {
     { fn $name:tt ( $( $arg:tt : $argty:ty ),* ) -> $return:ty } => {
         fn $name (&self, $( $arg : $argty ),* ) -> $return {
-            match self {
-                Self::Nil => <() as MetaObject>::$name(&(), $( $arg ),* ),
-                Self::Boolean(value) => <bool as MetaObject>::$name(value, $( $arg ),* ),
-                Self::Integer(value) => <IntType as MetaObject>::$name(value, $( $arg ),* ),
-                Self::Float(value) => <FloatType as MetaObject>::$name(value, $( $arg ),* ),
-                Self::String(value) => <StringValue as MetaObject>::$name(value, $( $arg ),* ),
-                Self::Tuple(value) => <Tuple as MetaObject>::$name(value, $( $arg ),* ),
-                Self::Function(fun) => <GC<Function> as MetaObject>::$name(fun, $( $arg ),* ),
-                Self::NativeFunction(fun) => <GC<NativeFunction> as MetaObject>::$name(fun, $( $arg ),* ),
+            match self.0 {
+                Variant::Nil => <() as MetaObject>::$name(&(), $( $arg ),* ),
+                Variant::BoolTrue => <bool as MetaObject>::$name(&true, $( $arg ),* ),
+                Variant::BoolFalse => <bool as MetaObject>::$name(&false, $( $arg ),* ),
+                Variant::Integer(value) => <IntType as MetaObject>::$name(value, $( $arg ),* ),
+                Variant::Float(value) => <FloatType as MetaObject>::$name(value, $( $arg ),* ),
+                
+                Variant::InternStr(symbol) => <StringValue as MetaObject>::$name(&(*symbol).into(), $( $arg ),* ),
+                Variant::InlineStr(inline) => <StringValue as MetaObject>::$name(&(*inline).into(), $( $arg ),* ),
+                Variant::GCStr(gc_str) => <StringValue as MetaObject>::$name(&(*gc_str).into(), $( $arg ),* ),
+                Variant::Tuple(tuple) => <Tuple as MetaObject>::$name(tuple, $( $arg ),* ),
+                Variant::Function(fun) =>  <GC<Function> as MetaObject>::$name(fun, $( $arg ),* ),
+                Variant::NativeFunction(fun) => <GC<NativeFunction> as MetaObject>::$name(fun, $( $arg ),* ),
             }
         }
     };
 }
 
-impl MetaObject for MetaDispatch {
+impl MetaObject for MetaDispatch<'_> {
     
     static_dispatch!{ fn type_tag() -> Type }
     
