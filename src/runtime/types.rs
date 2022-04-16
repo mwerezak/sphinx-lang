@@ -1,5 +1,4 @@
 use core::fmt;
-use core::ops::Deref;
 use core::convert::AsRef;
 use once_cell::sync::Lazy;
 
@@ -11,6 +10,7 @@ use crate::runtime::strings::{StringValue, StringSymbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 mod ops;
+mod dispatch;
 mod metatable;
 mod numeric;
 mod string;
@@ -120,75 +120,8 @@ pub trait MetaObject {
     fn cmp_le(&self, other: &Variant) -> Option<ExecResult<bool>> { None }
 }
 
-// allows Variant to store types that don't impl MetaObject, 
-// but can be converted into one (e.g. string types)
-enum MetaDispatch {
-    Nil,
-    Boolean(bool),
-    Integer(IntType),
-    Float(FloatType),
-    String(StringValue),
-    Tuple(Tuple),
-    Function(GC<Function>),
-    NativeFunction(GC<NativeFunction>),
-}
-
-impl Deref for MetaDispatch {
-    type Target = dyn MetaObject;
-    
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Nil => &(),
-            Self::Boolean(value) => value,
-            Self::Integer(value) => value,
-            Self::Float(value) => value,
-            Self::String(value) => value,
-            Self::Tuple(value) => value,
-            Self::Function(fun) => &*fun,
-            Self::NativeFunction(fun) => &*fun,
-        }
-    }
-}
 
 impl Variant {
-    #[inline]
-    pub fn as_meta(&self) -> impl Deref<Target=dyn MetaObject> {
-        match self {
-            Self::Nil => MetaDispatch::Nil,
-            Self::BoolTrue => MetaDispatch::Boolean(true),
-            Self::BoolFalse => MetaDispatch::Boolean(false),
-            Self::Integer(value) => MetaDispatch::Integer(*value),
-            Self::Float(value) => MetaDispatch::Float(*value),
-            
-            Self::InternStr(symbol) => MetaDispatch::String((*symbol).into()),
-            Self::InlineStr(inline) => MetaDispatch::String((*inline).into()),
-            Self::GCStr(gc_str) => MetaDispatch::String((*gc_str).into()),
-            
-            Self::Tuple(tuple) => MetaDispatch::Tuple(*tuple),
-            Self::Function(fun) => MetaDispatch::Function(*fun),
-            Self::NativeFunction(fun) => MetaDispatch::NativeFunction(*fun),
-        }
-    }
-    
-    pub fn type_tag(&self) -> Type {
-        match self {
-            Self::Nil => ().type_tag(),
-            Self::BoolTrue => true.type_tag(),
-            Self::BoolFalse => false.type_tag(),
-            Self::Integer(value) => value.type_tag(),
-            Self::Float(value) => value.type_tag(),
-            
-            Self::InternStr(symbol) => StringValue::from(*symbol).type_tag(),
-            Self::InlineStr(inline) => StringValue::from(*inline).type_tag(),
-            Self::GCStr(gc_str) => StringValue::from(*gc_str).type_tag(),
-            
-            Self::Tuple(tuple) => tuple.type_tag(),
-            Self::Function(fun) => fun.type_tag(),
-            Self::NativeFunction(fun) => fun.type_tag(),
-        }
-    }
-    
     pub fn as_bool(&self) -> ExecResult<bool> { 
         match self {
             Self::Nil => Ok(false),
