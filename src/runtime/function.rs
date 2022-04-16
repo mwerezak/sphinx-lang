@@ -1,7 +1,7 @@
 use core::cell::{RefCell, Ref, Cell};
 use crate::codegen::{FunctionID, FunctionProto};
 use crate::runtime::Variant;
-use crate::runtime::module::Module;
+use crate::runtime::module::{Module, GlobalEnv};
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::errors::ExecResult;
 
@@ -138,15 +138,18 @@ pub type NativeFn = fn(self_fun: &NativeFunction, args: &[Variant]) -> ExecResul
 pub struct NativeFunction {
     signature: Signature,
     defaults: Option<Box<[Variant]>>,
+    env: GC<GlobalEnv>,
     func: NativeFn,
 }
 
 impl NativeFunction {
-    pub fn new(signature: Signature, defaults: Option<Box<[Variant]>>, func: NativeFn) -> Self {
-        Self { signature, defaults, func }
+    pub fn new(signature: Signature, defaults: Option<Box<[Variant]>>, env: GC<GlobalEnv>, func: NativeFn) -> Self {
+        Self { signature, defaults, env, func }
     }
     
     pub fn signature(&self) -> &Signature { &self.signature }
+    
+    pub fn env(&self) -> GC<GlobalEnv> { self.env }
     
     pub fn defaults(&self) -> &[Variant] {
         match self.defaults.as_ref() {
@@ -171,6 +174,8 @@ impl Callable for GC<NativeFunction> {
 
 unsafe impl GCTrace for NativeFunction {
     fn trace(&self) {
+        GC::mark_trace(&self.env);
+        
         if let Some(defaults) = self.defaults.as_ref() {
             defaults.trace()
         }

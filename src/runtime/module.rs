@@ -95,6 +95,7 @@ impl Namespace {
 }
 
 
+/// Mutable container for storing a Namespace in a GC.
 #[derive(Debug, Default, Clone)]
 pub struct GlobalEnv {
     namespace: RefCell<Namespace>,
@@ -107,11 +108,7 @@ impl From<Namespace> for GlobalEnv {
 }
 
 impl GlobalEnv {
-    pub fn new() -> Self {
-        Self::default()
-    }
-    
-    pub fn allocate() -> GC<Self> {
+    pub fn new() -> GC<Self> {
         GC::new(Self::default())
     }
     
@@ -150,7 +147,7 @@ unsafe impl GCTrace for Module {
 
 impl Module {
     pub fn allocate(source: Option<ModuleSource>, data: ProgramData) -> GC<Self> {
-        let globals = GlobalEnv::allocate();
+        let globals = GlobalEnv::new();
         Self::with_env(source, data, globals)
     }
     
@@ -180,7 +177,7 @@ impl Module {
     pub fn data(&self) -> &ProgramData { &self.data }
     
     #[inline(always)]
-    pub fn globals(&self) -> &GlobalEnv { &self.globals }
+    pub fn globals(&self) -> GC<GlobalEnv> { self.globals }
     
     #[inline]
     pub fn get_const(&self, cid: ConstID) -> Variant {

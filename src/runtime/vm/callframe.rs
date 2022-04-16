@@ -311,8 +311,9 @@ impl<'c> VMCallFrame<'c> {
                 let name = into_name(stack.pop());
                 let value = *stack.peek();
                 
-                let mut globals = self.module.globals().borrow_mut();
-                let store = globals.lookup_mut(&name)?;
+                let globals = self.module.globals();
+                let mut namespace = globals.borrow_mut();
+                let store = namespace.lookup_mut(&name)?;
                 *store = value;
             },
             OpCode::LoadGlobal => {
