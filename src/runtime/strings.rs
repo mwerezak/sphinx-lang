@@ -10,15 +10,16 @@ pub mod inline;
 
 pub use intern::{StringSymbol, StringInterner, STRING_TABLE};
 
-use inline::InlineStr;
 use intern::StringTable;
 
+pub type InlineStr = inline::InlineStr<14>;
+pub type GCStr = GC<Box<str>>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum StringValue {
     Intern(StringSymbol),
-    Inline(InlineStr<14>),
-    GC(GC<Box<str>>),
+    Inline(InlineStr),
+    GC(GCStr),
 }
 
 unsafe impl GCTrace for Box<str> {
@@ -50,6 +51,18 @@ impl From<&str> for StringValue {
 impl From<StringSymbol> for StringValue {
     fn from(symbol: StringSymbol) -> Self {
         StringValue::Intern(symbol)
+    }
+}
+
+impl From<InlineStr> for StringValue {
+    fn from(inline: InlineStr) -> Self {
+        StringValue::Inline(inline)
+    }
+}
+
+impl From<GCStr> for StringValue {
+    fn from(gc_str: GCStr) -> Self {
+        StringValue::GC(gc_str)
     }
 }
 

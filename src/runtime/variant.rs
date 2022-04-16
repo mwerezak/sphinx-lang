@@ -6,7 +6,7 @@ use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
 use crate::runtime::types::{Type, Tuple};
 use crate::runtime::function::{Function, NativeFunction, Call};
-use crate::runtime::strings::{StringValue, StringSymbol};
+use crate::runtime::strings::{StringValue, StringSymbol, InlineStr, GCStr};
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
@@ -22,7 +22,12 @@ pub enum Variant {
     
     Integer(IntType),
     Float(FloatType),
+    
     String(StringValue),
+    // separate different string types here to keep size down
+    // InternStr(StringSymbol),
+    // InlineStr(InlineStr),
+    // GCStr(GCStr),
     
     Tuple(Tuple), // TODO: stop using Box when DST support is stabilized
     Function(GC<Function>),
