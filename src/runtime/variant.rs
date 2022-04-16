@@ -24,12 +24,11 @@ pub enum Variant {
     Float(FloatType),
     
     // separate different string types here to keep size down
-    // it leads to ugly code elsewhere but dropping the size of every Variant from 24 to 16 bytes is worth it
     InternStr(StringSymbol),
     InlineStr(InlineStr),
     GCStr(GCStr),
     
-    Tuple(Tuple), // TODO: stop using Box when DST support is stabilized
+    Tuple(Tuple),
     Function(GC<Function>),
     NativeFunction(GC<NativeFunction>),
 }

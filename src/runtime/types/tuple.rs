@@ -7,7 +7,7 @@ use crate::runtime::errors::ExecResult;
 #[derive(Clone, Copy)]
 pub enum Tuple {
     Empty,
-    NonEmpty(GC<Box<[Variant]>>),
+    NonEmpty(GC<Box<[Variant]>>),  // TODO: stop using Box when DST support is stabilized
 }
 
 unsafe impl GCTrace for Box<[Variant]> {
@@ -23,9 +23,7 @@ unsafe impl GCTrace for Box<[Variant]> {
 }
 
 impl Default for Tuple {
-    fn default() -> Self {
-        Self::Empty
-    }
+    fn default() -> Self { Self::Empty }
 }
 
 impl From<Box<[Variant]>> for Tuple {
@@ -76,6 +74,14 @@ impl Tuple {
     }
 }
 
+impl MetaObject for Tuple {
+    fn type_tag(&self) -> Type { Type::Tuple }
+    
+    fn len(&self) -> Option<ExecResult<usize>> {
+        Some(Ok(Tuple::len(self)))
+    }
+}
+
 impl fmt::Debug for Tuple {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut tuple = fmt.debug_tuple("");
@@ -100,13 +106,5 @@ impl fmt::Display for Tuple {
                 write!(fmt, "{})", last)
             },
         }
-    }
-}
-
-impl MetaObject for Tuple {
-    fn type_tag(&self) -> Type { Type::Tuple }
-    
-    fn len(&self) -> Option<ExecResult<usize>> {
-        Some(Ok(Tuple::len(self)))
     }
 }

@@ -5,7 +5,7 @@ They are used to support `for` loops and `...` argument unpacking syntax.
 
 ## Iterators and Iterables
 
-An *iterator* in Sphinx is just a 3-tuple: `(iterfunc, i, invariant)`.
+An *iterator* in Sphinx is anything that supports the `__next` metamethod
 
 An *iterable* is one of the following:
 - A callable that when invoked with no arguments returns an iterator.

@@ -585,7 +585,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         let mut first_expr = Some(self.parse_binop_expr(ctx)?); // might be taken into tuple later
         
         // check for tuple constructor
-        let mut tuple_exprs = Vec::<ExprMeta>::new();
+        let mut tuple_exprs = Vec::new();
         loop {
             let next = self.peek()?;
             if !matches!(next.token, Token::Comma) {
