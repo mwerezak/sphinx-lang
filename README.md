@@ -12,7 +12,7 @@ Sphinx is not complete! I started work on it in February 2022, and there is stil
 
 My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be decently fast, and I aim to balance these two goals.
 
-For example, I have an internal type system built around a `MetaObject` trait which makes it easy to specify the behaviours that are supported for each of the core primitive types in the language. Thanks to Rust's enum types this is implemented without any vtables, using static dispatch based on the enum discriminant.
+For example, I have an internal type system built around a `MetaObject` trait which makes it easy to specify the behaviours that are supported by each of the core primitive types in the language. Thanks to Rust's enum types (and some macros) this is implemented without any vtables, using static dispatch based on the enum discriminant.
 
 As well, `Variant` (the core dynamic data type), is 16 bytes wide and short strings are "inlined" inside this value when possible (inspired by flexstr). All strings that are used as identifiers are interned. The bytecode compiler converts local variable names into indexes into the value stack, so strings are not used at all when referencing local variables.
 
