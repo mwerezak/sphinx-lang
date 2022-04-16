@@ -11,7 +11,7 @@ use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 #[cfg(target_arch = "x86_64")]
-assert_eq_size!(Variant, [u8; 24]);
+assert_eq_size!(Variant, [u8; 16]);
 
 // Fundamental data value type
 #[derive(Debug, Clone, Copy)]
@@ -23,11 +23,11 @@ pub enum Variant {
     Integer(IntType),
     Float(FloatType),
     
-    String(StringValue),
     // separate different string types here to keep size down
-    // InternStr(StringSymbol),
-    // InlineStr(InlineStr),
-    // GCStr(GCStr),
+    // it leads to ugly code elsewhere but dropping the size of every Variant from 24 to 16 bytes is worth it
+    InternStr(StringSymbol),
+    InlineStr(InlineStr),
+    GCStr(GCStr),
     
     Tuple(Tuple), // TODO: stop using Box when DST support is stabilized
     Function(GC<Function>),
@@ -35,8 +35,23 @@ pub enum Variant {
 }
 
 impl Variant {
+    // extract the GC handle for GC'd types
     pub fn as_gc(&self) -> Option<GC<dyn GCTrace>> {
-        GC::<dyn GCTrace>::try_from(self).ok()
+        match self {
+            Self::Tuple(tuple) => tuple.as_gc(),
+            Self::Function(fun) => Some((*fun).into()),
+            Self::NativeFunction(fun) => Some((*fun).into()),
+            _ => None,
+        }
+    }
+    
+    pub fn as_strval(&self) -> Option<StringValue> {
+        match self {
+            Self::InternStr(symbol) => Some(StringValue::from(*symbol)),
+            Self::InlineStr(inline) => Some(StringValue::from(*inline)),
+            Self::GCStr(gc_str) => Some(StringValue::from(*gc_str)),
+            _ => None,
+        }
     }
     
     pub fn echo(&self) -> impl fmt::Display + '_ {
@@ -63,18 +78,24 @@ impl From<FloatType> for Variant {
 }
 
 impl From<StringValue> for Variant {
-    fn from(value: StringValue) -> Self { Self::String(value) }
+    fn from(value: StringValue) -> Self {
+        match value {
+            StringValue::Intern(symbol) => Self::InternStr(symbol),
+            StringValue::Inline(inline) => Self::InlineStr(inline),
+            StringValue::GC(gc_str) => Self::GCStr(gc_str),
+        }
+    }
 }
 
 impl From<StringSymbol> for Variant {
     fn from(symbol: StringSymbol) -> Self {
-        Self::String(symbol.into())
+        Self::InternStr(symbol)
     }
 }
 
 impl From<&str> for Variant {
     fn from(string: &str) -> Self {
-        Self::String(string.into())
+        StringValue::from(string).into()
     }
 }
 
@@ -109,21 +130,6 @@ unsafe impl GCTrace for Variant {
 }
 
 
-// extract the GC handle for GC'd types
-impl TryFrom<&Variant> for GC<dyn GCTrace> {
-    type Error = ();
-    
-    fn try_from(value: &Variant) -> Result<Self, Self::Error> {
-        match value {
-            Variant::Tuple(tuple) => tuple.as_gc().ok_or(()),
-            Variant::Function(fun) => Ok((*fun).into()),
-            Variant::NativeFunction(fun) => Ok((*fun).into()),
-            _ => Err(()),
-        }
-    }
-}
-
-
 // Not all Variants are hashable
 impl Variant {
     pub fn can_hash(&self) -> bool {
@@ -143,7 +149,7 @@ impl Variant {
                 => discr.hash(state),
             
             Self::Integer(value) => (discr, value).hash(state),
-            Self::String(value) => (discr, value).hash(state),
+            
             Self::Function(fun) => (discr, fun).hash(state),
             Self::NativeFunction(fun) => (discr, fun).hash(state),
             Self::Tuple(items) => {
@@ -152,6 +158,9 @@ impl Variant {
                     item.try_hash(state)?;
                 }
             },
+            
+            Self::InternStr(..) | Self::InlineStr(..) | Self::GCStr(..) =>
+                self.as_strval().unwrap().hash(state),
             
             _ => return Err(ErrorKind::UnhashableValue(*self).into()),
         }
@@ -183,27 +192,7 @@ impl Hash for VariantKey<'_> {
 
 impl<'s> PartialEq for VariantKey<'_> {
     fn eq(&self, other: &VariantKey) -> bool {
-        match (self.0, other.0) {
-            (Variant::Nil, Variant::Nil) => true,
-            (Variant::BoolTrue, Variant::BoolTrue) => true,
-            (Variant::BoolFalse, Variant::BoolFalse) => true,
-            
-            (Variant::Integer(a), Variant::Integer(b)) => a == b,
-            (Variant::String(a), Variant::String(b)) => a == b,
-            
-            (Variant::Tuple(a), Variant::Tuple(b)) if a.is_empty() && b.is_empty() => true,
-            (Variant::Tuple(a), Variant::Tuple(b)) => {
-                a.len() == b.len() && (
-                    a.as_ref().iter().zip(b.as_ref().iter())
-                        .all(|(a, b)| VariantKey(a) == VariantKey(b))
-                )
-            },
-            
-            (Variant::Function(a), Variant::Function(b)) => GC::ptr_eq(a, b),
-            (Variant::NativeFunction(a), Variant::NativeFunction(b)) => GC::ptr_eq(a, b),
-            
-            _ => false,
-        }
+        self.0.cmp_eq(other.0).unwrap_or(false)
     }
 }
 impl Eq for VariantKey<'_> { }
@@ -215,7 +204,9 @@ impl fmt::Display for Variant {
             Self::BoolTrue => fmt.write_str("true"),
             Self::BoolFalse => fmt.write_str("false"),
             
-            Self::String(value) => write!(fmt, "{}", value),
+            Self::InternStr(..) | Self::InlineStr(..) | Self::GCStr(..) =>
+                write!(fmt, "{}", self.as_strval().unwrap()),
+            
             Self::Tuple(tuple) => write!(fmt, "{}", tuple),
             
             Self::Integer(value) => write!(fmt, "{}", *value),
@@ -251,7 +242,9 @@ struct EchoDisplay<'a>(&'a Variant);
 impl fmt::Display for EchoDisplay<'_> {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self.0 {
-            Variant::String(value) => write!(fmt, "\"{}\"", value),
+            Variant::InternStr(..) | Variant::InlineStr(..) | Variant::GCStr(..)
+                => write!(fmt, "\"{}\"", self.0.as_strval().unwrap()),
+            
             _ => write!(fmt, "{}", self.0),
         }
     }

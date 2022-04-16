@@ -13,7 +13,17 @@ pub use intern::{StringSymbol, StringInterner, STRING_TABLE};
 use intern::StringTable;
 
 pub type InlineStr = inline::InlineStr<14>;
-pub type GCStr = GC<Box<str>>;
+
+#[derive(Debug, Clone, Copy)]
+pub struct GCStr(GC<Box<str>>);
+
+impl Deref for GCStr {
+    type Target = GC<Box<str>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 
 #[derive(Debug, Clone, Copy)]
 pub enum StringValue {
@@ -44,7 +54,7 @@ impl From<&str> for StringValue {
             return Self::Intern(StringSymbol::intern(string))
         }
         
-        Self::GC(GC::new(string.to_string().into_boxed_str()))
+        Self::GC(GCStr(GC::new(string.to_string().into_boxed_str())))
     }
 }
 

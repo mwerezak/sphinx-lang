@@ -1,4 +1,5 @@
 use core::fmt;
+use core::ops::Deref;
 use core::convert::AsRef;
 use once_cell::sync::Lazy;
 
@@ -6,7 +7,7 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::function::{Call, Function, NativeFunction, Callable};
-use crate::runtime::strings::StringSymbol;
+use crate::runtime::strings::{StringValue, StringSymbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 pub mod operator;
@@ -123,7 +124,11 @@ impl Variant {
             Self::BoolFalse => &false,
             Self::Integer(value) => value,
             Self::Float(value) => value,
-            Self::String(value) => value,
+            
+            Self::InternStr(symbol) => symbol,
+            Self::InlineStr(inline) => inline,
+            Self::GCStr(gc_str) => gc_str,
+            
             Self::Tuple(tuple) => tuple,
             Self::Function(fun) => &*fun,
             Self::NativeFunction(fun) => &*fun,
@@ -137,7 +142,11 @@ impl Variant {
             Self::BoolFalse => false.type_tag(),
             Self::Integer(value) => value.type_tag(),
             Self::Float(value) => value.type_tag(),
-            Self::String(value) => value.type_tag(),
+            
+            Self::InternStr(symbol) => StringValue::from(*symbol).type_tag(),
+            Self::InlineStr(inline) => StringValue::from(*inline).type_tag(),
+            Self::GCStr(gc_str) => StringValue::from(*gc_str).type_tag(),
+            
             Self::Tuple(tuple) => tuple.type_tag(),
             Self::Function(fun) => fun.type_tag(),
             Self::NativeFunction(fun) => fun.type_tag(),

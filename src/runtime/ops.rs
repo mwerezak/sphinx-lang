@@ -201,13 +201,17 @@ impl Variant {
             (Variant::BoolTrue,  Variant::BoolFalse) => Ok(false),
             (Variant::BoolFalse, Variant::BoolTrue)  => Ok(false),
             
-            (Variant::String(a), Variant::String(b)) => Ok(*a == *b),
             (Variant::Integer(a), Variant::Integer(b)) => Ok(*a == *b),
+            (Variant::Float(a), Variant::Float(b)) => Ok(*a == *b),
             
             (Variant::Tuple(a), Variant::Tuple(b)) 
                 if a.is_empty() && b.is_empty() => Ok(true),
             
             _ => {
+                if let (Some(a), Some(b)) = (self.as_strval(), other.as_strval()) {
+                    return Ok(a == b);
+                }
+                
                 if let Some(result) = self.as_meta().cmp_eq(other) {
                     return result;
                 }
