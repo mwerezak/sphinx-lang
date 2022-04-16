@@ -1,66 +1,28 @@
-An intepreter for a dynamic language inspired by Lua and Python, see ``syntax_examples.sph``.
-
 # Sphinx
 
-Welcome to the Sphinx programming language! Sphinx is (or will be) a dynamically typed programming language that is inspired by Lua and Python, and implemented entirely in Rust!
+Sphinx is a dynamically typed programming language that is inspired by Lua and Python, and implemented entirely in Rust!
+
+Sphinx is not complete! I started work on it in February 2022, and there is still a lot to do before it is a functional language. Some things on my radar:
+
+ - import system
+ - a basic standard library
+ - work out the details of the class/object system
 
 # Goals
 
-My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be decently fast, and the design of the language tries to balance these goals.
+My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be decently fast, and I aim to balance these two goals.
+
+For example, I have an internal type system built around a `MetaObject` trait which makes it easy to specify the behaviours that are supported for each of the core primitive types in the language. Thanks to Rust's enum types this is implemented without any vtables, using static dispatch based on the enum discriminant.
+
+As well, `Variant` (the core dynamic data type), is 16 bytes wide and short strings are "inlined" inside this value when possible (inspired by flexstr). All strings that are used as identifiers are interned. The bytecode compiler converts local variable names into indexes into the value stack, so strings are not used at all when referencing local variables.
+
+The Sphinx language uses a simple Mark-Trace GC inspired by `rust-gc`. The *runtime* itself does not use any GC. Since we are only GC'ing script data, a lot of the challenges that would be involved in writing a GC for general Rust code are avoided (that for example, `rust-gc` has to deal with). In the future I would like to support incremental GC and *maybe* generational GC as well, but the current implementation is simple and works pretty well.
 
 # Safe Rust FFI
 
 Because Sphinx is (mostly) implemented in Safe Rust, it should be possible to provide a completely safe FFI with Rust code. This would allow a host Rust application to gain the capabilities of an embedded dynamic scripting language.
 
-Example of how Rust's macro system is used to make exporting functions and values easy:
-```rust
-use core::time::{SystemTime, Duration};
-use crate::runtime::ops;
-
-namespace! {
-    let PI = core::f64::consts::PI;
-    
-    fun _ = native_function!(time => {
-        let time = SystemTime::UNIX_EPOCH
-            .elapsed()
-            .unwrap()
-            .as_secs_f64();
-        Ok(Variant::from(time))
-    });
-    
-    // Contrived example to show handling of default values and variadics is supported
-    fun _ = native_function!(add_example: a; defaults: b = 1; ...varargs; => {
-        println!("{:?}", varargs);
-        ops::eval_add(a, b)
-    });
-}
-```
-
-Result (in REPL):
-```
->>> time
-<built-in fun time()>
->>> time()
-1648605594.4928553
->>> PI
-3.141592653589793
->>> add_example
-<built-in fun add_example(a, b = ..., varargs...)>
->>> add_example(1)
-[]
-2
->>> add_example("one", "two", "three", "four", "five")
-["three", "four", "five"]
-"onetwo"
-```
-
 As a long term goal I would like to also leverage the rlua bindings to provide a Lua FFI in Sphinx, as well.
-
-# Future Type Inference and Static Type Checking
-
-While it is a bit long term, I would like to eventually have a (dynamic) structurally typed programming language that also includes static type checking using type annotations and inference (in the same vein as PyType). However, for the time being the main focus is on just getting the language up and running. 
-
-The plan is first - an interpreter, then compilation to bytecode and a VM - then static analysis during the bytecode compilation step.
 
 # Syntax Highlighting Support
 
