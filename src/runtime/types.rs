@@ -77,41 +77,41 @@ pub trait MetaObject {
     fn invoke(&self, args: &[Variant]) -> Option<ExecResult<Call>> { None }
     
     // unary operators
-    fn apply_neg(&self) -> Option<ExecResult<Variant>> { None }
-    fn apply_pos(&self) -> Option<ExecResult<Variant>> { None }
-    fn apply_inv(&self) -> Option<ExecResult<Variant>> { None }
+    fn op_neg(&self) -> Option<ExecResult<Variant>> { None }
+    fn op_pos(&self) -> Option<ExecResult<Variant>> { None }
+    fn op_inv(&self) -> Option<ExecResult<Variant>> { None }
 
     // arithmetic operators
-    fn apply_mul(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_rmul(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_mul(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_rmul(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
-    fn apply_div(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_rdiv(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_div(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_rdiv(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
-    fn apply_mod(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_rmod(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_mod(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_rmod(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
-    fn apply_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_radd(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_radd(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
-    fn apply_sub(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_rsub(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_sub(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_rsub(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
     // bitwise operators
-    fn apply_and(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_rand(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_and(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_rand(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
-    fn apply_xor(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_xor(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
-    fn apply_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
-    fn apply_shl(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_rshl(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_shl(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_rshl(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
-    fn apply_shr(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn apply_rshr(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_shr(&self, rhs: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn op_rshr(&self, lhs: &Variant) -> Option<ExecResult<Variant>> { None }
     
     // comparisons
     
@@ -269,41 +269,41 @@ impl MetaObject for bool {
         else { Some(Ok(0)) } // all 0s
     }
     
-    fn apply_inv(&self) -> Option<ExecResult<Variant>> { 
+    fn op_inv(&self) -> Option<ExecResult<Variant>> { 
         Some(Ok(Variant::from(!(*self)))) 
     }
     
-    fn apply_and(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_and(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         match rhs {
             Variant::BoolFalse => Some(Ok(Variant::from(false))),
             Variant::BoolTrue => Some(Ok(Variant::from(*self))),
             _ => None,
         }
     }
-    fn apply_rand(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_and(lhs)
+    fn op_rand(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_and(lhs)
     }
     
-    fn apply_xor(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_xor(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         match rhs {
             Variant::BoolFalse => Some(Ok(Variant::from(*self))),
             Variant::BoolTrue => Some(Ok(Variant::from(!(*self)))),
             _ => None,
         }
     }
-    fn apply_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_and(lhs)
+    fn op_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_and(lhs)
     }
     
-    fn apply_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         match rhs {
             Variant::BoolFalse => Some(Ok(Variant::from(*self))),
             Variant::BoolTrue => Some(Ok(Variant::from(true))),
             _ => None,
         }
     }
-    fn apply_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_or(lhs)
+    fn op_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_or(lhs)
     }
     
     fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {

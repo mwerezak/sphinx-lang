@@ -20,11 +20,11 @@ impl MetaObject for IntType {
     fn as_int(&self) -> Option<ExecResult<IntType>> { Some(Ok(*self)) }
     fn as_float(&self) -> Option<ExecResult<FloatType>> { Some(Ok(*self as FloatType)) }
     
-    fn apply_neg(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(-(*self)))) }
-    fn apply_pos(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(*self))) }
-    fn apply_inv(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(!(*self)))) }
+    fn op_neg(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(-(*self)))) }
+    fn op_pos(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(*self))) }
+    fn op_inv(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(!(*self)))) }
     
-    fn apply_mul(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_mul(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         match rhs {
             Variant::Integer(rhs) => Some(checked_int_math!(checked_mul, *self, *rhs)),
             _ => rhs.as_meta().as_int()
@@ -32,11 +32,11 @@ impl MetaObject for IntType {
         }
     }
     
-    fn apply_rmul(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_mul(lhs)
+    fn op_rmul(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_mul(lhs)
     }
     
-    fn apply_div(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_div(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         rhs.as_meta().as_int().map(|rhs| {
             let rhs = rhs?;
             if rhs == 0 {
@@ -47,7 +47,7 @@ impl MetaObject for IntType {
         })
     }
     
-    fn apply_rdiv(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_rdiv(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_int().map(|lhs| {
             if *self == 0 {
                 return Err(ErrorKind::DivideByZero.into());
@@ -57,15 +57,15 @@ impl MetaObject for IntType {
         })
     }
     
-    fn apply_mod(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_mod(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         rhs.as_meta().as_int().map(|rhs| Ok(Variant::from(*self % rhs?)))
     }
     
-    fn apply_rmod(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_rmod(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_int().map(|lhs| Ok(Variant::from(lhs? % *self)))
     }
     
-    fn apply_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         match rhs {
             Variant::Integer(rhs) => Some(checked_int_math!(checked_add, *self, *rhs)),
             _ => rhs.as_meta().as_int()
@@ -73,11 +73,11 @@ impl MetaObject for IntType {
         }
     }
     
-    fn apply_radd(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_add(lhs)
+    fn op_radd(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_add(lhs)
     }
     
-    fn apply_sub(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_sub(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         match rhs {
             Variant::Integer(rhs) => Some(checked_int_math!(checked_sub, *self, *rhs)),
             _ => rhs.as_meta().as_int()
@@ -85,7 +85,7 @@ impl MetaObject for IntType {
         }
     }
     
-    fn apply_rsub(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_rsub(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         match lhs {
             Variant::Integer(lhs) => Some(checked_int_math!(checked_sub, *lhs, *self)),
             _ => lhs.as_meta().as_int()
@@ -93,7 +93,7 @@ impl MetaObject for IntType {
         }
     }
     
-    fn apply_and(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_and(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         let lhs = self.as_bits().unwrap().unwrap();
         match rhs {
             Variant::BoolFalse => Some(Ok(Variant::from(lhs & false.as_bits().unwrap().unwrap()))),
@@ -104,11 +104,11 @@ impl MetaObject for IntType {
         }
     }
     
-    fn apply_rand(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_and(lhs)
+    fn op_rand(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_and(lhs)
     }
 
-    fn apply_xor(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_xor(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         let lhs = self.as_bits().unwrap().unwrap();
         match rhs {
             Variant::BoolFalse => Some(Ok(Variant::from(lhs ^ false.as_bits().unwrap().unwrap()))),
@@ -119,11 +119,11 @@ impl MetaObject for IntType {
         }
     }
     
-    fn apply_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_xor(lhs)
+    fn op_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_xor(lhs)
     }
 
-    fn apply_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         let lhs = self.as_bits().unwrap().unwrap();
         match rhs {
             Variant::BoolFalse => Some(Ok(Variant::from(lhs | false.as_bits().unwrap().unwrap()))),
@@ -134,11 +134,11 @@ impl MetaObject for IntType {
         }
     }
     
-    fn apply_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_or(lhs)
+    fn op_ror(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_or(lhs)
     }
     
-    fn apply_shl(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_shl(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         let rhs = match rhs {
             Variant::BoolFalse => Some(0),
             Variant::BoolTrue => Some(1),
@@ -158,7 +158,7 @@ impl MetaObject for IntType {
         })
     }
     
-    fn apply_rshl(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_rshl(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_bits().map(|lhs| {
             if lhs.is_err() {
                 return Err(lhs.unwrap_err());
@@ -170,7 +170,7 @@ impl MetaObject for IntType {
         })
     }
     
-    fn apply_shr(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_shr(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         let rhs = match rhs {
             Variant::BoolFalse => Some(0),
             Variant::BoolTrue => Some(1),
@@ -190,7 +190,7 @@ impl MetaObject for IntType {
         })
     }
     
-    fn apply_rshr(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_rshr(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_bits().map(|lhs| {
             if lhs.is_err() {
                 return Err(lhs.unwrap_err());
@@ -233,46 +233,46 @@ impl MetaObject for FloatType {
     
     fn as_float(&self) -> Option<ExecResult<FloatType>> { Some(Ok(*self)) }
     
-    fn apply_neg(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(-(*self)))) }
-    fn apply_pos(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(*self))) }
+    fn op_neg(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(-(*self)))) }
+    fn op_pos(&self) -> Option<ExecResult<Variant>> { Some(Ok(Variant::from(*self))) }
     
-    fn apply_mul(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_mul(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         rhs.as_meta().as_float().map(|rhs| Ok(Variant::from(*self * rhs?)))
     }
     
-    fn apply_rmul(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_mul(lhs)
+    fn op_rmul(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_mul(lhs)
     }
     
-    fn apply_div(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_div(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         rhs.as_meta().as_float().map(|rhs| Ok(Variant::from(*self / rhs?)))
     }
     
-    fn apply_rdiv(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_rdiv(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_float().map(|lhs| Ok(Variant::from(lhs? / *self)))
     }
     
-    fn apply_mod(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_mod(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         rhs.as_meta().as_float().map(|rhs| Ok(Variant::from(*self % rhs?)))
     }
     
-    fn apply_rmod(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_rmod(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_float().map(|lhs| Ok(Variant::from(lhs? % *self)))
     }
     
-    fn apply_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         rhs.as_meta().as_float().map(|rhs| Ok(Variant::from(*self + rhs?)))
     }
     
-    fn apply_radd(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.apply_add(lhs)
+    fn op_radd(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+        self.op_add(lhs)
     }
     
-    fn apply_sub(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_sub(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         rhs.as_meta().as_float().map(|rhs| Ok(Variant::from(*self - rhs?)))
     }
     
-    fn apply_rsub(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
+    fn op_rsub(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_float().map(|lhs| Ok(Variant::from(lhs? - *self)))
     }
     

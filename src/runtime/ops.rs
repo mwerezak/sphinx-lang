@@ -75,28 +75,28 @@ impl Variant {
     #[inline(always)]
     pub fn apply_neg(&self) -> ExecResult<Variant> {
         match self {
-            Self::Integer(value) => value.apply_neg().unwrap(),
-            Self::Float(value) => value.apply_neg().unwrap(),
-            _ => meta_eval_unary!(self, apply_neg),
+            Self::Integer(value) => value.op_neg().unwrap(),
+            Self::Float(value) => value.op_neg().unwrap(),
+            _ => meta_eval_unary!(self, op_neg),
         }
     }
     
     #[inline(always)]
     pub fn apply_pos(&self) -> ExecResult<Variant> {
         match self {
-            Self::Integer(value) => value.apply_pos().unwrap(),
-            Self::Float(value) => value.apply_pos().unwrap(),
-            _ => meta_eval_unary!(self, apply_pos),
+            Self::Integer(value) => value.op_pos().unwrap(),
+            Self::Float(value) => value.op_pos().unwrap(),
+            _ => meta_eval_unary!(self, op_pos),
         }
     }
     
     #[inline(always)]
     pub fn apply_inv(&self) -> ExecResult<Variant> {
         match self {
-            Self::BoolTrue => true.apply_inv().unwrap(),
-            Self::BoolFalse => false.apply_inv().unwrap(),
-            Self::Integer(value) => value.apply_inv().unwrap(),
-            _ => meta_eval_unary!(self, apply_inv)
+            Self::BoolTrue => true.op_inv().unwrap(),
+            Self::BoolFalse => false.op_inv().unwrap(),
+            Self::Integer(value) => value.op_inv().unwrap(),
+            _ => meta_eval_unary!(self, op_inv)
         }
     }
     
@@ -114,40 +114,40 @@ impl Variant {
     #[inline(always)]
     pub fn apply_mul(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_mul(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_mul, apply_rmul),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_mul(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_mul, op_rmul),
         }
     }
     
     #[inline(always)]
     pub fn apply_div(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_div(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_div, apply_rdiv),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_div(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_div, op_rdiv),
         }
     }
     
     #[inline(always)]
     pub fn apply_mod(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_mod(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_mod, apply_rmod),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_mod(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_mod, op_rmod),
         }
     }
     
     #[inline(always)]
     pub fn apply_add(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_add(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_add, apply_radd),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_add(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_add, op_radd),
         }
     }
     
     #[inline(always)]
     pub fn apply_sub(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_sub(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_sub, apply_rsub),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_sub(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_sub, op_rsub),
         }
     }
     
@@ -155,22 +155,22 @@ impl Variant {
     
     pub fn apply_and(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_and(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_and, apply_rand),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_and(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_and, op_rand),
         }
     }
     
     pub fn apply_xor(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_xor(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_xor, apply_rxor),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_xor(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_xor, op_rxor),
         }
     }
     
     pub fn apply_or(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_or(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_or, apply_ror),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_or(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_or, op_ror),
         }
     }
     
@@ -178,15 +178,15 @@ impl Variant {
     
     pub fn apply_shl(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_shl(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_shl, apply_rshl),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_shl(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_shl, op_rshl),
         }
     }
     
     pub fn apply_shr(&self, rhs: &Variant) -> ExecResult<Variant> {
         match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.apply_shr(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, apply_shr, apply_rshr),
+            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_shr(rhs).unwrap(),
+            _ => meta_eval_binary!(self, rhs, op_shr, op_rshr),
         }
     }
 
