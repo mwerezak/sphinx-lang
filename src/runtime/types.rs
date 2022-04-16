@@ -115,23 +115,54 @@ pub trait MetaObject {
     fn cmp_le(&self, other: &Variant) -> Option<ExecResult<bool>> { None }
 }
 
+// allows Variant to store types that don't impl MetaObject, 
+// but can be converted into one (e.g. string types)
+enum MetaDispatch {
+    Nil,
+    Boolean(bool),
+    Integer(IntType),
+    Float(FloatType),
+    String(StringValue),
+    Tuple(Tuple),
+    Function(GC<Function>),
+    NativeFunction(GC<NativeFunction>),
+}
 
-impl Variant {
-    pub fn as_meta(&self) -> &dyn MetaObject {
+impl Deref for MetaDispatch {
+    type Target = dyn MetaObject;
+    
+    #[inline]
+    fn deref(&self) -> &Self::Target {
         match self {
             Self::Nil => &(),
-            Self::BoolTrue => &true,
-            Self::BoolFalse => &false,
+            Self::Boolean(value) => value,
             Self::Integer(value) => value,
             Self::Float(value) => value,
-            
-            Self::InternStr(symbol) => symbol,
-            Self::InlineStr(inline) => inline,
-            Self::GCStr(gc_str) => gc_str,
-            
-            Self::Tuple(tuple) => tuple,
+            Self::String(value) => value,
+            Self::Tuple(value) => value,
             Self::Function(fun) => &*fun,
             Self::NativeFunction(fun) => &*fun,
+        }
+    }
+}
+
+impl Variant {
+    #[inline]
+    pub fn as_meta(&self) -> impl Deref<Target=dyn MetaObject> {
+        match self {
+            Self::Nil => MetaDispatch::Nil,
+            Self::BoolTrue => MetaDispatch::Boolean(true),
+            Self::BoolFalse => MetaDispatch::Boolean(false),
+            Self::Integer(value) => MetaDispatch::Integer(*value),
+            Self::Float(value) => MetaDispatch::Float(*value),
+            
+            Self::InternStr(symbol) => MetaDispatch::String((*symbol).into()),
+            Self::InlineStr(inline) => MetaDispatch::String((*inline).into()),
+            Self::GCStr(gc_str) => MetaDispatch::String((*gc_str).into()),
+            
+            Self::Tuple(tuple) => MetaDispatch::Tuple(*tuple),
+            Self::Function(fun) => MetaDispatch::Function(*fun),
+            Self::NativeFunction(fun) => MetaDispatch::NativeFunction(*fun),
         }
     }
     

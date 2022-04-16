@@ -44,10 +44,9 @@ use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control
 
 #[inline]
 fn into_name(value: Variant) -> StringSymbol {
-    match value.as_strval() {
-        Some(strval) => strval.as_intern(),
-        _ => panic!("invalid operand"),
-    }
+    value.as_strval()
+        .expect("invalid operand")
+        .as_intern()
 }
 
 #[inline]

@@ -199,13 +199,16 @@ impl Eq for VariantKey<'_> { }
 
 impl fmt::Display for Variant {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if let Some(strval) = self.as_strval() {
+            return write!(fmt, "{}", strval)
+        }
+        
         match self {
             Self::Nil => fmt.write_str("nil"),
             Self::BoolTrue => fmt.write_str("true"),
             Self::BoolFalse => fmt.write_str("false"),
             
-            Self::InternStr(..) | Self::InlineStr(..) | Self::GCStr(..) =>
-                write!(fmt, "{}", self.as_strval().unwrap()),
+            Self::InternStr(..) | Self::InlineStr(..) | Self::GCStr(..) => unreachable!(),
             
             Self::Tuple(tuple) => write!(fmt, "{}", tuple),
             
@@ -241,11 +244,9 @@ struct EchoDisplay<'a>(&'a Variant);
 
 impl fmt::Display for EchoDisplay<'_> {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self.0 {
-            Variant::InternStr(..) | Variant::InlineStr(..) | Variant::GCStr(..)
-                => write!(fmt, "\"{}\"", self.0.as_strval().unwrap()),
-            
-            _ => write!(fmt, "{}", self.0),
+        if let Some(strval) = self.0.as_strval() {
+            return write!(fmt, "\"{}\"", strval)
         }
+        write!(fmt, "{}", self.0)
     }
 }
