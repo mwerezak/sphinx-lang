@@ -130,6 +130,8 @@ impl fmt::Display for RuntimeError {
                     MethodTag::AsInt => format!("can't interpret '{}' as int", receiver),
                     MethodTag::AsFloat => format!("can't interpret '{}' as float", receiver),
                     MethodTag::Invoke => format!("type '{}' is not callable", receiver),
+                    MethodTag::Next => format!("type '{}' is not an iterator", receiver),
+                    MethodTag::Iter => format!("type '{}' is not iterable", receiver),
                     _ => format!("type '{}' does not support '{}'", receiver, method),
                 }
             }

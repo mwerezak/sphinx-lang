@@ -64,9 +64,14 @@ pub trait MetaObject {
     fn as_int(&self) -> Option<ExecResult<IntType>> { None }
     fn as_float(&self) -> Option<ExecResult<FloatType>> { None }
     
-    // data
+    // iterators
+    fn next(&self) -> Option<ExecResult<Variant>> { None }
+    
+    // data collections
     fn len(&self) -> Option<ExecResult<usize>> { None }
-    //fn get_item(&self, item: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn iter(&self) -> Option<ExecResult<Variant>> { None }
+    //fn getitem(&self, item: &Variant) -> Option<ExecResult<Variant>> { None }
+    //fn setitem(&self, item: &Variant) -> Option<ExecResult<Variant>> { None }
     
     // callable
     fn invoke(&self, args: &[Variant]) -> Option<ExecResult<Call>> { None }
@@ -326,6 +331,8 @@ impl<F> MetaObject for GC<F> where F: GCTrace, GC<F>: Callable {
 pub enum MethodTag {
     Invoke,
     Len,
+    Next,
+    Iter,
     AsBool,
     AsBits,
     AsInt,
@@ -335,12 +342,20 @@ pub enum MethodTag {
 impl MethodTag {
     pub fn method_name(&self) -> &'static str {
         match self {
-            Self::Invoke => "__call",
-            Self::Len => "__len",
-            Self::AsBool => "__bool",
-            Self::AsBits => "__bits",
-            Self::AsInt => "__int",
-            Self::AsFloat => "__float",
+            Self::Invoke => "call",
+            
+            // iterators and iterables
+            Self::Next => "next",
+            Self::Iter => "iter",
+            
+            // sequences
+            Self::Len => "len",
+            
+            // primitive coercion
+            Self::AsBool => "bool",
+            Self::AsBits => "bits",
+            Self::AsInt => "int",
+            Self::AsFloat => "float",
         }
     }
 }
