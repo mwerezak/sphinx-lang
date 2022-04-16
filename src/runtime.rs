@@ -3,7 +3,6 @@ use ahash::{self, AHasher};
 
 mod variant;
 pub mod strings;
-pub mod ops;
 pub mod types;
 pub mod gc;
 pub mod vm;

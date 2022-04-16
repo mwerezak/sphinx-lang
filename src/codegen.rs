@@ -8,7 +8,7 @@ use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary, AccessItem};
 use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
 use crate::parser::fundefs::{FunctionDef, SignatureDef};
-use crate::runtime::types::operator::{UnaryOp, BinaryOp, Arithmetic, Bitwise, Shift, Comparison, Logical};
+use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::strings::{StringInterner};
 use crate::debug::symbol::{DebugSymbol, ChunkSymbols, DebugSymbolTable};
 
@@ -733,35 +733,28 @@ impl CodeGenerator<'_> {
     
     fn emit_binary_op(&mut self, symbol: Option<&DebugSymbol>, op: &BinaryOp) {
         match op {
-            BinaryOp::Logical(logic) => unimplemented!(),
+            BinaryOp::And => unimplemented!(),
+            BinaryOp::Or => unimplemented!(),
             
-            BinaryOp::Arithmetic(op) => match op {
-                Arithmetic::Mul => self.emit_instr(symbol, OpCode::Mul),
-                Arithmetic::Div => self.emit_instr(symbol, OpCode::Div),
-                Arithmetic::Mod => self.emit_instr(symbol, OpCode::Mod),
-                Arithmetic::Add => self.emit_instr(symbol, OpCode::Add),
-                Arithmetic::Sub => self.emit_instr(symbol, OpCode::Sub),
-            },
+            BinaryOp::Mul => self.emit_instr(symbol, OpCode::Mul),
+            BinaryOp::Div => self.emit_instr(symbol, OpCode::Div),
+            BinaryOp::Mod => self.emit_instr(symbol, OpCode::Mod),
+            BinaryOp::Add => self.emit_instr(symbol, OpCode::Add),
+            BinaryOp::Sub => self.emit_instr(symbol, OpCode::Sub),
             
-            BinaryOp::Bitwise(op) => match op {
-                Bitwise::And => self.emit_instr(symbol, OpCode::And),
-                Bitwise::Xor => self.emit_instr(symbol, OpCode::Xor),
-                Bitwise::Or  => self.emit_instr(symbol, OpCode::Or),
-            },
+            BinaryOp::BitAnd => self.emit_instr(symbol, OpCode::And),
+            BinaryOp::BitXor => self.emit_instr(symbol, OpCode::Xor),
+            BinaryOp::BitOr  => self.emit_instr(symbol, OpCode::Or),
             
-            BinaryOp::Shift(op) => match op {
-                Shift::Left  => self.emit_instr(symbol, OpCode::Shl),
-                Shift::Right => self.emit_instr(symbol, OpCode::Shr),
-            },
+            BinaryOp::LShift  => self.emit_instr(symbol, OpCode::Shl),
+            BinaryOp::RShift => self.emit_instr(symbol, OpCode::Shr),
             
-            BinaryOp::Comparison(op) => match op {
-                Comparison::LT => self.emit_instr(symbol, OpCode::LT),
-                Comparison::GT => self.emit_instr(symbol, OpCode::GT),
-                Comparison::LE => self.emit_instr(symbol, OpCode::LE),
-                Comparison::GE => self.emit_instr(symbol, OpCode::GE),
-                Comparison::EQ => self.emit_instr(symbol, OpCode::EQ),
-                Comparison::NE => self.emit_instr(symbol, OpCode::NE),
-            },
+            BinaryOp::LT => self.emit_instr(symbol, OpCode::LT),
+            BinaryOp::GT => self.emit_instr(symbol, OpCode::GT),
+            BinaryOp::LE => self.emit_instr(symbol, OpCode::LE),
+            BinaryOp::GE => self.emit_instr(symbol, OpCode::GE),
+            BinaryOp::EQ => self.emit_instr(symbol, OpCode::EQ),
+            BinaryOp::NE => self.emit_instr(symbol, OpCode::NE),
         }
     }
     

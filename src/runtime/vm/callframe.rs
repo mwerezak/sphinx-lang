@@ -4,7 +4,6 @@ use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::VMFrameSnapshot;
 use crate::runtime::Variant;
 use crate::runtime::gc::{GC, GCTrace};
-use crate::runtime::ops;
 use crate::runtime::function::{Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, Access, Chunk, ConstID, FunctionID, FunctionProto};

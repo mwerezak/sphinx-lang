@@ -1,7 +1,7 @@
 
 use crate::language::InternSymbol;
 use crate::parser::primary::{Primary, AccessItem, Atom};
-use crate::runtime::types::operator::BinaryOp;
+use crate::parser::operator::BinaryOp;
 use crate::parser::expr::{Expr, ExprMeta};
 
 

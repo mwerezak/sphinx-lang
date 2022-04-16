@@ -10,11 +10,11 @@ use crate::runtime::function::{Call, Function, NativeFunction, Callable};
 use crate::runtime::strings::{StringValue, StringSymbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
-pub mod operator;
-pub mod metatable;
-pub mod numeric;
-pub mod string;
-pub mod tuple;
+mod ops;
+mod metatable;
+mod numeric;
+mod string;
+mod tuple;
 
 pub use tuple::Tuple;
 

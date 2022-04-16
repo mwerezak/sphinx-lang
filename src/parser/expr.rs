@@ -1,5 +1,5 @@
 use crate::debug::DebugSymbol;
-use crate::runtime::types::operator::{BinaryOp, UnaryOp};
+use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::lvalue::{Assignment, Declaration};
 use crate::parser::fundefs::FunctionDef;

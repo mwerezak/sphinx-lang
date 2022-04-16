@@ -9,7 +9,6 @@ use crate::runtime::errors::ExecResult;
 // examples for testing
 
 use std::time::SystemTime;
-use crate::runtime::ops;
 
 pub fn create_prelude() -> GC<GlobalEnv> {
     let env = GlobalEnv::new();
