@@ -603,6 +603,11 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             ctx.set_end(&self.advance().unwrap()); // consume comma
             
+            let next = self.peek()?;
+            if matches!(next.token, Token::CloseParen) {
+                break;
+            }
+            
             ctx.push(ContextTag::ExprMeta);
             let next_expr = self.parse_binop_expr(ctx)?;
             let symbol = ctx.frame().as_debug_symbol().unwrap();
@@ -1307,6 +1312,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                     
                     return Err(ErrorKind::SyntaxError(message).into())
                 },
+                
+                Token::CloseParen => return Err("unmatched \")\"".into()),
+                Token::CloseSquare => return Err("unmatched \"]\"".into()),
+                Token::CloseBrace => return Err("unmatched \"}\"".into()),
                 
                 _ => { return Err("expected an expression here".into()) },
             };
