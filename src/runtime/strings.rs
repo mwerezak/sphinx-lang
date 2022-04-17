@@ -2,7 +2,7 @@ use core::fmt;
 use core::cmp;
 use core::ops::Deref;
 use core::hash::{Hash, Hasher};
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 pub mod intern;
@@ -15,10 +15,10 @@ use intern::StringTable;
 pub type InlineStr = inline::InlineStr<14>;
 
 #[derive(Debug, Clone, Copy)]
-pub struct GCStr(GC<Box<str>>);
+pub struct GCStr(Gc<Box<str>>);
 
 impl Deref for GCStr {
-    type Target = GC<Box<str>>;
+    type Target = Gc<Box<str>>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -29,10 +29,10 @@ impl Deref for GCStr {
 pub enum StringValue {
     Intern(StringSymbol),
     Inline(InlineStr),
-    GC(GCStr),
+    Gc(GCStr),
 }
 
-unsafe impl GCTrace for Box<str> {
+unsafe impl GcTrace for Box<str> {
     fn trace(&self) { }
     
     fn size_hint(&self) -> usize {
@@ -54,7 +54,7 @@ impl From<&str> for StringValue {
             return Self::Intern(StringSymbol::intern(string))
         }
         
-        Self::GC(GCStr(GC::new(string.to_string().into_boxed_str())))
+        Self::Gc(GCStr(Gc::new(string.to_string().into_boxed_str())))
     }
 }
 
@@ -72,13 +72,13 @@ impl From<InlineStr> for StringValue {
 
 impl From<GCStr> for StringValue {
     fn from(gc_str: GCStr) -> Self {
-        StringValue::GC(gc_str)
+        StringValue::Gc(gc_str)
     }
 }
 
 impl StringValue {
     pub fn trace(&self) {
-        if let Self::GC(gc_str) = self {
+        if let Self::Gc(gc_str) = self {
             gc_str.mark_trace()
         }
     }
@@ -87,7 +87,7 @@ impl StringValue {
         match self {
             Self::Intern(symbol) => symbol.write(buf),
             Self::Inline(inline) => buf.write_str(&*inline),
-            Self::GC(gc_str) => buf.write_str(&**gc_str),
+            Self::Gc(gc_str) => buf.write_str(&**gc_str),
         }
     }
     
@@ -96,7 +96,7 @@ impl StringValue {
         match self {
             Self::Intern(symbol) => *symbol,
             Self::Inline(inline) => StringSymbol::intern(&*inline),
-            Self::GC(gc_str) => StringSymbol::intern(&**gc_str),
+            Self::Gc(gc_str) => StringSymbol::intern(&**gc_str),
         }
     }
     
@@ -114,14 +114,14 @@ impl StringValue {
         match self {
             Self::Intern(symbol) => string_table.resolve(symbol),
             Self::Inline(inline) => &*inline,
-            Self::GC(gc_str) => &**gc_str,
+            Self::Gc(gc_str) => &**gc_str,
         }
     }
     
     fn try_str(&self) -> Option<&str> {
         match self {
             Self::Inline(inline) => Some(&*inline),
-            Self::GC(gc_str) => Some(&**gc_str),
+            Self::Gc(gc_str) => Some(&**gc_str),
             _ => None,
         }
     }
@@ -140,7 +140,7 @@ impl StringValue {
 }
 
 // It's important for strings to hash consistently regardless of representation
-// This means that a string "foo" should hash the same whether it is Intern, Inline, or GC
+// This means that a string "foo" should hash the same whether it is Intern, Inline, or Gc
 // Unfortunately Rust's hash API makes it VERY hard to have precise control of the hash output
 // So we either have to lookup and hash the underlying string data each time (which would kill the 
 // performance benefits of string interning) or double-hash.
@@ -159,7 +159,7 @@ impl Hash for StringValue {
             Self::Inline(inline) =>
                 string_table.borrow().hash_str(&*inline).hash(state),
             
-            Self::GC(gc_str) => 
+            Self::Gc(gc_str) => 
                 string_table.borrow().hash_str(&**gc_str).hash(state),
             
         })

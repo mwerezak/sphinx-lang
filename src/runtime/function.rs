@@ -2,7 +2,7 @@ use core::cell::{RefCell, Ref, Cell};
 use crate::codegen::{FunctionID, FunctionProto};
 use crate::runtime::Variant;
 use crate::runtime::module::{Module, GlobalEnv};
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::ExecResult;
 
 mod signature;
@@ -14,8 +14,8 @@ pub use crate::codegen::opcodes::UpvalueIndex;
 /// Call directive
 
 pub enum Call {
-    Chunk(GC<Module>, FunctionID),
-    Native(GC<NativeFunction>),
+    Chunk(Gc<Module>, FunctionID),
+    Native(Gc<NativeFunction>),
 }
 
 pub trait Callable {
@@ -34,12 +34,12 @@ pub trait Callable {
 #[derive(Debug)]
 pub struct Function {
     fun_id: FunctionID,
-    module: GC<Module>,
+    module: Gc<Module>,
     upvalues: Box<[Upvalue]>,
 }
 
 impl Function {
-    pub fn new(fun_id: FunctionID, module: GC<Module>, upvalues: Box<[Upvalue]>) -> Self {
+    pub fn new(fun_id: FunctionID, module: Gc<Module>, upvalues: Box<[Upvalue]>) -> Self {
         Self { fun_id, module, upvalues }
     }
     
@@ -62,7 +62,7 @@ impl Callable for Function {
     }
 }
 
-impl Callable for GC<Function> {
+impl Callable for Gc<Function> {
     fn signature(&self) -> &Signature {
         <Function as Callable>::signature(self)
     }
@@ -72,7 +72,7 @@ impl Callable for GC<Function> {
     }
 }
 
-unsafe impl GCTrace for Function {
+unsafe impl GcTrace for Function {
     fn trace(&self) {
         self.module.mark_trace();
         for upval in self.upvalues.iter() {
@@ -93,7 +93,7 @@ unsafe impl GCTrace for Function {
 #[derive(Debug, Clone, Copy)]
 pub enum Closure {
     Open(usize),
-    Closed(GC<Cell<Variant>>),
+    Closed(Gc<Cell<Variant>>),
 }
 
 impl Closure {
@@ -101,7 +101,7 @@ impl Closure {
     pub fn is_closed(&self) -> bool { matches!(self, Self::Closed(..)) }
 }
 
-unsafe impl GCTrace for Cell<Variant> {
+unsafe impl GcTrace for Cell<Variant> {
     fn trace(&self) {
         self.get().trace()
     }
@@ -124,7 +124,7 @@ impl Upvalue {
     pub fn closure(&self) -> Closure { self.value.get() }
     
     #[inline]
-    pub fn close(&self, gc_cell: GC<Cell<Variant>>) {
+    pub fn close(&self, gc_cell: Gc<Cell<Variant>>) {
         self.value.set(Closure::Closed(gc_cell))
     }
 }
@@ -138,18 +138,18 @@ pub type NativeFn = fn(self_fun: &NativeFunction, args: &[Variant]) -> ExecResul
 pub struct NativeFunction {
     signature: Signature,
     defaults: Option<Box<[Variant]>>,
-    env: GC<GlobalEnv>,
+    env: Gc<GlobalEnv>,
     func: NativeFn,
 }
 
 impl NativeFunction {
-    pub fn new(signature: Signature, defaults: Option<Box<[Variant]>>, env: GC<GlobalEnv>, func: NativeFn) -> Self {
+    pub fn new(signature: Signature, defaults: Option<Box<[Variant]>>, env: Gc<GlobalEnv>, func: NativeFn) -> Self {
         Self { signature, defaults, env, func }
     }
     
     pub fn signature(&self) -> &Signature { &self.signature }
     
-    pub fn env(&self) -> GC<GlobalEnv> { self.env }
+    pub fn env(&self) -> Gc<GlobalEnv> { self.env }
     
     pub fn defaults(&self) -> &[Variant] {
         match self.defaults.as_ref() {
@@ -164,7 +164,7 @@ impl NativeFunction {
     }
 }
 
-impl Callable for GC<NativeFunction> {
+impl Callable for Gc<NativeFunction> {
     fn signature(&self) -> &Signature { &self.signature }
     
     fn raw_call(&self, _args: &[Variant]) -> Call {
@@ -172,9 +172,9 @@ impl Callable for GC<NativeFunction> {
     }
 }
 
-unsafe impl GCTrace for NativeFunction {
+unsafe impl GcTrace for NativeFunction {
     fn trace(&self) {
-        GC::mark_trace(&self.env);
+        Gc::mark_trace(&self.env);
         
         if let Some(defaults) = self.defaults.as_ref() {
             defaults.trace()

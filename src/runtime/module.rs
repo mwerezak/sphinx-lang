@@ -14,7 +14,7 @@ use once_cell::sync::Lazy;
 use crate::source::ModuleSource;
 use crate::language::FloatType;
 use crate::runtime::{Variant, HashMap, DefaultBuildHasher};
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::function::Function;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
@@ -95,7 +95,7 @@ impl Namespace {
 }
 
 
-/// Mutable container for storing a Namespace in a GC.
+/// Mutable container for storing a Namespace in a Gc.
 #[derive(Debug, Default, Clone)]
 pub struct GlobalEnv {
     namespace: RefCell<Namespace>,
@@ -108,8 +108,8 @@ impl From<Namespace> for GlobalEnv {
 }
 
 impl GlobalEnv {
-    pub fn new() -> GC<Self> {
-        GC::new(Self::default())
+    pub fn new() -> Gc<Self> {
+        Gc::new(Self::default())
     }
     
     pub fn borrow(&self) -> Ref<Namespace> {
@@ -121,7 +121,7 @@ impl GlobalEnv {
     }
 }
 
-unsafe impl GCTrace for GlobalEnv {
+unsafe impl GcTrace for GlobalEnv {
     fn trace(&self) {
         for value in self.namespace.borrow().values() {
             value.trace();
@@ -136,22 +136,22 @@ pub struct Module {
     display: String,
     source: Option<ModuleSource>,
     data: ProgramData,
-    globals: GC<GlobalEnv>,
+    globals: Gc<GlobalEnv>,
 }
 
-unsafe impl GCTrace for Module {
+unsafe impl GcTrace for Module {
     fn trace(&self) {
         self.globals.mark_trace()
     }
 }
 
 impl Module {
-    pub fn allocate(source: Option<ModuleSource>, data: ProgramData) -> GC<Self> {
+    pub fn allocate(source: Option<ModuleSource>, data: ProgramData) -> Gc<Self> {
         let globals = GlobalEnv::new();
         Self::with_env(source, data, globals)
     }
     
-    pub fn with_env(source: Option<ModuleSource>, data: ProgramData, globals: GC<GlobalEnv>) -> GC<Self> {
+    pub fn with_env(source: Option<ModuleSource>, data: ProgramData, globals: Gc<GlobalEnv>) -> Gc<Self> {
         let ident = 
             if let Some(source) = source.as_ref() { ModuleIdent::from(source) }
             else { ModuleIdent::from(globals) };
@@ -166,7 +166,7 @@ impl Module {
             globals,
         };
         
-        GC::new(module)
+        Gc::new(module)
     }
     
     pub fn ident(&self) -> &ModuleIdent { &self.ident }
@@ -177,7 +177,7 @@ impl Module {
     pub fn data(&self) -> &ProgramData { &self.data }
     
     #[inline(always)]
-    pub fn globals(&self) -> GC<GlobalEnv> { self.globals }
+    pub fn globals(&self) -> Gc<GlobalEnv> { self.globals }
     
     #[inline]
     pub fn get_const(&self, cid: ConstID) -> Variant {
@@ -208,7 +208,7 @@ impl fmt::Display for Module {
 pub enum ModuleIdent {
     SourcePath(PathBuf), // canonicalized path to the source file
     SourceHash(u64),  // hash of source text
-    RefHash(u64),  // GC address of globals, for Native Modules
+    RefHash(u64),  // Gc address of globals, for Native Modules
 }
 
 
@@ -232,10 +232,10 @@ impl From<&ModuleSource> for ModuleIdent {
     }
 }
 
-impl From<GC<GlobalEnv>> for ModuleIdent {
-    fn from(env: GC<GlobalEnv>) -> Self {
+impl From<Gc<GlobalEnv>> for ModuleIdent {
+    fn from(env: Gc<GlobalEnv>) -> Self {
         let mut state = MODULE_IDENT_HASH.build_hasher();
-        <GC<GlobalEnv> as Hash>::hash(&env, &mut state);
+        <Gc<GlobalEnv> as Hash>::hash(&env, &mut state);
         let hash = state.finish();
         Self::RefHash(hash)
     }

@@ -1,6 +1,6 @@
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-use crate::runtime::gc::GCTrace;
+use crate::runtime::gc::GcTrace;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::function::Call;
 use crate::runtime::errors::ExecResult;
@@ -58,7 +58,7 @@ pub struct Metatable<T> {
     cmp_eq: Option<MethodCompare<T>>, // __eq
 }
 
-unsafe impl<T> GCTrace for Metatable<T> {
+unsafe impl<T> GcTrace for Metatable<T> {
     fn trace(&self) {
         // don't need to do anything as the metatable only holds function pointers
     }

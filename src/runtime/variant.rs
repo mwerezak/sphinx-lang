@@ -7,7 +7,7 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::types::{Type, Tuple, UserDataBox};
 use crate::runtime::function::{Function, NativeFunction, Call};
 use crate::runtime::strings::{StringValue, StringSymbol, InlineStr, GCStr};
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 #[cfg(target_arch = "x86_64")]
@@ -29,15 +29,15 @@ pub enum Variant {
     GCStr(GCStr),
     
     Tuple(Tuple),
-    Function(GC<Function>),
-    NativeFunction(GC<NativeFunction>),
+    Function(Gc<Function>),
+    NativeFunction(Gc<NativeFunction>),
     
-    UserData(GC<UserDataBox>),
+    UserData(Gc<UserDataBox>),
 }
 
 impl Variant {
-    // extract the GC handle for GC'd types
-    pub fn as_gc(&self) -> Option<GC<dyn GCTrace>> {
+    // extract the Gc handle for Gc'd types
+    pub fn as_gc(&self) -> Option<Gc<dyn GcTrace>> {
         match self {
             Self::Tuple(tuple) => tuple.as_gc(),
             Self::Function(fun) => Some((*fun).into()),
@@ -83,7 +83,7 @@ impl From<StringValue> for Variant {
         match value {
             StringValue::Intern(symbol) => Self::InternStr(symbol),
             StringValue::Inline(inline) => Self::InlineStr(inline),
-            StringValue::GC(gc_str) => Self::GCStr(gc_str),
+            StringValue::Gc(gc_str) => Self::GCStr(gc_str),
         }
     }
 }
@@ -108,17 +108,17 @@ impl From<Box<[Variant]>> for Variant {
 
 impl From<Function> for Variant {
     fn from(func: Function) -> Self {
-        Self::Function(GC::new(func))
+        Self::Function(Gc::new(func))
     }
 }
 
 impl From<NativeFunction> for Variant {
     fn from(func: NativeFunction) -> Self {
-        Self::NativeFunction(GC::new(func))
+        Self::NativeFunction(Gc::new(func))
     }
 }
 
-unsafe impl GCTrace for Variant {
+unsafe impl GcTrace for Variant {
     #[inline]
     fn trace(&self) {
         match self {
@@ -227,20 +227,20 @@ impl fmt::Display for Variant {
             Self::Function(fun) => write!(
                 fmt, "<{} at {:#X}>",
                 fun.signature().display_short(), 
-                GC::as_id(fun),
+                Gc::as_id(fun),
             ),
             
             Self::NativeFunction(fun) => write!(
                 fmt, "<built-in {} at {:#X}>",
                 fun.signature().display_short(),
-                GC::as_id(fun),
+                Gc::as_id(fun),
             ),
             
             Self::UserData(data) =>
                 if let Ok(name) = data.type_name() {
-                    write!(fmt, "<{} at {:#X}>", name, GC::as_id(data))
+                    write!(fmt, "<{} at {:#X}>", name, Gc::as_id(data))
                 } else {
-                    write!(fmt, "<userdata at {:#X}>", GC::as_id(data))
+                    write!(fmt, "<userdata at {:#X}>", Gc::as_id(data))
                 }
         }
     }

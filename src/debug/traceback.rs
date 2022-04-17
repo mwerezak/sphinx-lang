@@ -1,7 +1,7 @@
 use core::fmt;
 use crate::source::ModuleSource;
 use crate::codegen::chunk::ChunkInfo;
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::module::{Module, Chunk};
 
 
@@ -10,13 +10,13 @@ use crate::runtime::module::{Module, Chunk};
 pub enum TraceSite {
     Chunk {
         offset: usize,
-        module: GC<Module>,
+        module: Gc<Module>,
         chunk_id: Chunk,
     },
     Native,  // TODO reference native function?
 }
 
-unsafe impl GCTrace for TraceSite {
+unsafe impl GcTrace for TraceSite {
     fn trace(&self) {
         if let Self::Chunk { module, .. } = self {
             module.mark_trace();

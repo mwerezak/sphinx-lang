@@ -6,15 +6,15 @@ use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use std::rc::Rc;
 
-use crate::runtime::gc::{GCBox, GC_STATE, deref_safe, GCTrace};
+use crate::runtime::gc::{GcBox, GC_STATE, deref_safe, GcTrace};
 
 
-pub struct GC<T> where T: GCTrace + ?Sized + 'static {
-    ptr: NonNull<GCBox<T>>,
-    _marker: PhantomData<Rc<GCBox<T>>>,
+pub struct Gc<T> where T: GcTrace + ?Sized + 'static {
+    ptr: NonNull<GcBox<T>>,
+    _marker: PhantomData<Rc<GcBox<T>>>,
 }
 
-impl<T: GCTrace> GC<T> {
+impl<T: GcTrace> Gc<T> {
     pub fn new(data: T) -> Self {
         GC_STATE.with(|gc| {
             let mut gc = gc.borrow_mut();
@@ -23,20 +23,20 @@ impl<T: GCTrace> GC<T> {
     }
 }
 
-impl<T> GC<T> where T: GCTrace + ?Sized {
-    pub(super) fn from_raw(ptr: NonNull<GCBox<T>>) -> Self {
+impl<T> Gc<T> where T: GcTrace + ?Sized {
+    pub(super) fn from_raw(ptr: NonNull<GcBox<T>>) -> Self {
         Self { ptr, _marker: PhantomData }
     }
     
     #[inline]
-    pub(super) fn inner(&self) -> &GCBox<T> {
+    pub(super) fn inner(&self) -> &GcBox<T> {
         // must not deref during sweep. This should only be possible if called inside a Drop impl
         debug_assert!(deref_safe());
         unsafe { &*self.ptr.as_ptr() }
     }
     
     #[inline]
-    fn inner_mut(&self) -> &mut GCBox<T> {
+    fn inner_mut(&self) -> &mut GcBox<T> {
         // must not deref during sweep. This should only be possible if called inside a Drop impl
         debug_assert!(deref_safe());
         unsafe { &mut *self.ptr.as_ptr() }
@@ -46,20 +46,20 @@ impl<T> GC<T> where T: GCTrace + ?Sized {
         self.inner_mut().mark_trace()
     }
     
-    pub fn ptr_eq(self_gc: &GC<T>, other_gc: &GC<T>) -> bool {
+    pub fn ptr_eq(self_gc: &Gc<T>, other_gc: &Gc<T>) -> bool {
         self_gc.inner().ptr_eq(other_gc.inner())
     }
     
     /// Casts the inner pointer to a usize. 
-    /// This is intended for identifying the GC, and should not be cast back to a pointer.
-    pub fn as_id(self_gc: &GC<T>) -> usize {
+    /// This is intended for identifying the Gc, and should not be cast back to a pointer.
+    pub fn as_id(self_gc: &Gc<T>) -> usize {
         self_gc.ptr.as_ptr() as *const () as usize
     }
 
 }
 
-impl<T> From<GC<T>> for GC<dyn GCTrace> where T: GCTrace {
-    fn from(handle: GC<T>) -> Self {
+impl<T> From<Gc<T>> for Gc<dyn GcTrace> where T: GcTrace {
+    fn from(handle: Gc<T>) -> Self {
         Self {
             ptr: handle.ptr,
             _marker: PhantomData,
@@ -67,19 +67,19 @@ impl<T> From<GC<T>> for GC<dyn GCTrace> where T: GCTrace {
     }
 }
 
-impl<T> AsRef<T> for GC<T> where T: GCTrace + ?Sized {
+impl<T> AsRef<T> for Gc<T> where T: GcTrace + ?Sized {
     fn as_ref(&self) -> &T {
         self.deref()
     }
 }
 
-impl<T> Borrow<T> for GC<T> where T: GCTrace + ?Sized {
+impl<T> Borrow<T> for Gc<T> where T: GcTrace + ?Sized {
     fn borrow(&self) -> &T {
         self.deref()
     }
 }
 
-impl<T> Deref for GC<T> where T: GCTrace + ?Sized {
+impl<T> Deref for Gc<T> where T: GcTrace + ?Sized {
     type Target = T;
     
     #[inline]
@@ -88,7 +88,7 @@ impl<T> Deref for GC<T> where T: GCTrace + ?Sized {
     }
 }
 
-impl<T> Clone for GC<T> where T: GCTrace + ?Sized {
+impl<T> Clone for Gc<T> where T: GcTrace + ?Sized {
     fn clone(&self) -> Self {
         Self {
             ptr: self.ptr,
@@ -97,20 +97,20 @@ impl<T> Clone for GC<T> where T: GCTrace + ?Sized {
     }
 }
 
-impl<T> Copy for GC<T> where T: GCTrace + ?Sized { }
+impl<T> Copy for Gc<T> where T: GcTrace + ?Sized { }
 
-impl<T> Hash for GC<T> where T: GCTrace {
+impl<T> Hash for Gc<T> where T: GcTrace {
     fn hash<H>(self: &Self, state: &mut H) where H: Hasher {
-        <NonNull<GCBox<T>> as Hash>::hash(&self.ptr, state)
+        <NonNull<GcBox<T>> as Hash>::hash(&self.ptr, state)
     }
 }
 
-impl<T> fmt::Debug for GC<T> where T: GCTrace + ?Sized {
+impl<T> fmt::Debug for Gc<T> where T: GcTrace + ?Sized {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         if fmt.alternate() {
-            write!(fmt, "GC({:#?})", self.ptr)
+            write!(fmt, "Gc({:#?})", self.ptr)
         } else {
-            write!(fmt, "GC({:?})", self.ptr)
+            write!(fmt, "Gc({:?})", self.ptr)
         }
     }
 }

@@ -4,7 +4,7 @@ use sphinx;
 use sphinx::stdlib;
 use sphinx::source::ModuleSource;
 use sphinx::codegen::{Program, CompiledProgram};
-use sphinx::runtime::{Module, VirtualMachine, GC};
+use sphinx::runtime::{Module, VirtualMachine, Gc};
 use sphinx::runtime::errors::{ExecResult, ErrorKind};
 
 
@@ -25,7 +25,7 @@ fn run_test_script(path: &Path) -> ExecResult<()> {
     
     let program = Program::load(build.program);
     
-    let main_env = GC::new(stdlib::prelude_env());
+    let main_env = Gc::new(stdlib::prelude_env());
     let main_module = Module::with_env(Some(source), program.data, main_env);
     
     let vm = VirtualMachine::new(main_module, &program.main);

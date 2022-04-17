@@ -9,17 +9,17 @@ use log;
 mod data;
 mod handle;
 
-pub use data::GCTrace;
-pub use handle::GC;
+pub use data::GcTrace;
+pub use handle::Gc;
 
-use data::GCBox;
+use data::GcBox;
 
 
 thread_local! {
-    static GC_STATE: RefCell<GCState> = RefCell::new(GCState::default());
+    static GC_STATE: RefCell<GcState> = RefCell::new(GcState::default());
 }
 
-pub fn gc_collect(root: &impl GCTrace) {
+pub fn gc_collect(root: &impl GcTrace) {
     GC_STATE.with(|gc| {
         let mut gc = gc.borrow_mut();
         if gc.should_collect() {
@@ -28,33 +28,33 @@ pub fn gc_collect(root: &impl GCTrace) {
     })
 }
 
-pub fn gc_force(root: &impl GCTrace) {
+pub fn gc_force(root: &impl GcTrace) {
     GC_STATE.with(|gc| {
         let mut gc = gc.borrow_mut();
         gc.collect_garbage(root)
     })
 }
 
-struct GCState {
-    stats: GCStats,
-    config: GCConfig,
+struct GcState {
+    stats: GcStats,
+    config: GcConfig,
     threshold: usize,
-    boxes_start: Option<NonNull<GCBox<dyn GCTrace>>>,
+    boxes_start: Option<NonNull<GcBox<dyn GcTrace>>>,
 }
 
 #[derive(Debug)]
-struct GCStats {
+struct GcStats {
     allocated: usize,
     box_count: usize,
     cycle_count: usize,
 }
 
-struct GCConfig {
+struct GcConfig {
     threshold: u16,
     pause_factor: u16,  // percent memory use relative to last cycle before starting a new cycle
 }
 
-impl Default for GCConfig {
+impl Default for GcConfig {
     fn default() -> Self {
         Self {
             threshold: 512, // Small because of stop-the-world. If we go incremental increase this to 8 kiB
@@ -63,21 +63,21 @@ impl Default for GCConfig {
     }
 }
 
-impl Default for GCState {
+impl Default for GcState {
     fn default() -> Self {
-        GCState::new(GCConfig::default())
+        GcState::new(GcConfig::default())
     }
 }
 
-impl GCState {
-    fn new(config: GCConfig) -> Self {
+impl GcState {
+    fn new(config: GcConfig) -> Self {
         let threshold = config.threshold as usize;
         
         Self {
             config,
             threshold,
             
-            stats: GCStats {
+            stats: GcStats {
                 allocated: 0,
                 box_count: 0,
                 cycle_count: 0,
@@ -92,8 +92,8 @@ impl GCState {
         self.stats.allocated > self.threshold
     }
     
-    fn allocate<T: GCTrace>(&mut self, data: T) -> NonNull<GCBox<T>> {
-        let gcbox = GCBox::new(data);
+    fn allocate<T: GcTrace>(&mut self, data: T) -> NonNull<GcBox<T>> {
+        let gcbox = GcBox::new(data);
         let ptr = gcbox.as_ptr();
 
         unsafe {
@@ -109,11 +109,11 @@ impl GCState {
         gcbox
     }
     
-    /// frees the GCBox, yielding it's next pointer
-    fn free(&mut self, gcbox: NonNull<GCBox<dyn GCTrace>>) -> Option<NonNull<GCBox<dyn GCTrace>>> {
+    /// frees the GcBox, yielding it's next pointer
+    fn free(&mut self, gcbox: NonNull<GcBox<dyn GcTrace>>) -> Option<NonNull<GcBox<dyn GcTrace>>> {
         let ptr = gcbox.as_ptr();
         
-        // SAFETY: This is safe as long as we only ever free() GCBoxes that were created by allocate()
+        // SAFETY: This is safe as long as we only ever free() GcBoxes that were created by allocate()
         let gcbox = unsafe { Box::from_raw(ptr) };
         
         let size = gcbox.size();
@@ -126,8 +126,8 @@ impl GCState {
         // gcbox should get dropped here
     }
     
-    fn collect_garbage(&mut self, root: &impl GCTrace) {
-        log::debug!("GC cycle begin ---");
+    fn collect_garbage(&mut self, root: &impl GcTrace) {
+        log::debug!("Gc cycle begin ---");
         
         let allocated = self.stats.allocated;
         let box_count = self.stats.box_count;
@@ -148,13 +148,13 @@ impl GCState {
         self.threshold = (self.stats.allocated * self.config.pause_factor as usize) / 100;
         log::debug!("Next collection at {} bytes", self.threshold);
         
-        log::debug!("GC cycle end ---");
+        log::debug!("Gc cycle end ---");
     }
     
     unsafe fn sweep(&mut self) {
         let _guard = DropGuard::new();
         
-        //boxes_start: Option<NonNull<GCBox<dyn GCTrace>>>,
+        //boxes_start: Option<NonNull<GcBox<dyn GcTrace>>>,
         let mut prev_box = None;
         let mut next_box = self.boxes_start;
         while let Some(gcbox) = next_box {
@@ -180,7 +180,7 @@ impl GCState {
     }
 }
 
-impl Drop for GCState {
+impl Drop for GcState {
     fn drop(&mut self) {
         // unimplemented!()
     }
@@ -210,7 +210,7 @@ fn deref_safe() -> bool {
 }
 
 
-impl fmt::Display for GCStats {
+impl fmt::Display for GcStats {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             fmt, "Cycle {}: estimated usage {}u ({} allocations)", 

@@ -1,7 +1,7 @@
 use core::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::runtime::Variant;
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::strings::{StringSymbol, STRING_TABLE};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 

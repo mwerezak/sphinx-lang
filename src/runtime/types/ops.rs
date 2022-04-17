@@ -7,7 +7,7 @@
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-use crate::runtime::gc::GC;
+use crate::runtime::gc::Gc;
 use crate::runtime::types::MetaObject;
 use crate::runtime::errors::{ExecResult, ErrorKind};
 

@@ -4,7 +4,7 @@ use std::error::Error;
 use crate::utils;
 use crate::runtime::Variant;
 use crate::runtime::function::Signature;
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::types::{Type, MethodTag};
 use crate::runtime::strings::StringSymbol;
 use crate::debug::traceback::{TraceSite, Traceback};
@@ -42,7 +42,7 @@ impl From<ErrorKind> for Box<RuntimeError> {
     }
 }
 
-unsafe impl GCTrace for ErrorKind {
+unsafe impl GcTrace for ErrorKind {
     fn trace(&self) {
         match self {
             Self::UnhashableValue(value) => value.trace(),
@@ -68,7 +68,7 @@ pub struct RuntimeError {
     cause: Option<Box<RuntimeError>>,
 }
 
-unsafe impl GCTrace for RuntimeError {
+unsafe impl GcTrace for RuntimeError {
     fn trace(&self) {
         self.kind.trace();
         for site in self.traceback.iter() {

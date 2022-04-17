@@ -2,7 +2,7 @@ use core::cell::Cell;
 use core::ops::Deref;
 use crate::codegen::LocalIndex;
 use crate::runtime::{Variant, HashMap};
-use crate::runtime::gc::{GC, GCTrace, gc_collect};
+use crate::runtime::gc::{Gc, GcTrace, gc_collect};
 use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
 use crate::runtime::module::Module;
 use crate::runtime::errors::ExecResult;
@@ -34,7 +34,7 @@ enum Control {
 #[derive(Debug, Clone, Copy)]
 struct UpvalueRef {
     // TODO weak reference
-    fun: GC<Function>,
+    fun: Gc<Function>,
     index: UpvalueIndex,
 }
 
@@ -47,7 +47,7 @@ impl Deref for UpvalueRef {
     }
 }
 
-impl GC<Function> {
+impl Gc<Function> {
     #[inline(always)]
     fn ref_upvalue(self, index: UpvalueIndex) -> UpvalueRef {
         UpvalueRef {
@@ -73,7 +73,7 @@ pub struct VirtualMachine<'c> {
 
 impl<'c> VirtualMachine<'c> {
     /// Create a new VM with the specified root module and an empty main chunk
-    pub fn new(main_module: GC<Module>, main_chunk: &'c [u8]) -> Self {
+    pub fn new(main_module: Gc<Module>, main_chunk: &'c [u8]) -> Self {
         Self {
             traceback: Vec::new(),
             calls: Vec::new(),
@@ -155,8 +155,8 @@ impl<'c> VirtualMachine<'c> {
     }
 }
 
-// trace through all GC roots
-unsafe impl GCTrace for VirtualMachine<'_> {
+// trace through all Gc roots
+unsafe impl GcTrace for VirtualMachine<'_> {
     fn trace(&self) {
         // trace through the value stack
         for value in self.values.stack.iter() {
@@ -198,7 +198,7 @@ impl ValueStack {
     }
     
     // Note: when moving values off the stack, make sure to copy *before* popping
-    // This ensures that the GC sees the values as rooted
+    // This ensures that the Gc sees the values as rooted
     
     #[inline(always)]
     fn len(&self) -> usize {
@@ -322,7 +322,7 @@ impl OpenUpvalues {
         self.upvalues.values().flat_map(|refs| refs.iter())
     }
     
-    fn register(&mut self, function: GC<Function>) {
+    fn register(&mut self, function: Gc<Function>) {
         for (index, upval) in function.upvalues().iter().enumerate() {
             if upval.closure().is_open() {
                 let upval_ref = function.ref_upvalue(index.try_into().unwrap());
@@ -346,7 +346,7 @@ impl OpenUpvalues {
     
     fn close_upvalues(&mut self, index: usize, value: Variant) {
         if let Some(upvalues) = self.upvalues.remove(&index) {
-            let gc_cell = GC::new(Cell::new(value));
+            let gc_cell = Gc::new(Cell::new(value));
             for upvalue in upvalues.iter() {
                 upvalue.close(gc_cell)
             }

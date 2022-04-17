@@ -12,7 +12,7 @@ pub mod errors;
 
 mod tests;
 
-pub use gc::GC;
+pub use gc::Gc;
 pub use vm::VirtualMachine;
 pub use strings::STRING_TABLE;
 pub use variant::{Variant, VariantKey};

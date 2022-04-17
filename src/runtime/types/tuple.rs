@@ -1,16 +1,16 @@
 use core::fmt;
 use crate::runtime::Variant;
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::types::{Type, MetaObject};
 use crate::runtime::errors::ExecResult;
 
 #[derive(Clone, Copy)]
 pub enum Tuple {
     Empty,
-    NonEmpty(GC<Box<[Variant]>>),  // TODO: stop using Box when DST support is stabilized
+    NonEmpty(Gc<Box<[Variant]>>),  // TODO: stop using Box when DST support is stabilized
 }
 
-unsafe impl GCTrace for Box<[Variant]> {
+unsafe impl GcTrace for Box<[Variant]> {
     fn trace(&self) {
         for item in self.iter() {
             item.trace();
@@ -31,7 +31,7 @@ impl From<Box<[Variant]>> for Tuple {
         if items.is_empty() {
             Self::Empty
         } else {
-            Self::NonEmpty(GC::new(items))
+            Self::NonEmpty(Gc::new(items))
         }
     }
 }
@@ -52,7 +52,7 @@ impl Tuple {
         }
     }
     
-    pub fn as_gc(&self) -> Option<GC<dyn GCTrace>> {
+    pub fn as_gc(&self) -> Option<Gc<dyn GcTrace>> {
         match self {
             Self::NonEmpty(gc_items) => Some((*gc_items).into()),
             Self::Empty => None,

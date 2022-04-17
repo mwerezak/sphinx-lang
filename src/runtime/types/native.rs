@@ -1,6 +1,6 @@
 use core::any::Any;
 use core::ops::Deref;
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::types::{Type, MetaObject};
 
 
@@ -19,7 +19,7 @@ impl Deref for UserDataBox {
     }
 }
 
-unsafe impl GCTrace for UserDataBox {
+unsafe impl GcTrace for UserDataBox {
     fn trace(&self) {
         self.data.trace()
     }
@@ -31,6 +31,6 @@ unsafe impl GCTrace for UserDataBox {
 
 
 /// Trait for custom data
-pub trait UserData: Any + GCTrace + MetaObject {
+pub trait UserData: Any + GcTrace + MetaObject {
     fn type_tag(&self) -> Type { Type::UserData }
 }

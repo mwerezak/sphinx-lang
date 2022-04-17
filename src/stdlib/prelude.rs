@@ -1,5 +1,5 @@
 
-use crate::runtime::{Variant, GC};
+use crate::runtime::{Variant, Gc};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Namespace, GlobalEnv, Access};
 use crate::runtime::function::{NativeFunction, Signature, Parameter};
@@ -10,7 +10,7 @@ use crate::runtime::errors::ExecResult;
 
 use std::time::SystemTime;
 
-pub fn create_prelude() -> GC<GlobalEnv> {
+pub fn create_prelude() -> Gc<GlobalEnv> {
     let env = GlobalEnv::new();
     
     let time = native_function!(time, env, _  => {

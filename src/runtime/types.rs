@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::function::{Call, Function, NativeFunction, Callable};
 use crate::runtime::strings::{StringValue, StringSymbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
@@ -257,7 +257,7 @@ impl MetaObject for bool {
     }
 }
 
-impl<F> MetaObject for GC<F> where F: GCTrace, GC<F>: Callable {
+impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
     fn type_tag(&self) -> Type { Type::Function }
     
     fn invoke(&self, args: &[Variant]) -> Option<ExecResult<Call>> {
@@ -265,7 +265,7 @@ impl<F> MetaObject for GC<F> where F: GCTrace, GC<F>: Callable {
     }
     
     fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
-        other.as_gc().map(|other| Ok(GC::ptr_eq(&(*self).into(), &other)))
+        other.as_gc().map(|other| Ok(Gc::ptr_eq(&(*self).into(), &other)))
     }
 }
 

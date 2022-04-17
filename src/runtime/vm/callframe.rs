@@ -3,7 +3,7 @@ use crate::codegen::{OpCode, LocalIndex, UpvalueTarget};
 use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::VMFrameSnapshot;
 use crate::runtime::Variant;
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::function::{Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Module, Access, Chunk, ConstID, FunctionID, FunctionProto};
@@ -59,7 +59,7 @@ fn into_usize(value: Variant) -> usize {
 }
 
 #[inline]
-fn into_function(value: Variant) -> GC<Function> {
+fn into_function(value: Variant) -> Gc<Function> {
     match value {
         Variant::Function(fun) => fun,
         _ => panic!("invalid operand")
@@ -118,7 +118,7 @@ macro_rules! cond_jump {
 
 #[derive(Debug)]
 pub struct VMCallFrame<'c> {
-    module: GC<Module>,
+    module: Gc<Module>,
     chunk: &'c [u8],
     chunk_id: Chunk,
     frame_idx: usize,   // start index for this frame in the value stack
@@ -126,14 +126,14 @@ pub struct VMCallFrame<'c> {
     pc: usize,
 }
 
-unsafe impl GCTrace for VMCallFrame<'_> {
+unsafe impl GcTrace for VMCallFrame<'_> {
     fn trace(&self) {
         self.module.mark_trace();
     }
 }
 
 impl<'c> VMCallFrame<'c> {
-    pub fn call_frame(module: GC<Module>, fun_id: FunctionID, frame_idx: usize, locals: LocalIndex) -> Self {
+    pub fn call_frame(module: Gc<Module>, fun_id: FunctionID, frame_idx: usize, locals: LocalIndex) -> Self {
         
         // This hack allows us to get around the self-referentiality of storing both "module" and "chunk"
         // in the same struct. The alternative would be to store "chunk" as an `Option<Box<[u8]>>` and call 
@@ -153,7 +153,7 @@ impl<'c> VMCallFrame<'c> {
         }
     }
     
-    pub fn main_chunk(module: GC<Module>, chunk: &'c [u8]) -> Self {
+    pub fn main_chunk(module: Gc<Module>, chunk: &'c [u8]) -> Self {
         Self {
             module,
             chunk,
@@ -272,14 +272,14 @@ impl<'c> VMCallFrame<'c> {
             OpCode::LoadFunction => {
                 let fun_id = FunctionID::from(data[0]);
                 let proto = self.module.get_function(fun_id);
-                let function = GC::new(self.make_function(stack, proto));
+                let function = Gc::new(self.make_function(stack, proto));
                 upvalues.register(function);
                 stack.push(Variant::Function(function));
             }
             OpCode::LoadFunction16 => {
                 let fun_id = FunctionID::from(read_le_bytes!(u16, data));
                 let proto = self.module.get_function(fun_id);
-                let function = GC::new(self.make_function(stack, proto));
+                let function = Gc::new(self.make_function(stack, proto));
                 upvalues.register(function);
                 stack.push(Variant::Function(function));
             }

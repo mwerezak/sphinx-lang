@@ -3,7 +3,7 @@
 use core::ops::Deref;
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-use crate::runtime::gc::{GC, GCTrace};
+use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::function::{Call, Function, NativeFunction, Callable};
 use crate::runtime::strings::{StringValue, StringSymbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
@@ -40,8 +40,8 @@ macro_rules! static_dispatch {
                 
                 Variant::Tuple(tuple) => <Tuple as MetaObject>::$name(tuple, $( $arg ),* ),
                 
-                Variant::Function(fun) => <GC<Function> as MetaObject>::$name(fun, $( $arg ),* ),
-                Variant::NativeFunction(fun) => <GC<NativeFunction> as MetaObject>::$name(fun, $( $arg ),* ),
+                Variant::Function(fun) => <Gc<Function> as MetaObject>::$name(fun, $( $arg ),* ),
+                Variant::NativeFunction(fun) => <Gc<NativeFunction> as MetaObject>::$name(fun, $( $arg ),* ),
                 
                 Variant::UserData(data) => <(dyn UserData + 'static) as MetaObject>::$name(&***data, $( $arg ),* ),
             }
