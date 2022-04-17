@@ -17,6 +17,18 @@ struct GCBox<T> where T: GCTrace + ?Sized + 'static {
     data: T,
 }
 
+impl<T> GCBox<T> where T: GCTrace {
+    fn new(data: T) -> NonNull<GCBox<T>> {
+        let gcbox = Box::new(GCBox {
+            next: None,
+            marked: false,
+            data,
+        });
+        
+        unsafe { NonNull::new_unchecked(Box::into_raw(gcbox)) }
+    }
+}
+
 impl<T> GCBox<T> where T: GCTrace + ?Sized {
     fn value(&self) -> &T { &self.data }
     
@@ -133,26 +145,20 @@ impl GCState {
     }
     
     fn allocate<T: GCTrace>(&mut self, data: T) -> NonNull<GCBox<T>> {
-        
-        let gcbox = Box::new(GCBox {
-            next: self.boxes_start.take(),
-            marked: false,
-            data,
-        });
+        let gcbox = GCBox::new(data);
+        let ptr = gcbox.as_ptr();
 
-        let size = gcbox.size();
-        let ptr = Box::into_raw(gcbox);
-        log::debug!("{:#X} allocate {} bytes", ptr as usize, size);
+        unsafe {
+            let size = (*ptr).size();
+            log::debug!("{:#X} allocate {} bytes", ptr as usize, size);
+            
+            (*ptr).next = self.boxes_start.take();
+            self.boxes_start = Some(gcbox);
+            self.stats.allocated += size;
+            self.stats.box_count += 1;
+        }
         
-        let ptr = unsafe {
-            NonNull::new_unchecked(ptr)
-        };
-        
-        self.boxes_start = Some(ptr);
-        self.stats.allocated += size;
-        self.stats.box_count += 1;
-        
-        ptr
+        gcbox
     }
     
     /// frees the GCBox, yielding it's next pointer
