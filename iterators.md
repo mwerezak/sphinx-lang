@@ -5,14 +5,16 @@ They are used to support `for` loops and `...` argument unpacking syntax.
 
 ## Iterators and Iterables
 
-An *iterator* in Sphinx is anything that supports the `__next` metamethod
+An *iterator* in Sphinx is anything that supports the `__next` metamethod.
 
 An *iterable* is one of the following:
 - A callable that when invoked with no arguments returns an iterator.
 - An object that has the `__iter` metamethod which returns am iterator.
 - A plain iterator is also an iterable.
 
-`iterfunc` must be a callable that accepts two arguments: `(i, invariant)` and returns a tuple `(next_i, ...)` or `nil`.
+`__next` takes no arguments and returns a tuple `(next, ...)` or `nil`.
+
+
 
 `invariant` is a value that is passed to each invocation of `iterfunc`
 

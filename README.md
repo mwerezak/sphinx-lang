@@ -12,9 +12,11 @@ Sphinx is not complete! I started work on it in February 2022, and there is stil
 
 My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be decently fast, and I aim to balance these two goals.
 
-For example, I have an internal type system built around a `MetaObject` trait which makes it easy to specify the behaviours that are supported by each of the core primitive types in the language. Thanks to Rust's enum types (and some macros) this is implemented without any vtables, using static dispatch based on the enum discriminant.
+# Some Things That I Like About the Implementation
 
-As well, `Variant` (the core dynamic data type), is 16 bytes wide and short strings are "inlined" inside this value when possible (inspired by flexstr). All strings that are used as identifiers are interned. The bytecode compiler converts local variable names into indexes into the value stack, so strings are not used at all when referencing local variables.
+I have an internal type system built around a `MetaObject` trait which makes it easy to specify the behaviours that are supported by each of the core primitive types in the language. Thanks to Rust's enum types (and some macros) this is implemented without any vtables, using static dispatch based on the enum discriminant.
+
+Different representations of string data. Short strings are "inlined" on the stack when possible (inspired by flexstr). All strings that are used as identifiers are interned. Only strings >40 bytes long are allocated using the GC. The bytecode compiler converts local variable names into indexes into the value stack, so strings are not used at all when referencing local variables.
 
 The Sphinx language uses a simple Mark-Trace GC inspired by `rust-gc`. The *runtime* itself does not use any GC. Since we are only GC'ing script data, a lot of the challenges that would be involved in writing a GC for general Rust code are avoided (that for example, `rust-gc` has to deal with). In the future I would like to support incremental GC and *maybe* generational GC as well, but the current implementation is simple and works pretty well.
 
