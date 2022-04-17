@@ -4,7 +4,7 @@ use core::hash::{Hash, Hasher};
 use core::cmp::{PartialEq, Eq};
 use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Type, Tuple, UserData};
+use crate::runtime::types::{Type, Tuple, UserDataBox};
 use crate::runtime::function::{Function, NativeFunction, Call};
 use crate::runtime::strings::{StringValue, StringSymbol, InlineStr, GCStr};
 use crate::runtime::gc::{GC, GCTrace};
@@ -32,7 +32,7 @@ pub enum Variant {
     Function(GC<Function>),
     NativeFunction(GC<NativeFunction>),
     
-    UserData(GC<dyn UserData>),
+    UserData(GC<UserDataBox>),
 }
 
 impl Variant {
