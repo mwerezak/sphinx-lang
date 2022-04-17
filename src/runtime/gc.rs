@@ -6,65 +6,13 @@ use core::ptr::{self, NonNull};
 use core::cell::{Cell, RefCell};
 use log;
 
+mod data;
 mod handle;
+
+pub use data::GCTrace;
 pub use handle::GC;
 
-
-/// TODO store GCBoxes in linear chunks instead of individual linked nodes
-struct GCBox<T> where T: GCTrace + ?Sized + 'static {
-    next: Option<NonNull<GCBox<dyn GCTrace>>>,
-    marked: bool,
-    data: T,
-}
-
-impl<T> GCBox<T> where T: GCTrace {
-    fn new(data: T) -> NonNull<GCBox<T>> {
-        let gcbox = Box::new(GCBox {
-            next: None,
-            marked: false,
-            data,
-        });
-        
-        unsafe { NonNull::new_unchecked(Box::into_raw(gcbox)) }
-    }
-}
-
-impl<T> GCBox<T> where T: GCTrace + ?Sized {
-    fn value(&self) -> &T { &self.data }
-    
-    #[inline]
-    fn size(&self) -> usize {
-        mem::size_of_val(self) + self.value().size_hint()
-    }
-    
-    fn ptr_eq(&self, other: &GCBox<T>) -> bool {
-        // in case T is a trait object, work around for <https://github.com/rust-lang/rust/issues/46139>
-        ptr::eq(&self.marked, &other.marked)
-    }
-    
-    fn mark_trace(&mut self) {
-        if !self.marked {
-            self.marked = true;
-            self.data.trace();
-        }
-    }
-}
-
-
-/// Unsafe because if the GCTrace::trace() implementation fails to mark any GC handles that it can reach, 
-/// the GC will not be able to mark them and will free memory that is still in use.
-/// SAFETY: Must not impl Drop
-pub unsafe trait GCTrace {
-    
-    /// SAFETY: Must call `GC::mark_trace()` on every reachable GC handle
-    fn trace(&self);
-    
-    /// If the GCTrace owns any allocations, this should return the extra allocated size.
-    /// If the allocation can change size, like a Vec<T>, then don't include it in the 
-    /// size hint, or return a const estimate of the average size.
-    #[inline]
-    fn size_hint(&self) -> usize { 0 }
-}
+use data::GCBox;
 
 
 thread_local! {
@@ -152,7 +100,7 @@ impl GCState {
             let size = (*ptr).size();
             log::debug!("{:#X} allocate {} bytes", ptr as usize, size);
             
-            (*ptr).next = self.boxes_start.take();
+            (*ptr).set_next(self.boxes_start.take());
             self.boxes_start = Some(gcbox);
             self.stats.allocated += size;
             self.stats.box_count += 1;
@@ -173,7 +121,7 @@ impl GCState {
         self.stats.box_count -= 1;
         log::debug!("{:#X} free {} bytes", ptr as *const () as usize, size);
         
-        gcbox.next
+        gcbox.next()
         
         // gcbox should get dropped here
     }
@@ -212,17 +160,17 @@ impl GCState {
         while let Some(gcbox) = next_box {
             let box_ptr = gcbox.as_ptr();
             
-            if (*box_ptr).marked {
-                (*box_ptr).marked = false;
+            if (*box_ptr).is_marked() {
+                (*box_ptr).clear_mark();
                 
-                next_box = (*box_ptr).next;
+                next_box = (*box_ptr).next();
                 prev_box.replace(gcbox);
                 
             } else {
                 
                 next_box = self.free(gcbox);
                 if let Some(prev_box) = prev_box {
-                    (*prev_box.as_ptr()).next = next_box;
+                    (*prev_box.as_ptr()).set_next(next_box);
                 } else {
                     self.boxes_start = next_box;
                 }
