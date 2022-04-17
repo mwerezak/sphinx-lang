@@ -4,7 +4,7 @@ use core::hash::{Hash, Hasher};
 use core::cmp::{PartialEq, Eq};
 use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Type, Tuple};
+use crate::runtime::types::{Type, Tuple, UserData};
 use crate::runtime::function::{Function, NativeFunction, Call};
 use crate::runtime::strings::{StringValue, StringSymbol, InlineStr, GCStr};
 use crate::runtime::gc::{GC, GCTrace};
@@ -31,6 +31,8 @@ pub enum Variant {
     Tuple(Tuple),
     Function(GC<Function>),
     NativeFunction(GC<NativeFunction>),
+    
+    UserData(GC<dyn UserData>),
 }
 
 impl Variant {
@@ -233,6 +235,13 @@ impl fmt::Display for Variant {
                 fun.signature().display_short(),
                 GC::as_id(fun),
             ),
+            
+            Self::UserData(data) =>
+                if let Ok(name) = data.type_name() {
+                    write!(fmt, "<{} at {:#X}>", name, GC::as_id(data))
+                } else {
+                    write!(fmt, "<userdata at {:#X}>", GC::as_id(data))
+                }
         }
     }
 }

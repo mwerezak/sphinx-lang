@@ -7,7 +7,7 @@ use crate::runtime::gc::{GC, GCTrace};
 use crate::runtime::function::{Call, Function, NativeFunction, Callable};
 use crate::runtime::strings::{StringValue, StringSymbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
-use crate::runtime::types::{Type, MetaObject, Tuple};
+use crate::runtime::types::{Type, MetaObject, Tuple, UserData};
 
 
 /// Newtype wrapper for `Variant` that impls `MetaObject` using enum-based static dispatch.
@@ -37,9 +37,13 @@ macro_rules! static_dispatch {
                 Variant::InternStr(symbol) => <StringValue as MetaObject>::$name(&(*symbol).into(), $( $arg ),* ),
                 Variant::InlineStr(inline) => <StringValue as MetaObject>::$name(&(*inline).into(), $( $arg ),* ),
                 Variant::GCStr(gc_str) => <StringValue as MetaObject>::$name(&(*gc_str).into(), $( $arg ),* ),
+                
                 Variant::Tuple(tuple) => <Tuple as MetaObject>::$name(tuple, $( $arg ),* ),
-                Variant::Function(fun) =>  <GC<Function> as MetaObject>::$name(fun, $( $arg ),* ),
+                
+                Variant::Function(fun) => <GC<Function> as MetaObject>::$name(fun, $( $arg ),* ),
                 Variant::NativeFunction(fun) => <GC<NativeFunction> as MetaObject>::$name(fun, $( $arg ),* ),
+                
+                Variant::UserData(data) => <(dyn UserData + 'static) as MetaObject>::$name(&**data, $( $arg ),* ),
             }
         }
     };

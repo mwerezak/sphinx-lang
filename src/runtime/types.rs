@@ -15,8 +15,10 @@ mod metatable;
 mod numeric;
 mod string;
 mod tuple;
+mod native;
 
 pub use tuple::Tuple;
+pub use native::UserData;
 
 
 // Type tag for Sphinx's "primitive" types
@@ -31,12 +33,12 @@ pub enum Type {
     Function,
     Metatable,
     Object,
+    UserData,
 }
 
-
-impl fmt::Display for Type {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = match self {
+impl Type {
+    pub fn name(&self) -> &'static str {
+        match self {
             Self::Nil => "nil",
             Self::Boolean => "bool",
             Self::Integer => "int",
@@ -45,18 +47,25 @@ impl fmt::Display for Type {
             Self::Tuple => "tuple",
             Self::Function => "function",
             Self::Metatable => "metatable",
-            
-            // note, when looking up the type of an object value 
-            // the object's metatable should be used to generate the type name
             Self::Object => "object",
-        };
-        fmt.write_str(name)
+            Self::UserData => "userdata",
+        }
+    }
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.write_str(self.name())
     }
 }
 
 #[allow(unused_variables)]
 pub trait MetaObject {
     fn type_tag(&self) -> Type;
+    
+    fn type_name(&self) -> ExecResult<StringValue> {
+        Ok(StringValue::from(self.type_tag().name()))
+    }
     
     // primitive coercions
     fn as_bool(&self) -> ExecResult<bool> { Ok(true) }
