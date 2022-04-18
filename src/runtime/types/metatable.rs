@@ -58,11 +58,11 @@ pub struct Metatable<T> {
     cmp_eq: Option<MethodCompare<T>>, // __eq
 }
 
-unsafe impl<T> GcTrace for Metatable<T> {
-    fn trace(&self) {
-        // don't need to do anything as the metatable only holds function pointers
-    }
-}
+// unsafe impl<T> GcTrace for Metatable<T> {
+//     fn trace(&self) {
+//         // don't need to do anything as the metatable only holds function pointers
+//     }
+// }
 
 // Metamethod Tags
 

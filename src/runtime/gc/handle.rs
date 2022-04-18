@@ -18,12 +18,31 @@ impl<T: GcTrace> Gc<T> {
     pub fn new(data: T) -> Self {
         GC_STATE.with(|gc| {
             let mut gc = gc.borrow_mut();
-            Self::from_raw(gc.allocate(data))
+            
+            let gcbox = GcBox::new(data);
+            gc.insert(gcbox);
+            Self::from_raw(gcbox)
         })
     }
 }
 
 impl<T> Gc<T> where T: GcTrace + ?Sized {
+    pub fn from_box(data: Box<T>) -> Self {
+        GC_STATE.with(|gc| {
+            let mut gc = gc.borrow_mut();
+            
+            let gcbox = GcBox::from_box(data);
+            
+            gc.insert(gcbox);
+            
+            
+            Self::from_raw(gcbox)
+        })
+    }
+}
+
+impl<T> Gc<T> where T: GcTrace + ?Sized {
+    
     pub(super) fn from_raw(ptr: NonNull<GcBox<T>>) -> Self {
         Self { ptr, _marker: PhantomData }
     }

@@ -92,21 +92,17 @@ impl GcState {
         self.stats.allocated > self.threshold
     }
     
-    fn allocate<T: GcTrace>(&mut self, data: T) -> NonNull<GcBox<T>> {
-        let gcbox = GcBox::new(data);
-        let ptr = gcbox.as_ptr();
-
+    fn insert(&mut self, gcbox: NonNull<GcBox<dyn GcTrace>>) {
         unsafe {
+            let ptr = gcbox.as_ptr();
             let size = (*ptr).size();
-            log::debug!("{:#X} allocate {} bytes", ptr as usize, size);
+            log::debug!("{:#X} allocate {} bytes", ptr as *const () as usize, size);
             
             (*ptr).set_next(self.boxes_start.take());
             self.boxes_start = Some(gcbox);
             self.stats.allocated += size;
             self.stats.box_count += 1;
         }
-        
-        gcbox
     }
     
     /// frees the GcBox, yielding it's next pointer
