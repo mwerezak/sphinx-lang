@@ -107,19 +107,14 @@ impl GcState {
     
     /// frees the GcBox, yielding it's next pointer
     fn free(&mut self, gcbox: NonNull<GcBox<dyn GcTrace>>) -> Option<NonNull<GcBox<dyn GcTrace>>> {
-        let ptr = gcbox.as_ptr();
+        let gcbox = gcbox.as_ptr();
         
-        // SAFETY: This is safe as long as we only ever free() GcBoxes that were created by allocate()
-        let gcbox = unsafe { Box::from_raw(ptr) };
-        
-        let size = gcbox.size();
+        let size = unsafe { (*gcbox).size() };
         self.stats.allocated -= size;
         self.stats.box_count -= 1;
-        log::debug!("{:#X} free {} bytes", ptr as *const () as usize, size);
+        log::debug!("{:#X} free {} bytes", gcbox as *const () as usize, size);
         
-        gcbox.next()
-        
-        // gcbox should get dropped here
+        unsafe { GcBox::free(gcbox) }
     }
     
     fn collect_garbage(&mut self, root: &impl GcTrace) {

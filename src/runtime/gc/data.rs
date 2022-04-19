@@ -35,14 +35,22 @@ unsafe impl<T> GcTrace for [T] where T: GcTrace {
     }
 }
 
+#[derive(Debug)]
+enum Dealloc {
+    FromBox,
+    FromLayout(Layout),
+}
 
+#[derive(Debug)]
 struct GcBoxHeader {
     next: Option<NonNull<GcBox<dyn GcTrace>>>,
     marked: bool,
+    dealloc: Dealloc,
 }
 
 // need to control memory layout to alloc for unsized data
 #[repr(C)]
+#[derive(Debug)]
 pub struct GcBox<T> where T: GcTrace + ?Sized + 'static {
     header: GcBoxHeader,
     data: T,
@@ -55,6 +63,7 @@ impl<T> GcBox<T> where T: GcTrace {
             header: GcBoxHeader {
                 next: None,
                 marked: false,
+                dealloc: Dealloc::FromBox,
             },
             data,
         });
@@ -93,41 +102,55 @@ impl<T> GcBox<T> where
         let header = GcBoxHeader {
             next: None,
             marked: false,
+            dealloc: Dealloc::FromLayout(layout),
         };
         
         unsafe {
             ptr::write(&mut (*ptr).header, header);
-            // seems a little sketchy
-            ptr::copy_nonoverlapping(data_ptr as *mut u8, ptr::addr_of_mut!((*ptr).data) as *mut u8, data_size);
+            ptr::copy_nonoverlapping(
+                data_ptr as *mut u8,
+                ptr::addr_of_mut!((*ptr).data) as *mut u8, 
+                data_size
+            );
         }
         
-        // manually drop the original box
-        unsafe {
-            dealloc(data_ptr as *mut u8, data_layout);
-        }
+        // manually free the original box
+        unsafe { dealloc(data_ptr as *mut u8, data_layout); }
         
         // SAFETY: Checked ptr.is_null() earlier.
         unsafe { NonNull::new_unchecked(ptr) }
     }
 }
 
-// fn bar<T: ?Sized>(ptr: *mut T) -> *mut Foo<T> 
-// where
-//     T: Pointee,
-//     Foo<T>: Pointee<Metadata = T::Metadata>,
-// {
-//     ptr::from_raw_parts_mut(
-//         ptr as *mut (),
-//         ptr::metadata(ptr),
-//     )
-// }
 
-/*
-expected associated type `<GcBox<T> as Pointee>::Metadata`
-   found associated type `<T as Pointee>::Metadata`
-*/
+// destructor
+impl<T> GcBox<T> where T: GcTrace + ?Sized {
+    
+    /// SAFETY: ptr must be non-null and (*ptr).header.dealloc must be accurate
+    pub unsafe fn free(ptr: *mut Self) -> Option<NonNull<GcBox<dyn GcTrace>>> {
+        match (*ptr).header.dealloc {
+            Dealloc::FromBox => {
+                // SAFETY: This is safe as long as we only ever free() GcBoxes that were created Box::into_raw()
+                let gcbox = Box::from_raw(ptr);
+                gcbox.next()
+                
+                // gcbox should get dropped here
+            }
+            
+            Dealloc::FromLayout(layout) => {
+                let next = (*ptr).next();
+                dealloc(ptr as *mut u8, layout);
+                
+                next
+            }
+        }
+        
+    }
+}
+
 
 impl<T> GcBox<T> where T: GcTrace + ?Sized {
+    
     #[inline]
     pub fn value(&self) -> &T { &self.data }
     
@@ -168,4 +191,28 @@ impl<T> GcBox<T> where T: GcTrace + ?Sized {
     pub fn clear_mark(&mut self) {
         self.header.marked = false
     }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    unsafe impl GcTrace for i32 {
+        fn trace(&self) {}
+    }
+    
+    #[test]
+    fn test_gcbox_alloc_dealloc() {
+        let data = 63;
+        let gcbox = GcBox::new(data);
+        println!("gcbox sized: {:#?}", unsafe { &*gcbox.as_ptr() });
+        unsafe { GcBox::free(gcbox.as_ptr()); }
+        
+        let unsized_data = vec![1,2,3,4,5].into_boxed_slice();
+        let gcbox = GcBox::from_box(unsized_data);
+        println!("gcbox unsized: {:#?}", unsafe { &*gcbox.as_ptr() });
+        unsafe { GcBox::free(gcbox.as_ptr()); }
+    }
+    
 }
