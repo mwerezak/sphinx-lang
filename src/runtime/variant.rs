@@ -1,6 +1,5 @@
 use core::fmt;
 use core::hash::{Hash, Hasher};
-use core::cmp::{PartialEq, Eq};
 use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
 use crate::runtime::types::{Tuple, UserData};
