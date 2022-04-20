@@ -20,4 +20,11 @@ impl MetaObject for StringValue {
         }
         None
     }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        if let Some(other) = other.as_strval() {
+            return Some(Ok(*self == other))
+        }
+        None
+    }
 }

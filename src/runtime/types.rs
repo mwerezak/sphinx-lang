@@ -132,56 +132,32 @@ pub trait MetaObject {
 
 impl Variant {
     pub fn as_bool(&self) -> ExecResult<bool> { 
-        match self {
-            Self::Nil => Ok(false),
-            Self::BoolFalse => Ok(false),
-            Self::BoolTrue => Ok(true),
-            _ => self.as_meta().as_bool(),
-        }
+        self.as_meta().as_bool()
     }
     
     pub fn as_bits(&self) -> ExecResult<IntType> {
-        match self {
-            Self::BoolFalse => false.as_bits().unwrap(),
-            Self::BoolTrue => true.as_bits().unwrap(),
-            Self::Integer(value) => Ok(*value),
-            _ => self.as_meta().as_bits()
-                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsBits))?,
-        }
+        self.as_meta().as_bits()
+            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsBits))?
     }
     
     pub fn as_int(&self) -> ExecResult<IntType> {
-        match self {
-            Self::Integer(value) => Ok(*value),
-            _ => self.as_meta().as_int()
-                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsInt))?
-        }
+        self.as_meta().as_int()
+            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsInt))?
     }
     
     pub fn as_float(&self) -> ExecResult<FloatType> {
-        match self {
-            Self::Float(value) => Ok(*value),
-            Self::Integer(value) => Ok(*value as FloatType),
-            _ => self.as_meta().as_float()
-                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsFloat))?
-        }
+        self.as_meta().as_float()
+            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsFloat))?
     }
     
     pub fn len(&self) -> ExecResult<usize> {
-        match self {
-            Self::Tuple(tuple) => <Tuple as MetaObject>::len(tuple).unwrap(),
-            _ => self.as_meta().len()
-                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Len))?
-        }
+        self.as_meta().len()
+            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Len))?
     }
     
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
-        match self {
-            Self::Function(fun) => fun.checked_call(args),
-            Self::NativeFunction(fun) => fun.checked_call(args),
-            _ => self.as_meta().invoke(args)
-                .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Invoke))?
-        }
+        self.as_meta().invoke(args)
+            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Invoke))?
     }
 }
 

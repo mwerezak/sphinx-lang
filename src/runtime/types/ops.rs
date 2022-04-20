@@ -73,158 +73,89 @@ impl Variant {
     
     #[inline(always)]
     pub fn apply_neg(&self) -> ExecResult<Variant> {
-        match self {
-            Self::Integer(value) => value.op_neg().unwrap(),
-            Self::Float(value) => value.op_neg().unwrap(),
-            _ => meta_eval_unary!(self, op_neg),
-        }
+        meta_eval_unary!(self, op_neg)
     }
     
     #[inline(always)]
     pub fn apply_pos(&self) -> ExecResult<Variant> {
-        match self {
-            Self::Integer(value) => value.op_pos().unwrap(),
-            Self::Float(value) => value.op_pos().unwrap(),
-            _ => meta_eval_unary!(self, op_pos),
-        }
+        meta_eval_unary!(self, op_pos)
     }
     
     #[inline(always)]
     pub fn apply_inv(&self) -> ExecResult<Variant> {
-        match self {
-            Self::BoolTrue => true.op_inv().unwrap(),
-            Self::BoolFalse => false.op_inv().unwrap(),
-            Self::Integer(value) => value.op_inv().unwrap(),
-            _ => meta_eval_unary!(self, op_inv)
-        }
+        meta_eval_unary!(self, op_inv)
     }
     
     #[inline(always)]
     pub fn apply_not(&self) -> ExecResult<Variant> {
-        match self {
-            Self::BoolTrue => Ok(Self::BoolFalse),
-            Self::BoolFalse => Ok(Self::BoolTrue),
-            _ => Ok(Variant::from(!self.as_bool()?)),
-        }
+        Ok(Variant::from(!self.as_bool()?))
     }
     
     // Arithmetic
     
     #[inline(always)]
     pub fn apply_mul(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_mul(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_mul, op_rmul),
-        }
+        meta_eval_binary!(self, rhs, op_mul, op_rmul)
     }
     
     #[inline(always)]
     pub fn apply_div(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_div(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_div, op_rdiv),
-        }
+        meta_eval_binary!(self, rhs, op_div, op_rdiv)
     }
     
     #[inline(always)]
     pub fn apply_mod(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_mod(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_mod, op_rmod),
-        }
+        meta_eval_binary!(self, rhs, op_mod, op_rmod)
     }
     
     #[inline(always)]
     pub fn apply_add(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_add(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_add, op_radd),
-        }
+        meta_eval_binary!(self, rhs, op_add, op_radd)
     }
     
     #[inline(always)]
     pub fn apply_sub(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_sub(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_sub, op_rsub),
-        }
+        meta_eval_binary!(self, rhs, op_sub, op_rsub)
     }
     
     // Bitwise
     
     pub fn apply_and(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_and(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_and, op_rand),
-        }
+        meta_eval_binary!(self, rhs, op_and, op_rand)
     }
     
     pub fn apply_xor(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_xor(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_xor, op_rxor),
-        }
+        meta_eval_binary!(self, rhs, op_xor, op_rxor)
     }
     
     pub fn apply_or(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_or(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_or, op_ror),
-        }
+        meta_eval_binary!(self, rhs, op_or, op_ror)
     }
     
     // Shifts
     
     pub fn apply_shl(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_shl(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_shl, op_rshl),
-        }
+        meta_eval_binary!(self, rhs, op_shl, op_rshl)
     }
     
     pub fn apply_shr(&self, rhs: &Variant) -> ExecResult<Variant> {
-        match (self, rhs) {
-            (Self::Integer(lhs), Self::Integer(..)) => lhs.op_shr(rhs).unwrap(),
-            _ => meta_eval_binary!(self, rhs, op_shr, op_rshr),
-        }
+        meta_eval_binary!(self, rhs, op_shr, op_rshr)
     }
 
     // Comparison
     
     pub fn cmp_eq(&self, other: &Variant) -> ExecResult<bool> {
-        match (self, other) {
-            (Variant::Nil, Variant::Nil) => Ok(true),
-            
-            (Variant::BoolTrue,  Variant::BoolTrue)  => Ok(true),
-            (Variant::BoolFalse, Variant::BoolFalse) => Ok(true),
-            (Variant::BoolTrue,  Variant::BoolFalse) => Ok(false),
-            (Variant::BoolFalse, Variant::BoolTrue)  => Ok(false),
-            
-            (Variant::Integer(a), Variant::Integer(b)) => Ok(*a == *b),
-            (Variant::Float(a), Variant::Float(b)) => Ok(*a == *b),
-            
-            (Variant::Tuple(a), Variant::Tuple(b)) 
-                if a.is_empty() && b.is_empty() => Ok(true),
-            
-            _ => {
-                if let (Some(a), Some(b)) = (self.as_strval(), other.as_strval()) {
-                    return Ok(a == b);
-                }
-                
-                if let Some(result) = self.as_meta().cmp_eq(other) {
-                    return result;
-                }
-                
-                if self.type_tag() != other.type_tag() {
-                    if let Some(result) = other.as_meta().cmp_eq(self) {
-                        return result;
-                    }
-                }
-                
-                Ok(false)
+        if let Some(result) = self.as_meta().cmp_eq(other) {
+            return result;
+        }
+        
+        if self.type_tag() != other.type_tag() {
+            if let Some(result) = other.as_meta().cmp_eq(self) {
+                return result;
             }
         }
         
+        Ok(false)
     }
     
     pub fn cmp_ne(&self, other: &Variant) -> ExecResult<bool> {
@@ -232,19 +163,11 @@ impl Variant {
     }
     
     pub fn cmp_lt(&self, other: &Variant) -> ExecResult<bool> {
-        match (self, other) {
-            (Self::Integer(this), Self::Integer(..)) => this.cmp_lt(other).unwrap(),
-            (Self::Float(this), Self::Float(..)) => this.cmp_lt(other).unwrap(),
-            _ => meta_eval_inequality!(self, other, cmp_lt, cmp_le)
-        }
+        meta_eval_inequality!(self, other, cmp_lt, cmp_le)
     }
     
     pub fn cmp_le(&self, other: &Variant) -> ExecResult<bool> {
-        match (self, other) {
-            (Self::Integer(this), Self::Integer(..)) => this.cmp_le(other).unwrap(),
-            (Self::Float(this), Self::Float(..)) => this.cmp_le(other).unwrap(),
-            _ => meta_eval_inequality!(self, other, cmp_le, cmp_lt)
-        }
+        meta_eval_inequality!(self, other, cmp_le, cmp_lt)
     }
     
     pub fn cmp_gt(&self, other: &Variant) -> ExecResult<bool> {
