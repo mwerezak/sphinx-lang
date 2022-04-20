@@ -12,7 +12,15 @@ pub use intern::{StringSymbol, StringInterner, STRING_TABLE};
 
 use intern::StringTable;
 
-pub type InlineStr = inline::InlineStr<14>;
+
+#[derive(Debug, Clone, Copy)]
+pub enum StringValue {
+    Intern(StringSymbol),
+    Inline(InlineStr),
+    Gc(GCStr),
+}
+
+pub type InlineStr = inline::InlineStr<22>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct GCStr(Gc<str>);
@@ -22,14 +30,6 @@ impl Deref for GCStr {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
-}
-
-
-#[derive(Debug, Clone, Copy)]
-pub enum StringValue {
-    Intern(StringSymbol),
-    Inline(InlineStr),
-    Gc(GCStr),
 }
 
 unsafe impl GcTrace for str {

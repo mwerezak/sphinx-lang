@@ -7,7 +7,7 @@ use crate::lexer::rules::keywords::KeywordRule;
 use crate::lexer::rules::literals::*;
 use crate::lexer::rules::literals::string::*;
 
-pub type IntType = i64;    // internal representation for integers
+pub type IntType = i128;    // internal representation for integers
 pub type FloatType = f64;  // internal representation for floats
 pub type InternSymbol = DefaultSymbol;  // for interned strings
 
