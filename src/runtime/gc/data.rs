@@ -122,10 +122,10 @@ impl<T> GcBox<T> where
     pub fn from_box(data: Box<T>) -> NonNull<GcBox<T>> {
         let size_hint = data.size_hint();
         let data_size = mem::size_of_val(&*data);
+        
         if data_size == 0 {
             panic!("gc alloc zero-sized value")
         }
-        
         
         // copy layout of data
         let data_layout = Layout::for_value::<T>(&*data);

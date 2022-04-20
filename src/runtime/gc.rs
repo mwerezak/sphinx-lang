@@ -1,5 +1,3 @@
-/// Partial clone of rust-gc's mark and sweep implementation
-
 use core::fmt;
 use core::ptr::NonNull;
 use core::cell::{Cell, RefCell};
