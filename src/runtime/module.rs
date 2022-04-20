@@ -49,11 +49,11 @@ impl Namespace {
         }
     }
     
-    fn names(&self) -> impl Iterator<Item=&StringSymbol> {
+    pub fn names(&self) -> impl Iterator<Item=&StringSymbol> {
         self.store.keys()
     }
     
-    fn values(&self) -> impl Iterator<Item=&Variant> {
+    pub fn values(&self) -> impl Iterator<Item=&Variant> {
         self.store.values().map(|var| &var.value)
     }
     

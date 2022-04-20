@@ -170,6 +170,8 @@ impl<'c> VMCallFrame<'c> {
     #[inline]
     pub fn locals(&self) -> LocalIndex { self.locals }
 
+    pub fn module(&self) -> Gc<Module> { self.module }
+
     #[inline(always)]
     fn offset_pc(&self, offset: isize) -> Option<usize> {
         if offset >= 0 {

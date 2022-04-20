@@ -82,6 +82,8 @@ impl<'c> VirtualMachine<'c> {
         }
     }
     
+    pub fn frame(&self) -> &VMCallFrame<'_> { &self.frame }
+    
     pub fn run(mut self) -> ExecResult<()> {
         while !self.exec_next()? { }
         Ok(())
