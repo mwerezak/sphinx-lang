@@ -27,4 +27,18 @@ impl MetaObject for StringValue {
         }
         None
     }
+    
+    fn cmp_lt(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        if let Some(other) = other.as_strval() {
+            return Some(Ok(*self < other))
+        }
+        None
+    }
+    
+    fn cmp_le(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        if let Some(other) = other.as_strval() {
+            return Some(Ok(*self <= other))
+        }
+        None
+    }
 }
