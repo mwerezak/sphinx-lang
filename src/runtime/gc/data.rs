@@ -97,6 +97,10 @@ pub struct GcBox<T> where T: GcTrace + ?Sized + 'static {
 // constructor for sized types
 impl<T> GcBox<T> where T: GcTrace {
     pub fn new(data: T) -> NonNull<GcBox<T>> {
+        if mem::size_of::<T>() == 0 {
+            panic!("gc alloc zero-sized type")
+        }
+        
         let layout = Layout::new::<GcBox<T>>();
         let size = layout.size() + data.size_hint();
         
@@ -118,6 +122,13 @@ impl<T> GcBox<T> where
     GcBox<T>: Pointee<Metadata = T::Metadata> 
 {
     pub fn from_box(data: Box<T>) -> NonNull<GcBox<T>> {
+        let size_hint = data.size_hint();
+        let data_size = mem::size_of_val(&*data);
+        if data_size == 0 {
+            panic!("gc alloc zero-sized value")
+        }
+        
+        
         // copy layout of data
         let data_layout = Layout::for_value::<T>(&*data);
         
@@ -133,9 +144,6 @@ impl<T> GcBox<T> where
         }
         
         // copy metadata from source pointer
-        let data_size = mem::size_of_val(&*data);
-        let size_hint = data.size_hint();
-        
         let data_ptr = Box::into_raw(data);
         let ptr_meta = ptr::metadata(data_ptr);
         
