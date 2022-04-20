@@ -36,15 +36,6 @@ pub enum Variant {
 }
 
 impl Variant {
-    // extract the Gc handle for Gc'd types
-    pub fn as_gc(&self) -> Option<Gc<dyn GcTrace>> {
-        match self {
-            Self::Tuple(tuple) => tuple.as_gc(),
-            Self::Function(fun) => Some((*fun).into()),
-            Self::NativeFunction(fun) => Some((*fun).into()),
-            _ => None,
-        }
-    }
     
     pub fn as_strval(&self) -> Option<StringValue> {
         match self {

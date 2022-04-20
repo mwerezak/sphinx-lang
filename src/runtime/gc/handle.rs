@@ -1,7 +1,7 @@
 use core::fmt;
 use core::ops::Deref;
 use core::borrow::Borrow;
-use core::ptr::{NonNull, Pointee};
+use core::ptr::{self, NonNull, Pointee};
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use std::rc::Rc;
@@ -67,8 +67,8 @@ impl<T> Gc<T> where T: GcTrace + ?Sized {
         self.inner_mut().mark_trace()
     }
     
-    pub fn ptr_eq(self_gc: &Gc<T>, other_gc: &Gc<T>) -> bool {
-        self_gc.inner().ptr_eq(other_gc.inner())
+    pub fn ptr_eq<U>(self_gc: &Gc<T>, other_gc: &Gc<U>) -> bool where U: GcTrace + ?Sized {
+        ptr::eq(self_gc.inner().header(), other_gc.inner().header())
     }
     
     /// Casts the inner pointer to a usize. 

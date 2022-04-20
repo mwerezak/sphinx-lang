@@ -265,7 +265,11 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
     }
     
     fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
-        other.as_gc().map(|other| Ok(Gc::ptr_eq(&(*self).into(), &other)))
+        match other {
+            Variant::Function(other) => Some(Ok(Gc::ptr_eq(self, &other))),
+            Variant::NativeFunction(other) => Some(Ok(Gc::ptr_eq(self, &other))),
+            _ => Some(Ok(false)),
+        }
     }
 }
 

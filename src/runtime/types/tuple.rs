@@ -7,7 +7,7 @@ use crate::runtime::errors::ExecResult;
 #[derive(Clone, Copy)]
 pub enum Tuple {
     Empty,
-    NonEmpty(Gc<Box<[Variant]>>),  // TODO: stop using Box when DST support is stabilized
+    NonEmpty(Gc<[Variant]>),
 }
 
 unsafe impl GcTrace for Box<[Variant]> {
@@ -31,7 +31,7 @@ impl From<Box<[Variant]>> for Tuple {
         if items.is_empty() {
             Self::Empty
         } else {
-            Self::NonEmpty(Gc::new(items))
+            Self::NonEmpty(Gc::from_box(items))
         }
     }
 }
@@ -49,13 +49,6 @@ impl Tuple {
     pub fn trace(&self) {
         if let Self::NonEmpty(gc_items) = self {
             gc_items.mark_trace()
-        }
-    }
-    
-    pub fn as_gc(&self) -> Option<Gc<dyn GcTrace>> {
-        match self {
-            Self::NonEmpty(gc_items) => Some((*gc_items).into()),
-            Self::Empty => None,
         }
     }
     

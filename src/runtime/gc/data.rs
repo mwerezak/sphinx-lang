@@ -170,14 +170,11 @@ impl<T> GcBox<T> where
 
 
 impl<T> GcBox<T> where T: GcTrace + ?Sized {
+    #[inline]
+    pub fn header(&self) -> &GcBoxHeader { &self.header }
 
     #[inline]
     pub fn value(&self) -> &T { &self.data }
-    
-    #[inline]
-    pub fn ptr_eq(&self, other: &GcBox<T>) -> bool {
-        ptr::eq(&self.header, &other.header)
-    }
     
     #[inline]
     pub fn mark_trace(&mut self) {
