@@ -12,7 +12,7 @@ mod handle;
 pub use data::GcTrace;
 pub use handle::Gc;
 
-use data::GcBox;
+use data::{GcBox, GcBoxHeader};
 
 
 thread_local! {
@@ -39,7 +39,7 @@ struct GcState {
     stats: GcStats,
     config: GcConfig,
     threshold: usize,
-    boxes_start: Option<NonNull<GcBox<dyn GcTrace>>>,
+    boxes_start: Option<NonNull<GcBoxHeader>>,
 }
 
 #[derive(Debug)]
@@ -92,13 +92,12 @@ impl GcState {
         self.stats.allocated > self.threshold
     }
     
-    fn insert(&mut self, gcbox: NonNull<GcBox<dyn GcTrace>>) {
+    fn insert(&mut self, mut gcbox: NonNull<GcBoxHeader>) {
         unsafe {
-            let ptr = gcbox.as_ptr();
-            let size = (*ptr).size();
-            log::debug!("{:#X} allocate {} bytes", ptr as *const () as usize, size);
+            let size = gcbox.as_ref().size();
+            log::debug!("{:#X} allocate {} bytes", gcbox.as_ptr() as *const () as usize, size);
             
-            (*ptr).set_next(self.boxes_start.take());
+            gcbox.as_mut().set_next(self.boxes_start.take());
             self.boxes_start = Some(gcbox);
             self.stats.allocated += size;
             self.stats.box_count += 1;
@@ -106,15 +105,13 @@ impl GcState {
     }
     
     /// frees the GcBox, yielding it's next pointer
-    fn free(&mut self, gcbox: NonNull<GcBox<dyn GcTrace>>) -> Option<NonNull<GcBox<dyn GcTrace>>> {
-        let gcbox = gcbox.as_ptr();
-        
-        let size = unsafe { (*gcbox).size() };
+    fn free(&mut self, gcbox: NonNull<GcBoxHeader>) -> Option<NonNull<GcBoxHeader>> {
+        let size = unsafe { gcbox.as_ref().size() };
         self.stats.allocated -= size;
         self.stats.box_count -= 1;
-        log::debug!("{:#X} free {} bytes", gcbox as *const () as usize, size);
+        log::debug!("{:#X} free {} bytes", gcbox.as_ptr() as *const () as usize, size);
         
-        unsafe { GcBox::free(gcbox) }
+        unsafe { GcBoxHeader::free(gcbox) }
     }
     
     fn collect_garbage(&mut self, root: &impl GcTrace) {
@@ -148,20 +145,18 @@ impl GcState {
         //boxes_start: Option<NonNull<GcBox<dyn GcTrace>>>,
         let mut prev_box = None;
         let mut next_box = self.boxes_start;
-        while let Some(gcbox) = next_box {
-            let box_ptr = gcbox.as_ptr();
-            
-            if (*box_ptr).is_marked() {
-                (*box_ptr).clear_mark();
+        while let Some(mut gcbox) = next_box {
+            if gcbox.as_ref().is_marked() {
+                gcbox.as_mut().set_marked(false);
                 
-                next_box = (*box_ptr).next();
+                next_box = gcbox.as_ref().next();
                 prev_box.replace(gcbox);
                 
             } else {
                 
                 next_box = self.free(gcbox);
-                if let Some(prev_box) = prev_box {
-                    (*prev_box.as_ptr()).set_next(next_box);
+                if let Some(mut prev_box) = prev_box {
+                    prev_box.as_mut().set_next(next_box);
                 } else {
                     self.boxes_start = next_box;
                 }

@@ -1,12 +1,12 @@
 use core::fmt;
 use core::ops::Deref;
 use core::borrow::Borrow;
-use core::ptr::NonNull;
+use core::ptr::{NonNull, Pointee};
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
 use std::rc::Rc;
 
-use crate::runtime::gc::{GcBox, GC_STATE, deref_safe, GcTrace};
+use crate::runtime::gc::{GcBox, GcBoxHeader, GC_STATE, deref_safe, GcTrace};
 
 
 pub struct Gc<T> where T: GcTrace + ?Sized + 'static {
@@ -20,22 +20,24 @@ impl<T: GcTrace> Gc<T> {
             let mut gc = gc.borrow_mut();
             
             let gcbox = GcBox::new(data);
-            gc.insert(gcbox);
+            let header = GcBoxHeader::from_alloc(gcbox);
+            gc.insert(header);
             Self::from_raw(gcbox)
         })
     }
 }
 
-impl<T> Gc<T> where T: GcTrace + ?Sized {
+impl<T> Gc<T> where 
+    T: GcTrace + ?Sized + Pointee, 
+    GcBox<T>: Pointee<Metadata = T::Metadata> 
+{
     pub fn from_box(data: Box<T>) -> Self {
         GC_STATE.with(|gc| {
             let mut gc = gc.borrow_mut();
             
             let gcbox = GcBox::from_box(data);
-            
-            gc.insert(gcbox);
-            
-            
+            let header = GcBoxHeader::from_alloc(gcbox);
+            gc.insert(header);
             Self::from_raw(gcbox)
         })
     }

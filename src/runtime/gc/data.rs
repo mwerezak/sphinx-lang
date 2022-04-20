@@ -21,7 +21,6 @@ pub unsafe trait GcTrace {
     fn size_hint(&self) -> usize { 0 }
 }
 
-
 // arrays
 unsafe impl<T> GcTrace for [T] where T: GcTrace {
     fn trace(&self) {
@@ -36,17 +35,56 @@ unsafe impl<T> GcTrace for [T] where T: GcTrace {
 }
 
 #[derive(Debug)]
-enum Dealloc {
-    FromBox,
-    FromLayout(Layout),
+pub struct GcBoxHeader {
+    next: Option<NonNull<GcBoxHeader>>,
+    marked: bool,
+    size: usize,
+    layout: Layout,
 }
 
-#[derive(Debug)]
-struct GcBoxHeader {
-    next: Option<NonNull<GcBox<dyn GcTrace>>>,
-    marked: bool,
-    dealloc: Dealloc,
+impl GcBoxHeader {
+    #[inline]
+    pub fn from_alloc<T>(gcbox: NonNull<GcBox<T>>) -> NonNull<Self> where T: GcTrace + ?Sized {
+        unsafe { NonNull::new_unchecked(gcbox.as_ptr() as *mut GcBoxHeader) }
+    }
+    
+    #[inline]
+    pub fn next(&self) -> Option<NonNull<Self>> {
+        self.next
+    }
+    
+    #[inline]
+    pub fn set_next(&mut self, next: Option<NonNull<Self>>) {
+        self.next = next
+    }
+    
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.size
+    }
+    
+    #[inline]
+    pub fn is_marked(&self) -> bool {
+        self.marked
+    }
+    
+    #[inline]
+    pub fn set_marked(&mut self, marked: bool) {
+        self.marked = marked
+    }
+    
+    /// Frees the entire gcbox
+    #[inline]
+    pub unsafe fn free(gcbox: NonNull<Self>) -> Option<NonNull<Self>> {
+        let next = gcbox.as_ref().next;
+        let layout = gcbox.as_ref().layout;
+        
+        dealloc(gcbox.as_ptr() as *mut u8, layout);
+        
+        next
+    }
 }
+
 
 // need to control memory layout to alloc for unsized data
 #[repr(C)]
@@ -59,11 +97,14 @@ pub struct GcBox<T> where T: GcTrace + ?Sized + 'static {
 // constructor for sized types
 impl<T> GcBox<T> where T: GcTrace {
     pub fn new(data: T) -> NonNull<GcBox<T>> {
+        let layout = Layout::new::<GcBox<T>>();
+        let size = layout.size() + data.size_hint();
+        
         let gcbox = Box::new(GcBox {
             header: GcBoxHeader {
                 next: None,
                 marked: false,
-                dealloc: Dealloc::FromBox,
+                size, layout,
             },
             data,
         });
@@ -93,16 +134,21 @@ impl<T> GcBox<T> where
         
         // copy metadata from source pointer
         let data_size = mem::size_of_val(&*data);
+        let size_hint = data.size_hint();
+        
         let data_ptr = Box::into_raw(data);
+        let ptr_meta = ptr::metadata(data_ptr);
+        
         let ptr: *mut GcBox<T> = ptr::from_raw_parts_mut::<GcBox<T>>(
-            ptr as *mut (), ptr::metadata(data_ptr)
+            ptr as *mut (), ptr_meta
         );
         
         // initialize the GcBox
         let header = GcBoxHeader {
             next: None,
             marked: false,
-            dealloc: Dealloc::FromLayout(layout),
+            size: layout.size() + size_hint,
+            layout,
         };
         
         unsafe {
@@ -123,51 +169,10 @@ impl<T> GcBox<T> where
 }
 
 
-// destructor
 impl<T> GcBox<T> where T: GcTrace + ?Sized {
-    
-    /// SAFETY: ptr must be non-null and (*ptr).header.dealloc must be accurate
-    pub unsafe fn free(ptr: *mut Self) -> Option<NonNull<GcBox<dyn GcTrace>>> {
-        match (*ptr).header.dealloc {
-            Dealloc::FromBox => {
-                // SAFETY: This is safe as long as we only ever free() GcBoxes that were created Box::into_raw()
-                let gcbox = Box::from_raw(ptr);
-                gcbox.next()
-                
-                // gcbox should get dropped here
-            }
-            
-            Dealloc::FromLayout(layout) => {
-                let next = (*ptr).next();
-                dealloc(ptr as *mut u8, layout);
-                
-                next
-            }
-        }
-        
-    }
-}
 
-
-impl<T> GcBox<T> where T: GcTrace + ?Sized {
-    
     #[inline]
     pub fn value(&self) -> &T { &self.data }
-    
-    #[inline]
-    pub fn next(&self) -> Option<NonNull<GcBox<dyn GcTrace>>> {
-        self.header.next
-    }
-    
-    #[inline]
-    pub fn set_next(&mut self, next: Option<NonNull<GcBox<dyn GcTrace>>>) {
-        self.header.next = next
-    }
-    
-    #[inline]
-    pub fn size(&self) -> usize {
-        mem::size_of_val(self) + self.value().size_hint()
-    }
     
     #[inline]
     pub fn ptr_eq(&self, other: &GcBox<T>) -> bool {
@@ -175,22 +180,18 @@ impl<T> GcBox<T> where T: GcTrace + ?Sized {
     }
     
     #[inline]
-    pub fn is_marked(&self) -> bool {
-        self.header.marked
-    }
-    
-    #[inline]
     pub fn mark_trace(&mut self) {
-        if !self.header.marked {
-            self.header.marked = true;
+        if !self.header.is_marked() {
+            self.header.set_marked(true);
             self.data.trace();
         }
     }
     
-    #[inline]
-    pub fn clear_mark(&mut self) {
-        self.header.marked = false
+    unsafe fn free(gcbox: NonNull<GcBox<T>>) {
+        let layout = gcbox.as_ref().header.layout;
+        dealloc(gcbox.as_ptr() as *mut u8, layout);
     }
+    
 }
 
 
@@ -206,13 +207,39 @@ mod tests {
     fn test_gcbox_alloc_dealloc() {
         let data = 63;
         let gcbox = GcBox::new(data);
-        println!("gcbox sized: {:#?}", unsafe { &*gcbox.as_ptr() });
-        unsafe { GcBox::free(gcbox.as_ptr()); }
-        
-        let unsized_data = vec![1,2,3,4,5].into_boxed_slice();
-        let gcbox = GcBox::from_box(unsized_data);
-        println!("gcbox unsized: {:#?}", unsafe { &*gcbox.as_ptr() });
-        unsafe { GcBox::free(gcbox.as_ptr()); }
+        println!("gcbox sized: {:#?}", unsafe { gcbox.as_ref() });
+        unsafe { GcBox::free(gcbox); }
     }
     
+    #[test]
+    fn test_gcbox_alloc_dealloc_unsized() {
+        let unsized_data = vec![1,2,3,4,5].into_boxed_slice();
+        let gcbox = GcBox::from_box(unsized_data);
+        println!("gcbox unsized: {:#?}", unsafe { gcbox.as_ref() });
+        unsafe { GcBox::free(gcbox); }
+    }
+    
+    #[test]
+    fn test_gcbox_alloc_dealloc_from_header() {
+        let data = 63;
+        let gcbox = GcBox::new(data);
+        println!("gcbox sized: {:#?}", unsafe { gcbox.as_ref() });
+        unsafe {
+            // let header = NonNull::new_unchecked(gcbox.as_ptr() as *mut GcBoxHeader);
+            let header = GcBoxHeader::from_alloc(gcbox);
+            GcBoxHeader::free(header); 
+        }
+    }
+    
+    #[test]
+    fn test_gcbox_alloc_dealloc_from_header_unsized() {
+        let unsized_data = vec![1,2,3,4,5].into_boxed_slice();
+        let gcbox = GcBox::from_box(unsized_data);
+        println!("gcbox unsized: {:#?}", unsafe { gcbox.as_ref() });
+        unsafe {
+            // let header = NonNull::new_unchecked(gcbox.as_ptr() as *mut GcBoxHeader);
+            let header = GcBoxHeader::from_alloc(gcbox);
+            GcBoxHeader::free(header);
+        }
+    }
 }
