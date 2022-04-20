@@ -8,7 +8,7 @@ impl MetaObject for StringValue {
     fn type_tag(&self) -> Type { Type::String }
     
     fn len(&self) -> Option<ExecResult<usize>> {
-        Some(Ok(self.char_len()))
+        Some(Ok(self.char_count()))
     }
     
     fn op_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {

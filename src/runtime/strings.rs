@@ -115,7 +115,7 @@ impl StringValue {
         }
     }
     
-    pub fn char_len(&self) -> usize {
+    pub fn char_count(&self) -> usize {
         match self.try_str() {
             Ok(string) => string.chars().count(),
             
