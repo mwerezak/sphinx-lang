@@ -2,6 +2,7 @@ use core::cell::Cell;
 use crate::codegen::{FunctionID, FunctionProto};
 use crate::runtime::Variant;
 use crate::runtime::module::{Module, GlobalEnv};
+use crate::runtime::vm::VirtualMachine;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::ExecResult;
 
@@ -133,7 +134,7 @@ impl Upvalue {
 
 // Native Functions
 
-pub type NativeFn = fn(self_fun: &NativeFunction, args: &[Variant]) -> ExecResult<Variant>;
+pub type NativeFn = fn(self_fun: &NativeFunction, vm: &mut VirtualMachine<'_>, args: &[Variant]) -> ExecResult<Variant>;
 
 pub struct NativeFunction {
     signature: Signature,
@@ -158,9 +159,10 @@ impl NativeFunction {
         }
     }
     
-    pub fn invoke(&self, args: &[Variant]) -> ExecResult<Variant> {
+    /// actually execute a native function
+    pub fn exec_fun(&self, vm: &mut VirtualMachine<'_>, args: &[Variant]) -> ExecResult<Variant> {
         self.signature().check_args(args)?;
-        (self.func)(self, args)
+        (self.func)(self, vm, args)
     }
 }
 

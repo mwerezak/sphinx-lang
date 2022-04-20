@@ -62,7 +62,7 @@ macro_rules! __defaults {
 macro_rules! native_function {
     
     // with default params
-    ( $func_name:tt, $env:expr, $self_name:tt $( , params ( $( $required:tt ),+ ) )? $( , defaults ( $( $default:tt = $default_value:expr ),+ ) )? $( , variadic ( $variadic:tt ) )? => $body:expr ) => {
+    ( $func_name:tt, $env:expr $( , this ( $self_name:tt ) )? $( , vm ( $vm_name:tt ) )? $( , params ( $( $required:tt ),+ ) )? $( , defaults ( $( $default:tt = $default_value:expr ),+ ) )? $( , variadic ( $variadic:tt ) )? => $body:expr ) => {
         {
             let signature = Signature::new(
                 Some(stringify!($func_name)),
@@ -73,14 +73,15 @@ macro_rules! native_function {
             
             let defaults = __defaults!( $( $( $default_value )+ )? );
             
-            fn body(self_fun: &NativeFunction, args: &[Variant]) -> ExecResult<Variant> {
+            fn body(self_fun: &NativeFunction, _vm: &mut VirtualMachine<'_>, args: &[Variant]) -> ExecResult<Variant> {
                 const _ARGC: usize = __count!( $( $( $required )+ )? $( $( $default )+ )? );
                 
                 let mut _argbuf = [Variant::Nil; _ARGC];
                 let _bound = self_fun.signature().bind_args(args, self_fun.defaults(), &mut _argbuf);
                 let _rest = _bound.args;
                 
-                let $self_name = self_fun;
+                $( let $self_name = self_fun; )?
+                $( let $vm_name = _vm; )?
                 $( $( let ($required, _rest) = _rest.split_first().unwrap(); )+ )?
                 $( $( let ($default, _rest) = _rest.split_first().unwrap(); )+ )?
                 $( let $variadic = _bound.varargs; )?

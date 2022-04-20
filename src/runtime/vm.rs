@@ -114,8 +114,10 @@ impl<'c> VirtualMachine<'c> {
         
         match call.call {
             Call::Native(func) => {
-                let args = self.values.peek_many(call.nargs);
-                let retval = func.invoke(args)?;
+                let args = self.values.peek_many(call.nargs)
+                    .iter().copied().collect::<Vec<Variant>>();
+                
+                let retval = func.exec_fun(self, &args)?;
                 self.values.truncate(call.frame);
                 self.values.push(retval);
                 self.traceback.pop();
