@@ -50,7 +50,7 @@ impl MetaObject for IntType {
     fn op_rdiv(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_int().map(|lhs| {
             if *self == 0 {
-                return Err(ErrorKind::DivideByZero.into());
+                Err(ErrorKind::DivideByZero.into())
             } else {
                 checked_int_math!(checked_div, lhs?, *self)
             }
@@ -160,13 +160,11 @@ impl MetaObject for IntType {
     
     fn op_rshl(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_bits().map(|lhs| {
-            if lhs.is_err() {
-                return Err(lhs.unwrap_err());
-            }
+            let lhs = lhs?;
             if *self < 0 {
                 return Err(ErrorKind::NegativeShiftCount.into());
             }
-            return checked_int_math!(checked_shl, lhs.unwrap(), (*self).try_into().unwrap());
+            return checked_int_math!(checked_shl, lhs, (*self).try_into().unwrap());
         })
     }
     
@@ -192,13 +190,11 @@ impl MetaObject for IntType {
     
     fn op_rshr(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_bits().map(|lhs| {
-            if lhs.is_err() {
-                return Err(lhs.unwrap_err());
-            }
+            let lhs = lhs?;
             if *self < 0 {
                 return Err(ErrorKind::NegativeShiftCount.into());
             }
-            return checked_int_math!(checked_shr, lhs.unwrap(), (*self).try_into().unwrap());
+            return checked_int_math!(checked_shr, lhs, (*self).try_into().unwrap());
         })
     }
     

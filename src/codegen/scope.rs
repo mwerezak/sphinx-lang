@@ -67,7 +67,7 @@ impl Scope {
         let index = self.last_index().map_or(
             Ok(0),
             |index| index.checked_add(1)
-                .ok_or_else(|| ErrorKind::InternalLimit("local variable limit reached"))
+                .ok_or(ErrorKind::InternalLimit("local variable limit reached"))
         )?;
         
         let local = Local {

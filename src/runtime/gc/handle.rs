@@ -56,15 +56,10 @@ impl<T> Gc<T> where T: GcTrace + ?Sized {
         unsafe { &*self.ptr.as_ptr() }
     }
     
-    #[inline]
-    fn inner_mut(&self) -> &mut GcBox<T> {
-        // must not deref during sweep. This should only be possible if called inside a Drop impl
-        debug_assert!(deref_safe());
-        unsafe { &mut *self.ptr.as_ptr() }
-    }
-    
     pub fn mark_trace(&self) {
-        self.inner_mut().mark_trace()
+        debug_assert!(deref_safe());
+        let inner_mut = unsafe { &mut *self.ptr.as_ptr() };
+        inner_mut.mark_trace()
     }
     
     pub fn ptr_eq<U>(self_gc: &Gc<T>, other_gc: &Gc<U>) -> bool where U: GcTrace + ?Sized {
@@ -121,7 +116,7 @@ impl<T> Clone for Gc<T> where T: GcTrace + ?Sized {
 impl<T> Copy for Gc<T> where T: GcTrace + ?Sized { }
 
 impl<T> Hash for Gc<T> where T: GcTrace {
-    fn hash<H>(self: &Self, state: &mut H) where H: Hasher {
+    fn hash<H>(&self, state: &mut H) where H: Hasher {
         <NonNull<GcBox<T>> as Hash>::hash(&self.ptr, state)
     }
 }

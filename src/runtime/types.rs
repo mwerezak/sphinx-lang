@@ -153,6 +153,10 @@ impl Variant {
             .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Len))?
     }
     
+    pub fn is_empty(&self) -> ExecResult<bool> {
+        Ok(self.len()? == 0)
+    }
+    
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
         self.as_meta().invoke(args)
             .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Invoke))?
@@ -240,8 +244,8 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
     
     fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
         match other {
-            Variant::Function(other) => Some(Ok(Gc::ptr_eq(self, &other))),
-            Variant::NativeFunction(other) => Some(Ok(Gc::ptr_eq(self, &other))),
+            Variant::Function(other) => Some(Ok(Gc::ptr_eq(self, other))),
+            Variant::NativeFunction(other) => Some(Ok(Gc::ptr_eq(self, other))),
             _ => Some(Ok(false)),
         }
     }

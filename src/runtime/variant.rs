@@ -205,9 +205,7 @@ impl fmt::Display for Variant {
             
             Self::Integer(value) => write!(fmt, "{}", *value),
             Self::Float(value) => {
-                if !value.is_finite() {
-                    write!(fmt, "{}", *value)
-                } else if value.trunc() != *value {
+                if !value.is_finite() || value.trunc() != *value {
                     write!(fmt, "{}", *value)
                 } else {
                     write!(fmt, "{}.0", value)

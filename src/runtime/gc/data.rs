@@ -6,7 +6,7 @@ use std::alloc::{self, alloc, dealloc};
 
 /// Unsafe because if the GcTrace::trace() implementation fails to mark any Gc handles that it can reach, 
 /// the Gc will not be able to mark them and will free memory that is still in use.
-/// SAFETY: Must not impl Drop
+/// # SAFETY: Must not impl Drop
 pub unsafe trait GcTrace {
     
     /// SAFETY: Must call `Gc::mark_trace()` on every reachable Gc handle

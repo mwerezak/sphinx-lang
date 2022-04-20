@@ -245,9 +245,9 @@ impl fmt::Display for ModuleIdent {
         match self {
             Self::SourcePath(path) => {
                 let prefix = std::env::current_dir().ok()
-                    .map(|pwd| pwd.canonicalize().ok()).flatten();
+                    .and_then(|pwd| pwd.canonicalize().ok());
                 
-                let path = prefix.map(|prefix| path.strip_prefix(prefix).ok()).flatten()
+                let path = prefix.and_then(|prefix| path.strip_prefix(prefix).ok())
                     .unwrap_or(path);
                 
                 write!(fmt, "\"{}\"", path.display())

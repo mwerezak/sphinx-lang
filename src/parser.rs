@@ -512,8 +512,6 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             ctx.pop_extend();
             
-            let op = op.map(|op| op.into());
-            
             let nonlocal = matches!(optional_token.map(|tok| tok.token), Some(Token::NonLocal));
             
             let assign = Box::new(Assignment { lhs, op, rhs, nonlocal });
@@ -662,7 +660,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             
             let rhs_expr = self.parse_binop_expr_levels(ctx, level - 1)?;
             
-            expr = Expr::BinaryOp(binary_op.into(), Box::new((expr, rhs_expr)));
+            expr = Expr::BinaryOp(binary_op, Box::new((expr, rhs_expr)));
         }
         
         if push_ctx {
@@ -686,7 +684,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             let expr = self.parse_unary_expr(ctx)?;
             
             ctx.pop_extend();
-            return Ok(Expr::UnaryOp(unary_op.into(), Box::new(expr)));
+            return Ok(Expr::UnaryOp(unary_op, Box::new(expr)));
         }
         
         self.parse_primary_expr(ctx)

@@ -9,14 +9,14 @@ impl MetaObject for StringValue {
     
     fn op_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         if let Some(rhs) = rhs.as_strval() {
-            return Some(self.concat(&rhs).map(|strval| Variant::from(strval)))
+            return Some(self.concat(&rhs).map(Variant::from))
         }
         None
     }
     
     fn op_radd(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         if let Some(lhs) = lhs.as_strval() {
-            return Some(lhs.concat(self).map(|strval| Variant::from(strval)))
+            return Some(lhs.concat(self).map(Variant::from))
         }
         None
     }

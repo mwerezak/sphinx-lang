@@ -181,7 +181,7 @@ impl<'c> VMCallFrame<'c> {
 
     // convert a local variable index to an index into the value stack
     #[inline]
-    fn from_local_index(&self, local: LocalIndex) -> usize {
+    fn index_from_local(&self, local: LocalIndex) -> usize {
         self.frame_idx + usize::from(local)
     }
     
@@ -212,13 +212,13 @@ impl<'c> VMCallFrame<'c> {
     
     #[inline]
     fn get_upvalue(&self, stack: &ValueStack, index: UpvalueIndex) -> UpvalueRef {
-        let fun = into_function(*stack.peek_at(self.from_local_index(0)));
+        let fun = into_function(*stack.peek_at(self.index_from_local(0)));
         fun.ref_upvalue(index)
     }
     
     fn make_function(&self, stack: &ValueStack, proto: &FunctionProto) -> Function {
         let upvalues = proto.upvalues().iter().map(|upval| match upval {
-                UpvalueTarget::Local(index) => Upvalue::new(self.from_local_index(*index)),
+                UpvalueTarget::Local(index) => Upvalue::new(self.index_from_local(*index)),
                 UpvalueTarget::Upvalue(index) => (*self.get_upvalue(stack, *index)).clone(),
             })
             .collect::<Vec<Upvalue>>()
@@ -324,29 +324,29 @@ impl<'c> VMCallFrame<'c> {
             
             OpCode::InsertLocal => {
                 let value = *stack.peek();
-                stack.insert(self.from_local_index(self.locals), value);
+                stack.insert(self.index_from_local(self.locals), value);
                 self.locals += 1;
             },
             OpCode::StoreLocal => {
                 let index = LocalIndex::from(data[0]);
-                stack.replace_at(self.from_local_index(index), *stack.peek());
+                stack.replace_at(self.index_from_local(index), *stack.peek());
             },
             OpCode::StoreLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
-                stack.replace_at(self.from_local_index(index), *stack.peek());
+                stack.replace_at(self.index_from_local(index), *stack.peek());
             },
             OpCode::LoadLocal => {
                 let index = LocalIndex::from(data[0]);
-                stack.push(*stack.peek_at(self.from_local_index(index)));
+                stack.push(*stack.peek_at(self.index_from_local(index)));
             },
             OpCode::LoadLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
-                stack.push(*stack.peek_at(self.from_local_index(index)));
+                stack.push(*stack.peek_at(self.index_from_local(index)));
             },
             OpCode::DropLocals => {
                 let count = LocalIndex::from(data[0]);
                 
-                let locals_end_index = self.from_local_index(self.locals);
+                let locals_end_index = self.index_from_local(self.locals);
                 if stack.len() == locals_end_index {
                     stack.discard(usize::from(count));
                 } else {
@@ -379,12 +379,12 @@ impl<'c> VMCallFrame<'c> {
             
             OpCode::CloseUpvalue => {
                 let local_index = LocalIndex::from(data[0]);
-                let index = self.from_local_index(local_index);
+                let index = self.index_from_local(local_index);
                 upvalues.close_upvalues(index, *stack.peek_at(index));
             }
             OpCode::CloseUpvalue16 => {
                 let local_index = LocalIndex::from(read_le_bytes!(u16, data));
-                let index = self.from_local_index(local_index);
+                let index = self.index_from_local(local_index);
                 upvalues.close_upvalues(index, *stack.peek_at(index));
             }
             
