@@ -1,6 +1,5 @@
 use core::fmt;
 use core::cmp;
-use core::ops::Deref;
 use core::hash::{Hash, Hasher};
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::{ExecResult, ErrorKind};
@@ -13,23 +12,13 @@ pub use intern::{StringSymbol, StringInterner, STRING_TABLE};
 use intern::StringTable;
 
 
+pub type InlineStr = inline::InlineStr<22>;
+
 #[derive(Debug, Clone, Copy)]
 pub enum StringValue {
     Intern(StringSymbol),
     Inline(InlineStr),
-    Gc(GCStr),
-}
-
-pub type InlineStr = inline::InlineStr<22>;
-
-#[derive(Debug, Clone, Copy)]
-pub struct GCStr(Gc<str>);
-
-impl Deref for GCStr {
-    type Target = Gc<str>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+    Gc(Gc<str>),
 }
 
 unsafe impl GcTrace for str {
@@ -54,7 +43,7 @@ impl From<&str> for StringValue {
             return Self::Intern(StringSymbol::intern(string))
         }
         
-        Self::Gc(GCStr(Gc::from_box(string.to_string().into_boxed_str())))
+        Self::Gc(Gc::from_box(string.to_string().into_boxed_str()))
     }
 }
 
@@ -70,8 +59,8 @@ impl From<InlineStr> for StringValue {
     }
 }
 
-impl From<GCStr> for StringValue {
-    fn from(gc_str: GCStr) -> Self {
+impl From<Gc<str>> for StringValue {
+    fn from(gc_str: Gc<str>) -> Self {
         StringValue::Gc(gc_str)
     }
 }

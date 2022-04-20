@@ -4,7 +4,7 @@ use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
 use crate::runtime::types::{Tuple, UserData};
 use crate::runtime::function::{Function, NativeFunction};
-use crate::runtime::strings::{StringValue, StringSymbol, InlineStr, GCStr};
+use crate::runtime::strings::{StringValue, StringSymbol, InlineStr};
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
@@ -24,7 +24,7 @@ pub enum Variant {
     // separate different string types here to keep size down
     InternStr(StringSymbol),
     InlineStr(InlineStr),
-    GCStr(GCStr),
+    GCStr(Gc<str>),
     
     Tuple(Tuple),
     Function(Gc<Function>),
