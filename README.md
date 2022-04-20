@@ -1,8 +1,10 @@
 # Sphinx
 
+*The lastest version (0.5) requires nightly Rust. This is because pointer metadata is being used to GC unsized types, whereas before a double-indirection was required.*
+
 Sphinx is a dynamically typed programming language that is inspired by Lua and Python, and implemented entirely in Rust!
 
-Sphinx is not complete! I started work on it in February 2022, and there is still a lot to do before it is a functional language. Some things on my radar:
+Sphinx is not complete! There is still a lot to do before it is a functional language. Some things on my radar:
 
  - import system
  - a basic standard library
