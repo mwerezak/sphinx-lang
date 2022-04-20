@@ -1,54 +1,26 @@
-
+use crate::language::IntType;
 use crate::runtime::{Variant, Gc};
-use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{GlobalEnv, Access};
 use crate::runtime::function::{NativeFunction, Signature, Parameter};
-use crate::runtime::errors::ExecResult;
+use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
-// examples for testing
-
-use std::time::SystemTime;
-
+/// Create an Env containing the core builtins
 pub fn create_prelude() -> Gc<GlobalEnv> {
     let env = GlobalEnv::new();
     
-    let time = native_function!(time, env, _  => {
-        let time = SystemTime::UNIX_EPOCH
-            .elapsed()
-            .unwrap()
-            .as_secs_f64();
-        Ok(Variant::from(time))
-    });
-    
-    // example using env
-    let radians = native_function!(radians, env, this, params(degrees) => {
-        let result = degrees.as_float()?/180.0 * this.env().borrow().lookup(&StringSymbol::intern("PI"))?.as_float()?;
-        Ok(Variant::from(result))
-    });
-    
-    // Contrived example to show handling of default values and variadics is supported
-    let add_example = native_function!(add_example, env, _,
-        params(a),
-        defaults(b = 1),
-        variadic(varargs) => {
-            
-        // for value in varargs.iter() {
-        //     println!("{}", value);
-        // }
-        println!("{:?}", varargs);
-        a.apply_add(b)
+    // Get the length of a container using the `__len` metamethod.
+    let len = native_function!(len, env, _, params(obj) => {
+        let len = obj.len()?;
+        match IntType::try_from(len) {
+            Ok(len) => Ok(Variant::from(len)),
+            Err(..) => Err(ErrorKind::OverflowError.into()),
+        }
     });
     
     namespace!(env.borrow_mut(), {
-        let PI = core::f64::consts::PI;
-        fun _ = time;
-        fun _ = radians;
-        fun _ = add_example;
+        fun _ = len;
     });
     
-    // let env = 
-    
-    // namespace
     env
 }
