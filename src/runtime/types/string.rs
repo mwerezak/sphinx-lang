@@ -7,6 +7,10 @@ use crate::runtime::errors::{ExecResult};
 impl MetaObject for StringValue {
     fn type_tag(&self) -> Type { Type::String }
     
+    fn len(&self) -> Option<ExecResult<usize>> {
+        Some(Ok(self.char_len()))
+    }
+    
     fn op_add(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
         if let Some(rhs) = rhs.as_strval() {
             return Some(self.concat(&rhs).map(Variant::from))

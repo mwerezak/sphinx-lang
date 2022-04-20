@@ -107,11 +107,22 @@ impl StringValue {
         }
     }
     
-    fn try_str(&self) -> Option<&str> {
+    fn try_str(&self) -> Result<&str, StringSymbol> {
         match self {
-            Self::Inline(inline) => Some(&*inline),
-            Self::Gc(gc_str) => Some(&**gc_str),
-            _ => None,
+            Self::Inline(inline) => Ok(&*inline),
+            Self::Gc(gc_str) => Ok(&**gc_str),
+            Self::Intern(symbol) => Err(*symbol),
+        }
+    }
+    
+    pub fn char_len(&self) -> usize {
+        match self.try_str() {
+            Ok(string) => string.chars().count(),
+            
+            Err(symbol) => STRING_TABLE.with(|string_table| {
+                string_table.borrow().resolve(&symbol)
+                    .chars().count()
+            })
         }
     }
     
@@ -176,10 +187,8 @@ impl Eq for StringValue { }
 
 impl PartialOrd for StringValue {
     fn partial_cmp(&self, other: &StringValue) -> Option<cmp::Ordering> {
-        let a = self.try_str();
-        let b = other.try_str();
-        if a.and(b).is_some() {
-            return a.unwrap().partial_cmp(b.unwrap())
+        if let (Ok(a), Ok(b)) = (self.try_str(), other.try_str()) {
+            return a.partial_cmp(b)
         }
         
         STRING_TABLE.with(|string_table| {
@@ -192,10 +201,8 @@ impl PartialOrd for StringValue {
 
 impl Ord for StringValue {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
-        let a = self.try_str();
-        let b = other.try_str();
-        if a.and(b).is_some() {
-            return a.unwrap().cmp(b.unwrap())
+        if let (Ok(a), Ok(b)) = (self.try_str(), other.try_str()) {
+            return a.cmp(b)
         }
         
         STRING_TABLE.with(|string_table| {
