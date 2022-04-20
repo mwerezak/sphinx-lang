@@ -22,6 +22,10 @@ impl Variant {
     pub fn type_tag(&self) -> Type {
         self.as_meta().type_tag()
     }
+    
+    pub fn type_name(&self) -> ExecResult<StringValue> {
+        self.as_meta().type_name()
+    }
 }
 
 macro_rules! static_dispatch {
@@ -52,6 +56,8 @@ macro_rules! static_dispatch {
 impl MetaObject for MetaDispatch<'_> {
     
     static_dispatch!{ fn type_tag() -> Type }
+    
+    static_dispatch!{ fn type_name() -> ExecResult<StringValue> }
     
     static_dispatch!{ fn as_bool() -> ExecResult<bool> }
     static_dispatch!{ fn as_bits() -> Option<ExecResult<IntType>> }
