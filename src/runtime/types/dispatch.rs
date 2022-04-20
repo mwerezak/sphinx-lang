@@ -1,13 +1,12 @@
 ///! Enum-based static dispatch for `MetaObject`
 
-use core::ops::Deref;
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-use crate::runtime::gc::{Gc, GcTrace};
-use crate::runtime::function::{Call, Function, NativeFunction, Callable};
-use crate::runtime::strings::{StringValue, StringSymbol};
-use crate::runtime::errors::{ExecResult, ErrorKind};
+use crate::runtime::gc::Gc;
+use crate::runtime::function::{Call, Function, NativeFunction};
+use crate::runtime::strings::StringValue;
 use crate::runtime::types::{Type, MetaObject, Tuple, UserData};
+use crate::runtime::errors::ExecResult;
 
 
 /// Newtype wrapper for `Variant` that impls `MetaObject` using enum-based static dispatch.

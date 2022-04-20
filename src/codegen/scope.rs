@@ -5,7 +5,7 @@ use crate::parser::lvalue::DeclType;
 use crate::debug::symbol::DebugSymbol;
 use crate::codegen::opcodes::{LocalIndex, UpvalueIndex};
 use crate::codegen::funproto::UpvalueTarget;
-use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
+use crate::codegen::errors::{CompileResult, ErrorKind};
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

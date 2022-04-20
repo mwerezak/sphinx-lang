@@ -1,28 +1,7 @@
-//! Binary and unary operations with certain primitive types will *short-circuit*,
-//! meaning that the resulting value will be computed using the logic defined here
-//! instead of deferring to the type system.
-//!
-//! For most functions in this module, returning None means that the operation
-//! should be deferred to the metatables of the operands involved.
-
-use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-use crate::runtime::gc::Gc;
 use crate::runtime::types::MetaObject;
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
-
-#[inline(always)]
-pub fn is_arithmetic_primitive(value: &Variant) -> bool {
-    matches!(value, Variant::Integer(..) | Variant::Float(..))
-}
-
-#[inline(always)]
-pub fn is_bitwise_primitive(value: &Variant) -> bool {
-    matches!(value, Variant::BoolTrue | Variant::BoolFalse | Variant::Integer(..))
-}
-
-// Metamethod Fallbacks
 
 macro_rules! meta_eval_unary {
     ( $operand:expr, $unary_method:tt ) => {

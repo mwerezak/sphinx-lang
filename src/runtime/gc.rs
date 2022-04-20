@@ -1,8 +1,7 @@
 /// Partial clone of rust-gc's mark and sweep implementation
 
 use core::fmt;
-use core::mem;
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
 use core::cell::{Cell, RefCell};
 use log;
 

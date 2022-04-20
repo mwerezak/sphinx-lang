@@ -27,7 +27,6 @@ enum Control {
     Continue,
     Call(CallInfo),
     Return,
-    Exit,
 }
 
 
@@ -98,7 +97,6 @@ impl<'c> VirtualMachine<'c> {
             .map_err(|error| error.extend_trace(self.traceback.iter().rev().cloned()))?;
         
         match control {
-            Control::Exit => return Ok(true),
             Control::Return if self.calls.is_empty() => return Ok(true),
             
             Control::Call(info) => self.setup_call(info)?,

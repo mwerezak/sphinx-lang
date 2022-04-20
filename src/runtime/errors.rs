@@ -4,7 +4,7 @@ use std::error::Error;
 use crate::utils;
 use crate::runtime::Variant;
 use crate::runtime::function::Signature;
-use crate::runtime::gc::{Gc, GcTrace};
+use crate::runtime::gc::GcTrace;
 use crate::runtime::types::{Type, MethodTag};
 use crate::runtime::strings::StringSymbol;
 use crate::debug::traceback::{TraceSite, Traceback};

@@ -1,6 +1,6 @@
 // disable these until we have a working system
 #![allow(dead_code)]
-#![allow(unused_imports)]
+// #![allow(unused_imports)]
 #![feature(ptr_metadata)]
 
 use std::io;

@@ -8,7 +8,7 @@ use crate::runtime::strings::{StringInterner, StringSymbol};
 use crate::runtime::function::{Signature, Parameter};
 use crate::codegen::consts::{Constant, ConstID, StringID};
 use crate::codegen::funproto::{FunctionProto, UnloadedFunction, UnloadedSignature, UnloadedParam, FunctionID};
-use crate::codegen::errors::{CompileResult, CompileError, ErrorKind};
+use crate::codegen::errors::{CompileResult, ErrorKind};
 use crate::debug::DebugSymbol;
 
 

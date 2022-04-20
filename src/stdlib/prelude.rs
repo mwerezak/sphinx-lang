@@ -1,7 +1,7 @@
 
 use crate::runtime::{Variant, Gc};
 use crate::runtime::strings::StringSymbol;
-use crate::runtime::module::{Namespace, GlobalEnv, Access};
+use crate::runtime::module::{GlobalEnv, Access};
 use crate::runtime::function::{NativeFunction, Signature, Parameter};
 use crate::runtime::errors::ExecResult;
 

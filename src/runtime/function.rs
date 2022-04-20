@@ -1,4 +1,4 @@
-use core::cell::{RefCell, Ref, Cell};
+use core::cell::Cell;
 use crate::codegen::{FunctionID, FunctionProto};
 use crate::runtime::Variant;
 use crate::runtime::module::{Module, GlobalEnv};

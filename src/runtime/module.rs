@@ -15,7 +15,6 @@ use crate::source::ModuleSource;
 use crate::language::FloatType;
 use crate::runtime::{Variant, HashMap, DefaultBuildHasher};
 use crate::runtime::gc::{Gc, GcTrace};
-use crate::runtime::function::Function;
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 

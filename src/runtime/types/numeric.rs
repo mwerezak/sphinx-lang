@@ -2,7 +2,7 @@
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::types::{MetaObject, Type};
-use crate::runtime::errors::{ExecResult, ErrorKind, RuntimeError};
+use crate::runtime::errors::{ExecResult, ErrorKind};
 
 macro_rules! checked_int_math {
     ( $method:tt, $lhs:expr, $rhs:expr ) => {

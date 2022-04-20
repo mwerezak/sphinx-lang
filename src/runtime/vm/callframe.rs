@@ -1,4 +1,4 @@
-use crate::language::{IntType, FloatType};
+use crate::language::IntType;
 use crate::codegen::{OpCode, LocalIndex, UpvalueTarget};
 use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::VMFrameSnapshot;

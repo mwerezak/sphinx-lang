@@ -1,11 +1,10 @@
 use core::fmt;
-use core::cell::Cell;
 use core::hash::{Hash, Hasher};
 use core::cmp::{PartialEq, Eq};
 use static_assertions::assert_eq_size;
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Type, Tuple, UserData};
-use crate::runtime::function::{Function, NativeFunction, Call};
+use crate::runtime::types::{Tuple, UserData};
+use crate::runtime::function::{Function, NativeFunction};
 use crate::runtime::strings::{StringValue, StringSymbol, InlineStr, GCStr};
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};

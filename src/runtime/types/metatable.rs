@@ -1,7 +1,5 @@
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
-use crate::runtime::gc::GcTrace;
-use crate::runtime::strings::StringSymbol;
 use crate::runtime::function::Call;
 use crate::runtime::errors::ExecResult;
 

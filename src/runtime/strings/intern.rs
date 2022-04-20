@@ -7,7 +7,7 @@ use string_interner::{self, DefaultBackend};
 use string_interner::symbol::Symbol;
 
 use crate::language::InternSymbol;
-use crate::runtime::{DefaultHasher, DefaultBuildHasher};
+use crate::runtime::DefaultBuildHasher;
 
 
 thread_local! {

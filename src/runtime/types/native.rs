@@ -1,6 +1,5 @@
 use core::any::Any;
-use core::ops::Deref;
-use crate::runtime::gc::{Gc, GcTrace};
+use crate::runtime::gc::GcTrace;
 use crate::runtime::types::{Type, MetaObject};
 
 

@@ -1,8 +1,6 @@
-use core::fmt;
-use core::mem::{self, MaybeUninit};
+use core::mem;
 use core::alloc::Layout;
 use core::ptr::{self, NonNull, Pointee};
-use core::cell::{Cell, RefCell};
 use std::alloc::{self, alloc, dealloc};
 
 
