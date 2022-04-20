@@ -94,9 +94,9 @@ impl fmt::Display for Tuple {
                 
                 write!(fmt, "(")?;
                 for item in rest.iter() {
-                    write!(fmt, "{}, ", item)?;
+                    write!(fmt, "{}, ", item.echo())?;
                 }
-                write!(fmt, "{})", last)
+                write!(fmt, "{})", last.echo())
             },
         }
     }
