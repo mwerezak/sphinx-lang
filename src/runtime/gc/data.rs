@@ -230,7 +230,6 @@ mod tests {
         let gcbox = GcBox::new(data);
         println!("gcbox sized: {:#?}", unsafe { gcbox.as_ref() });
         unsafe {
-            // let header = NonNull::new_unchecked(gcbox.as_ptr() as *mut GcBoxHeader);
             let header = GcBoxHeader::from_alloc(gcbox);
             GcBoxHeader::free(header); 
         }
@@ -242,7 +241,6 @@ mod tests {
         let gcbox = GcBox::from_box(unsized_data);
         println!("gcbox unsized: {:#?}", unsafe { gcbox.as_ref() });
         unsafe {
-            // let header = NonNull::new_unchecked(gcbox.as_ptr() as *mut GcBoxHeader);
             let header = GcBoxHeader::from_alloc(gcbox);
             GcBoxHeader::free(header);
         }

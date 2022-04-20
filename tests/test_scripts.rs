@@ -1,10 +1,10 @@
-use core::path::Path;
+use std::path::Path;
 
 use sphinx;
 use sphinx::stdlib;
 use sphinx::source::ModuleSource;
 use sphinx::codegen::{Program, CompiledProgram};
-use sphinx::runtime::{Module, VirtualMachine, Gc};
+use sphinx::runtime::{Module, VirtualMachine};
 use sphinx::runtime::errors::{ExecResult, ErrorKind};
 
 
@@ -25,7 +25,7 @@ fn run_test_script(path: &Path) -> ExecResult<()> {
     
     let program = Program::load(build.program);
     
-    let main_env = Gc::new(stdlib::prelude_env());
+    let main_env = stdlib::create_prelude();
     let main_module = Module::with_env(Some(source), program.data, main_env);
     
     let vm = VirtualMachine::new(main_module, &program.main);
@@ -100,7 +100,7 @@ mod function_tests {
     test_script!(local_recursion, "tests/function/local_recursion.sph");
     test_script!(nested_call_with_arguments, "tests/function/nested_call_with_arguments.sph");
     test_script!(inner_block, "tests/function/inner_block.sph");
-    test_script!(missing_arguments, "tests/function/missing_arguments.sph", error: ErrorKind::MissingArguments(..));
+    test_script!(missing_arguments, "tests/function/missing_arguments.sph", error: ErrorKind::MissingArguments {..});
 }
 
 mod closure_tests {
