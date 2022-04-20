@@ -18,7 +18,7 @@ mod tuple;
 mod native;
 
 pub use tuple::Tuple;
-pub use native::{UserData, UserDataBox};
+pub use native::UserData;
 
 
 // Type tag for Sphinx's "primitive" types

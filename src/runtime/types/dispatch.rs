@@ -43,7 +43,7 @@ macro_rules! static_dispatch {
                 Variant::Function(fun) => <Gc<Function> as MetaObject>::$name(fun, $( $arg ),* ),
                 Variant::NativeFunction(fun) => <Gc<NativeFunction> as MetaObject>::$name(fun, $( $arg ),* ),
                 
-                Variant::UserData(data) => <(dyn UserData + 'static) as MetaObject>::$name(&***data, $( $arg ),* ),
+                Variant::UserData(data) => <(dyn UserData + 'static) as MetaObject>::$name(&**data, $( $arg ),* ),
             }
         }
     };
