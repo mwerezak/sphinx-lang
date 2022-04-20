@@ -15,10 +15,10 @@ use intern::StringTable;
 pub type InlineStr = inline::InlineStr<14>;
 
 #[derive(Debug, Clone, Copy)]
-pub struct GCStr(Gc<Box<str>>);
+pub struct GCStr(Gc<str>);
 
 impl Deref for GCStr {
-    type Target = Gc<Box<str>>;
+    type Target = Gc<str>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -32,7 +32,7 @@ pub enum StringValue {
     Gc(GCStr),
 }
 
-unsafe impl GcTrace for Box<str> {
+unsafe impl GcTrace for str {
     fn trace(&self) { }
     
     fn size_hint(&self) -> usize {
@@ -54,7 +54,7 @@ impl From<&str> for StringValue {
             return Self::Intern(StringSymbol::intern(string))
         }
         
-        Self::Gc(GCStr(Gc::new(string.to_string().into_boxed_str())))
+        Self::Gc(GCStr(Gc::from_box(string.to_string().into_boxed_str())))
     }
 }
 
