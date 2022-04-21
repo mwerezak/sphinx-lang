@@ -10,14 +10,36 @@ use crate::runtime::errors::{ExecResult, ErrorKind};
 pub fn create_prelude() -> Gc<GlobalEnv> {
     let env = GlobalEnv::new();
     
+    // Metamethods
+    
     // Get the length of a container using the `__len` metamethod.
-    let len = native_function!(len, env, params(obj) => {
-        let len = obj.len()?;
+    let len = native_function!(len, env, params(value) => {
+        let len = value.len()?;
         match IntType::try_from(len) {
             Ok(len) => Ok(Variant::from(len)),
             Err(..) => Err(ErrorKind::OverflowError.into()),
         }
     });
+    
+    // primitive type constructors
+    
+    let as_bool = native_function!(bool, env, params(value) => {
+        Ok(Variant::from(value.as_bool()?))
+    });
+    
+    let as_bits = native_function!(bitfield, env, params(value) => {
+        Ok(Variant::from(value.as_bits()?))
+    });
+    
+    let as_int = native_function!(int, env, params(value) => {
+        Ok(Variant::from(value.as_int()?))
+    });
+    
+    let as_float = native_function!(float, env, params(value) => {
+        Ok(Variant::from(value.as_float()?))
+    });
+    
+    // Misc
     
     let print = native_function!(print, env, variadic(values)  => {
         if let Some((first, rest)) = values.split_first() {
@@ -45,8 +67,14 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
     });
     
     namespace!(env.borrow_mut(), {
-        fun _ = globals;
         fun _ = len;
+        
+        fun _ = as_bool;
+        fun _ = as_bits;
+        fun _ = as_int;
+        fun _ = as_float;
+        
+        fun _ = globals;
         fun _ = print;
     });
     
