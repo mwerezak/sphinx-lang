@@ -1,4 +1,4 @@
-use crate::language::IntType;
+use crate::language::{IntType, FloatType};
 use crate::runtime::{Variant, Gc};
 use crate::runtime::module::{GlobalEnv, Access};
 use crate::runtime::function::{NativeFunction, Signature, Parameter};
@@ -32,7 +32,17 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
     });
     
     let as_int = native_function!(int, env, params(value) => {
-        Ok(Variant::from(value.as_int()?))
+        match value {
+            Variant::Float(value) if value.is_finite() => {
+                let value = value.trunc();
+                if IntType::MIN as FloatType <= value && value <= IntType::MAX as FloatType {
+                    Ok(Variant::from(value as IntType))
+                } else {
+                    Err(ErrorKind::OverflowError.into())
+                }
+            }
+            _ => Ok(Variant::from(value.as_int()?))
+        }
     });
     
     let as_float = native_function!(float, env, params(value) => {
