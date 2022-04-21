@@ -83,12 +83,6 @@ impl From<StringSymbol> for Variant {
     }
 }
 
-impl From<&str> for Variant {
-    fn from(string: &str) -> Self {
-        StringValue::from(string).into()
-    }
-}
-
 impl From<Box<[Variant]>> for Variant {
     fn from(items: Box<[Variant]>) -> Self {
         Self::Tuple(items.into())

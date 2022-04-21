@@ -29,24 +29,6 @@ unsafe impl GcTrace for str {
     }
 }
 
-const INTERN_THRESHOLD: usize = 40;
-
-impl From<&str> for StringValue {
-    fn from(string: &str) -> Self {
-        // first, try inlining
-        if let Ok(inline) = InlineStr::try_new(string) {
-            return Self::Inline(inline);
-        }
-        
-        // always intern short-ish strings
-        if string.len() <= INTERN_THRESHOLD {
-            return Self::Intern(StringSymbol::intern(string))
-        }
-        
-        Self::Gc(Gc::from_box(string.to_string().into_boxed_str()))
-    }
-}
-
 impl From<StringSymbol> for StringValue {
     fn from(symbol: StringSymbol) -> Self {
         StringValue::Intern(symbol)
@@ -64,6 +46,43 @@ impl From<Gc<str>> for StringValue {
         StringValue::Gc(gc_str)
     }
 }
+
+const INTERN_THRESHOLD: usize = 40;
+
+// different constructors for different interning policies
+impl StringValue {
+    pub fn new_maybe_interned<S>(s: S) -> Self where S: AsRef<str> {
+        let string = s.as_ref();
+        
+        // first, try inlining
+        if let Ok(inline) = InlineStr::try_new(string) {
+            return Self::Inline(inline);
+        }
+        
+        // always intern short-ish strings
+        if string.len() <= INTERN_THRESHOLD {
+            return Self::Intern(StringSymbol::intern(string))
+        }
+        
+        Self::Gc(Gc::from_box(string.to_string().into_boxed_str()))
+    }
+    
+    pub fn new_uninterned<S>(s: S) -> Self where S: AsRef<str> {
+        let string = s.as_ref();
+        
+        // first, try inlining
+        if let Ok(inline) = InlineStr::try_new(string) {
+            return Self::Inline(inline);
+        }
+        
+        Self::Gc(Gc::from_box(string.to_string().into_boxed_str()))
+    }
+    
+    pub fn new_interned<S>(s: S) -> Self where S: AsRef<str> {
+        Self::Intern(StringSymbol::from(s.as_ref()))
+    }
+}
+
 
 impl StringValue {
     pub fn trace(&self) {
@@ -90,7 +109,7 @@ impl StringValue {
     }
     
     /// Interns the string *in place*.
-    pub fn intern(&mut self) {
+    pub fn make_intern(&mut self) {
         let symbol = self.as_intern();
         *self = Self::Intern(symbol)
     }
@@ -135,7 +154,7 @@ impl StringValue {
         other.write(&mut buf)
             .map_err(|error| ErrorKind::Other(format!("{}", error)))?;
         
-        Ok(StringValue::from(buf.as_str()))
+        Ok(StringValue::new_maybe_interned(buf.as_str()))
     }
 }
 

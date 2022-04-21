@@ -62,7 +62,7 @@ pub trait MetaObject {
     fn type_tag(&self) -> Type;
     
     fn type_name(&self) -> ExecResult<StringValue> {
-        Ok(StringValue::from(self.type_tag().name()))
+        Ok(StringValue::new_maybe_interned(self.type_tag().name()))
     }
     
     // primitive coercions
