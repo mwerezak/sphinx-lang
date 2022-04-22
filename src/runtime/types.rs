@@ -275,7 +275,7 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
     fn fmt_echo(&self) -> ExecResult<StringValue> {
         // TODO cache this in the signature struct
         let result = format!(
-            "<{} at {:#X}>", self.signature().display_short(), Gc::as_id(self)
+            "<{} at {:#X}>", self.signature().fmt_name(), Gc::as_id(self)
         );
         Ok(StringValue::new_uninterned(result))
     }

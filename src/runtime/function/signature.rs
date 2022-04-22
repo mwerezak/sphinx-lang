@@ -1,7 +1,7 @@
 use core::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::runtime::Variant;
-use crate::runtime::strings::{StringSymbol, STRING_TABLE};
+use crate::runtime::strings::{StringValue, StringSymbol, StrBuffer, STRING_TABLE};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
@@ -31,9 +31,30 @@ impl Signature {
     }
     
     pub fn name(&self) -> Option<StringSymbol> { self.name }
-    pub fn display_short(&self) -> impl fmt::Display + '_ {
-        ShortDisplay(self)
+    
+    pub fn fmt_signature(&self) -> StringValue {
+        StringValue::new_uninterned(&self.display)
     }
+    
+    pub fn fmt_name(&self) -> StringValue {
+        fn write_name(name: Option<StringSymbol>, fmt: &mut impl fmt::Write) -> fmt::Result {
+            if let Some(name) = name {
+                write!(fmt, "function \"{}()\"", name)
+            } else {
+                fmt.write_str("anonymous function")
+            }
+        }
+        
+        let mut buf = StrBuffer::<64>::new();
+        if write_name(self.name, &mut buf).is_ok() {
+            StringValue::new_maybe_interned(buf)
+        } else {
+            let mut buf = String::new();
+            write_name(self.name, &mut buf).ok();
+            StringValue::new_maybe_interned(buf)
+        }
+    }
+    
     
     pub fn required(&self) -> &[Parameter] { &self.required }
     pub fn default(&self) -> &[Parameter] { &self.default }
@@ -169,18 +190,4 @@ fn format_signature(name: Option<&StringSymbol>, required: &[Parameter], default
         
         format!("fun {}({})", name.unwrap_or(""), parameters.join(", "))
     })
-}
-
-
-// short-form display for Signature
-struct ShortDisplay<'a>(&'a Signature);
-
-impl fmt::Display for ShortDisplay<'_> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(name) = self.0.name {
-            write!(fmt, "{}()", name)
-        } else {
-            fmt.write_str("fun()")
-        }
-    }
 }

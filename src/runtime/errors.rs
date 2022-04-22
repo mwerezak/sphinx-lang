@@ -156,7 +156,7 @@ impl fmt::Display for RuntimeError {
                 
                 format!(
                     "{} missing {} required {}: {}",
-                    signature.display_short(), 
+                    signature.fmt_name(), 
                     count, 
                     if count == 1 { "argument" }
                     else { "arguments" },
@@ -167,7 +167,7 @@ impl fmt::Display for RuntimeError {
             ErrorKind::TooManyArguments { signature, nargs } => {
                 format!(
                     "{} takes {} arguments but {} were given", 
-                    signature.display_short(), 
+                    signature.fmt_name(), 
                     signature.max_arity().unwrap(), 
                     nargs,
                 )
