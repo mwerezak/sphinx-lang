@@ -50,6 +50,13 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
     });
     
     // Misc
+    let to_str = native_function!(str, env, params(value) => {
+        Ok(Variant::from(value.to_string()?))
+    });
+    
+    let echo = native_function!(echo, env, params(value) => {
+        Ok(Variant::from(value.fmt_echo()?))
+    });
     
     let print = native_function!(print, env, variadic(values)  => {
         if let Some((first, rest)) = values.split_first() {
@@ -85,6 +92,8 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         fun _ = as_float;
         
         fun _ = globals;
+        fun _ = to_str;
+        fun _ = echo;
         fun _ = print;
     });
     

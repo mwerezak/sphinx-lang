@@ -226,10 +226,10 @@ impl MetaObject for IntType {
     fn fmt_echo(&self) -> ExecResult<StringValue> {
         let mut buf = StrBuffer::<32>::new();
         if write!(buf, "{}", *self).is_ok() {
-            Ok(StringValue::new_uninterned(buf))
+            Ok(StringValue::new_maybe_interned(buf))
         } else {
             // resort to allocated buffer
-            Ok(StringValue::new_uninterned(format!("{}", *self)))
+            Ok(StringValue::new_maybe_interned(format!("{}", *self)))
         }
     }
 }
@@ -295,7 +295,7 @@ impl MetaObject for FloatType {
         other.as_meta().as_float().map(|other| Ok(*self <= other?))
     }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn to_string(&self) -> ExecResult<StringValue> {
         fn write_float(value: FloatType, fmt: &mut impl fmt::Write) -> fmt::Result {
             if !value.is_finite() || value.trunc() != value {
                 write!(fmt, "{}", value)
@@ -306,12 +306,34 @@ impl MetaObject for FloatType {
         
         let mut buf = StrBuffer::<32>::new();
         if write_float(*self, &mut buf).is_ok() {
-            Ok(StringValue::new_uninterned(buf))
+            Ok(StringValue::new_maybe_interned(buf))
         } else {
             let mut buf = String::new();
             write_float(*self, &mut buf)
                 .map_err(|err| ErrorKind::Other(format!("{}", err)))?;
-            Ok(StringValue::new_uninterned(buf))
+            Ok(StringValue::new_maybe_interned(buf))
+        }
+    }
+    
+    fn fmt_echo(&self) -> ExecResult<StringValue> {
+        fn write_float(value: FloatType, fmt: &mut impl fmt::Write) -> fmt::Result {
+            if !value.is_finite() {
+                write!(fmt, "float({})", value)
+            } else if value.trunc() != value {
+                write!(fmt, "{}", value)
+            } else {
+                write!(fmt, "{}.0", value)
+            }
+        }
+        
+        let mut buf = StrBuffer::<32>::new();
+        if write_float(*self, &mut buf).is_ok() {
+            Ok(StringValue::new_maybe_interned(buf))
+        } else {
+            let mut buf = String::new();
+            write_float(*self, &mut buf)
+                .map_err(|err| ErrorKind::Other(format!("{}", err)))?;
+            Ok(StringValue::new_maybe_interned(buf))
         }
     }
 }
