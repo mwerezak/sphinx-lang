@@ -185,25 +185,23 @@ impl LexerRule for IntegerLiteralRule {
 }
 
 #[derive(Clone)]
-pub struct HexIntegerLiteralRule {
+pub struct PrefixedIntegerLiteralRule {
     buf: String,
     prefix: StrMatcher<'static>,
+    radix: u32,
 }
 
-impl Default for HexIntegerLiteralRule {
-    fn default() -> Self { Self::new() }
-}
-
-impl HexIntegerLiteralRule {
-    pub fn new() -> Self {
-        HexIntegerLiteralRule {
+impl PrefixedIntegerLiteralRule {
+    pub fn new(prefix: &'static str, radix: u32) -> Self {
+        PrefixedIntegerLiteralRule {
             buf: String::new(),
-            prefix: StrMatcher::ascii_case_insensitive("0x"),
+            prefix: StrMatcher::ascii_case_insensitive(prefix),
+            radix,
         }
     }
 }
 
-impl LexerRule for HexIntegerLiteralRule {
+impl LexerRule for PrefixedIntegerLiteralRule {
     fn reset(&mut self) {
         self.buf.clear();
         self.prefix.reset();
@@ -238,7 +236,7 @@ impl LexerRule for HexIntegerLiteralRule {
     fn get_token(&self) -> Result<Token, TokenError> {
         debug_assert!(self.current_state().is_complete_match());
         
-        let conversion = language::IntType::from_str_radix(self.buf.as_str(), 16);
+        let conversion = language::IntType::from_str_radix(self.buf.as_str(), self.radix);
         match conversion {
             Ok(value) => Ok(Token::IntegerLiteral(value)),
             

@@ -131,7 +131,9 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     // Identifiers and literals
     .add_rule(IdentifierRule::new())
     .add_rule(IntegerLiteralRule::new())
-    .add_rule(HexIntegerLiteralRule::new())
+    .add_rule(PrefixedIntegerLiteralRule::new("0x", 16))
+    .add_rule(PrefixedIntegerLiteralRule::new("0o", 8))
+    .add_rule(PrefixedIntegerLiteralRule::new("0b", 2))
     .add_rule(FloatLiteralRule::new())
     .add_rule(StringLiteralRule::new(all_escape_sequences()))
     .add_rule(LabelRule::new("::"))
