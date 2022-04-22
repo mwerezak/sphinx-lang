@@ -5,14 +5,14 @@ use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 pub mod intern;
-pub mod inline;
+pub mod buffer;
 
-pub use intern::{StringSymbol, StringInterner, STRING_TABLE};
+pub use intern::{StringSymbol, StringInterner, static_symbol, STRING_TABLE};
+pub use buffer::StrBuffer;
 
 use intern::StringTable;
 
-
-pub type InlineStr = inline::InlineStr<22>;
+pub type InlineStr = StrBuffer<22>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum StringValue {

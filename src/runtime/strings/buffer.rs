@@ -17,13 +17,13 @@ use core::borrow::Borrow;
 // pub const STRING_SIZED_INLINE: usize = mem::size_of::<String>() - 2;
 
 #[derive(Clone, Copy)]
-pub struct InlineStr<const N: usize> {
+pub struct StrBuffer<const N: usize> {
     data: [mem::MaybeUninit<u8>; N],
     len: u8,
 }
 
-impl<const N: usize> InlineStr<N> {
-    /// Attempts to return a new `InlineStr` if the source string is short enough to be copied.
+impl<const N: usize> StrBuffer<N> {
+    /// Attempts to return a new `StrBuffer` if the source string is short enough to be copied.
     /// If not, the source is returned as the error.
     #[inline]
     pub fn try_new<T: AsRef<str>>(s: T) -> Result<Self, T> {
@@ -92,7 +92,7 @@ impl<const N: usize> InlineStr<N> {
 }
 
 
-impl<const N: usize> core::ops::Deref for InlineStr<N> {
+impl<const N: usize> core::ops::Deref for StrBuffer<N> {
     type Target = str;
 
     #[inline]
@@ -108,22 +108,22 @@ impl<const N: usize> core::ops::Deref for InlineStr<N> {
     }
 }
 
-impl<const N: usize> AsRef<str> for InlineStr<N> {
+impl<const N: usize> AsRef<str> for StrBuffer<N> {
     fn as_ref(&self) -> &str { &*self }
 }
 
-impl<const N: usize> Borrow<str> for InlineStr<N> {
+impl<const N: usize> Borrow<str> for StrBuffer<N> {
     fn borrow(&self) -> &str { &*self }
 }
 
-impl<const N: usize> fmt::Debug for InlineStr<N> {
+impl<const N: usize> fmt::Debug for StrBuffer<N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         <str as fmt::Debug>::fmt(self, f)
     }
 }
 
-impl<const N: usize> fmt::Display for InlineStr<N> {
+impl<const N: usize> fmt::Display for StrBuffer<N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         <str as fmt::Display>::fmt(self, f)
@@ -133,7 +133,7 @@ impl<const N: usize> fmt::Display for InlineStr<N> {
 
 // Conversion from other string types
 
-impl<'s, const N: usize> TryFrom<&'s String> for InlineStr<N> {
+impl<'s, const N: usize> TryFrom<&'s String> for StrBuffer<N> {
     type Error = &'s String;
 
     #[inline]
@@ -142,7 +142,7 @@ impl<'s, const N: usize> TryFrom<&'s String> for InlineStr<N> {
     }
 }
 
-impl<'s, const N: usize> TryFrom<&'s str> for InlineStr<N> {
+impl<'s, const N: usize> TryFrom<&'s str> for StrBuffer<N> {
     type Error = &'s str;
 
     #[inline]
@@ -157,12 +157,12 @@ impl<'s, const N: usize> TryFrom<&'s str> for InlineStr<N> {
 
 #[cfg(test)]
 mod tests {
-    use crate::runtime::strings::inline::InlineStr;
+    use crate::runtime::strings::inline::StrBuffer;
 
     #[test]
     fn empty() {
         let lit = "";
-        let s: InlineStr<22> = lit.try_into().expect("bad inline str");
+        let s: StrBuffer<22> = lit.try_into().expect("bad inline str");
         assert_eq!(&*s, lit);
         assert_eq!(s.len(), lit.len())
     }
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn good_init() {
         let lit = "inline";
-        let s: InlineStr<22> = lit.try_into().expect("bad inline str");
+        let s: StrBuffer<22> = lit.try_into().expect("bad inline str");
         assert_eq!(&*s, lit);
         assert_eq!(s.len(), lit.len())
     }
@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn bad_init() {
         let lit = "This is way too long to be an inline string!!!";
-        let s = <InlineStr<22>>::try_new(lit).unwrap_err();
+        let s = <StrBuffer<22>>::try_new(lit).unwrap_err();
         assert_eq!(s, lit);
         assert_eq!(s.len(), lit.len())
     }
@@ -187,7 +187,7 @@ mod tests {
     fn good_concat() {
         let lit = "Inline";
         let lit2 = " me";
-        let mut s = <InlineStr<22>>::try_new(lit).expect("bad inline str");
+        let mut s = <StrBuffer<22>>::try_new(lit).expect("bad inline str");
         assert!(s.try_concat(lit2));
         assert_eq!(&*s, lit.to_string() + lit2);
     }
@@ -196,7 +196,7 @@ mod tests {
     fn bad_concat() {
         let lit = "This is";
         let lit2 = " way too long to be an inline string!!!";
-        let mut s = <InlineStr<22>>::try_new(lit).expect("bad inline str");
+        let mut s = <StrBuffer<22>>::try_new(lit).expect("bad inline str");
         assert!(!s.try_concat(lit2));
         assert_eq!(&*s, lit);
     }
