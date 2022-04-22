@@ -27,6 +27,7 @@ pub enum ErrorKind {
     TooManyArguments { signature: Box<Signature>, nargs: usize },
     MethodNotSupported(Type, MethodTag),
     AssertFailed,
+    InvalidValue(Variant, String),
     Other(String),
 }
 
@@ -120,9 +121,17 @@ impl fmt::Display for RuntimeError {
             ErrorKind::NegativeShiftCount => format!("negative bitshift count"),
             ErrorKind::NameNotDefined(name) => format!("undefined variable \"{}\"", name),
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
-            ErrorKind::UnhashableValue(value) => format!("'{:?}' is not hashable", value),
+            ErrorKind::UnhashableValue(value) => format!("{} is not hashable", value.echo()),
             ErrorKind::AssertFailed => format!("assertion failed"),
             ErrorKind::Other(message) => message.to_string(),
+            
+            ErrorKind::InvalidValue(value, message) => {
+                if message.is_empty() {
+                    format!("invalid value {}", value.echo())
+                } else {
+                    format!("invalid value {}: {}", value.echo(), message)
+                }
+            }
             
             ErrorKind::MethodNotSupported(receiver, method) => {
                 match method {
@@ -132,7 +141,7 @@ impl fmt::Display for RuntimeError {
                     MethodTag::Invoke => format!("type '{}' is not callable", receiver),
                     MethodTag::Next => format!("type '{}' is not an iterator", receiver),
                     MethodTag::Iter => format!("type '{}' is not iterable", receiver),
-                    _ => format!("type '{}' does not support '{}'", receiver, method),
+                    _ => format!("type '{}' does not support '__{}'", receiver, method),
                 }
             }
             

@@ -1,5 +1,6 @@
+use core::fmt::Write;
 use crate::runtime::Variant;
-use crate::runtime::strings::StringValue;
+use crate::runtime::strings::{StringValue, StrBuffer};
 use crate::runtime::types::{Type, MetaObject};
 use crate::runtime::errors::{ExecResult};
 
@@ -44,5 +45,19 @@ impl MetaObject for StringValue {
             return Some(Ok(*self <= other))
         }
         None
+    }
+    
+    fn to_string(&self) -> ExecResult<StringValue> {
+        Ok(*self)
+    }
+    
+    fn fmt_echo(&self) -> ExecResult<StringValue> {
+        let mut buf = StrBuffer::<64>::new();
+        if write!(buf, "\"{}\"", self).is_ok() {
+            Ok(StringValue::new_uninterned(buf))
+        } else {
+            // resort to allocated buffer
+            Ok(StringValue::new_uninterned(format!("\"{}\"", self)))
+        }
     }
 }

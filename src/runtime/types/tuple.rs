@@ -1,6 +1,7 @@
-use core::fmt;
+use core::fmt::{self, Write};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
+use crate::runtime::strings::{StringValue, StrBuffer};
 use crate::runtime::types::{Type, MetaObject};
 use crate::runtime::errors::ExecResult;
 
@@ -72,6 +73,18 @@ impl MetaObject for Tuple {
     
     fn len(&self) -> Option<ExecResult<usize>> {
         Some(Ok(Tuple::len(self)))
+    }
+    
+    fn fmt_echo(&self) -> ExecResult<StringValue> {
+        // only use StrBuffer for small tuples to avoid wasted work
+        if self.len() <= 8 {
+            let mut buf = StrBuffer::<64>::new();
+            if write!(buf, "{}", self).is_ok() {
+                return Ok(StringValue::new_uninterned(buf))
+            }
+        }
+        
+        Ok(StringValue::new_uninterned(format!("{}", self)))
     }
 }
 

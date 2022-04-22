@@ -96,14 +96,14 @@ impl<const N: usize> StrBuffer<N> {
     #[inline]
     pub fn is_empty(&self) -> bool { self.len == 0 }
 
-    pub fn try_push(&mut self, ch: char) -> Result<(), ()> {
+    pub fn try_push(&mut self, ch: char) -> fmt::Result {
         let mut buf = [0u8; 4];
         self.try_push_str(ch.encode_utf8(&mut buf))
     }
 
     /// Attempts to concatenate the `&str` if there is room. It returns true if it is able to do so.
     #[inline]
-    pub fn try_push_str<S: AsRef<str>>(&mut self, s: S) -> Result<(), ()> {
+    pub fn try_push_str<S: AsRef<str>>(&mut self, s: S) -> fmt::Result {
         let s_ref = s.as_ref();
         
         if self.len() + s_ref.len() <= Self::capacity() {
@@ -119,7 +119,7 @@ impl<const N: usize> StrBuffer<N> {
             self.len += s_ref.len() as u8;
             Ok(())
         } else {
-            Err(())
+            Err(fmt::Error::default())
         }
     }
 }
@@ -149,6 +149,16 @@ impl<const N: usize> Borrow<str> for StrBuffer<N> {
     fn borrow(&self) -> &str { &*self }
 }
 
+impl<const N: usize> fmt::Write for StrBuffer<N> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.try_push_str(s)
+    }
+
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.try_push(c)
+    }
+}
+
 impl<const N: usize> fmt::Debug for StrBuffer<N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -162,7 +172,6 @@ impl<const N: usize> fmt::Display for StrBuffer<N> {
         <str as fmt::Display>::fmt(self, f)
     }
 }
-
 
 
 

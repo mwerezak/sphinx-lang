@@ -2,7 +2,7 @@ use core::fmt;
 use core::cmp;
 use core::hash::{Hash, Hasher};
 use crate::runtime::gc::{Gc, GcTrace};
-use crate::runtime::errors::{ExecResult, ErrorKind};
+use crate::runtime::errors::ExecResult;
 
 pub mod intern;
 pub mod buffer;

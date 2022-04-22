@@ -1,11 +1,11 @@
 use core::fmt;
-
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::function::{Call, Callable};
-use crate::runtime::strings::StringValue;
+use crate::runtime::strings::{StringValue, StringSymbol, static_symbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
+
 
 mod ops;
 mod dispatch;
@@ -64,6 +64,10 @@ pub trait MetaObject {
     fn type_name(&self) -> ExecResult<StringValue> {
         Ok(StringValue::new_maybe_interned(self.type_tag().name()))
     }
+    
+    // formatting
+    fn fmt_echo(&self) -> ExecResult<StringValue>;
+    fn to_string(&self) -> ExecResult<StringValue> { self.fmt_echo() }
     
     // primitive coercions
     fn as_bool(&self) -> ExecResult<bool> { Ok(true) }
@@ -161,6 +165,14 @@ impl Variant {
         self.as_meta().invoke(args)
             .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Invoke))?
     }
+    
+    pub fn fmt_echo(&self) -> ExecResult<StringValue> {
+        self.as_meta().fmt_echo()
+    }
+    
+    pub fn to_string(&self) -> ExecResult<StringValue> {
+        self.as_meta().to_string()
+    }
 }
 
 
@@ -175,6 +187,10 @@ impl MetaObject for () {
             Variant::Nil => Some(Ok(true)),
             _ => None,
         }
+    }
+    
+    fn fmt_echo(&self) -> ExecResult<StringValue> {
+        Ok(StringValue::from(static_symbol!("nil")))
     }
 }
 
@@ -233,6 +249,13 @@ impl MetaObject for bool {
             _ => None,
         }
     }
+    
+    fn fmt_echo(&self) -> ExecResult<StringValue> {
+        match self {
+            true => Ok(static_symbol!("true").into()),
+            false => Ok(static_symbol!("false").into()),
+        }
+    }
 }
 
 impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
@@ -249,6 +272,14 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
             _ => Some(Ok(false)),
         }
     }
+    
+    fn fmt_echo(&self) -> ExecResult<StringValue> {
+        // TODO cache this in the signature struct
+        let result = format!(
+            "<{} at {:#X}>", self.signature().display_short(), Gc::as_id(self)
+        );
+        Ok(StringValue::new_uninterned(result))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -261,6 +292,8 @@ pub enum MethodTag {
     AsBits,
     AsInt,
     AsFloat,
+    ToString,
+    Echo,
 }
 
 impl MethodTag {
@@ -280,6 +313,9 @@ impl MethodTag {
             Self::AsBits => "bits",
             Self::AsInt => "int",
             Self::AsFloat => "float",
+            
+            Self::ToString => "tostring",
+            Self::Echo => "echo",
         }
     }
 }

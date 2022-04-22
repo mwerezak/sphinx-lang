@@ -55,8 +55,10 @@ macro_rules! static_dispatch {
 impl MetaObject for MetaDispatch<'_> {
     
     static_dispatch!{ fn type_tag() -> Type }
-    
     static_dispatch!{ fn type_name() -> ExecResult<StringValue> }
+    
+    static_dispatch!{ fn fmt_echo() -> ExecResult<StringValue> }
+    static_dispatch!{ fn to_string() -> ExecResult<StringValue> }
     
     static_dispatch!{ fn as_bool() -> ExecResult<bool> }
     static_dispatch!{ fn as_bits() -> Option<ExecResult<IntType>> }

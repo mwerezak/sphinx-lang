@@ -180,7 +180,7 @@ impl fmt::Display for ShortDisplay<'_> {
         if let Some(name) = self.0.name {
             write!(fmt, "{}()", name)
         } else {
-            fmt.write_str("anonymous function")
+            fmt.write_str("fun()")
         }
     }
 }
