@@ -83,6 +83,19 @@ impl StringValue {
     }
 }
 
+/// evaluates an expression using a StringValue, accessing the STRING_TABLE only if needed
+macro_rules! with_strval {
+    ($strval:expr, $string:ident => $expr:expr) => {
+        match $strval.try_str() {
+            Ok($string) => $expr,
+            Err(symbol) => STRING_TABLE.with(|string_table| {
+                let $string = string_table.borrow().resolve(&symbol);
+                $expr
+            })
+        }
+    };
+}
+
 
 impl StringValue {
     pub fn trace(&self) {
@@ -134,27 +147,29 @@ impl StringValue {
         }
     }
     
+    pub fn len(&self) -> usize {
+        with_strval!(self, s => s.len())
+    }
+    
     pub fn char_count(&self) -> usize {
-        match self.try_str() {
-            Ok(string) => string.chars().count(),
-            
-            Err(symbol) => STRING_TABLE.with(|string_table| {
-                string_table.borrow().resolve(&symbol)
-                    .chars().count()
-            })
-        }
+        with_strval!(self, s => s.chars().count())
     }
     
     pub fn concat(&self, other: &StringValue) -> ExecResult<StringValue> {
-        let mut buf = String::new();
-        
-        self.write(&mut buf)
-            .map_err(|error| ErrorKind::Other(format!("{}", error)))?;
+        // don't allocate when concatenating small strings
+        const BUFLEN: usize = 64;
+        if self.len() + other.len() <= BUFLEN {
+            let mut buf = with_strval!(self, s => StrBuffer::<BUFLEN>::try_new(s).unwrap());
+            with_strval!(other, s => buf.try_push_str(s).unwrap());
             
-        other.write(&mut buf)
-            .map_err(|error| ErrorKind::Other(format!("{}", error)))?;
-        
-        Ok(StringValue::new_maybe_interned(buf.as_str()))
+            Ok(StringValue::new_maybe_interned(buf))
+        } else {
+            let mut buf = String::new();
+            with_strval!(self, s => buf.push_str(s));
+            with_strval!(other, s => buf.push_str(s));
+            
+            Ok(StringValue::new_maybe_interned(buf.as_str()))
+        }
     }
 }
 

@@ -14,6 +14,20 @@ thread_local! {
     pub static STRING_TABLE: RefCell<StringTable> = RefCell::new(StringTable::new());
 }
 
+// Helper macro for static interned strings
+#[macro_export]
+macro_rules! static_symbol {
+    ($str:expr) => {
+        {
+            thread_local! {
+                static SYMBOL: StringSymbol = StringSymbol::from($str);
+            }
+            SYMBOL.with(|symbol| *symbol)
+        }
+    };
+}
+
+pub use static_symbol;
 
 // Interned Strings
 

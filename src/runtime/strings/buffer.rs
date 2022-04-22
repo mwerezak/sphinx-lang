@@ -70,10 +70,17 @@ impl<const N: usize> StrBuffer<N> {
     #[inline]
     pub fn is_empty(&self) -> bool { self.len == 0 }
 
+    pub fn try_push(&mut self, ch: char) -> Result<(), ()> {
+        let buf = [0u8; 4];
+        self.try_push_str(ch.encode_utf8(&mut buf))
+    }
+
     /// Attempts to concatenate the `&str` if there is room. It returns true if it is able to do so.
     #[inline]
-    pub fn try_concat(&mut self, s: &str) -> bool {
-        if self.len() + s.len() <= Self::capacity() {
+    pub fn try_push_str<S: AsRef<str>>(&mut self, s: S) -> Result<(), ()> {
+        let s_ref = s.as_ref();
+        
+        if self.len() + s_ref.len() <= Self::capacity() {
             // Point to the location directly after our string
             let data = self.data[self.len as usize..].as_mut_ptr().cast::<u8>();
 
@@ -81,12 +88,12 @@ impl<const N: usize> StrBuffer<N> {
                 // SAFETY: We know the buffer is large enough and that the location is not overlapping
                 // this one (we know that because we have ownership of one of them)
                 // Copy contents of &str to our data buffer
-                ptr::copy_nonoverlapping(s.as_ptr(), data, s.len());
+                ptr::copy_nonoverlapping(s_ref.as_ptr(), data, s_ref.len());
             }
-            self.len += s.len() as u8;
-            true
+            self.len += s_ref.len() as u8;
+            Ok(())
         } else {
-            false
+            Err(())
         }
     }
 }
