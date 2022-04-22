@@ -67,7 +67,6 @@ pub trait MetaObject {
     
     // formatting
     fn fmt_echo(&self) -> ExecResult<StringValue>;
-    fn fmt_str(&self) -> ExecResult<StringValue> { self.fmt_echo() }
     
     // primitive coercions
     fn as_bool(&self) -> ExecResult<bool> { Ok(true) }
@@ -168,10 +167,6 @@ impl Variant {
     
     pub fn fmt_echo(&self) -> ExecResult<StringValue> {
         self.as_meta().fmt_echo()
-    }
-    
-    pub fn fmt_str(&self) -> ExecResult<StringValue> {
-        self.as_meta().fmt_str()
     }
 }
 
@@ -291,7 +286,6 @@ pub enum MethodTag {
     AsBits,
     AsInt,
     AsFloat,
-    ToString,
     Echo,
 }
 
@@ -313,7 +307,7 @@ impl MethodTag {
             Self::AsInt => "int",
             Self::AsFloat => "float",
             
-            Self::ToString => "tostring",
+            // misc
             Self::Echo => "echo",
         }
     }

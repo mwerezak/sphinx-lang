@@ -47,10 +47,6 @@ impl MetaObject for StringValue {
         None
     }
     
-    fn fmt_str(&self) -> ExecResult<StringValue> {
-        Ok(*self)
-    }
-    
     fn fmt_echo(&self) -> ExecResult<StringValue> {
         let mut buf = StrBuffer::<64>::new();
         if write!(buf, "\"{}\"", self).is_ok() {

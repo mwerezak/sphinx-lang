@@ -92,7 +92,11 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
     
     // Misc
     let to_str = native_function!(str, env, params(value) => {
-        Ok(Variant::from(value.fmt_str()?))
+        if value.as_strval().is_some() {
+            Ok(*value)
+        } else {
+            Ok(Variant::from(value.fmt_echo()?))
+        }
     });
     
     let echo = native_function!(echo, env, params(value) => {

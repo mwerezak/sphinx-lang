@@ -90,12 +90,16 @@ Note: while there are separate metamethods for attr and index access,
 by default all objects are dictionaries like in Lua and support both attr access and indexing.
 
 - `__bool` truth value of an object
-- `__tostring`
+- `__int`
+- `__float`
+- `__bitval`
 
 - `__new`
 - `__newmeta`
 - `__class`
 - `__mro`
+
+- `__echo` introspection formatting
 
 ### Context Managers
 
