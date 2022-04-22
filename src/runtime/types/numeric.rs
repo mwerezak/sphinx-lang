@@ -326,8 +326,7 @@ impl MetaObject for FloatType {
             Ok(StringValue::new_maybe_interned(buf))
         } else {
             let mut buf = String::new();
-            write_float(*self, &mut buf)
-                .map_err(|err| ErrorKind::Message(format!("{}", err)))?;
+            write_float(*self, &mut buf).map_err(ErrorKind::from)?;
             Ok(StringValue::new_maybe_interned(buf))
         }
     }
@@ -348,8 +347,7 @@ impl MetaObject for FloatType {
             Ok(StringValue::new_maybe_interned(buf))
         } else {
             let mut buf = String::new();
-            write_float(*self, &mut buf)
-                .map_err(|err| ErrorKind::Message(format!("{}", err)))?;
+            write_float(*self, &mut buf).map_err(ErrorKind::from)?;
             Ok(StringValue::new_maybe_interned(buf))
         }
     }

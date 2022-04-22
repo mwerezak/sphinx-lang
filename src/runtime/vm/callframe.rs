@@ -463,7 +463,7 @@ impl<'c> VMCallFrame<'c> {
             OpCode::PopLongJumpIfFalse => cond_jump!(self, !stack.pop().as_bool()?,  isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             OpCode::PopLongJumpIfTrue  => cond_jump!(self, stack.pop().as_bool()?,   isize::try_from(read_le_bytes!(i32, data)).unwrap()),
             
-            OpCode::Inspect => println!("{}", stack.peek().echo()),
+            OpCode::Inspect => println!("{}", stack.peek().display_echo()),
             OpCode::Assert => {
                 if !stack.peek().as_bool()? {
                     return Err(ErrorKind::AssertFailed.into());

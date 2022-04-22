@@ -34,7 +34,6 @@ pub enum Variant {
 }
 
 impl Variant {
-    
     pub fn as_strval(&self) -> Option<StringValue> {
         match self {
             Self::InternStr(symbol) => Some(StringValue::from(*symbol)),
@@ -44,8 +43,18 @@ impl Variant {
         }
     }
     
-    pub fn echo(&self) -> impl fmt::Display + '_ {
-        EchoDisplay(self)
+    pub fn display_echo(&self) -> impl fmt::Display + '_ {
+        struct Display<'a>(&'a Variant);
+        impl fmt::Display for Display<'_> {
+            fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                match self.0.fmt_echo() {
+                    Ok(strval) => write!(fmt, "{}", strval),
+                    Err(error) => write!(fmt, "{}", error),
+                }
+            }
+        }
+        
+        Display(self)
     }
 }
 
@@ -196,11 +205,11 @@ impl fmt::Display for Variant {
         //     Self::Nil => fmt.write_str("nil"),
         //     Self::BoolTrue => fmt.write_str("true"),
         //     Self::BoolFalse => fmt.write_str("false"),
-            
+        
         //     Self::InternStr(..) | Self::InlineStr(..) | Self::GCStr(..) => unreachable!(),
-            
+        
         //     Self::Tuple(tuple) => write!(fmt, "{}", tuple),
-            
+        
         //     Self::Integer(value) => write!(fmt, "{}", *value),
         //     Self::Float(value) => {
         //         if !value.is_finite() || value.trunc() != *value {
@@ -209,19 +218,19 @@ impl fmt::Display for Variant {
         //             write!(fmt, "{}.0", value)
         //         }
         //     },
-            
+        
         //     Self::Function(fun) => write!(
         //         fmt, "<{} at {:#X}>",
         //         fun.signature().display_short(), 
         //         Gc::as_id(fun),
         //     ),
-            
+        
         //     Self::NativeFunction(fun) => write!(
         //         fmt, "<built-in {} at {:#X}>",
         //         fun.signature().display_short(),
         //         Gc::as_id(fun),
         //     ),
-            
+        
         //     Self::UserData(data) =>
         //         if let Ok(name) = data.type_name() {
         //             write!(fmt, "<{} at {:#X}>", name, Gc::as_id(data))
@@ -229,18 +238,5 @@ impl fmt::Display for Variant {
         //             write!(fmt, "<userdata at {:#X}>", Gc::as_id(data))
         //         }
         // }
-    }
-}
-
-
-/// Alternative display for Variant, kind of like repr() vs str() in Python
-struct EchoDisplay<'a>(&'a Variant);
-
-impl fmt::Display for EchoDisplay<'_> {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self.0.fmt_echo() {
-            Ok(strval) => write!(fmt, "{}", strval),
-            Err(error) => write!(fmt, "{}", error),
-        }
     }
 }

@@ -29,6 +29,13 @@ pub enum ErrorKind {
     AssertFailed,
     StaticMessage(&'static str),
     Message(String),
+    Other(String),
+}
+
+impl<E: Error> From<E> for ErrorKind {
+    fn from(error: E) -> Self {
+        Self::Other(format!("{}", error))
+    }
 }
 
 impl From<ErrorKind> for RuntimeError {
@@ -121,10 +128,11 @@ impl fmt::Display for RuntimeError {
             ErrorKind::NegativeShiftCount => format!("negative bitshift count"),
             ErrorKind::NameNotDefined(name) => format!("undefined variable \"{}\"", name),
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
-            ErrorKind::UnhashableValue(value) => format!("{} is not hashable", value.echo()),
+            ErrorKind::UnhashableValue(value) => format!("{} is not hashable", value.display_echo()),
             ErrorKind::AssertFailed => format!("assertion failed"),
             ErrorKind::StaticMessage(message) => message.to_string(),
             ErrorKind::Message(message) => message.to_string(),
+            ErrorKind::Other(message) => message.to_string(),
             
             ErrorKind::MethodNotSupported(receiver, method) => {
                 match method {

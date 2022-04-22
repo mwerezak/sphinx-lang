@@ -1,9 +1,9 @@
 use core::fmt::{self, Write};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
-use crate::runtime::strings::{StringValue, StrBuffer};
+use crate::runtime::strings::{StringValue, StringSymbol, static_symbol};
 use crate::runtime::types::{Type, MetaObject};
-use crate::runtime::errors::ExecResult;
+use crate::runtime::errors::{ExecResult, ErrorKind};
 
 #[derive(Clone, Copy)]
 pub enum Tuple {
@@ -76,15 +76,24 @@ impl MetaObject for Tuple {
     }
     
     fn fmt_echo(&self) -> ExecResult<StringValue> {
-        // only use StrBuffer for small tuples to avoid wasted work
-        if self.len() <= 8 {
-            let mut buf = StrBuffer::<64>::new();
-            if write!(buf, "{}", self).is_ok() {
-                return Ok(StringValue::new_uninterned(buf))
+        match self {
+            Self::Empty => Ok(StringValue::from(static_symbol!("()"))),
+            
+            Self::NonEmpty(items) => {
+                let (last, rest) = items.split_last().unwrap(); // should never be empty
+                
+                let mut buf = String::new();
+                buf.push('(');
+                for item in rest.iter() {
+                    write!(&mut buf, "{}, ", item.fmt_echo()?)
+                        .map_err(ErrorKind::from)?;
+                }
+                write!(&mut buf, "{})", last.fmt_echo()?)
+                    .map_err(ErrorKind::from)?;
+                
+                Ok(StringValue::new_maybe_interned(buf))
             }
         }
-        
-        Ok(StringValue::new_uninterned(format!("{}", self)))
     }
 }
 
@@ -95,22 +104,5 @@ impl fmt::Debug for Tuple {
             tuple.field(item);
         }
         tuple.finish()
-    }
-}
-
-impl fmt::Display for Tuple {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::Empty => fmt.write_str("()"),
-            Self::NonEmpty(items) => {
-                let (last, rest) = items.split_last().unwrap(); // will never be empty
-                
-                write!(fmt, "(")?;
-                for item in rest.iter() {
-                    write!(fmt, "{}, ", item.echo())?;
-                }
-                write!(fmt, "{})", last.echo())
-            },
-        }
     }
 }

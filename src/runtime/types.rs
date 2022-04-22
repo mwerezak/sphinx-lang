@@ -175,7 +175,6 @@ impl Variant {
     }
 }
 
-
 // Nil
 impl MetaObject for () {
     fn type_tag(&self) -> Type { Type::Nil }
