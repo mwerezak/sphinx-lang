@@ -27,8 +27,8 @@ pub enum ErrorKind {
     TooManyArguments { signature: Box<Signature>, nargs: usize },
     MethodNotSupported(Type, MethodTag),
     AssertFailed,
-    InvalidValue(Variant, String),
-    Other(String),
+    StaticMessage(&'static str),
+    Message(String),
 }
 
 impl From<ErrorKind> for RuntimeError {
@@ -123,15 +123,8 @@ impl fmt::Display for RuntimeError {
             ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
             ErrorKind::UnhashableValue(value) => format!("{} is not hashable", value.echo()),
             ErrorKind::AssertFailed => format!("assertion failed"),
-            ErrorKind::Other(message) => message.to_string(),
-            
-            ErrorKind::InvalidValue(value, message) => {
-                if message.is_empty() {
-                    format!("invalid value {}", value.echo())
-                } else {
-                    format!("invalid value {}: {}", value.echo(), message)
-                }
-            }
+            ErrorKind::StaticMessage(message) => message.to_string(),
+            ErrorKind::Message(message) => message.to_string(),
             
             ErrorKind::MethodNotSupported(receiver, method) => {
                 match method {

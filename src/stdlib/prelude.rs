@@ -2,6 +2,7 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::{Variant, Gc};
 use crate::runtime::module::{GlobalEnv, Access};
 use crate::runtime::function::{NativeFunction, Signature, Parameter};
+use crate::runtime::types::{int_from_str, float_from_str};
 use crate::runtime::vm::VirtualMachine;
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
@@ -31,7 +32,14 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         Ok(Variant::from(value.as_bits()?))
     });
     
-    let as_int = native_function!(int, env, params(value) => {
+    let as_int = native_function!(int, env, params(value), defaults(radix = 10) => {
+        if let Some(strval) = value.as_strval() {
+            return strval.with_str(|s| {
+                let int = int_from_str(s, radix.as_int()?)?;
+                Ok(Variant::from(int))
+            })
+        }
+        
         match value {
             Variant::Float(value) if value.is_finite() => {
                 let value = value.trunc();
@@ -41,17 +49,24 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
                     Err(ErrorKind::OverflowError.into())
                 }
             }
+            
             _ => Ok(Variant::from(value.as_int()?))
         }
     });
     
     let as_float = native_function!(float, env, params(value) => {
+        if let Some(strval) = value.as_strval() {
+            return strval.with_str(
+                |s| Ok(Variant::from(float_from_str(s)?))
+            )
+        }
+        
         Ok(Variant::from(value.as_float()?))
     });
     
     // Misc
     let to_str = native_function!(str, env, params(value) => {
-        Ok(Variant::from(value.to_string()?))
+        Ok(Variant::from(value.fmt_str()?))
     });
     
     let echo = native_function!(echo, env, params(value) => {

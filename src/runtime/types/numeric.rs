@@ -1,3 +1,4 @@
+use core::str::FromStr;
 use core::fmt::{self, Write};
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
@@ -12,6 +13,16 @@ macro_rules! checked_int_math {
             None => Err(ErrorKind::OverflowError.into()),
         }
     };
+}
+
+pub fn int_from_str(s: &str, radix: IntType) -> ExecResult<IntType> {
+    if !(2..=36).contains(&radix) {
+        return Err(ErrorKind::StaticMessage("invalid radix").into());
+    }
+    
+    let value = IntType::from_str_radix(s, radix.try_into().unwrap())
+        .map_err(|_| ErrorKind::Message(format!("could not parse \"{}\" as int", s)))?;
+    Ok(value)
 }
 
 impl MetaObject for IntType {
@@ -235,6 +246,12 @@ impl MetaObject for IntType {
 }
 
 
+pub fn float_from_str(s: &str) -> ExecResult<FloatType> {
+    let value = FloatType::from_str(s)
+        .map_err(|_| ErrorKind::Message(format!("could not parse \"{}\" as float", s)))?;
+    Ok(value)
+}
+
 impl MetaObject for FloatType {
     fn type_tag(&self) -> Type { Type::Float }
     
@@ -295,7 +312,7 @@ impl MetaObject for FloatType {
         other.as_meta().as_float().map(|other| Ok(*self <= other?))
     }
     
-    fn to_string(&self) -> ExecResult<StringValue> {
+    fn fmt_str(&self) -> ExecResult<StringValue> {
         fn write_float(value: FloatType, fmt: &mut impl fmt::Write) -> fmt::Result {
             if !value.is_finite() || value.trunc() != value {
                 write!(fmt, "{}", value)
@@ -310,7 +327,7 @@ impl MetaObject for FloatType {
         } else {
             let mut buf = String::new();
             write_float(*self, &mut buf)
-                .map_err(|err| ErrorKind::Other(format!("{}", err)))?;
+                .map_err(|err| ErrorKind::Message(format!("{}", err)))?;
             Ok(StringValue::new_maybe_interned(buf))
         }
     }
@@ -318,7 +335,7 @@ impl MetaObject for FloatType {
     fn fmt_echo(&self) -> ExecResult<StringValue> {
         fn write_float(value: FloatType, fmt: &mut impl fmt::Write) -> fmt::Result {
             if !value.is_finite() {
-                write!(fmt, "float({})", value)
+                write!(fmt, "float(\"{}\")", value)
             } else if value.trunc() != value {
                 write!(fmt, "{}", value)
             } else {
@@ -332,7 +349,7 @@ impl MetaObject for FloatType {
         } else {
             let mut buf = String::new();
             write_float(*self, &mut buf)
-                .map_err(|err| ErrorKind::Other(format!("{}", err)))?;
+                .map_err(|err| ErrorKind::Message(format!("{}", err)))?;
             Ok(StringValue::new_maybe_interned(buf))
         }
     }

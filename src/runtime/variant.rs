@@ -183,7 +183,7 @@ impl Eq for VariantKey<'_> { }
 
 impl fmt::Display for Variant {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self.to_string() {
+        match self.fmt_str() {
             Ok(strval) => write!(fmt, "{}", strval),
             Err(error) => write!(fmt, "{}", error),
         }
@@ -242,10 +242,5 @@ impl fmt::Display for EchoDisplay<'_> {
             Ok(strval) => write!(fmt, "{}", strval),
             Err(error) => write!(fmt, "{}", error),
         }
-        
-        // if let Some(strval) = self.0.as_strval() {
-        //     return write!(fmt, "\"{}\"", strval)
-        // }
-        // write!(fmt, "{}", self.0)
     }
 }

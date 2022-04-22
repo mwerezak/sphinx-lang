@@ -17,7 +17,7 @@ mod native;
 
 pub use tuple::Tuple;
 pub use native::UserData;
-
+pub use numeric::{int_from_str, float_from_str};
 
 // Type tag for Sphinx's "primitive" types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -67,7 +67,7 @@ pub trait MetaObject {
     
     // formatting
     fn fmt_echo(&self) -> ExecResult<StringValue>;
-    fn to_string(&self) -> ExecResult<StringValue> { self.fmt_echo() }
+    fn fmt_str(&self) -> ExecResult<StringValue> { self.fmt_echo() }
     
     // primitive coercions
     fn as_bool(&self) -> ExecResult<bool> { Ok(true) }
@@ -170,8 +170,8 @@ impl Variant {
         self.as_meta().fmt_echo()
     }
     
-    pub fn to_string(&self) -> ExecResult<StringValue> {
-        self.as_meta().to_string()
+    pub fn fmt_str(&self) -> ExecResult<StringValue> {
+        self.as_meta().fmt_str()
     }
 }
 

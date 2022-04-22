@@ -47,7 +47,7 @@ impl MetaObject for StringValue {
         None
     }
     
-    fn to_string(&self) -> ExecResult<StringValue> {
+    fn fmt_str(&self) -> ExecResult<StringValue> {
         Ok(*self)
     }
     

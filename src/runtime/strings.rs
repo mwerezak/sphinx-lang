@@ -84,7 +84,7 @@ impl StringValue {
 }
 
 /// evaluates an expression using a StringValue, accessing the STRING_TABLE only if needed
-macro_rules! with_strval {
+macro_rules! with_str {
     ($strval:expr, $string:ident => $expr:expr) => {
         match $strval.try_str() {
             Ok($string) => $expr,
@@ -140,6 +140,10 @@ impl StringValue {
         }
     }
     
+    pub fn with_str<R>(&self, f: impl FnOnce(&str) -> R) -> R {
+        with_str!(self, s => f(s))
+    }
+    
     fn try_str(&self) -> Result<&str, StringSymbol> {
         match self {
             Self::Inline(inline) => Ok(&*inline),
@@ -149,11 +153,11 @@ impl StringValue {
     }
     
     pub fn len(&self) -> usize {
-        with_strval!(self, s => s.len())
+        with_str!(self, s => s.len())
     }
     
     pub fn char_count(&self) -> usize {
-        with_strval!(self, s => s.chars().count())
+        with_str!(self, s => s.chars().count())
     }
     
     pub fn concat(&self, other: &StringValue) -> ExecResult<StringValue> {
@@ -161,14 +165,14 @@ impl StringValue {
         const BUFLEN: usize = 64;
         if self.len() + other.len() <= BUFLEN {
             let mut buf = StrBuffer::<BUFLEN>::new();
-            with_strval!(self, s => buf.try_push_str(s).unwrap());
-            with_strval!(other, s => buf.try_push_str(s).unwrap());
+            with_str!(self, s => buf.try_push_str(s).unwrap());
+            with_str!(other, s => buf.try_push_str(s).unwrap());
             
             Ok(StringValue::new_maybe_interned(buf))
         } else {
             let mut buf = String::new();
-            with_strval!(self, s => buf.push_str(s));
-            with_strval!(other, s => buf.push_str(s));
+            with_str!(self, s => buf.push_str(s));
+            with_str!(other, s => buf.push_str(s));
             
             Ok(StringValue::new_maybe_interned(buf.as_str()))
         }
