@@ -32,10 +32,36 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         Ok(Variant::from(value.as_bits()?))
     });
     
-    let as_int = native_function!(int, env, params(value), defaults(radix = 10) => {
+    let as_int = native_function!(int, env, params(value), defaults(radix = Variant::Nil) => {
         if let Some(strval) = value.as_strval() {
-            return strval.with_str(|s| {
-                let int = int_from_str(s, radix.as_int()?)?;
+            return strval.with_str(|mut s| {
+                // strip common prefixes
+                let mut radix = match radix {
+                    Variant::Nil => None,
+                    radix => Some(radix.as_int()?),
+                };
+                
+                if matches!(radix, None|Some(2)) {
+                    if let Some(stripped) = s.strip_prefix("0b").or(s.strip_prefix("0B")) {
+                        radix = Some(2);
+                        s = stripped;
+                    }
+                }
+                if matches!(radix, None|Some(8)) {
+                    if let Some(stripped) = s.strip_prefix("0o").or(s.strip_prefix("0O")) {
+                        radix = Some(8);
+                        s = stripped;
+                    }
+                }
+                if matches!(radix, None|Some(16)) {
+                    if let Some(stripped) = s.strip_prefix("0x").or(s.strip_prefix("0X")) {
+                        radix = Some(16);
+                        s = stripped;
+                    }
+                }
+                
+                let radix = radix.unwrap_or(10);
+                let int = int_from_str(s, radix)?;
                 Ok(Variant::from(int))
             })
         }

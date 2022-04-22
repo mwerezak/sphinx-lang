@@ -21,7 +21,7 @@ pub fn int_from_str(s: &str, radix: IntType) -> ExecResult<IntType> {
     }
     
     let value = IntType::from_str_radix(s, radix.try_into().unwrap())
-        .map_err(|_| ErrorKind::Message(format!("could not parse \"{}\" as int", s)))?;
+        .map_err(|_| ErrorKind::Message(format!("could not parse \"{}\" as int with radix {}", s, radix)))?;
     Ok(value)
 }
 

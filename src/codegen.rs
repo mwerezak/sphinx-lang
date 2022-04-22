@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 
 use core::iter;
-use log;
+
 use crate::language::{IntType, FloatType, InternSymbol};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
