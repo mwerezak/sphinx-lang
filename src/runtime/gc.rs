@@ -112,7 +112,7 @@ impl GcState {
     }
     
     fn collect_garbage(&mut self, root: &impl GcTrace) {
-        log::debug!("Gc cycle begin ---");
+        log::debug!("GC cycle begin ---");
         
         let allocated = self.stats.allocated;
         let box_count = self.stats.box_count;
@@ -133,7 +133,7 @@ impl GcState {
         self.threshold = (self.stats.allocated * self.config.pause_factor as usize) / 100;
         log::debug!("Next collection at {} bytes", self.threshold);
         
-        log::debug!("Gc cycle end ---");
+        log::debug!("GC cycle end ---");
     }
     
     unsafe fn sweep(&mut self) {
