@@ -55,7 +55,7 @@ impl StringValue {
         let string = s.as_ref();
         
         // first, try inlining
-        if let Ok(inline) = InlineStr::try_new(string) {
+        if let Ok(inline) = InlineStr::try_from(string) {
             return Self::Inline(inline);
         }
         
@@ -71,7 +71,7 @@ impl StringValue {
         let string = s.as_ref();
         
         // first, try inlining
-        if let Ok(inline) = InlineStr::try_new(string) {
+        if let Ok(inline) = InlineStr::try_from(string) {
             return Self::Inline(inline);
         }
         
@@ -89,7 +89,8 @@ macro_rules! with_strval {
         match $strval.try_str() {
             Ok($string) => $expr,
             Err(symbol) => STRING_TABLE.with(|string_table| {
-                let $string = string_table.borrow().resolve(&symbol);
+                let string_table = string_table.borrow();
+                let $string = string_table.resolve(&symbol);
                 $expr
             })
         }
@@ -159,7 +160,8 @@ impl StringValue {
         // don't allocate when concatenating small strings
         const BUFLEN: usize = 64;
         if self.len() + other.len() <= BUFLEN {
-            let mut buf = with_strval!(self, s => StrBuffer::<BUFLEN>::try_new(s).unwrap());
+            let mut buf = StrBuffer::<BUFLEN>::new();
+            with_strval!(self, s => buf.try_push_str(s).unwrap());
             with_strval!(other, s => buf.try_push_str(s).unwrap());
             
             Ok(StringValue::new_maybe_interned(buf))

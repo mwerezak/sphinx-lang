@@ -4,10 +4,10 @@
     <https://github.com/nu11ptr/flexstr/blob/be94d3647bad6a626aa40c1e20290a71c1ee8a74/src/inline.rs>
 */
 
-use core::mem;
 use core::ptr;
 use core::str;
 use core::fmt;
+use core::mem::{self, MaybeUninit};
 use core::borrow::Borrow;
 
 
@@ -18,32 +18,58 @@ use core::borrow::Borrow;
 
 #[derive(Clone, Copy)]
 pub struct StrBuffer<const N: usize> {
-    data: [mem::MaybeUninit<u8>; N],
+    data: [MaybeUninit<u8>; N],
     len: u8,
 }
 
+// Conversion from other string types
+impl<'s, const N: usize> TryFrom<&'s String> for StrBuffer<N> {
+    type Error = &'s String;
+    #[inline]
+    fn try_from(value: &'s String) -> Result<Self, Self::Error> {
+        Self::try_from(value)
+    }
+}
+
+impl<'s, const N: usize> TryFrom<&'s str> for StrBuffer<N> {
+    type Error = &'s str;
+    #[inline]
+    fn try_from(value: &'s str) -> Result<Self, Self::Error> {
+        Self::try_from(value)
+    }
+}
+
 impl<const N: usize> StrBuffer<N> {
+    /// Create a new empty `StrBuffer`
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            len: 0,
+            data: [MaybeUninit::<u8>::uninit(); N]
+        }
+    }
+    
     /// Attempts to return a new `StrBuffer` if the source string is short enough to be copied.
     /// If not, the source is returned as the error.
     #[inline]
-    pub fn try_new<T: AsRef<str>>(s: T) -> Result<Self, T> {
+    fn try_from<S: AsRef<str>>(s: S) -> Result<Self, S> {
         let s_ref = s.as_ref();
 
         if s_ref.len() <= Self::capacity() {
-            unsafe { Ok(Self::new(s_ref)) }
+            unsafe { Ok(Self::new_unchecked(s_ref)) }
         } else {
             Err(s)
         }
     }
     
     #[inline]
-    unsafe fn new(s: &str) -> Self {
+    unsafe fn new_unchecked(s: &str) -> Self {
         // SAFETY: This is safe because while uninitialized to start, we copy the the str contents
         // over the top. We check to ensure it is not too long in `try_new` and don't call this
         // function directly. The copy is restrained to the length of the str.
 
         // Declare array, but keep uninitialized (we will overwrite momentarily)
-        let mut data: [mem::MaybeUninit<u8>; N] = mem::MaybeUninit::uninit().assume_init();
+        let mut data = [MaybeUninit::<u8>::uninit(); N];
         // Copy contents of &str to our data buffer
         ptr::copy_nonoverlapping(s.as_ptr(), data.as_mut_ptr().cast::<u8>(), s.len());
 
@@ -54,7 +80,7 @@ impl<const N: usize> StrBuffer<N> {
     }
     
     #[inline]
-    fn from_array(data: [mem::MaybeUninit<u8>; N], len: u8) -> Self {
+    fn from_array(data: [MaybeUninit<u8>; N], len: u8) -> Self {
         Self { data, len }
     }
 
@@ -71,7 +97,7 @@ impl<const N: usize> StrBuffer<N> {
     pub fn is_empty(&self) -> bool { self.len == 0 }
 
     pub fn try_push(&mut self, ch: char) -> Result<(), ()> {
-        let buf = [0u8; 4];
+        let mut buf = [0u8; 4];
         self.try_push_str(ch.encode_utf8(&mut buf))
     }
 
@@ -138,33 +164,12 @@ impl<const N: usize> fmt::Display for StrBuffer<N> {
 }
 
 
-// Conversion from other string types
-
-impl<'s, const N: usize> TryFrom<&'s String> for StrBuffer<N> {
-    type Error = &'s String;
-
-    #[inline]
-    fn try_from(value: &'s String) -> Result<Self, Self::Error> {
-        Self::try_new(value)
-    }
-}
-
-impl<'s, const N: usize> TryFrom<&'s str> for StrBuffer<N> {
-    type Error = &'s str;
-
-    #[inline]
-    fn try_from(value: &'s str) -> Result<Self, Self::Error> {
-        Self::try_new(value)
-    }
-}
-
-
 
 
 
 #[cfg(test)]
 mod tests {
-    use crate::runtime::strings::inline::StrBuffer;
+    use crate::runtime::strings::buffer::StrBuffer;
 
     #[test]
     fn empty() {
@@ -185,7 +190,7 @@ mod tests {
     #[test]
     fn bad_init() {
         let lit = "This is way too long to be an inline string!!!";
-        let s = <StrBuffer<22>>::try_new(lit).unwrap_err();
+        let s = <StrBuffer<22>>::try_from(lit).unwrap_err();
         assert_eq!(s, lit);
         assert_eq!(s.len(), lit.len())
     }
@@ -194,7 +199,7 @@ mod tests {
     fn good_concat() {
         let lit = "Inline";
         let lit2 = " me";
-        let mut s = <StrBuffer<22>>::try_new(lit).expect("bad inline str");
+        let mut s = <StrBuffer<22>>::try_from(lit).expect("bad inline str");
         assert!(s.try_concat(lit2));
         assert_eq!(&*s, lit.to_string() + lit2);
     }
@@ -203,7 +208,7 @@ mod tests {
     fn bad_concat() {
         let lit = "This is";
         let lit2 = " way too long to be an inline string!!!";
-        let mut s = <StrBuffer<22>>::try_new(lit).expect("bad inline str");
+        let mut s = <StrBuffer<22>>::try_from(lit).expect("bad inline str");
         assert!(!s.try_concat(lit2));
         assert_eq!(&*s, lit);
     }
