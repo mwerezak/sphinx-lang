@@ -3,7 +3,7 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::function::{Call, Callable};
-use crate::runtime::strings::{StringValue, StringSymbol, static_symbol};
+use crate::runtime::strings::{StringValue, static_symbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 

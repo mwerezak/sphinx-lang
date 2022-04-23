@@ -4,21 +4,37 @@
 #[macro_export]
 macro_rules! __namespace_item {
     ( $namespace:expr, let $name:tt $value:tt ) => {
-        $namespace.create(stringify!($name).into(), Access::ReadOnly, Variant::from($value));
+        $namespace.create(
+            stringify!($name).into(), 
+            crate::runtime::module::Access::ReadOnly, 
+            crate::runtime::Variant::from($value)
+        );
     };
     
     ( $namespace:expr, var $name:tt $value:tt ) => {
-        $namespace.create(stringify!($name).into(), Access::ReadWrite, Variant::from($value));
+        $namespace.create(
+            stringify!($name).into(), 
+            crate::runtime::module::Access::ReadWrite, 
+            crate::runtime::Variant::from($value)
+        );
     };
     
     ( $namespace:expr, fun _ $func:expr ) => {
         let func = $func;
         let name = func.signature().name().unwrap();
-        $namespace.create(name, Access::ReadOnly, Variant::from(func));
+        $namespace.create(
+            name, 
+            crate::runtime::module::Access::ReadOnly, 
+            crate::runtime::Variant::from(func)
+        );
     };
     
     ( $namespace:expr, fun $name:tt $func:expr ) => {
-        $namespace.create(stringify!($name).into(), Access::ReadOnly, Variant::from($func));
+        $namespace.create(
+            stringify!($name).into(), 
+            crate::runtime::module::Access::ReadOnly, 
+            crate::runtime::Variant::from($func)
+        );
     };
 }
 
@@ -46,7 +62,7 @@ macro_rules! __count {
 #[macro_export]
 macro_rules! __variadic {
     () => { None };
-    ( $name:tt ) => { Some(Parameter::new_var(stringify!($name))) };
+    ( $name:tt ) => { Some(crate::runtime::function::Parameter::new_var(stringify!($name))) };
 }
 
 #[doc(hidden)]
@@ -54,7 +70,7 @@ macro_rules! __variadic {
 macro_rules! __defaults {
     () => { None };
     ( $( $default_value:tt )+ ) => { 
-        Some(vec![ $( Variant::from($default_value) ),+ ].into_boxed_slice())
+        Some(vec![ $( crate::runtime::Variant::from($default_value) ),+ ].into_boxed_slice())
     };
 }
 
@@ -64,6 +80,13 @@ macro_rules! native_function {
     // with default params
     ( $func_name:tt, $env:expr $( , this ( $self_name:tt ) )? $( , vm ( $vm_name:tt ) )? $( , params ( $( $required:tt ),+ ) )? $( , defaults ( $( $default:tt = $default_value:expr ),+ ) )? $( , variadic ( $variadic:tt ) )? => $body:expr ) => {
         {
+            type Variant = crate::runtime::Variant;
+            type Signature = crate::runtime::function::Signature;
+            type Parameter = crate::runtime::function::Parameter;
+            type NativeFunction = crate::runtime::function::NativeFunction;
+            type VirtualMachine<'a> = crate::runtime::vm::VirtualMachine<'a>;
+            type ExecResult<T> = crate::runtime::errors::ExecResult<T>;
+            
             let signature = Signature::new(
                 Some(stringify!($func_name)),
                 vec![ $( $( Parameter::new_var(stringify!($required)) ),+ )? ],

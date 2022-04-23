@@ -19,6 +19,7 @@ thread_local! {
 macro_rules! static_symbol {
     ($str:expr) => {
         {
+            type StringSymbol = crate::runtime::strings::StringSymbol;
             thread_local! {
                 static SYMBOL: StringSymbol = StringSymbol::from($str);
             }

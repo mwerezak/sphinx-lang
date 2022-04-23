@@ -1,10 +1,8 @@
 use crate::language::{IntType, FloatType};
-use crate::runtime::{Variant, Gc};
-use crate::runtime::module::{GlobalEnv, Access};
-use crate::runtime::function::{NativeFunction, Signature, Parameter};
+use crate::runtime::Gc;
+use crate::runtime::module::{GlobalEnv};
 use crate::runtime::types::{int_from_str, float_from_str};
-use crate::runtime::vm::VirtualMachine;
-use crate::runtime::errors::{ExecResult, ErrorKind};
+use crate::runtime::errors::{ErrorKind};
 
 
 /// Create an Env containing the core builtins

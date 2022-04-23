@@ -1,7 +1,7 @@
 use core::fmt::{self, Write};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
-use crate::runtime::strings::{StringValue, StringSymbol, static_symbol};
+use crate::runtime::strings::{StringValue, static_symbol};
 use crate::runtime::types::{Type, MetaObject};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
