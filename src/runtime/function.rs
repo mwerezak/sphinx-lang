@@ -170,7 +170,7 @@ impl Callable for Gc<NativeFunction> {
 
 unsafe impl GcTrace for NativeFunction {
     fn trace(&self) {
-        Gc::mark_trace(&self.env);
+        self.env.mark_trace();
         
         if let Some(defaults) = self.defaults.as_ref() {
             defaults.trace()

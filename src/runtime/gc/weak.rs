@@ -22,6 +22,14 @@ impl<T> GcWeakCell<T> where T: GcTrace + ?Sized {
     pub(super) fn get(&self) -> Option<NonNull<GcBox<T>>> {
         self.ptr.get()
     }
+    
+    pub(super) fn invalidate(&self) {
+        if let Some(weak_ptr) = self.ptr.get() {
+            log::debug!("{:#X} invalidate weak reference", weak_ptr.as_ptr() as *mut () as usize);
+        }
+        
+        self.ptr.set(None)
+    }
 }
 
 impl<T> Drop for GcWeakCell<T> where T: GcTrace + ?Sized {
@@ -36,11 +44,7 @@ impl<T> Drop for GcWeakCell<T> where T: GcTrace + ?Sized {
 
 impl<T> WeakCell for GcWeakCell<T> where T: GcTrace + ?Sized {
     fn invalidate(&self) {
-        if let Some(weak_ptr) = self.ptr.get() {
-            log::debug!("{:#X} invalidate weak reference", weak_ptr.as_ptr() as *mut () as usize);
-        }
-        
-        self.ptr.set(None)
+        GcWeakCell::invalidate(self)
     }
 }
 

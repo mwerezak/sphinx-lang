@@ -56,23 +56,26 @@ impl<T> Gc<T> where T: GcTrace + ?Sized {
         unsafe { self.ptr.as_ref() }
     }
     
-    fn inner_mut(&self) -> &mut GcBox<T> {
+    fn inner_mut(&mut self) -> &mut GcBox<T> {
         debug_assert!(deref_safe());
-        unsafe { &mut *self.ptr.as_ptr() }
+        unsafe { self.ptr.as_mut() }
     }
     
-    pub fn mark_trace(&self) {
+    pub fn mark_trace(mut self) {
         self.inner_mut().mark_trace()
     }
     
     /// Create a weak reference from this GC handle
-    pub fn weakref(&self) -> GcWeak<T> {
+    pub fn weakref(mut self) -> GcWeak<T> {
         let weak_ptr = self.inner_mut().get_or_make_weak();
         GcWeak::new(Gc::from_raw(weak_ptr))
     }
     
     pub fn ptr_eq<U>(self_gc: &Gc<T>, other_gc: &Gc<U>) -> bool where U: GcTrace + ?Sized {
-        ptr::eq(self_gc.inner().header(), other_gc.inner().header())
+        ptr::eq(
+            self_gc.ptr.as_ptr() as *const (),
+            other_gc.ptr.as_ptr() as *const (),
+        )
     }
     
     /// Casts the inner pointer to a usize. 
@@ -132,15 +135,14 @@ impl<T> Hash for Gc<T> where T: GcTrace {
 
 impl<T> fmt::Debug for Gc<T> where T: GcTrace + ?Sized {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if fmt.alternate() {
-            write!(fmt, "Gc({:#?})", self.ptr)
-        } else {
-            write!(fmt, "Gc({:?})", self.ptr)
-        }
+        fmt.debug_tuple("Gc")
+            .field(&self.ptr)
+            .finish()
     }
 }
 
 
+#[derive(Clone, Copy)]
 pub struct GcWeak<T> where T: GcTrace + ?Sized + 'static {
     gc_weak: Gc<GcWeakCell<T>>,
 }
@@ -176,6 +178,14 @@ impl<T> GcWeak<T> where T: GcTrace + ?Sized {
     /// This is intended for identifying the GcWeak, and should not be cast back to a pointer.
     pub fn as_id(self_weak: &GcWeak<T>) -> usize {
         Gc::as_id(&self_weak.gc_weak)
+    }
+}
+
+impl<T> fmt::Debug for GcWeak<T> where T: GcTrace + ?Sized {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_tuple("GcWeak")
+            .field(&self.gc_weak.ptr)
+            .finish()
     }
 }
 

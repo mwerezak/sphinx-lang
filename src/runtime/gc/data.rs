@@ -90,8 +90,8 @@ impl GcBoxPtr {
     }
     
     #[inline]
-    pub(super) fn as_ptr(&self) -> *mut () {
-        self.ptr.as_ptr() as *mut ()
+    pub(super) fn as_ptr<T>(&self) -> *mut T {
+        self.ptr.as_ptr() as *mut T
     }
     
     #[inline]
@@ -106,7 +106,7 @@ pub(super) struct GcBoxHeader {
     size: usize,
     layout: Layout,
     weak: Option<NonNull<GcBox<dyn WeakCell>>>,
-    destructor: Option<Box<dyn Fn(*mut ())>>,
+    destructor: Option<Box<dyn Fn(GcBoxPtr)>>,
 }
 
 impl GcBoxHeader {
@@ -146,7 +146,7 @@ impl GcBoxHeader {
     }
     
     #[inline]
-    fn take_destructor(&mut self) -> Option<Box<dyn Fn(*mut ())>> {
+    fn take_destructor(&mut self) -> Option<Box<dyn Fn(GcBoxPtr)>> {
         self.destructor.take()
     }
 }
@@ -189,9 +189,9 @@ impl<T> GcBox<T> where T: GcTrace {
         
         let layout = Layout::new::<GcBox<T>>();
         let size = layout.size() + data.size_hint();
-        let destructor = |ptr: *mut ()| unsafe {
-            log::debug!("{:#X} run sized destructor", ptr as usize);
-            ptr::drop_in_place::<GcBox<T>>(ptr as *mut GcBox<T>)
+        let destructor = |ptr: GcBoxPtr| unsafe {
+            log::debug!("{:#X} run sized destructor", ptr.as_ptr::<()>() as usize);
+            ptr::drop_in_place::<GcBox<T>>(ptr.as_ptr())
         };
         
         let gcbox = Box::new(GcBox {
@@ -244,9 +244,9 @@ impl<T> GcBox<T> where
         );
         
         // initialize the GcBox
-        let destructor = move |ptr: *mut ()| unsafe {
-            log::debug!("{:#X} run unsized destructor", ptr as usize);
-            let ptr = ptr::from_raw_parts_mut::<GcBox<T>>(ptr, ptr_meta);
+        let destructor = move |ptr: GcBoxPtr| unsafe {
+            log::debug!("{:#X} run unsized destructor", ptr.as_ptr::<()>() as usize);
+            let ptr = ptr::from_raw_parts_mut::<GcBox<T>>(ptr.as_ptr(), ptr_meta);
             ptr::drop_in_place(ptr);
         };
         
@@ -285,7 +285,7 @@ pub(super) unsafe fn free_gcbox(mut ptr: GcBoxPtr) -> Option<GcBoxPtr> {
     // this also prevents a GcBox's destructor from being called twice
     let cleanup_fn = ptr.header_mut().take_destructor();
     if let Some(cleanup_fn) = cleanup_fn {
-        cleanup_fn(ptr.as_ptr())
+        cleanup_fn(ptr)
     }
     
     // assert that any weak ref has been cleaned up
