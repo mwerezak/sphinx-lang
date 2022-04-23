@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::lexer::{LexerBuilder, Token, TokenMeta, LexerError, ErrorKind, DebugSymbol};
+use crate::lexer::{LexerBuilder, Token, TokenMeta, ErrorKind};
 use crate::lexer::rules::SingleCharRule;
 use crate::lexer::rules::literals::*;
 use crate::lexer::rules::keywords::KeywordRule;
@@ -171,7 +171,7 @@ fn lexer_test_integer_literals() {
     
     let mut lexer = LexerBuilder::new()
         .add_rule(IntegerLiteralRule::new())
-        .add_rule(HexIntegerLiteralRule::new())
+        .add_rule(PrefixedIntegerLiteralRule::new("0x", 16))
         .build_once(source.chars().map(|c| Ok(c)));
     
     assert_token_sequence!(lexer,

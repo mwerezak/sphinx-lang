@@ -1,10 +1,17 @@
 begin
     var a = "a"
-    assert (echo a) == "a"
+    print("a:", echo(a))
+    assert a == "a"
+    
     var b = a + " b"
-    assert (echo b) == "a b"
+    print("b:", echo(b))
+    assert b == "a b"
+    
     var c = a + " c"
-    assert (echo c) == "a c"
+    print("c:", echo(c))
+    assert c == "a c"
+    
     var d = b + " d"
-    assert (echo d) == "a b d"
+    print("d:", echo(d))
+    assert d == "a b d"
 end

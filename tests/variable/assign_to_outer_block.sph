@@ -1,0 +1,19 @@
+begin
+    var a = "a"
+    if true then
+        var b = "b"
+        if true then
+            print("a:", echo(a))
+            print("b:", echo(b))
+            assert "a" == a
+            assert "b" == b
+            
+            a = b = "c"
+            
+            print("a:", echo(a))
+            print("b:", echo(b))
+            assert "c" == a
+            assert "c" == b
+        end
+    end
+end

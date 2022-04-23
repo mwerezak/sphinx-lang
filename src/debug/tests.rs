@@ -1,7 +1,7 @@
 #![cfg(test)]
 
-use crate::source::{ModuleSource, SourceText};
-use super::symbol::{DebugSymbol, ResolvedSymbol, DebugSymbolResolver};
+use crate::source::{ModuleSource};
+use super::symbol::{DebugSymbol, DebugSymbolResolver};
 
 #[test]
 fn debug_symbols_test_symbol_resolution() {

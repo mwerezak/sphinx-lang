@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate::debug::DebugSymbol;
-use crate::lexer::errors::{LexerError, ErrorKind};
+use crate::lexer::errors::{ErrorKind};
 
 struct ErrorData<'a> {
     kind: &'a ErrorKind,

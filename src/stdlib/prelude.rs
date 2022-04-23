@@ -92,11 +92,7 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
     
     // Misc
     let to_str = native_function!(str, env, params(value) => {
-        if value.as_strval().is_some() {
-            Ok(*value)
-        } else {
-            Ok(Variant::from(value.fmt_echo()?))
-        }
+        Ok(Variant::from(value.fmt_str()?))
     });
     
     let echo = native_function!(echo, env, params(value) => {
@@ -105,10 +101,10 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
     
     let print = native_function!(print, env, variadic(values)  => {
         if let Some((first, rest)) = values.split_first() {
-            print!("{}", first);
+            print!("{}", first.fmt_str()?);
             for value in rest.iter() {
                 print!(" ");
-                print!("{}", value);
+                print!("{}", value.fmt_str()?);
             }
         }
         println!();

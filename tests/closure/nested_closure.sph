@@ -7,9 +7,12 @@ fun f1()
         fun f3()
             let c = "c";
             fun f4()
-                assert "a" == echo a
-                assert "b" == echo b
-                assert "c" == echo c
+                print("a:", echo(a))
+                print("b:", echo(b))
+                print("c:", echo(c))
+                assert "a" == a
+                assert "b" == b
+                assert "c" == c
             end
             nonlocal f = f4;
         end

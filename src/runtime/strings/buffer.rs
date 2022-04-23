@@ -209,7 +209,7 @@ mod tests {
         let lit = "Inline";
         let lit2 = " me";
         let mut s = <StrBuffer<22>>::try_from(lit).expect("bad inline str");
-        assert!(s.try_concat(lit2));
+        assert!(s.try_push_str(lit2).is_ok());
         assert_eq!(&*s, lit.to_string() + lit2);
     }
 
@@ -218,7 +218,7 @@ mod tests {
         let lit = "This is";
         let lit2 = " way too long to be an inline string!!!";
         let mut s = <StrBuffer<22>>::try_from(lit).expect("bad inline str");
-        assert!(!s.try_concat(lit2));
+        assert!(s.try_push_str(lit2).is_err());
         assert_eq!(&*s, lit);
     }
 }

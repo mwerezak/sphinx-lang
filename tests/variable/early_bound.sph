@@ -1,7 +1,8 @@
 let a = "outer"
 begin
     fun foo()
-        echo a
+        print(echo(a))
+        a
     end
     
     assert foo() == "outer"

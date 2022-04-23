@@ -3,9 +3,11 @@ fun f()
     let a = "1"
     begin
         let a = "2"
-        assert "2" == echo a
+        print("inner a:", echo(a))
+        assert "2" == a
     end
-    assert "1" == echo a
+    print("outer a:", echo(a))
+    assert "1" == a
 end
 
 f()

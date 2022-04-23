@@ -56,6 +56,14 @@ impl Variant {
         
         Display(self)
     }
+    
+    pub fn fmt_str(&self) -> ExecResult<StringValue> {
+        if let Some(strval) = self.as_strval() {
+            Ok(strval)
+        } else {
+            self.fmt_echo()
+        }
+    }
 }
 
 

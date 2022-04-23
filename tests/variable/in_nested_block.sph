@@ -1,6 +1,7 @@
 begin
     let a = "outer"
     begin
-        assert "outer" == echo a
+        print("a:", echo(a))
+        assert "outer" == a
     end
 end

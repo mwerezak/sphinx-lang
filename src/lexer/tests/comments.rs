@@ -1,6 +1,5 @@
 #![cfg(test)]
 
-use crate::debug::DebugSymbol;
 use crate::lexer::{LexerBuilder, Token, TokenMeta};
 use crate::lexer::rules::MultiCharRule;
 use crate::lexer::rules::comments::*;

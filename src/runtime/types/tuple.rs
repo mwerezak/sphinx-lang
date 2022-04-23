@@ -80,16 +80,19 @@ impl MetaObject for Tuple {
             Self::Empty => Ok(StringValue::from(static_symbol!("()"))),
             
             Self::NonEmpty(items) => {
-                let (last, rest) = items.split_last().unwrap(); // should never be empty
+                let (first, rest) = items.split_first().unwrap(); // should never be empty
                 
                 let mut buf = String::new();
-                buf.push('(');
+                
+                write!(&mut buf, "({}", first.fmt_echo()?)
+                    .map_err(ErrorKind::from)?;
+                
                 for item in rest.iter() {
-                    write!(&mut buf, "{}, ", item.fmt_echo()?)
+                    write!(&mut buf, ", {}", item.fmt_echo()?)
                         .map_err(ErrorKind::from)?;
                 }
-                write!(&mut buf, "{})", last.fmt_echo()?)
-                    .map_err(ErrorKind::from)?;
+                buf.push(')');
+
                 
                 Ok(StringValue::new_maybe_interned(buf))
             }
