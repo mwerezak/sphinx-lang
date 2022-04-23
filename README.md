@@ -22,6 +22,10 @@ Different representations of string data. Short strings are "inlined" on the sta
 
 The Sphinx language uses a simple Mark-Trace GC inspired by `rust-gc`. The *runtime* itself does not use any GC. Since we are only GC'ing script data, a lot of the challenges that would be involved in writing a GC for general Rust code are avoided (that for example, `rust-gc` has to deal with). In the future I would like to support incremental GC and *maybe* generational GC as well, but the current implementation is simple and works pretty well.
 
+The GC also supports allocating dynamically sized types without double-indirection (i.e. the `Gc<T>` smart pointer used for GCed data points directly to the DST, not a Box). I am hoping to implement storing pointer metadata in the GC allocation header so that a `Gc<T>` for an unsized `T` is also a thin pointer.
+
+The GC also now supports weak references!
+
 # Safe Rust FFI
 
 Because Sphinx is (mostly) implemented in Safe Rust, it should be possible to provide a completely safe FFI with Rust code. This would allow a host Rust application to gain the capabilities of an embedded dynamic scripting language.
