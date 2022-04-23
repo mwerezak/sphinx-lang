@@ -202,7 +202,9 @@ mod tests {
         let data = Gc::new(1);
         let weak = data.weakref();
         
-        assert!(matches!(weak.try_deref(), Some(1)))
+        assert!(matches!(weak.try_deref(), Some(1)));
+        
+        gc_force(&0); //cleanup so miri doesn't complain about leaks
     }
     
     #[test]
@@ -215,6 +217,8 @@ mod tests {
         
         cell.set(cell.get() + 1);
         assert!(cell.get() == 3);
+        
+        gc_force(&0); //cleanup so miri doesn't complain about leaks
     }
     
     #[test]
@@ -227,7 +231,9 @@ mod tests {
         
         gc_force(&0);
         
-        assert!(!weak.is_valid())
+        assert!(!weak.is_valid());
+        
+        gc_force(&0); //cleanup so miri doesn't complain about leaks
     }
     
     #[test]
@@ -243,5 +249,7 @@ mod tests {
         gc_force(&0);
         
         assert!(data.inner().header().weak().is_none());
+        
+        gc_force(&0); //cleanup so miri doesn't complain about leaks
     }
 }
