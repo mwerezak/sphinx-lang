@@ -1,3 +1,5 @@
+use log;
+use core::fmt;
 use core::mem;
 use core::alloc::Layout;
 use core::ptr::{self, NonNull, Pointee};
@@ -32,17 +34,18 @@ unsafe impl<T> GcTrace for [T] where T: GcTrace {
     }
 }
 
-#[derive(Debug)]
-pub struct GcBoxHeader {
+
+pub(super) struct GcBoxHeader {
     next: Option<NonNull<GcBoxHeader>>,
     marked: bool,
     size: usize,
     layout: Layout,
+    destructor: Option<Box<dyn Fn(*mut ())>>,
 }
 
 impl GcBoxHeader {
     #[inline]
-    pub fn from_alloc<T>(gcbox: NonNull<GcBox<T>>) -> NonNull<Self> where T: GcTrace + ?Sized {
+    pub(super) fn from_alloc<T>(gcbox: NonNull<GcBox<T>>) -> NonNull<Self> where T: GcTrace + ?Sized {
         unsafe { NonNull::new_unchecked(gcbox.as_ptr() as *mut GcBoxHeader) }
     }
     
@@ -70,17 +73,37 @@ impl GcBoxHeader {
     pub fn set_marked(&mut self, marked: bool) {
         self.marked = marked
     }
-    
-    /// Frees the entire gcbox
-    #[inline]
-    pub unsafe fn free(gcbox: NonNull<Self>) -> Option<NonNull<Self>> {
-        let next = gcbox.as_ref().next;
-        let layout = gcbox.as_ref().layout;
-        
-        dealloc(gcbox.as_ptr() as *mut u8, layout);
-        
-        next
+}
+
+impl fmt::Debug for GcBoxHeader {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("GcBoxHeader")
+            .field("next", &self.next)
+            .field("size", &self.size)
+            .field("layout", &self.layout)
+            .field("destructor", &self.destructor.as_ref()
+                .map(|destfn| ptr::addr_of!(*destfn)))
+            .finish()
     }
+}
+
+
+pub(super) unsafe fn free_gcbox(ptr: NonNull<()>) -> Option<NonNull<GcBoxHeader>> {
+    let header = ptr.cast::<GcBoxHeader>().as_mut();
+    let next = header.next;
+    let layout = header.layout;
+    
+    // just in case, we take the destructor out of the gcbox
+    // so it doesn't drop itself while being executed
+    // this also prevents a GcBox's destructor from being called twice
+    let destructor = header.destructor.take();
+    if let Some(destructor) = destructor {
+        destructor(ptr.as_ptr())
+    }
+    
+    dealloc(ptr.as_ptr() as *mut u8, layout);
+    
+    next
 }
 
 
@@ -94,19 +117,24 @@ pub struct GcBox<T> where T: GcTrace + ?Sized + 'static {
 
 // constructor for sized types
 impl<T> GcBox<T> where T: GcTrace {
-    pub fn new(data: T) -> NonNull<GcBox<T>> {
+    pub(super) fn new(data: T) -> NonNull<GcBox<T>> {
         if mem::size_of::<T>() == 0 {
             panic!("gc alloc zero-sized type")
         }
         
         let layout = Layout::new::<GcBox<T>>();
         let size = layout.size() + data.size_hint();
+        let destructor = |ptr: *mut ()| unsafe {
+            log::debug!("{:#X} run sized destructor", ptr as usize);
+            ptr::drop_in_place::<GcBox<T>>(ptr as *mut GcBox<T>)
+        };
         
         let gcbox = Box::new(GcBox {
             header: GcBoxHeader {
                 next: None,
                 marked: false,
                 size, layout,
+                destructor: Some(Box::new(destructor)),
             },
             data,
         });
@@ -119,7 +147,7 @@ impl<T> GcBox<T> where
     T: GcTrace + ?Sized + Pointee + 'static, 
     GcBox<T>: Pointee<Metadata = T::Metadata> 
 {
-    pub fn from_box(data: Box<T>) -> NonNull<GcBox<T>> {
+    pub(super) fn from_box(data: Box<T>) -> NonNull<GcBox<T>> {
         let size_hint = data.size_hint();
         let data_size = mem::size_of_val(&*data);
         
@@ -150,11 +178,18 @@ impl<T> GcBox<T> where
         );
         
         // initialize the GcBox
+        let destructor = move |ptr: *mut ()| unsafe {
+            log::debug!("{:#X} run unsized destructor", ptr as usize);
+            let ptr = ptr::from_raw_parts_mut::<GcBox<T>>(ptr, ptr_meta);
+            ptr::drop_in_place(ptr);
+        };
+        
         let header = GcBoxHeader {
             next: None,
             marked: false,
             size: layout.size() + size_hint,
             layout,
+            destructor: Some(Box::new(destructor)),
         };
         
         unsafe {
@@ -177,33 +212,29 @@ impl<T> GcBox<T> where
 
 impl<T> GcBox<T> where T: GcTrace + ?Sized {
     #[inline]
-    pub fn header(&self) -> &GcBoxHeader { &self.header }
+    pub(super) fn header(&self) -> &GcBoxHeader { &self.header }
 
     #[inline]
-    pub fn value(&self) -> &T { &self.data }
+    pub(super) fn value(&self) -> &T { &self.data }
     
     #[inline]
-    pub fn mark_trace(&mut self) {
+    pub(super) fn mark_trace(&mut self) {
         if !self.header.is_marked() {
             self.header.set_marked(true);
             self.data.trace();
         }
     }
-    
-    unsafe fn free(gcbox: NonNull<GcBox<T>>) {
-        let layout = gcbox.as_ref().header.layout;
-        dealloc(gcbox.as_ptr() as *mut u8, layout);
-    }
-    
 }
-
 
 #[cfg(test)]
 mod tests {
+    use core::cell::Cell;
+    use std::sync::Mutex;
+    use once_cell::sync::Lazy;
     use super::*;
     
     unsafe impl GcTrace for i32 {
-        fn trace(&self) {}
+        fn trace(&self) { }
     }
     
     #[test]
@@ -211,7 +242,7 @@ mod tests {
         let data = 63;
         let gcbox = GcBox::new(data);
         println!("gcbox sized: {:#?}", unsafe { gcbox.as_ref() });
-        unsafe { GcBox::free(gcbox); }
+        unsafe { free_gcbox(gcbox.cast()); }
     }
     
     #[test]
@@ -219,7 +250,7 @@ mod tests {
         let unsized_data = vec![1,2,3,4,5].into_boxed_slice();
         let gcbox = GcBox::from_box(unsized_data);
         println!("gcbox unsized: {:#?}", unsafe { gcbox.as_ref() });
-        unsafe { GcBox::free(gcbox); }
+        unsafe { free_gcbox(gcbox.cast()); }
     }
     
     #[test]
@@ -229,7 +260,7 @@ mod tests {
         println!("gcbox sized: {:#?}", unsafe { gcbox.as_ref() });
         unsafe {
             let header = GcBoxHeader::from_alloc(gcbox);
-            GcBoxHeader::free(header); 
+            free_gcbox(header.cast());
         }
     }
     
@@ -240,7 +271,33 @@ mod tests {
         println!("gcbox unsized: {:#?}", unsafe { gcbox.as_ref() });
         unsafe {
             let header = GcBoxHeader::from_alloc(gcbox);
-            GcBoxHeader::free(header);
+            free_gcbox(header.cast());
         }
+    }
+    
+    #[test]
+    fn test_gcbox_drop() {
+        static DROPPED: Lazy<Mutex<Cell<bool>>> = Lazy::new(|| Mutex::new(Cell::new(false)));
+        
+        #[derive(Debug)]
+        struct DropTest(&'static Mutex<Cell<bool>>);
+        
+        unsafe impl GcTrace for DropTest {
+            fn trace(&self) { }
+        }
+        
+        impl Drop for DropTest {
+            fn drop(&mut self) {
+                println!("dropping {:?}", self);
+                (*self.0).lock().unwrap().set(true);
+            }
+        }
+        
+        let test = DropTest(&DROPPED);
+        let gcbox = GcBox::new(test);
+        println!("gcbox sized: {:#?}", unsafe { gcbox.as_ref() });
+        unsafe { free_gcbox(gcbox.cast()); }
+        
+        assert!(DROPPED.lock().unwrap().get())
     }
 }

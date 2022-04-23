@@ -9,7 +9,7 @@ mod handle;
 pub use data::GcTrace;
 pub use handle::Gc;
 
-use data::{GcBox, GcBoxHeader};
+use data::{GcBox, GcBoxHeader, free_gcbox};
 
 
 thread_local! {
@@ -108,7 +108,7 @@ impl GcState {
         self.stats.box_count -= 1;
         log::debug!("{:#X} free {} bytes", gcbox.as_ptr() as *const () as usize, size);
         
-        unsafe { GcBoxHeader::free(gcbox) }
+        unsafe { free_gcbox(gcbox.cast()) }
     }
     
     fn collect_garbage(&mut self, root: &impl GcTrace) {
