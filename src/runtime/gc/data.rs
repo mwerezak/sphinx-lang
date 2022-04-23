@@ -1,14 +1,17 @@
 use log;
 use core::fmt;
 use core::mem;
+use core::cell::{Cell, RefCell};
 use core::alloc::Layout;
 use core::ptr::{self, NonNull, Pointee};
 use std::alloc::{self, alloc, dealloc};
 
 
-/// Unsafe because if the GcTrace::trace() implementation fails to mark any Gc handles that it can reach, 
-/// the Gc will not be able to mark them and will free memory that is still in use.
-/// # SAFETY: Must not impl Drop
+/// Unsafe because if the `trace()` implementation fails to call `Gc::mark_trace()` 
+/// and `GcWeak::mark_trace()` on all of the `Gc` and `GcWeak` pointers that it can reach,
+/// the GC will free memory that is still in use.
+/// SAFETY: If the receiver also impls `Drop`, the `drop()` impl must not deref any `Gc` or `GcWeak` pointers
+/// It is recommended that `GcTrace` should not implemented for any types that also impl Drop
 pub unsafe trait GcTrace {
     
     /// SAFETY: Must call `Gc::mark_trace()` on every reachable Gc handle
@@ -19,9 +22,11 @@ pub unsafe trait GcTrace {
     /// size hint, or return a const estimate of the average size.
     #[inline]
     fn size_hint(&self) -> usize { 0 }
+    
+    fn cleanup(&self) { }
 }
 
-// arrays
+// Arrays
 unsafe impl<T> GcTrace for [T] where T: GcTrace {
     fn trace(&self) {
         for item in self.iter() {
@@ -34,12 +39,40 @@ unsafe impl<T> GcTrace for [T] where T: GcTrace {
     }
 }
 
+// Cells
+unsafe impl<T> GcTrace for Cell<T> where T: GcTrace + Copy {
+    fn trace(&self) {
+        self.get().trace()
+    }
+    
+    fn size_hint(&self) -> usize {
+        self.get().size_hint()
+    }
+}
+
+unsafe impl<T> GcTrace for RefCell<T> where T: GcTrace {
+    fn trace(&self) {
+        self.borrow().trace()
+    }
+    
+    fn size_hint(&self) -> usize {
+        self.borrow().size_hint()
+    }
+}
+
+
+/// allows GcBoxHeader to invalidate the weak cell without knowing the type
+pub(super) trait WeakCell: GcTrace {
+    fn invalidate(&self);
+}
+
 
 pub(super) struct GcBoxHeader {
     next: Option<NonNull<GcBoxHeader>>,
     marked: bool,
     size: usize,
     layout: Layout,
+    weak: Option<NonNull<GcBox<dyn WeakCell>>>,
     destructor: Option<Box<dyn Fn(*mut ())>>,
 }
 
@@ -50,28 +83,52 @@ impl GcBoxHeader {
     }
     
     #[inline]
-    pub fn next(&self) -> Option<NonNull<Self>> {
+    pub(super) fn next(&self) -> Option<NonNull<Self>> {
         self.next
     }
     
     #[inline]
-    pub fn set_next(&mut self, next: Option<NonNull<Self>>) {
+    pub(super) fn set_next(&mut self, next: Option<NonNull<Self>>) {
         self.next = next
     }
     
     #[inline]
-    pub fn size(&self) -> usize {
+    pub(super) fn size(&self) -> usize {
         self.size
     }
     
     #[inline]
-    pub fn is_marked(&self) -> bool {
+    pub(super) fn is_marked(&self) -> bool {
         self.marked
     }
     
     #[inline]
-    pub fn set_marked(&mut self, marked: bool) {
+    pub(super) fn set_marked(&mut self, marked: bool) {
         self.marked = marked
+    }
+    
+    #[inline]
+    pub(super) fn weak(&self) -> Option<NonNull<GcBox<dyn WeakCell>>> {
+        self.weak
+    }
+    
+    #[inline]
+    pub(super) fn set_weak(&mut self, weak: Option<NonNull<GcBox<dyn WeakCell>>>) {
+        self.weak = weak
+    }
+    
+    #[inline]
+    fn take_destructor(&mut self) -> Option<Box<dyn Fn(*mut ())>> {
+        self.destructor.take()
+    }
+}
+
+impl Drop for GcBoxHeader {
+    fn drop(&mut self) {
+        if let Some(weak_ptr) = self.weak.take() {
+            unsafe { weak_ptr.as_ref() }
+                .value().invalidate();
+        }
     }
 }
 
@@ -86,26 +143,6 @@ impl fmt::Debug for GcBoxHeader {
             .finish()
     }
 }
-
-
-pub(super) unsafe fn free_gcbox(ptr: NonNull<()>) -> Option<NonNull<GcBoxHeader>> {
-    let header = ptr.cast::<GcBoxHeader>().as_mut();
-    let next = header.next;
-    let layout = header.layout;
-    
-    // just in case, we take the destructor out of the gcbox
-    // so it doesn't drop itself while being executed
-    // this also prevents a GcBox's destructor from being called twice
-    let destructor = header.destructor.take();
-    if let Some(destructor) = destructor {
-        destructor(ptr.as_ptr())
-    }
-    
-    dealloc(ptr.as_ptr() as *mut u8, layout);
-    
-    next
-}
-
 
 // need to control memory layout to alloc for unsized data
 #[repr(C)]
@@ -134,6 +171,7 @@ impl<T> GcBox<T> where T: GcTrace {
                 next: None,
                 marked: false,
                 size, layout,
+                weak: None,
                 destructor: Some(Box::new(destructor)),
             },
             data,
@@ -189,6 +227,7 @@ impl<T> GcBox<T> where
             marked: false,
             size: layout.size() + size_hint,
             layout,
+            weak: None,
             destructor: Some(Box::new(destructor)),
         };
         
@@ -215,6 +254,9 @@ impl<T> GcBox<T> where T: GcTrace + ?Sized {
     pub(super) fn header(&self) -> &GcBoxHeader { &self.header }
 
     #[inline]
+    pub(super) fn header_mut(&mut self) -> &mut GcBoxHeader { &mut self.header }
+
+    #[inline]
     pub(super) fn value(&self) -> &T { &self.data }
     
     #[inline]
@@ -225,6 +267,28 @@ impl<T> GcBox<T> where T: GcTrace + ?Sized {
         }
     }
 }
+
+pub(super) unsafe fn free_gcbox(ptr: NonNull<()>) -> Option<NonNull<GcBoxHeader>> {
+    let header = ptr.cast::<GcBoxHeader>().as_mut();
+    let next = header.next;
+    let layout = header.layout;
+    
+    // just in case, we take the destructor out of the gcbox
+    // so it doesn't drop itself while being executed
+    // this also prevents a GcBox's destructor from being called twice
+    let cleanup_fn = header.take_destructor();
+    if let Some(cleanup_fn) = cleanup_fn {
+        cleanup_fn(ptr.as_ptr())
+    }
+    
+    // assert that any weak ref has been cleaned up
+    debug_assert!(header.weak().is_none());
+    
+    dealloc(ptr.as_ptr() as *mut u8, layout);
+    
+    next
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -276,7 +340,7 @@ mod tests {
     }
     
     #[test]
-    fn test_gcbox_drop() {
+    fn test_gcbox_destructor() {
         static DROPPED: Lazy<Mutex<Cell<bool>>> = Lazy::new(|| Mutex::new(Cell::new(false)));
         
         #[derive(Debug)]

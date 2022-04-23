@@ -28,3 +28,6 @@ static_assertions = "1.1.0"
 log = { version = "0.4.0", features = ["release_max_level_off"] }
 env_logger = "0.8.4"
 clap = "3.1.6"
+
+[dev-dependencies]
+test-log = "0.2.10"

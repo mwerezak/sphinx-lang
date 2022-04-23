@@ -102,12 +102,6 @@ impl Closure {
     pub fn is_closed(&self) -> bool { matches!(self, Self::Closed(..)) }
 }
 
-unsafe impl GcTrace for Cell<Variant> {
-    fn trace(&self) {
-        self.get().trace()
-    }
-}
-
 
 #[derive(Debug, Clone)]
 pub struct Upvalue {

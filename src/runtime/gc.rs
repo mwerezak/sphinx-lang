@@ -5,11 +5,12 @@ use log;
 
 mod data;
 mod handle;
+mod weak;
 
 pub use data::GcTrace;
-pub use handle::Gc;
+pub use handle::{Gc, GcWeak};
 
-use data::{GcBox, GcBoxHeader, free_gcbox};
+use data::{GcBoxHeader, free_gcbox};
 
 
 thread_local! {
