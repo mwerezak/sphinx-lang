@@ -2,7 +2,7 @@ use core::cell::Cell;
 use core::ops::Deref;
 use crate::codegen::LocalIndex;
 use crate::runtime::{Variant, HashMap};
-use crate::runtime::gc::{Gc, GcTrace, gc_collect};
+use crate::runtime::gc::{Gc, GcWeak, GcTrace, gc_collect};
 use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
 use crate::runtime::module::Module;
 use crate::runtime::errors::ExecResult;
@@ -32,9 +32,21 @@ enum Control {
 
 #[derive(Debug, Clone, Copy)]
 struct UpvalueRef {
-    // TODO weak reference
     fun: Gc<Function>,
     index: UpvalueIndex,
+}
+
+impl UpvalueRef {
+    fn mark_trace(&self) {
+        self.fun.mark_trace()
+    }
+    
+    fn weakref(&self) -> UpvalueWeakRef {
+        UpvalueWeakRef {
+            fun: self.fun.weakref(),
+            index: self.index,
+        }
+    }
 }
 
 impl Deref for UpvalueRef {
@@ -48,13 +60,39 @@ impl Deref for UpvalueRef {
 
 impl Gc<Function> {
     #[inline(always)]
-    fn ref_upvalue(self, index: UpvalueIndex) -> UpvalueRef {
+    fn upvalue(self, index: UpvalueIndex) -> UpvalueRef {
         UpvalueRef {
             fun: self,
             index
         }
     }
 }
+
+
+#[derive(Debug, Clone, Copy)]
+struct UpvalueWeakRef {
+    fun: GcWeak<Function>,
+    index: UpvalueIndex,
+}
+
+impl UpvalueWeakRef {
+    #[inline(always)]
+    fn try_deref(&self) -> Option<&Upvalue> {
+        self.fun.try_deref()
+            .map(|fun| &fun.upvalues()[usize::from(self.index)])
+    }
+    
+    fn is_valid(&self) -> bool {
+        self.fun.is_valid()
+    }
+    
+    fn mark_trace(&self) {
+        self.fun.mark_trace()
+    }
+}
+
+
+
 
 // struct UpvalueWeakRef
 
@@ -106,6 +144,7 @@ impl<'c> VirtualMachine<'c> {
             Control::Continue => { }
         }
         
+        self.upvalues.prune_invalid();
         gc_collect(self);
         
         Ok(false)
@@ -178,7 +217,7 @@ unsafe impl GcTrace for VirtualMachine<'_> {
         
         // open upvalues
         for upval_ref in self.upvalues.iter_refs() {
-            upval_ref.fun.mark_trace();
+            upval_ref.mark_trace();
         }
     }
 }
@@ -310,7 +349,7 @@ impl ValueStack {
 
 #[derive(Debug)]
 struct OpenUpvalues {
-    upvalues: HashMap<usize, Vec<UpvalueRef>>,
+    upvalues: HashMap<usize, Vec<UpvalueWeakRef>>,
 }
 
 impl OpenUpvalues {
@@ -320,37 +359,46 @@ impl OpenUpvalues {
         }
     }
     
-    fn iter_refs(&self) -> impl Iterator<Item=&UpvalueRef> {
+    fn iter_refs(&self) -> impl Iterator<Item=&UpvalueWeakRef> {
         self.upvalues.values().flat_map(|refs| refs.iter())
     }
     
+    fn prune_invalid(&mut self) {
+        self.upvalues.retain(|_, upvals| {
+            upvals.retain(UpvalueWeakRef::is_valid);
+            !upvals.is_empty()
+        })
+    }
+    
+    /// Enter all of a function's upvalues into the upvalue registry
     fn register(&mut self, function: Gc<Function>) {
         for (index, upval) in function.upvalues().iter().enumerate() {
             if upval.closure().is_open() {
-                let upval_ref = function.ref_upvalue(index.try_into().unwrap());
+                let upval_ref = function.upvalue(index.try_into().unwrap());
                 self.insert_ref(upval_ref);
             }
         }
     }
     
     fn insert_ref(&mut self, upval_ref: UpvalueRef) {
-        // let weak_ref = upval_ref.into()  // TODO use weak references
-        
         let index = match upval_ref.closure() {
             Closure::Open(index) => index,
             _ => panic!("insert non-open upvalue"),
         };
         
+        let weak_ref = upval_ref.weakref();
         self.upvalues.entry(index)
-            .and_modify(|refs| refs.push(upval_ref))
-            .or_insert_with(|| vec![ upval_ref ]);
+            .and_modify(|refs| refs.push(weak_ref))
+            .or_insert_with(|| vec![ weak_ref ]);
     }
     
     fn close_upvalues(&mut self, index: usize, value: Variant) {
         if let Some(upvalues) = self.upvalues.remove(&index) {
             let gc_cell = Gc::new(Cell::new(value));
-            for upvalue in upvalues.iter() {
-                upvalue.close(gc_cell)
+            for weak_ref in upvalues.iter() {
+                if let Some(upvalue) = weak_ref.try_deref() {
+                    upvalue.close(gc_cell)
+                }
             }
         }
     }

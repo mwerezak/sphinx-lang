@@ -142,7 +142,6 @@ impl<T> fmt::Debug for Gc<T> where T: GcTrace + ?Sized {
 }
 
 
-#[derive(Clone, Copy)]
 pub struct GcWeak<T> where T: GcTrace + ?Sized + 'static {
     gc_weak: Gc<GcWeakCell<T>>,
 }
@@ -179,6 +178,16 @@ impl<T> GcWeak<T> where T: GcTrace + ?Sized {
         Gc::as_id(&self_weak.gc_weak)
     }
 }
+
+impl<T> Clone for GcWeak<T> where T: GcTrace + ?Sized {
+    fn clone(&self) -> Self {
+        Self {
+            gc_weak: self.gc_weak.clone()
+        }
+    }
+}
+
+impl<T> Copy for GcWeak<T> where T: GcTrace + ?Sized { }
 
 impl<T> fmt::Debug for GcWeak<T> where T: GcTrace + ?Sized {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {

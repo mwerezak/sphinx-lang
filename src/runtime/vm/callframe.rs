@@ -215,7 +215,7 @@ impl<'c> VMCallFrame<'c> {
     #[inline]
     fn get_upvalue(&self, stack: &ValueStack, index: UpvalueIndex) -> UpvalueRef {
         let fun = into_function(*stack.peek_at(self.index_from_local(0)));
-        fun.ref_upvalue(index)
+        fun.upvalue(index)
     }
     
     fn make_function(&self, stack: &ValueStack, proto: &FunctionProto) -> Function {
