@@ -66,8 +66,8 @@ impl<T> Gc<T> where T: GcTrace + ?Sized {
     }
     
     /// Create a weak reference from this GC handle
-    pub fn weakref(mut self) -> GcWeak<T> {
-        let weak_ptr = self.inner_mut().get_or_make_weak();
+    pub fn weakref(&self) -> GcWeak<T> {
+        let weak_ptr = GcBox::get_or_make_weak(self.ptr);
         GcWeak::new(Gc::from_raw(weak_ptr))
     }
     
@@ -166,7 +166,6 @@ impl<T> GcWeak<T> where T: GcTrace + ?Sized {
     }
     
     // This marks the allocation for the weak reference - NOT the referent of the weak reference
-    // Is is critical for memory safety that 
     pub fn mark_trace(&self) {
         self.gc_weak.mark_trace()
     }

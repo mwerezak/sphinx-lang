@@ -52,17 +52,17 @@ impl<T> WeakCell for GcWeakCell<T> where T: GcTrace + ?Sized {
 impl<T> GcBox<T> where T: GcTrace + ?Sized {
     /// Get a pointer to the weak reference allocation for this `GcBox<T>`
     /// if it already exists, otherwise allocate a new one
-    pub(super) fn get_or_make_weak(&mut self) -> NonNull<GcBox<GcWeakCell<T>>> {
-        if let Some(weak_ptr) = self.header().weak() {
+    pub(super) fn get_or_make_weak(mut self_ptr: NonNull<GcBox<T>>) -> NonNull<GcBox<GcWeakCell<T>>> {
+        if let Some(weak_ptr) = unsafe { self_ptr.as_ref() }.header().weak() {
             weak_ptr.cast()
         } else {
-            let self_ptr = unsafe { NonNull::new_unchecked(self) };
             let weak_cell = GcWeakCell::new(self_ptr);
             let gcbox_weak = GcBox::new(weak_cell);
             
             // update the header weakref data
             let dyn_ptr = gcbox_weak.as_ptr() as *mut GcBox<dyn WeakCell>;
-            self.header_mut().set_weak(unsafe { Some(NonNull::new_unchecked(dyn_ptr)) });
+            unsafe { self_ptr.as_mut() }.header_mut()
+                .set_weak(unsafe { Some(NonNull::new_unchecked(dyn_ptr)) });
             
             // insert the new GcBox<GcWeakCell<T>> into GC tracking
             GC_STATE.with(|gc| gc.borrow_mut().insert(gcbox_weak));
