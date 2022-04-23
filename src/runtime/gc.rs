@@ -10,7 +10,7 @@ mod weak;
 pub use data::GcTrace;
 pub use handle::{Gc, GcWeak};
 
-use data::{GcBoxHeader, free_gcbox};
+use data::{GcBox, GcBoxPtr};
 
 
 thread_local! {
@@ -37,7 +37,7 @@ struct GcState {
     stats: GcStats,
     config: GcConfig,
     threshold: usize,
-    boxes_start: Option<NonNull<GcBoxHeader>>,
+    boxes_start: Option<GcBoxPtr>,
 }
 
 #[derive(Debug)]
@@ -90,26 +90,26 @@ impl GcState {
         self.stats.allocated > self.threshold
     }
     
-    fn insert(&mut self, mut gcbox: NonNull<GcBoxHeader>) {
+    fn insert<T>(&mut self, mut gcbox: NonNull<GcBox<T>>) where T: GcTrace + ?Sized {
         unsafe {
-            let size = gcbox.as_ref().size();
+            let size = gcbox.as_ref().header().size();
             log::debug!("{:#X} allocate {} bytes", gcbox.as_ptr() as *const () as usize, size);
             
-            gcbox.as_mut().set_next(self.boxes_start.take());
-            self.boxes_start = Some(gcbox);
+            gcbox.as_mut().header_mut().set_next(self.boxes_start.take());
+            self.boxes_start = Some(GcBoxPtr::new(gcbox));
             self.stats.allocated += size;
             self.stats.box_count += 1;
         }
     }
     
     /// frees the GcBox, yielding it's next pointer
-    fn free(&mut self, gcbox: NonNull<GcBoxHeader>) -> Option<NonNull<GcBoxHeader>> {
-        let size = unsafe { gcbox.as_ref().size() };
+    fn free(&mut self, gcbox: GcBoxPtr) -> Option<GcBoxPtr> {
+        let size = unsafe { gcbox.header().size() };
         self.stats.allocated -= size;
         self.stats.box_count -= 1;
         log::debug!("{:#X} free {} bytes", gcbox.as_ptr() as *const () as usize, size);
         
-        unsafe { free_gcbox(gcbox.cast()) }
+        unsafe { gcbox.free() }
     }
     
     fn collect_garbage(&mut self, root: &impl GcTrace) {
@@ -144,17 +144,17 @@ impl GcState {
         let mut prev_box = None;
         let mut next_box = self.boxes_start;
         while let Some(mut gcbox) = next_box {
-            if gcbox.as_ref().is_marked() {
-                gcbox.as_mut().set_marked(false);
+            if gcbox.header().is_marked() {
+                gcbox.header_mut().set_marked(false);
                 
-                next_box = gcbox.as_ref().next();
+                next_box = gcbox.header().next();
                 prev_box.replace(gcbox);
                 
             } else {
                 
                 next_box = self.free(gcbox);
                 if let Some(mut prev_box) = prev_box {
-                    prev_box.as_mut().set_next(next_box);
+                    prev_box.header_mut().set_next(next_box);
                 } else {
                     self.boxes_start = next_box;
                 }

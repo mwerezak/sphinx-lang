@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use std::rc::Rc;
 
 use crate::runtime::gc::{GC_STATE, deref_safe};
-use crate::runtime::gc::data::{GcBox, GcBoxHeader, GcTrace};
+use crate::runtime::gc::data::{GcBox, GcTrace};
 use crate::runtime::gc::weak::GcWeakCell;
 
 
@@ -22,8 +22,7 @@ impl<T: GcTrace> Gc<T> {
             let mut gc = gc.borrow_mut();
             
             let gcbox = GcBox::new(data);
-            let header = GcBoxHeader::from_alloc(gcbox);
-            gc.insert(header);
+            gc.insert(gcbox);
             Self::from_raw(gcbox)
         })
     }
@@ -38,8 +37,7 @@ impl<T> Gc<T> where
             let mut gc = gc.borrow_mut();
             
             let gcbox = GcBox::from_box(data);
-            let header = GcBoxHeader::from_alloc(gcbox);
-            gc.insert(header);
+            gc.insert(gcbox);
             Self::from_raw(gcbox)
         })
     }
@@ -187,7 +185,7 @@ mod tests {
     use super::*;
     use core::cell::Cell;
     use crate::runtime::gc::gc_force;
-    use test_log::test;
+    // use test_log::test;
     
     #[test]
     fn test_weak_ref_dereference() {

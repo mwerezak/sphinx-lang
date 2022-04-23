@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use core::ptr::NonNull;
 use crate::runtime::gc::GC_STATE;
-use crate::runtime::gc::data::{GcTrace, GcBox, GcBoxHeader, WeakCell};
+use crate::runtime::gc::data::{GcTrace, GcBox, WeakCell};
 
 #[derive(Debug)]
 pub(super) struct GcWeakCell<T> where T: GcTrace + ?Sized + 'static {
@@ -61,12 +61,7 @@ impl<T> GcBox<T> where T: GcTrace + ?Sized {
             self.header_mut().set_weak(unsafe { Some(NonNull::new_unchecked(dyn_ptr)) });
             
             // insert the new GcBox<GcWeakCell<T>> into GC tracking
-            GC_STATE.with(|gc| {
-                let mut gc = gc.borrow_mut();
-                // TODO refactor `GcBoxHeader::from_alloc`
-                let header = GcBoxHeader::from_alloc(gcbox_weak);
-                gc.insert(header);
-            });
+            GC_STATE.with(|gc| gc.borrow_mut().insert(gcbox_weak));
             
             gcbox_weak
         }
