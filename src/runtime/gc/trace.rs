@@ -1,3 +1,4 @@
+use core::fmt;
 use core::cell::{Cell, RefCell};
 
 
@@ -6,7 +7,7 @@ use core::cell::{Cell, RefCell};
 /// and `GcWeak::mark_trace()` on all of the `Gc` and `GcWeak` pointers that it can reach,
 /// the GC will free memory that is still in use.
 /// SAFETY: If the receiver also impls `Drop`, the `drop()` impl must not deref any `Gc` or `GcWeak` pointers
-pub unsafe trait GcTrace {
+pub unsafe trait GcTrace: fmt::Debug {
     
     /// SAFETY: Must call `Gc::mark_trace()` on every reachable Gc handle
     fn trace(&self);

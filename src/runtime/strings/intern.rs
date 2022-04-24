@@ -109,7 +109,9 @@ impl Ord for StringSymbol {
 
 impl fmt::Debug for StringSymbol {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "StringSymbol({})", self.as_usize())
+        fmt.debug_tuple("StringSymbol")
+            .field(&self.as_usize())
+            .finish()
     }
 }
 

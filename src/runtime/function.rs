@@ -1,3 +1,4 @@
+use core::fmt;
 use core::cell::Cell;
 use crate::codegen::{FunctionID, FunctionProto};
 use crate::runtime::Variant;
@@ -185,3 +186,13 @@ unsafe impl GcTrace for NativeFunction {
     }
 }
 
+impl fmt::Debug for NativeFunction {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("NativeFunction")
+            .field("signature", &self.signature)
+            .field("defaults", &self.defaults)
+            .field("env", &self.env)
+            .field("func", &core::ptr::addr_of!(self.func))
+            .finish()
+    }
+}
