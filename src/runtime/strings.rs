@@ -12,6 +12,8 @@ pub use buffer::StrBuffer;
 
 use intern::StringTable;
 
+
+#[cfg(target_arch = "x86_64")]
 pub type InlineStr = StrBuffer<14>;
 
 #[derive(Debug, Clone, Copy)]

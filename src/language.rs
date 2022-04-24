@@ -1,4 +1,4 @@
-use string_interner::DefaultSymbol;
+use string_interner::symbol::SymbolUsize;
 use once_cell::sync::OnceCell;
 
 use crate::lexer::{LexerBuilder, Token};
@@ -7,9 +7,14 @@ use crate::lexer::rules::keywords::KeywordRule;
 use crate::lexer::rules::literals::*;
 use crate::lexer::rules::literals::string::*;
 
+#[cfg(target_arch = "x86_64")]
 pub type IntType = i64;    // internal representation for integers
+
+#[cfg(target_arch = "x86_64")]
 pub type FloatType = f64;  // internal representation for floats
-pub type InternSymbol = DefaultSymbol;  // for interned strings
+
+#[cfg(target_arch = "x86_64")]
+pub type InternSymbol = SymbolUsize;  // for interned strings
 
 pub static COMMENT_CHAR: char = '#';
 

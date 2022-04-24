@@ -1,6 +1,6 @@
 use core::fmt;
 use core::hash::{Hash, Hasher};
-use static_assertions::assert_eq_size;
+use static_assertions::const_assert_eq;
 use crate::language::{IntType, FloatType};
 use crate::runtime::types::{Tuple, UserData};
 use crate::runtime::function::{Function, NativeFunction};
@@ -9,7 +9,7 @@ use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 #[cfg(target_arch = "x86_64")]
-assert_eq_size!(Variant, [u8; 16]);
+const_assert_eq!(core::mem::size_of::<Variant>(), 16);
 
 // Fundamental data value type
 #[derive(Debug, Clone, Copy)]
