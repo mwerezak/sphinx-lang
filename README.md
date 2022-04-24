@@ -14,7 +14,37 @@ Sphinx is not complete! There is still a lot to do before it is a functional lan
 
 My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be decently fast, and I aim to balance these two goals.
 
-# Some Things That I Like About the Implementation
+Finally, this whole project started just as a way to learn Rust, and I have definitely been doing a lot of that. While I would love for this to someday be an actual, practical, and complete development tool for someone, that's a pretty long road to walk.
+
+# Ok, how do I run it?
+
+Sphinx makes use of Rust's [pointer metadata API](https://github.com/rust-lang/rust/issues/81513), which has not yet been stabilized. So in order to build it you will need nightly Rust. Probably if you're here you're interested in looking at the internals of a compiler/VM (since the language itself is pretty WIP), so you probably already know how to set that up, but if you don't, you can get it with `rustup`. 
+
+Once built, you can run the REPL with `sphinx` and the disassembler with `sphinx-dasm`. Both executables have `--help` to list the command line options.
+
+Here is some example code you can run to get started:
+```
+# Makes a counter using closures
+fun make_inc()
+    var a = 0
+    fun inc(s = 1)
+        nonlocal a += s
+    end
+end
+
+# Warning - very slow! This was intended for a stress test
+# Try this: compile Sphinx in release mode and note the massive speedup when executing fib(30)
+fun fib(n)
+    if n < 2 then 
+        return n 
+    end
+    fib(n - 2) + fib(n - 1)
+end
+```
+
+Right now `sphinx` will compile the code and execute it from memory. I plan to add support for binary bytecode input/output, but right now even the file format for that is TBD 🙃
+
+# Some things that I like about the Implementation
 
 I have an internal type system built around a `MetaObject` trait which makes it easy to specify the behaviours that are supported by each of the core primitive types in the language. Thanks to Rust's enum types (and some macros) this is implemented without any vtables, using static dispatch based on the enum discriminant.
 
