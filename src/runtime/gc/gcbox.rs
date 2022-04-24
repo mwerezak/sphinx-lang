@@ -1,73 +1,30 @@
-use log;
 use core::fmt;
 use core::mem;
-use core::cell::{Cell, RefCell};
 use core::alloc::Layout;
-use core::ptr::{self, NonNull, Pointee, DynMetadata};
+use core::ptr::{self, NonNull, Pointee};
 use std::alloc::{self, alloc, dealloc};
+use log;
+
+use crate::runtime::gc::trace::GcTrace;
+use crate::runtime::gc::ptrmeta::PtrMetadata;
 
 
-/// Unsafe because if the `trace()` implementation fails to call `Gc::mark_trace()` 
-/// and `GcWeak::mark_trace()` on all of the `Gc` and `GcWeak` pointers that it can reach,
-/// the GC will free memory that is still in use.
-/// SAFETY: If the receiver also impls `Drop`, the `drop()` impl must not deref any `Gc` or `GcWeak` pointers
-/// It is recommended that `GcTrace` should not implemented for any types that also impl Drop
-pub unsafe trait GcTrace {
-    
-    /// SAFETY: Must call `Gc::mark_trace()` on every reachable Gc handle
-    fn trace(&self);
-    
-    /// If the GcTrace owns any allocations, this should return the extra allocated size.
-    /// If the allocation can change size, like a Vec<T>, then don't include it in the 
-    /// size hint, or return a const estimate of the average size.
-    #[inline]
-    fn size_hint(&self) -> usize { 0 }
-    
-    fn cleanup(&self) { }
-}
-
-// Arrays
-unsafe impl<T> GcTrace for [T] where T: GcTrace {
-    fn trace(&self) {
-        for item in self.iter() {
-            item.trace()
-        }
-    }
-    
-    fn size_hint(&self) -> usize {
-        self.iter().map(GcTrace::size_hint).sum()
-    }
-}
-
-// Cells
-unsafe impl<T> GcTrace for Cell<T> where T: GcTrace + Copy {
-    fn trace(&self) {
-        self.get().trace()
-    }
-    
-    fn size_hint(&self) -> usize {
-        self.get().size_hint()
-    }
-}
-
-unsafe impl<T> GcTrace for RefCell<T> where T: GcTrace {
-    fn trace(&self) {
-        self.borrow().trace()
-    }
-    
-    fn size_hint(&self) -> usize {
-        self.borrow().size_hint()
-    }
-}
-
-
-/// allows GcBoxHeader to invalidate the weak cell without knowing the type
-pub(super) trait WeakCell: GcTrace {
-    fn invalidate(&self);
-}
-
-
-/// used by GcState to store GcBox<T> of different types
+/// Non-generic pointer to a [GcBox<T>].
+/// Because GC data may be unsized, we can't rely on trait objects to store mixed `GcBox<T>` structs in a collection
+/// Therefore, `GcState` tracks all of the allocations using `repr(C)` type punning, which allows us to freely cast a
+/// `*mut GcBox<T>` into a `*mut GcBoxHeader` (and back). There are two consequences of this:
+///
+/// 1) `GcBoxHeader` must not be generic (or else we're just back to our original problem).
+/// 2) When dealing with mixed `GcBox<T>`s, the GC can only access the header.
+///
+/// Therefore the header must provide all the functionality needed by GcState without using generics.
+/// In practice this means:
+///
+/// - Reading and mutating the "marked" flag.
+/// - Freeing the allocation (including running destructors).
+/// - Getting the "next" allocation (for use as an intrusive list).
+/// - Getting the DST metadata (to support the [`Gc<T>`] thin pointer representation).
+///
 #[derive(Debug, Clone, Copy)]
 pub(super) struct GcBoxPtr {
     ptr: NonNull<GcBoxHeader>,
@@ -93,67 +50,13 @@ impl GcBoxPtr {
     pub(super) fn as_ptr<T>(&self) -> *mut T {
         self.ptr.as_ptr() as *mut T
     }
-    
-    #[inline]
-    pub(super) unsafe fn free(self) -> Option<GcBoxPtr> {
-        free_gcbox(self)
-    }
 }
 
-use crate::runtime::types::UserData;
 
-/// Because `GcBoxHeader` must not be generic the set of allowed 
-/// pointer metadata is closed and defined by this enum.
-#[derive(Clone, Copy)]
-pub enum PtrMetadata {
-    None,
-    Size(usize),
-    UserData(DynMetadata<dyn UserData>)
+/// Allows [GcBoxHeader] to invalidate a [GcWeakCell<T>] without knowing the type of `T`
+pub(super) trait WeakCell: GcTrace {
+    fn invalidate(&self);
 }
-
-impl From<()> for PtrMetadata {
-    fn from(_: ()) -> Self {
-        Self::None
-    }
-}
-
-impl TryInto<()> for PtrMetadata {
-    type Error = ();
-    fn try_into(self) -> Result<(), Self::Error> { Ok(()) }
-}
-
-impl From<usize> for PtrMetadata {
-    fn from(size: usize) -> Self {
-        Self::Size(size)
-    }
-}
-
-impl TryInto<usize> for PtrMetadata {
-    type Error = ();
-    fn try_into(self) -> Result<usize, Self::Error> {
-        match self {
-            Self::Size(size) => Ok(size),
-            _ => Err(()),
-        }
-    }
-}
-
-impl From<DynMetadata<dyn UserData>> for PtrMetadata {
-    fn from(meta: DynMetadata<dyn UserData>) -> Self {
-        Self::UserData(meta)
-    }
-}
-
-impl TryInto<DynMetadata<dyn UserData>> for PtrMetadata {
-    type Error = ();
-    fn try_into(self) -> Result<DynMetadata<dyn UserData>, Self::Error> {
-        match self {
-            Self::UserData(meta) => Ok(meta),
-            _ => Err(()),
-        }
-    }
-}
-
 
 pub(super) struct GcBoxHeader {
     next: Option<GcBoxPtr>,
@@ -244,13 +147,35 @@ impl fmt::Debug for GcBoxHeader {
     }
 }
 
-// need to control memory layout to alloc for unsized data
+// repr(C) is used to control memory layout to alloc for unsized data, and for GcBoxPtr type punning
 #[repr(C)]
 #[derive(Debug)]
 pub struct GcBox<T> where T: GcTrace + ?Sized + 'static {
     header: GcBoxHeader,
     data: T,
 }
+
+
+impl<T> GcBox<T> where T: GcTrace + ?Sized {
+    #[inline]
+    pub(super) fn header(&self) -> &GcBoxHeader { &self.header }
+
+    #[inline]
+    pub(super) fn header_mut(&mut self) -> &mut GcBoxHeader { &mut self.header }
+
+    #[inline]
+    pub(super) fn value(&self) -> &T { &self.data }
+    
+    #[inline]
+    pub(super) fn mark_trace(&mut self) {
+        if !self.header.is_marked() {
+            self.header.set_marked(true);
+            self.data.trace();
+        }
+    }
+}
+
+// Allocation and Deallocation
 
 // constructor for sized types
 impl<T> GcBox<T> where 
@@ -349,42 +274,31 @@ impl<T> GcBox<T> where
     }
 }
 
-pub(super) unsafe fn free_gcbox(mut ptr: GcBoxPtr) -> Option<GcBoxPtr> {
-    let next = ptr.header().next;
-    let layout = ptr.header().layout;
-    
-    // just in case, we take the destructor out of the gcbox
-    // so it doesn't drop itself while being executed
-    // this also prevents a GcBox's destructor from being called twice
-    let cleanup_fn = ptr.header_mut().take_destructor();
-    if let Some(cleanup_fn) = cleanup_fn {
-        cleanup_fn(ptr)
+impl<T> GcBox<T> where T: GcTrace + ?Sized {
+    pub(super) unsafe fn free(self_ptr: NonNull<Self>) -> Option<GcBoxPtr> {
+        GcBoxPtr::new(self_ptr).free()
     }
-    
-    // assert that any weak ref has been cleaned up
-    debug_assert!(ptr.header().weak().is_none());
-    
-    dealloc(ptr.as_ptr() as *mut u8, layout);
-    
-    next
 }
 
-impl<T> GcBox<T> where T: GcTrace + ?Sized {
-    #[inline]
-    pub(super) fn header(&self) -> &GcBoxHeader { &self.header }
-
-    #[inline]
-    pub(super) fn header_mut(&mut self) -> &mut GcBoxHeader { &mut self.header }
-
-    #[inline]
-    pub(super) fn value(&self) -> &T { &self.data }
-    
-    #[inline]
-    pub(super) fn mark_trace(&mut self) {
-        if !self.header.is_marked() {
-            self.header.set_marked(true);
-            self.data.trace();
+impl GcBoxPtr {
+    pub(super) unsafe fn free(mut self) -> Option<GcBoxPtr> {
+        let next = self.header().next;
+        let layout = self.header().layout;
+        
+        // just in case, we take the destructor out of the gcbox
+        // so it doesn't drop itself while being executed
+        // this also prevents a GcBox's destructor from being called twice
+        let cleanup_fn = self.header_mut().take_destructor();
+        if let Some(cleanup_fn) = cleanup_fn {
+            cleanup_fn(self)
         }
+        
+        // assert that any weak ref has been cleaned up
+        debug_assert!(self.header().weak().is_none());
+        
+        dealloc(self.as_ptr() as *mut u8, layout);
+        
+        next
     }
 }
 
@@ -405,7 +319,7 @@ mod tests {
         let data = 63;
         let gcbox = GcBox::new(data);
         println!("gcbox sized: {:#?}", unsafe { gcbox.as_ref() });
-        unsafe { free_gcbox(GcBoxPtr::new(gcbox)); }
+        unsafe { GcBox::free(gcbox); }
     }
     
     #[test]
@@ -413,7 +327,7 @@ mod tests {
         let unsized_data = vec![1,2,3,4,5].into_boxed_slice();
         let gcbox = GcBox::from_box(unsized_data);
         println!("gcbox unsized: {:#?}", unsafe { gcbox.as_ref() });
-        unsafe { free_gcbox(GcBoxPtr::new(gcbox)); }
+        unsafe { GcBox::free(gcbox); }
     }
     
     #[test]
@@ -437,7 +351,7 @@ mod tests {
         let test = DropTest(&DROPPED);
         let gcbox = GcBox::new(test);
         println!("gcbox sized: {:#?}", unsafe { gcbox.as_ref() });
-        unsafe { free_gcbox(GcBoxPtr::new(gcbox)); }
+        unsafe { GcBox::free(gcbox); }
         
         assert!(DROPPED.lock().unwrap().get())
     }

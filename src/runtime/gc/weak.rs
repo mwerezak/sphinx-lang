@@ -1,7 +1,8 @@
 use core::cell::Cell;
 use core::ptr::NonNull;
 use crate::runtime::gc::GC_STATE;
-use crate::runtime::gc::data::{GcTrace, GcBox, WeakCell};
+use crate::runtime::gc::trace::GcTrace;
+use crate::runtime::gc::gcbox::{GcBox, WeakCell};
 
 #[derive(Debug)]
 pub(super) struct GcWeakCell<T> where T: GcTrace + ?Sized + 'static {

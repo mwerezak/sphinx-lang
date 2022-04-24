@@ -1,3 +1,12 @@
+///! The "public API" for the gc is the `Gc<T>` struct, which is a smart pointer to GCed data.
+///! Data can be "inserted" into the GC using `Gc::new()` for `Sized` types or `Gc::from_box()` for `?Sized` types.
+///! Data is accessed using `Deref`. 
+///! Mutable access is not supported, so mutable data that needs to be GCed must use interior mutability.
+///! As well, all GCed data must `impl GcTrace`.
+///! Weak references to GCed data can be obtained using `Gc::weakref()`.
+///! 
+///! `Gc<T>` supports a "thin pointer" representation and should not be wider than a single `usize`.
+
 use core::fmt;
 use core::ops::Deref;
 use core::borrow::Borrow;
@@ -7,10 +16,13 @@ use core::marker::PhantomData;
 use std::rc::Rc;
 
 use crate::runtime::gc::{GC_STATE, deref_safe};
-use crate::runtime::gc::data::{GcBox, GcBoxPtr, GcTrace, PtrMetadata};
+use crate::runtime::gc::trace::GcTrace;
+use crate::runtime::gc::gcbox::{GcBox, GcBoxPtr};
+use crate::runtime::gc::ptrmeta::PtrMetadata;
 use crate::runtime::gc::weak::GcWeakCell;
 
 
+///! Smart pointer to GCed data. See the module-level documentation for more details.
 pub struct Gc<T> where T: GcTrace + ?Sized + 'static {
     ptr: GcBoxPtr,
     _marker: PhantomData<Rc<GcBox<T>>>,
@@ -235,6 +247,12 @@ mod tests {
     use super::*;
     use core::cell::Cell;
     use crate::runtime::gc::gc_force;
+    use static_assertions::assert_eq_size;
+    
+    assert_eq_size!(Gc<i32>, usize);
+    assert_eq_size!(Gc<[i32]>, usize);
+    
+    // comment this out when using miri
     // use test_log::test;
     
     #[test]

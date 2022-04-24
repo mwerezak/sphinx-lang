@@ -128,11 +128,15 @@ pub type StringInterner = string_interner::StringInterner<InternBackend, Default
 
 pub type StringBuildHasher = DefaultBuildHasher;
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct StringTable {
     interner: StringInterner,
     hasher_factory: StringBuildHasher,
     hashes: Vec<u64>,  // hash cache
+}
+
+impl Default for StringTable {
+    fn default() -> Self { Self::new() }
 }
 
 impl StringTable {

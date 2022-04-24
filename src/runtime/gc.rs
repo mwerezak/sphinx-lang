@@ -1,16 +1,22 @@
+///! The Sphinx language garbage collector.
+///! Most of the "public" API is centered around the `Gc<T>` smart pointer. 
+///! See the documentation for the [runtime::gc::handle].
+
 use core::fmt;
 use core::ptr::NonNull;
 use core::cell::{Cell, RefCell};
 use log;
 
-mod data;
+mod trace;
+mod ptrmeta;
+mod gcbox;
 mod handle;
 mod weak;
 
-pub use data::GcTrace;
+pub use trace::GcTrace;
 pub use handle::{Gc, GcWeak};
 
-use data::{GcBox, GcBoxPtr};
+use gcbox::{GcBox, GcBoxPtr};
 
 
 thread_local! {
