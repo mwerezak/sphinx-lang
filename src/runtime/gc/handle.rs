@@ -59,7 +59,7 @@ impl<T> Gc<T> where
 impl<T> Gc<T> where T: GcTrace + ?Sized {
     pub(super) fn from_raw(ptr: NonNull<GcBox<T>>) -> Self {
         Self { 
-            ptr: GcBoxPtr::new(ptr),
+            ptr: ptr.into(),
             _marker: PhantomData,
         }
     }
@@ -82,34 +82,22 @@ impl<T> Gc<T> where
     T: GcTrace + ?Sized, 
     PtrMetadata: TryInto<<GcBox<T> as Pointee>::Metadata>
 {
-    fn inner_ptr(&self) -> NonNull<GcBox<T>> {
-        // retrieve metadata and construct pointer
-        let metadata = unsafe { self.ptr.header().metadata() };
-        let ptr_meta = metadata.try_into()
-            .ok().expect("invalid pointer metadata");
-        
-        let ptr = ptr::from_raw_parts_mut::<GcBox<T>>(
-            self.ptr.as_ptr(), ptr_meta
-        );
-        unsafe { NonNull::new_unchecked(ptr) }
-    }
-    
     #[inline]
     fn inner(&self) -> &GcBox<T> {
         // must not deref during sweep. This should only be possible if called inside a Drop impl
         debug_assert!(deref_safe());
-        unsafe { self.inner_ptr().as_ref() }
+        unsafe { self.ptr.to_gcbox_ptr().as_ref() }
     }
     
     #[inline]
     fn inner_mut(&mut self) -> &mut GcBox<T> {
         debug_assert!(deref_safe());
-        unsafe { self.inner_ptr().as_mut() }
+        unsafe { self.ptr.to_gcbox_ptr().as_mut() }
     }
     
     /// Create a weak reference from this GC handle
     pub fn weakref(&self) -> GcWeak<T> {
-        let weak_ptr = GcBox::get_or_make_weak(self.inner_ptr());
+        let weak_ptr = GcBox::get_or_make_weak(self.ptr.to_gcbox_ptr());
         GcWeak::new(Gc::from_raw(weak_ptr))
     }
     
@@ -168,12 +156,9 @@ impl<T> Clone for Gc<T> where T: GcTrace + ?Sized {
 
 impl<T> Copy for Gc<T> where T: GcTrace + ?Sized { }
 
-impl<T> Hash for Gc<T> where 
-    T: GcTrace + ?Sized,
-    PtrMetadata: TryInto<<GcBox<T> as Pointee>::Metadata>
-{
+impl<T> Hash for Gc<T> where T: GcTrace + ?Sized {
     fn hash<H>(&self, state: &mut H) where H: Hasher {
-        <NonNull<GcBox<T>> as Hash>::hash(&self.inner_ptr(), state)
+        self.ptr.hash(state)
     }
 }
 

@@ -102,7 +102,7 @@ impl GcState {
             log::debug!("{:#X} allocate {} bytes", gcbox.as_ptr() as *const () as usize, size);
             
             gcbox.as_mut().header_mut().set_next(self.boxes_start.take());
-            self.boxes_start = Some(GcBoxPtr::new(gcbox));
+            self.boxes_start = Some(gcbox.into());
             self.stats.allocated += size;
             self.stats.box_count += 1;
         }

@@ -25,17 +25,18 @@ use crate::runtime::gc::ptrmeta::PtrMetadata;
 /// - Getting the "next" allocation (for use as an intrusive list).
 /// - Getting the DST metadata (to support the [`Gc<T>`] thin pointer representation).
 ///
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash)]
 pub(super) struct GcBoxPtr {
     ptr: NonNull<GcBoxHeader>,
 }
 
-impl GcBoxPtr {
-    #[inline]
-    pub(super) fn new<T>(gcbox: NonNull<GcBox<T>>) -> Self where T: GcTrace + ?Sized {
+impl<T> From<NonNull<GcBox<T>>> for GcBoxPtr where T: GcTrace + ?Sized {
+    fn from(gcbox: NonNull<GcBox<T>>) -> Self {
         Self { ptr: gcbox.cast() }
     }
-    
+}
+
+impl GcBoxPtr {
     #[inline]
     pub(super) unsafe fn header(&self) -> &GcBoxHeader {
         self.ptr.as_ref()
@@ -47,8 +48,23 @@ impl GcBoxPtr {
     }
     
     #[inline]
-    pub(super) fn as_ptr<T>(&self) -> *mut T {
-        self.ptr.as_ptr() as *mut T
+    pub(super) fn as_ptr(&self) -> *mut GcBoxHeader {
+        self.ptr.as_ptr()
+    }
+    
+    pub(super) fn to_gcbox_ptr<T>(self) -> NonNull<GcBox<T>> where 
+        T: GcTrace + ?Sized,
+        PtrMetadata: TryInto<<GcBox<T> as Pointee>::Metadata>
+    {
+        // retrieve metadata and construct pointer
+        let metadata = unsafe { self.header().metadata() };
+        let ptr_meta = metadata.try_into()
+            .ok().expect("invalid pointer metadata");
+        
+        let ptr = ptr::from_raw_parts_mut::<GcBox<T>>(
+            self.as_ptr() as *mut (), ptr_meta
+        );
+        unsafe { NonNull::new_unchecked(ptr) }
     }
 }
 
@@ -191,8 +207,8 @@ impl<T> GcBox<T> where
         let size = layout.size() + data.size_hint();
         let ptr_meta = ptr::metadata(&data); // should just be (), but better to be safe
         let destructor = |ptr: GcBoxPtr| unsafe {
-            log::debug!("{:#X} run sized destructor", ptr.as_ptr::<()>() as usize);
-            ptr::drop_in_place::<GcBox<T>>(ptr.as_ptr())
+            log::debug!("{:#X} run sized destructor", ptr.as_ptr() as usize);
+            ptr::drop_in_place::<GcBox<T>>(ptr.as_ptr() as *mut GcBox<T>)
         };
         
         let header = GcBoxHeader::new(
@@ -245,8 +261,10 @@ impl<T> GcBox<T> where
         
         // initialize the GcBox
         let destructor = move |ptr: GcBoxPtr| unsafe {
-            log::debug!("{:#X} run unsized destructor", ptr.as_ptr::<()>() as usize);
-            let ptr = ptr::from_raw_parts_mut::<GcBox<T>>(ptr.as_ptr(), ptr_meta);
+            log::debug!("{:#X} run unsized destructor", ptr.as_ptr() as usize);
+            let ptr = ptr::from_raw_parts_mut::<GcBox<T>>(
+                ptr.as_ptr() as *mut (), ptr_meta
+            );
             ptr::drop_in_place(ptr);
         };
         
@@ -276,7 +294,7 @@ impl<T> GcBox<T> where
 
 impl<T> GcBox<T> where T: GcTrace + ?Sized {
     pub(super) unsafe fn free(self_ptr: NonNull<Self>) -> Option<GcBoxPtr> {
-        GcBoxPtr::new(self_ptr).free()
+        GcBoxPtr::from(self_ptr).free()
     }
 }
 
