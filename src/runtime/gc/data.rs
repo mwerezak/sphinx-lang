@@ -3,7 +3,7 @@ use core::fmt;
 use core::mem;
 use core::cell::{Cell, RefCell};
 use core::alloc::Layout;
-use core::ptr::{self, NonNull, Pointee};
+use core::ptr::{self, NonNull, Pointee, DynMetadata};
 use std::alloc::{self, alloc, dealloc};
 
 
@@ -100,16 +100,83 @@ impl GcBoxPtr {
     }
 }
 
+use crate::runtime::types::UserData;
+
+/// Because `GcBoxHeader` must not be generic the set of allowed 
+/// pointer metadata is closed and defined by this enum.
+#[derive(Clone, Copy)]
+pub enum PtrMetadata {
+    None,
+    Size(usize),
+    UserData(DynMetadata<dyn UserData>)
+}
+
+impl From<()> for PtrMetadata {
+    fn from(_: ()) -> Self {
+        Self::None
+    }
+}
+
+impl TryInto<()> for PtrMetadata {
+    type Error = ();
+    fn try_into(self) -> Result<(), Self::Error> { Ok(()) }
+}
+
+impl From<usize> for PtrMetadata {
+    fn from(size: usize) -> Self {
+        Self::Size(size)
+    }
+}
+
+impl TryInto<usize> for PtrMetadata {
+    type Error = ();
+    fn try_into(self) -> Result<usize, Self::Error> {
+        match self {
+            Self::Size(size) => Ok(size),
+            _ => Err(()),
+        }
+    }
+}
+
+impl From<DynMetadata<dyn UserData>> for PtrMetadata {
+    fn from(meta: DynMetadata<dyn UserData>) -> Self {
+        Self::UserData(meta)
+    }
+}
+
+impl TryInto<DynMetadata<dyn UserData>> for PtrMetadata {
+    type Error = ();
+    fn try_into(self) -> Result<DynMetadata<dyn UserData>, Self::Error> {
+        match self {
+            Self::UserData(meta) => Ok(meta),
+            _ => Err(()),
+        }
+    }
+}
+
+
 pub(super) struct GcBoxHeader {
     next: Option<GcBoxPtr>,
     marked: bool,
     size: usize,
     layout: Layout,
+    metadata: PtrMetadata,
     weak: Option<NonNull<GcBox<dyn WeakCell>>>,
     destructor: Option<Box<dyn Fn(GcBoxPtr)>>,
 }
 
 impl GcBoxHeader {
+    fn new(size: usize, layout: Layout, metadata: PtrMetadata, destructor: Box<dyn Fn(GcBoxPtr)>) -> Self {
+        Self {
+            next: None,
+            marked: false,
+            size, layout,
+            metadata,
+            weak: None,
+            destructor: Some(destructor),
+        }
+    }
+    
     #[inline]
     pub(super) fn next(&self) -> Option<GcBoxPtr> {
         self.next
@@ -123,6 +190,11 @@ impl GcBoxHeader {
     #[inline]
     pub(super) fn size(&self) -> usize {
         self.size
+    }
+    
+    #[inline]
+    pub(super) fn metadata(&self) -> PtrMetadata {
+        self.metadata
     }
     
     #[inline]
@@ -181,7 +253,10 @@ pub struct GcBox<T> where T: GcTrace + ?Sized + 'static {
 }
 
 // constructor for sized types
-impl<T> GcBox<T> where T: GcTrace {
+impl<T> GcBox<T> where 
+    T: GcTrace + Pointee,
+    T::Metadata: Into<PtrMetadata>,
+{
     pub(super) fn new(data: T) -> NonNull<GcBox<T>> {
         if mem::size_of::<T>() == 0 {
             panic!("gc alloc zero-sized type")
@@ -189,28 +264,28 @@ impl<T> GcBox<T> where T: GcTrace {
         
         let layout = Layout::new::<GcBox<T>>();
         let size = layout.size() + data.size_hint();
+        let ptr_meta = ptr::metadata(&data); // should just be (), but better to be safe
         let destructor = |ptr: GcBoxPtr| unsafe {
             log::debug!("{:#X} run sized destructor", ptr.as_ptr::<()>() as usize);
             ptr::drop_in_place::<GcBox<T>>(ptr.as_ptr())
         };
         
-        let gcbox = Box::new(GcBox {
-            header: GcBoxHeader {
-                next: None,
-                marked: false,
-                size, layout,
-                weak: None,
-                destructor: Some(Box::new(destructor)),
-            },
-            data,
-        });
+        let header = GcBoxHeader::new(
+            size,
+            layout,
+            ptr_meta.into(),
+            Box::new(destructor)
+        );
+        
+        let gcbox = Box::new(GcBox { header, data });
         
         unsafe { NonNull::new_unchecked(Box::into_raw(gcbox)) }
     }
 }
 
 impl<T> GcBox<T> where 
-    T: GcTrace + ?Sized + Pointee + 'static, 
+    T: GcTrace + ?Sized + Pointee + 'static,
+    T::Metadata: Into<PtrMetadata>,
     GcBox<T>: Pointee<Metadata = T::Metadata> 
 {
     pub(super) fn from_box(data: Box<T>) -> NonNull<GcBox<T>> {
@@ -250,14 +325,12 @@ impl<T> GcBox<T> where
             ptr::drop_in_place(ptr);
         };
         
-        let header = GcBoxHeader {
-            next: None,
-            marked: false,
-            size: layout.size() + size_hint,
-            layout,
-            weak: None,
-            destructor: Some(Box::new(destructor)),
-        };
+        let header = GcBoxHeader::new(
+            layout.size() + size_hint, 
+            layout, 
+            ptr_meta.into(),
+            Box::new(destructor)
+        );
         
         unsafe {
             ptr::write(&mut (*ptr).header, header);

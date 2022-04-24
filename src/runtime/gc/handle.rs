@@ -7,12 +7,12 @@ use core::marker::PhantomData;
 use std::rc::Rc;
 
 use crate::runtime::gc::{GC_STATE, deref_safe};
-use crate::runtime::gc::data::{GcBox, GcTrace};
+use crate::runtime::gc::data::{GcBox, GcBoxPtr, GcTrace, PtrMetadata};
 use crate::runtime::gc::weak::GcWeakCell;
 
 
 pub struct Gc<T> where T: GcTrace + ?Sized + 'static {
-    ptr: NonNull<GcBox<T>>,
+    ptr: GcBoxPtr,
     _marker: PhantomData<Rc<GcBox<T>>>,
 }
 
@@ -30,6 +30,7 @@ impl<T: GcTrace> Gc<T> {
 
 impl<T> Gc<T> where 
     T: GcTrace + ?Sized + Pointee, 
+    T::Metadata: Into<PtrMetadata>,
     GcBox<T>: Pointee<Metadata = T::Metadata> 
 {
     pub fn from_box(data: Box<T>) -> Self {
@@ -44,31 +45,11 @@ impl<T> Gc<T> where
 }
 
 impl<T> Gc<T> where T: GcTrace + ?Sized {
-    
     pub(super) fn from_raw(ptr: NonNull<GcBox<T>>) -> Self {
-        Self { ptr, _marker: PhantomData }
-    }
-    
-    #[inline]
-    pub(super) fn inner(&self) -> &GcBox<T> {
-        // must not deref during sweep. This should only be possible if called inside a Drop impl
-        debug_assert!(deref_safe());
-        unsafe { self.ptr.as_ref() }
-    }
-    
-    fn inner_mut(&mut self) -> &mut GcBox<T> {
-        debug_assert!(deref_safe());
-        unsafe { self.ptr.as_mut() }
-    }
-    
-    pub fn mark_trace(mut self) {
-        self.inner_mut().mark_trace()
-    }
-    
-    /// Create a weak reference from this GC handle
-    pub fn weakref(&self) -> GcWeak<T> {
-        let weak_ptr = GcBox::get_or_make_weak(self.ptr);
-        GcWeak::new(Gc::from_raw(weak_ptr))
+        Self { 
+            ptr: GcBoxPtr::new(ptr),
+            _marker: PhantomData,
+        }
     }
     
     pub fn ptr_eq<U>(self_gc: &Gc<T>, other_gc: &Gc<U>) -> bool where U: GcTrace + ?Sized {
@@ -83,7 +64,46 @@ impl<T> Gc<T> where T: GcTrace + ?Sized {
     pub fn as_id(self_gc: &Gc<T>) -> usize {
         self_gc.ptr.as_ptr() as *const () as usize
     }
+}
 
+impl<T> Gc<T> where 
+    T: GcTrace + ?Sized, 
+    PtrMetadata: TryInto<<GcBox<T> as Pointee>::Metadata>
+{
+    fn inner_ptr(&self) -> NonNull<GcBox<T>> {
+        // retrieve metadata and construct pointer
+        let metadata = unsafe { self.ptr.header().metadata() };
+        let ptr_meta = metadata.try_into()
+            .ok().expect("invalid pointer metadata");
+        
+        let ptr = ptr::from_raw_parts_mut::<GcBox<T>>(
+            self.ptr.as_ptr(), ptr_meta
+        );
+        unsafe { NonNull::new_unchecked(ptr) }
+    }
+    
+    #[inline]
+    fn inner(&self) -> &GcBox<T> {
+        // must not deref during sweep. This should only be possible if called inside a Drop impl
+        debug_assert!(deref_safe());
+        unsafe { self.inner_ptr().as_ref() }
+    }
+    
+    #[inline]
+    fn inner_mut(&mut self) -> &mut GcBox<T> {
+        debug_assert!(deref_safe());
+        unsafe { self.inner_ptr().as_mut() }
+    }
+    
+    /// Create a weak reference from this GC handle
+    pub fn weakref(&self) -> GcWeak<T> {
+        let weak_ptr = GcBox::get_or_make_weak(self.inner_ptr());
+        GcWeak::new(Gc::from_raw(weak_ptr))
+    }
+    
+    pub fn mark_trace(mut self) {
+        self.inner_mut().mark_trace()
+    }
 }
 
 impl<T> From<Gc<T>> for Gc<dyn GcTrace> where T: GcTrace {
@@ -95,19 +115,28 @@ impl<T> From<Gc<T>> for Gc<dyn GcTrace> where T: GcTrace {
     }
 }
 
-impl<T> AsRef<T> for Gc<T> where T: GcTrace + ?Sized {
+impl<T> AsRef<T> for Gc<T> where 
+    T: GcTrace + ?Sized,
+    PtrMetadata: TryInto<<GcBox<T> as Pointee>::Metadata>
+{
     fn as_ref(&self) -> &T {
         self.deref()
     }
 }
 
-impl<T> Borrow<T> for Gc<T> where T: GcTrace + ?Sized {
+impl<T> Borrow<T> for Gc<T> where 
+    T: GcTrace + ?Sized,
+    PtrMetadata: TryInto<<GcBox<T> as Pointee>::Metadata>
+{
     fn borrow(&self) -> &T {
         self.deref()
     }
 }
 
-impl<T> Deref for Gc<T> where T: GcTrace + ?Sized {
+impl<T> Deref for Gc<T> where 
+    T: GcTrace + ?Sized,
+    PtrMetadata: TryInto<<GcBox<T> as Pointee>::Metadata>
+{
     type Target = T;
     
     #[inline]
@@ -127,9 +156,12 @@ impl<T> Clone for Gc<T> where T: GcTrace + ?Sized {
 
 impl<T> Copy for Gc<T> where T: GcTrace + ?Sized { }
 
-impl<T> Hash for Gc<T> where T: GcTrace {
+impl<T> Hash for Gc<T> where 
+    T: GcTrace + ?Sized,
+    PtrMetadata: TryInto<<GcBox<T> as Pointee>::Metadata>
+{
     fn hash<H>(&self, state: &mut H) where H: Hasher {
-        <NonNull<GcBox<T>> as Hash>::hash(&self.ptr, state)
+        <NonNull<GcBox<T>> as Hash>::hash(&self.inner_ptr(), state)
     }
 }
 

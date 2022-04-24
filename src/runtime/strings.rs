@@ -12,7 +12,7 @@ pub use buffer::StrBuffer;
 
 use intern::StringTable;
 
-pub type InlineStr = StrBuffer<22>;
+pub type InlineStr = StrBuffer<14>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum StringValue {

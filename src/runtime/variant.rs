@@ -9,7 +9,7 @@ use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
 #[cfg(target_arch = "x86_64")]
-assert_eq_size!(Variant, [u8; 24]);
+assert_eq_size!(Variant, [u8; 16]);
 
 // Fundamental data value type
 #[derive(Debug, Clone, Copy)]

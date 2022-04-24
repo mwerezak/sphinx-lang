@@ -20,11 +20,11 @@ I have an internal type system built around a `MetaObject` trait which makes it 
 
 Different representations of string data. Short strings are "inlined" on the stack when possible (inspired by flexstr). All strings that are used as identifiers are interned. Only strings >40 bytes long are allocated using the GC. The bytecode compiler converts local variable names into indexes into the value stack, so strings are not used at all when referencing local variables.
 
-The Sphinx language uses a simple Mark-Trace GC inspired by `rust-gc`. The *runtime* itself does not use any GC. Since we are only GC'ing script data, a lot of the challenges that would be involved in writing a GC for general Rust code are avoided (that for example, `rust-gc` has to deal with). In the future I would like to support incremental GC and *maybe* generational GC as well, but the current implementation is simple and works pretty well.
+The Sphinx language uses a simple Mark-Trace GC inspired by `rust-gc`. The *runtime* itself does not use any GC. Since we are only GC'ing script data, a lot of the challenges that would be involved in writing a GC for general Rust code are avoided (that for example, `rust-gc` has to deal with).
 
-The GC also supports allocating dynamically sized types without double-indirection (i.e. the `Gc<T>` smart pointer used for GCed data points directly to the DST, not a Box). I am hoping to implement storing pointer metadata in the GC allocation header so that a `Gc<T>` for an unsized `T` is also a thin pointer.
+The GC also supports allocating dynamically sized types without double-indirection (i.e. the `Gc<T>` smart pointer used for GCed data points directly to the DST, not a Box). It also uses *thin pointers* to refer to the dynamically sized allocation, which keeps the size of each `Gc<T>` down to a single `usize`. The GC also supports weak references!
 
-The GC also now supports weak references!
+In the future I would like to support incremental GC and *maybe* generational GC as well, but the current implementation is simple and works pretty well.
 
 # Safe Rust FFI
 
