@@ -63,19 +63,21 @@ pub struct Declaration {
     lvalue-list ::= lvalue-expression ( "," lvalue-expression )* ;
 */
 
+pub struct IntoLValueError;
+
 impl TryFrom<Atom> for LValue {
-    type Error = ();
+    type Error = IntoLValueError;
     fn try_from(atom: Atom) -> Result<Self, Self::Error> {
         match atom {
             Atom::Identifier(name) => Ok(LValue::Identifier(name)),
             Atom::Group(expr) => (*expr).try_into(),
-            _ => Err(())
+            _ => Err(IntoLValueError)
         }
     }
 }
 
 impl TryFrom<Primary> for LValue {
-    type Error = ();
+    type Error = IntoLValueError;
     fn try_from(primary: Primary) -> Result<Self, Self::Error> {
         // remove the last item so that primary will eval to the reciever
         let (atom, mut path) = primary.take();
@@ -87,7 +89,7 @@ impl TryFrom<Primary> for LValue {
                 => LValue::Attribute(Box::new(AttributeTarget { receiver, name })),
             Some(AccessItem::Index(index)) 
                 => LValue::Index(Box::new(IndexTarget { receiver, index })),
-            _ => return Err(()),
+            _ => return Err(IntoLValueError),
         };
         
         Ok(lvalue)
@@ -95,7 +97,7 @@ impl TryFrom<Primary> for LValue {
 }
 
 impl TryFrom<Expr> for LValue {
-    type Error = ();
+    type Error = IntoLValueError;
     fn try_from(expr: Expr) -> Result<Self, Self::Error> {
         match expr {
             Expr::Atom(atom) => atom.try_into(),
@@ -113,7 +115,7 @@ impl TryFrom<Expr> for LValue {
                 Ok(Self::Tuple(lvalue_list.into_boxed_slice()))
             },
             
-            _ => Err(()),
+            _ => Err(IntoLValueError),
         }
     }
 }
