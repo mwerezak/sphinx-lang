@@ -140,7 +140,6 @@ impl GcState {
     unsafe fn sweep(&mut self) {
         let _guard = DropGuard::new();
         
-        //boxes_start: Option<NonNull<GcBox<dyn GcTrace>>>,
         let mut prev_box = None;
         let mut next_box = self.boxes_start;
         while let Some(mut gcbox) = next_box {
@@ -166,7 +165,7 @@ impl GcState {
 
 impl Drop for GcState {
     fn drop(&mut self) {
-        // unimplemented!()
+        unsafe { self.sweep() }
     }
 }
 
