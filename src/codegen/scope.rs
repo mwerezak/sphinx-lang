@@ -157,12 +157,12 @@ impl Upvalue {
 
 
 #[derive(Debug)]
-pub struct ScopeFrame {
+pub struct CallFrame {
     scopes: NestedScopes,
     upvalues: Vec<Upvalue>,
 }
 
-impl ScopeFrame {
+impl CallFrame {
     fn new(symbol: Option<&DebugSymbol>) -> Self {
         let mut scopes = NestedScopes::new();
         scopes.push_scope(symbol);
@@ -224,20 +224,20 @@ impl ScopeFrame {
 
 #[derive(Debug)]
 pub struct ScopeTracker {
-    scopes: NestedScopes,
-    frames: Vec<ScopeFrame>,
+    toplevel: NestedScopes,
+    frames: Vec<CallFrame>,
 }
 
 impl ScopeTracker {
     pub fn new() -> Self {
         Self {
-            scopes: NestedScopes::new(),
+            toplevel: NestedScopes::new(),
             frames: Vec::new(),
         }
     }
     
     pub fn is_global_scope(&self) -> bool {
-        self.frames.is_empty() && self.scopes.is_empty()
+        self.frames.is_empty() && self.toplevel.is_empty()
     }
     
     pub fn is_global_frame(&self) -> bool {
@@ -245,21 +245,21 @@ impl ScopeTracker {
     }
     
     pub fn push_frame(&mut self, symbol: Option<&DebugSymbol>) {
-        self.frames.push(ScopeFrame::new(symbol))
+        self.frames.push(CallFrame::new(symbol))
     }
     
-    pub fn pop_frame(&mut self) -> ScopeFrame {
+    pub fn pop_frame(&mut self) -> CallFrame {
         self.frames.pop().expect("pop empty frames")
     }
     
     fn current_scope(&self) -> &NestedScopes {
         self.frames.last()
-            .map_or(&self.scopes, |frame| frame.scopes())
+            .map_or(&self.toplevel, |frame| frame.scopes())
     }
     
     fn current_scope_mut(&mut self) -> &mut NestedScopes {
         self.frames.last_mut()
-            .map_or(&mut self.scopes, |frame| frame.scopes_mut())
+            .map_or(&mut self.toplevel, |frame| frame.scopes_mut())
     }
     
     pub fn local_scope(&self) -> Option<&Scope> {
@@ -309,7 +309,7 @@ impl ScopeTracker {
             }
             
             // check if the local name exists in the enclosing scope
-            let enclosing = enclosing_frame.map_or(&mut self.scopes, |frame| frame.scopes_mut());
+            let enclosing = enclosing_frame.map_or(&mut self.toplevel, |frame| frame.scopes_mut());
             if let Some(local) = enclosing.iter_mut().find_map(|scope| scope.find_local_mut(name)) {
                 return Ok(Some(current_frame.create_upval_for_local(local)?.index));
             }
@@ -331,7 +331,7 @@ impl ScopeTracker {
     }
     
     // helper to get a frame by index and its enclosing frame
-    fn get_frames_mut(frames: &mut [ScopeFrame], frame_idx: usize) -> (&mut ScopeFrame, Option<&mut ScopeFrame>) {
+    fn get_frames_mut(frames: &mut [CallFrame], frame_idx: usize) -> (&mut CallFrame, Option<&mut CallFrame>) {
         let (frames, _) = frames.split_at_mut(frame_idx + 1);
         let (current_frame, frames) = frames.split_last_mut().unwrap();
         let enclosing_frame = frames.split_last_mut().map(|(last, _)| last);

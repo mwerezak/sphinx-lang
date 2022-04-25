@@ -107,6 +107,14 @@ const fn get_jump_opcode(jump: Jump, offset: JumpOffset) -> OpCode {
     }
 }
 
+// represents the site of a dummy jump instruction that will be patched with a target later
+struct JumpSite {
+    jump: Jump,
+    offset: usize,
+    width: usize,
+}
+
+
 
 /// Output container
 #[derive(Debug)]
@@ -355,15 +363,31 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn patch_jump_instr(&mut self, jump: Jump, jump_site: usize, dummy_width: usize, target: usize) -> CompileResult<()> {
+    fn emit_dummy_jump(&mut self, symbol: Option<&DebugSymbol>, jump: Jump) -> JumpSite {
+        let offset = self.current_offset();
+        let jump_site = JumpSite {
+            jump, offset,
+            width: jump.dummy_width(),
+        };
+        
+        self.emit_dummy_instr(symbol, jump_site.width);
+        
+        jump_site
+    }
+    
+    fn patch_jump_instr(&mut self, jump: &JumpSite, target: usize) -> CompileResult<()> {
+        let jump_type = jump.jump;
+        let jump_site = jump.offset;
+        let dummy_width = jump.width;
+        
         let mut jump_offset = Self::calc_jump_offset(jump_site + dummy_width, target)?;
-        let mut jump_opcode = get_jump_opcode(jump, jump_offset);
+        let mut jump_opcode = get_jump_opcode(jump_type, jump_offset);
         
         if dummy_width != jump_opcode.instr_len() {
             // need to recalculate offset with the new width
             let new_width = jump_opcode.instr_len();
             let new_offset = Self::calc_jump_offset(jump_site + new_width, target)?;
-            let new_opcode = get_jump_opcode(jump, new_offset);
+            let new_opcode = get_jump_opcode(jump_type, new_offset);
             
             // if we *still* don't have the right width, just abort
             if new_width != new_opcode.instr_len() {
@@ -542,8 +566,7 @@ impl CodeGenerator<'_> {
         // first iteration conditional jump
         self.compile_expr(symbol, condition)?;
         
-        let end_jump_site = self.current_offset();
-        self.emit_dummy_instr(symbol, Jump::PopIfFalse.dummy_width());
+        let end_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
         
         let loop_target = self.current_offset();
         
@@ -555,8 +578,7 @@ impl CodeGenerator<'_> {
         self.compile_expr(symbol, condition)?;
         self.emit_jump_instr(symbol, Jump::PopIfTrue, loop_target)?;
         
-        let end_jump_target = self.current_offset();
-        self.patch_jump_instr(Jump::PopIfFalse, end_jump_site, Jump::PopIfFalse.dummy_width(), end_jump_target)?;
+        self.patch_jump_instr(&end_jump_site, self.current_offset())?;
         
         Ok(())
     }
@@ -989,11 +1011,11 @@ impl CodeGenerator<'_> {
             
             self.compile_expr(symbol, branch.condition())?;
             
-            let branch_jump_site = self.current_offset();
             let branch_jump = 
                 if is_final_branch { Jump::IfFalse } // keep condition value
                 else { Jump::PopIfFalse };
-            self.emit_dummy_instr(symbol, branch_jump.dummy_width());
+            
+            let branch_jump_site = self.emit_dummy_jump(symbol, branch_jump);
             
             self.emit_begin_scope(symbol);
             self.compile_expr_block(symbol, branch.suite())?;
@@ -1001,14 +1023,12 @@ impl CodeGenerator<'_> {
             
             // site for the jump to the end of if-expression
             if !is_final_branch {
-                let end_offset = self.current_offset();
-                end_jump_sites.push(end_offset);
-                self.emit_dummy_instr(symbol, Jump::Uncond.dummy_width());
+                let jump_site = self.emit_dummy_jump(symbol, Jump::Uncond);
+                end_jump_sites.push(jump_site);
             }
             
             // target for the jump from the conditional of the now compiled branch
-            let branch_target = self.current_offset();
-            self.patch_jump_instr(branch_jump, branch_jump_site, branch_jump.dummy_width(), branch_target)?;
+            self.patch_jump_instr(&branch_jump_site, self.current_offset())?;
         }
         
         // else clause
@@ -1023,7 +1043,7 @@ impl CodeGenerator<'_> {
         // patch all of the end jump sites
         let end_target = self.current_offset();
         for jump_site in end_jump_sites.iter() {
-            self.patch_jump_instr(Jump::Uncond, *jump_site, Jump::Uncond.dummy_width(), end_target)?;
+            self.patch_jump_instr(jump_site, end_target)?;
         }
         
         Ok(())
@@ -1133,7 +1153,6 @@ impl CodeGenerator<'_> {
         
         let mut jump_sites = Vec::new();
         let mut jump_targets = Vec::new();
-        let mut jump_types = Vec::new();
         
         // depending on the number of arguments, jump into the default argument sequence
         let required_count = u8::try_from(signature.required.len())
@@ -1164,16 +1183,13 @@ impl CodeGenerator<'_> {
             self.emit_instr_byte(None, OpCode::UInt8, count);
             self.emit_instr(None, OpCode::EQ);
             
-            jump_sites.insert(count.into(), self.current_offset());
-            jump_types.insert(count.into(), Jump::PopIfTrue);
-            self.emit_dummy_instr(None, Jump::PopIfTrue.dummy_width());
-            
+            let jump_site = self.emit_dummy_jump(None, Jump::PopIfTrue);
+            jump_sites.insert(count.into(), jump_site);
         }
         
         // if we get here, jump unconditionally to the end
-        jump_sites.insert(default_count.into(), self.current_offset());
-        jump_types.insert(default_count.into(), Jump::Uncond);
-        self.emit_dummy_instr(None, Jump::Uncond.dummy_width());
+        let jump_site = self.emit_dummy_jump(None, Jump::Uncond);
+        jump_sites.insert(default_count.into(), jump_site);
         
         // generate default arguments
         for (idx, param) in signature.default.iter().enumerate() {
@@ -1189,8 +1205,9 @@ impl CodeGenerator<'_> {
         self.emit_instr(None, OpCode::Pop);  // drop "defaults passed"
         
         // patch all jumps
-        for idx in 0..=default_count.into() {
-            self.patch_jump_instr(jump_types[idx], jump_sites[idx], jump_types[idx].dummy_width(), jump_targets[idx])?;
+        debug_assert!(jump_sites.len() == jump_targets.len());
+        for (jump_site, jump_target) in jump_sites.iter().zip(jump_targets.into_iter()) {
+            self.patch_jump_instr(jump_site, jump_target)?;
         }
         
         Ok(())
@@ -1214,23 +1231,19 @@ impl CodeGenerator<'_> {
         self.emit_instr_byte(None, OpCode::UInt8, 0);
         self.emit_instr(None, OpCode::GT);
         
-        let tuple_jump_site = self.current_offset();
-        self.emit_dummy_instr(None, Jump::PopIfTrue.dummy_width());
+        let tuple_jump_site = self.emit_dummy_jump(None, Jump::PopIfTrue);
         
         // if we get here then the variadic arg is empty
         self.emit_instr(None, OpCode::Pop);
         self.emit_instr(None, OpCode::Empty);
         
-        let end_jump_site = self.current_offset();
-        self.emit_dummy_instr(None, Jump::Uncond.dummy_width());
+        let end_jump_site = self.emit_dummy_jump(None, Jump::Uncond);
         
-        let tuple_jump_target = self.current_offset();
-        self.patch_jump_instr(Jump::PopIfTrue, tuple_jump_site, Jump::PopIfTrue.dummy_width(), tuple_jump_target)?;
+        self.patch_jump_instr(&tuple_jump_site, self.current_offset())?;
         self.emit_instr(None, OpCode::TupleN);
         self.emit_instr(None, OpCode::InsertLocal);
         
-        let end_jump_target = self.current_offset();
-        self.patch_jump_instr(Jump::Uncond, end_jump_site, Jump::Uncond.dummy_width(), end_jump_target)?;
+        self.patch_jump_instr(&end_jump_site, self.current_offset())?;
         
         Ok(())
     }
