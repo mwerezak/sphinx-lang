@@ -2,6 +2,7 @@ use core::fmt;
 use std::error::Error;
 
 use crate::utils;
+use crate::parser::stmt::Label;
 use crate::debug::{DebugSymbol, SourceError};
 
 
@@ -13,6 +14,8 @@ pub enum ErrorKind {
     CantAssignNonLocal,
     TupleLenMismatch,
     CantUpdateAssignTuple,
+    CantResolveBreak(Option<Label>),
+    InvalidBreakWithValue,
     InternalLimit(&'static str),
 }
 
@@ -63,6 +66,13 @@ impl fmt::Display for CompileError {
             ErrorKind::CantAssignNonLocal => "can't assign to a non-local variable without the \"nonlocal\" keyword",
             ErrorKind::TupleLenMismatch => "can't assign tuples of different lengths",
             ErrorKind::CantUpdateAssignTuple => "can't use update-assigment when assigning to a tuple",
+            
+            ErrorKind::CantResolveBreak(label) => 
+                if label.is_some() { "can't find loop or block with matching label for \"break\"" }
+                else { "\"break\" outside of loop or block" },
+            
+            ErrorKind::InvalidBreakWithValue => "\"break\" with value outside of block expression",
+            
             ErrorKind::InternalLimit(message) => message,
         };
         

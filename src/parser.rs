@@ -357,9 +357,9 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                     ctx.set_end(&self.advance().unwrap());
                     
                     let name = match control {
-                        ControlFlow::Continue(..) => "continue",
-                        ControlFlow::Break(..) => "break",
-                        ControlFlow::Return(..) => "return",
+                        ControlFlow::Continue {..} => "continue",
+                        ControlFlow::Break {..} => "break",
+                        ControlFlow::Return {..} => "return",
                     };
                     
                     let message = format!("\"{}\" must be the last statement in a block", name);
@@ -412,7 +412,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                 
                 let label = self.try_parse_label(ctx)?;
                 
-                ControlFlow::Continue(label, ctx.frame().as_debug_symbol())
+                ControlFlow::Continue {
+                    label, 
+                    symbol: ctx.frame().as_debug_symbol()
+                }
             },
             
             Token::Break => {
@@ -426,7 +429,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                         Some(Box::new(self.parse_expr_variant(ctx)?))
                     } else { None };
                 
-                ControlFlow::Break(label, expr, ctx.frame().as_debug_symbol())
+                ControlFlow::Break {
+                    label, expr, 
+                    symbol: ctx.frame().as_debug_symbol()
+                }
             },
             
             Token::Return => {
@@ -438,7 +444,10 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
                         Some(Box::new(self.parse_expr_variant(ctx)?))
                     } else { None };
                 
-                ControlFlow::Return(expr, ctx.frame().as_debug_symbol())
+                ControlFlow::Return {
+                    expr, 
+                    symbol: ctx.frame().as_debug_symbol()
+                }
             }
             
             _ => return Ok(None),

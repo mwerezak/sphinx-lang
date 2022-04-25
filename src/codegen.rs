@@ -26,7 +26,7 @@ pub use consts::{ConstID, Constant};
 pub use funproto::{FunctionID, FunctionProto, UpvalueTarget};
 pub use errors::{CompileResult, CompileError, ErrorKind};
 
-use scope::{ScopeTracker, LocalName};
+use scope::{ScopeTracker, ScopeTag, Scope, LocalName, InsertLocal, ControlFlowTarget};
 use chunk::{ChunkBuilder, ChunkInfo, ChunkBuf};
 use funproto::{UnloadedFunction, UnloadedSignature, UnloadedParam};
 
@@ -74,7 +74,7 @@ enum JumpOffset {
     Long(i32),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Jump {
     Uncond,
     IfFalse,
@@ -108,12 +108,12 @@ const fn get_jump_opcode(jump: Jump, offset: JumpOffset) -> OpCode {
 }
 
 // represents the site of a dummy jump instruction that will be patched with a target later
+#[derive(Debug)]
 struct JumpSite {
     jump: Jump,
     offset: usize,
     width: usize,
 }
-
 
 
 /// Output container
@@ -127,7 +127,7 @@ pub struct CompiledProgram {
 // Code Generator
 pub struct Compiler {
     builder: ChunkBuilder,
-    scope: ScopeTracker,
+    scopes: ScopeTracker,
     errors: Vec<CompileError>,
     symbols: ChunkSymbols,
 }
@@ -140,7 +140,7 @@ impl Compiler {
         
         Self {
             builder: ChunkBuilder::with_strings(strings),
-            scope: ScopeTracker::new(),
+            scopes: ScopeTracker::new(),
             errors: Vec::new(),
             symbols,
         }
@@ -188,7 +188,6 @@ impl Compiler {
             Err(self.errors)
         }
     }
-
 }
 
 struct CodeGenerator<'c> {
@@ -218,8 +217,8 @@ impl CodeGenerator<'_> {
     fn builder(&self) -> &ChunkBuilder { &self.compiler.builder }
     fn builder_mut(&mut self) -> &mut ChunkBuilder { &mut self.compiler.builder }
     
-    fn scope(&self) -> &ScopeTracker { &self.compiler.scope }
-    fn scope_mut(&mut self) -> &mut ScopeTracker { &mut self.compiler.scope }
+    fn scopes(&self) -> &ScopeTracker { &self.compiler.scopes }
+    fn scopes_mut(&mut self) -> &mut ScopeTracker { &mut self.compiler.scopes }
     
     fn symbols(&self) -> &ChunkSymbols { &self.compiler.symbols }
     fn symbols_mut(&mut self) -> &mut ChunkSymbols { &mut self.compiler.symbols }
@@ -249,9 +248,11 @@ impl CodeGenerator<'_> {
         let chunk_id = self.compiler.new_chunk(metadata)?;
         Ok(self.compiler.get_chunk(chunk_id))
     }
-    
-    ///////// Emitting Bytecode /////////
-    
+}
+
+
+///////// Emitting Bytecode /////////
+impl CodeGenerator<'_> {
     fn emit_instr(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode) {
         debug_assert!(opcode.instr_len() == 1);
         
@@ -283,9 +284,10 @@ impl CodeGenerator<'_> {
         self.chunk_mut().push_byte(opcode);
         self.chunk_mut().extend_bytes(bytes);
     }
-    
-    ///////// Patching Bytecode /////////
-    
+}
+
+///////// Patching Bytecode /////////
+impl CodeGenerator<'_> {
     fn patch_instr_data<const N: usize>(&mut self, offset: usize, opcode: OpCode, bytes: &[u8; N]) {
         debug_assert!(opcode.instr_len() == 1 + N);
         
@@ -302,9 +304,10 @@ impl CodeGenerator<'_> {
             self.chunk_mut().push_byte(OpCode::Nop);
         }
     }
-    
-    ///////// Constants /////////
-    
+}
+
+///////// Constants /////////
+impl CodeGenerator<'_> {
     fn get_or_make_const(&mut self, value: Constant) -> CompileResult<ConstID> {
         self.builder_mut().get_or_insert_const(value)
     }
@@ -331,9 +334,10 @@ impl CodeGenerator<'_> {
             self.emit_instr_data(symbol, OpCode::LoadFunction16, &fun_id.to_le_bytes());
         }
     }
-    
-    ///////// Jumps /////////
-    
+}
+
+///////// Jumps /////////
+impl CodeGenerator<'_> {
     fn emit_jump_instr(&mut self, symbol: Option<&DebugSymbol>, jump: Jump, target: usize) -> CompileResult<()> {
         let jump_site = self.current_offset();
         let guess_width = jump.dummy_width();  // guess the width of the jump instruction
@@ -422,25 +426,56 @@ impl CodeGenerator<'_> {
         
         Err(ErrorKind::InternalLimit("could not calculate jump offset").into())
     }
-    
-    ///////// Scopes /////////
-    
-    fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>) {
+}
+
+///////// Scopes /////////
+
+// container for data needed to drop a scope
+struct ScopeDrop {
+    tag: ScopeTag,
+    locals: usize,
+    close_upvals: Vec<LocalIndex>,
+}
+
+impl From<&Scope> for ScopeDrop {
+    fn from(scope: &Scope) -> Self {
+        ScopeDrop {
+            tag: scope.tag(),
+            locals: scope.locals().len(),
+            close_upvals: scope.locals().iter()
+                .filter_map(|local| if local.captured() { Some(local.index()) } else { None })
+                .collect(),
+        }
+    }
+}
+
+impl CodeGenerator<'_> {
+    fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<&Label>) {
         let chunk_id = self.chunk_id;
-        self.scope_mut().push_scope(symbol);
+        self.scopes_mut().push_scope(symbol, tag, label.copied());
     }
     
-    fn emit_end_scope(&mut self) {
-        let scope = self.scope_mut().pop_scope();
-        let symbol = scope.debug_symbol();
-        
+    fn emit_end_scope(&mut self) -> Scope {
+        let scope = self.scopes_mut().pop_scope();
+        self.emit_scope_drop(scope.debug_symbol(), &(&scope).into());
+        scope
+    }
+    
+    fn finalize_scope(&mut self, scope: &Scope, break_target: usize) -> CompileResult<()> {
+        for break_site in scope.break_sites().iter() {
+            self.patch_jump_instr(break_site, break_target)?;
+        }
+        Ok(())
+    }
+    
+    fn emit_scope_drop(&mut self, symbol: Option<&DebugSymbol>, scope: &ScopeDrop) {
         // close all upvalues
-        for local in scope.locals().iter().filter(|local| local.captured()) {
-            self.emit_close_upvalue(symbol, local.index());
+        for local_index in scope.close_upvals.iter() {
+            self.emit_close_upvalue(symbol, *local_index);
         }
         
         // discard all the locals from the stack
-        let mut discard = scope.locals().len();
+        let mut discard = scope.locals;
         while discard > u8::MAX.into() {
             self.emit_instr_byte(symbol, OpCode::DropLocals, u8::MAX);
             discard -= usize::from(u8::MAX);
@@ -453,7 +488,7 @@ impl CodeGenerator<'_> {
     
     // If the local name cannot be found, no instructions are emitted and None is returned
     fn try_emit_load_local(&mut self, symbol: Option<&DebugSymbol>, name: &LocalName) -> Option<u16> {
-        if let Some(index) = self.scope().resolve_local(name).map(|local| local.index()) {
+        if let Some(index) = self.scopes().resolve_local(name).map(|local| local.index()) {
             if let Ok(index) = u8::try_from(index) {
                 self.emit_instr_byte(symbol, OpCode::LoadLocal, index);
             } else {
@@ -467,7 +502,7 @@ impl CodeGenerator<'_> {
     }
     
     fn try_emit_load_upval(&mut self, symbol: Option<&DebugSymbol>, name: &LocalName) -> CompileResult<Option<u16>> {
-        if let Some(index) = self.scope_mut().resolve_or_create_upval(name)?.map(|upval| upval.index()) {
+        if let Some(index) = self.scopes_mut().resolve_or_create_upval(name)?.map(|upval| upval.index()) {
             if let Ok(index) = u8::try_from(index) {
                 self.emit_instr_byte(symbol, OpCode::LoadUpvalue, index);
             } else {
@@ -487,9 +522,11 @@ impl CodeGenerator<'_> {
             self.emit_instr_data(symbol, OpCode::CloseUpvalue16, &index.to_le_bytes());
         }
     }
-    
-    ///////// Statements /////////
-    
+}
+
+
+///////// Statements /////////
+impl CodeGenerator<'_> {
     fn compile_stmt_with_symbol(&mut self, stmt: &StmtMeta) -> CompileResult<()> {
         let symbol = stmt.debug_symbol();
         self.compile_stmt(Some(symbol), stmt.variant())
@@ -526,37 +563,102 @@ impl CodeGenerator<'_> {
         
         // handle control flow
         if let Some(control) = stmt_list.end_control() {
-            match control {
-                ControlFlow::Continue(label, symbol) => {
-                    unimplemented!()
-                }
-                ControlFlow::Break(label, expr, symbol) => {
-                    unimplemented!()
-                }
-                ControlFlow::Return(expr, symbol) => {
-                    let symbol = symbol.as_ref();
-                    if let Some(expr) = expr {
-                        self.compile_expr(symbol, expr)?;
-                    } else {
-                        self.emit_instr(symbol, OpCode::Nil);
-                    }
-                    self.emit_instr(symbol, OpCode::Return);
-                }
+            let result = self.compile_control_flow(control);
+            if let Some(symbol) = control.debug_symbol() {
+                result.map_err(|error| error.with_symbol(*symbol))?;
+            } else {
+                result?;
             }
         }
         
         Ok(())
     }
     
+    fn compile_control_flow(&mut self, control_flow: &ControlFlow) -> CompileResult<()> {
+        match control_flow {
+            ControlFlow::Continue { label, symbol } => {
+                unimplemented!()
+            }
+            
+            ControlFlow::Break { label, expr, symbol } => self.compile_break_control(
+                symbol.as_ref(), label.as_ref(), expr.as_deref()
+            )?,
+            
+            ControlFlow::Return { expr, symbol } => {
+                let symbol = symbol.as_ref();
+                if let Some(expr) = expr {
+                    self.compile_expr(symbol, expr)?;
+                } else {
+                    self.emit_instr(symbol, OpCode::Nil);
+                }
+                self.emit_instr(symbol, OpCode::Return);
+            }
+        }
+        Ok(())
+    }
+    
+    fn compile_break_control(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, expr: Option<&Expr>) -> CompileResult<()> {
+        // find the target scope
+        let target_depth = match self.scopes().resolve_control_flow(ControlFlowTarget::Break(label.copied())) {
+            Some(scope) => scope.depth(),
+            None => return Err(ErrorKind::CantResolveBreak(label.copied()).into()),
+        };
+        
+        // drop all scopes up to and including the target
+        let scope_drop: Vec<ScopeDrop> = self.scopes().iter_scopes()
+            .take_while(|scope| scope.depth() >= target_depth)
+            .map(ScopeDrop::from)
+            .collect();
+        
+        let (target, through_scopes) = scope_drop.split_last().unwrap();
+        for scope in through_scopes.iter() {
+            self.emit_scope_drop(symbol, scope);
+            
+            // expression blocks expect their value to be on the stack when they exit
+            // so if we break through an expression block we need to drop its value
+            if target.tag.is_expr_block() {
+                self.emit_instr(symbol, OpCode::Pop);
+            }
+        }
+        self.emit_scope_drop(symbol, target); // drop target scope
+        
+        
+        // if breaking from an expression block, emit the expression value before jumping
+        if target.tag.is_expr_block() {
+            if let Some(expr) = expr {
+                self.compile_expr(symbol, expr)?;
+            } else {
+                self.emit_instr(symbol, OpCode::Nil);
+            }
+        } else if expr.is_some() {
+            return Err(CompileError::new(ErrorKind::InvalidBreakWithValue))
+        }
+        
+        // emit jump site, register with scope
+        let break_site = self.emit_dummy_jump(symbol, Jump::Uncond);
+        
+        let target_scope = self.scopes_mut().iter_scopes_mut()
+            .find(|scope| scope.depth() == target_depth)
+            .unwrap();
+        target_scope.register_break(break_site);
+        
+        Ok(())
+        
+    }
+    
     fn compile_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, body: &StmtList) -> CompileResult<()> {
         
         let loop_target = self.current_offset();
         
-        self.emit_begin_scope(symbol);
+        self.emit_begin_scope(symbol, ScopeTag::Loop, label);
         self.compile_stmt_list(body)?;
-        self.emit_end_scope();
+        let loop_scope = self.emit_end_scope();
         
         self.emit_jump_instr(symbol, Jump::Uncond, loop_target)?;
+        
+        // finalize scope
+        let break_target = self.current_offset();
+        self.finalize_scope(&loop_scope, break_target)?;
         
         Ok(())
     }
@@ -570,9 +672,9 @@ impl CodeGenerator<'_> {
         
         let loop_target = self.current_offset();
         
-        self.emit_begin_scope(symbol);
+        self.emit_begin_scope(symbol, ScopeTag::Loop, label);
         self.compile_stmt_list(body)?;
-        self.emit_end_scope();
+        let loop_scope = self.emit_end_scope();
         
         // rest iteration conditional jump
         self.compile_expr(symbol, condition)?;
@@ -580,11 +682,16 @@ impl CodeGenerator<'_> {
         
         self.patch_jump_instr(&end_jump_site, self.current_offset())?;
         
+        // finalize scope
+        let break_target = self.current_offset();
+        self.finalize_scope(&loop_scope, break_target)?;
+        
         Ok(())
     }
-    
-    ///////// Expressions /////////
-    
+}
+
+///////// Expressions /////////
+impl CodeGenerator<'_> {
     fn compile_expr_with_symbol(&mut self, expr: &ExprMeta) -> CompileResult<()> {
         let symbol = expr.debug_symbol();
         self.compile_expr(Some(symbol), expr.variant())
@@ -779,12 +886,13 @@ impl CodeGenerator<'_> {
             BinaryOp::NE => self.emit_instr(symbol, OpCode::NE),
         }
     }
-    
-    ///////// Declarations and Assignments /////////
-    
+}
+
+///////// Declarations and Assignments /////////
+impl CodeGenerator<'_> {
     fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclarationRef) -> CompileResult<()> {
         match &decl.lhs {
-            LValue::Identifier(name) => if self.scope().is_global_scope() {
+            LValue::Identifier(name) => if self.scopes().is_global_scope() {
                 self.compile_decl_global_name(symbol, decl.decl, *name, decl.init)
             } else {
                 self.compile_decl_local_name(symbol, decl.decl, *name, decl.init)
@@ -831,8 +939,14 @@ impl CodeGenerator<'_> {
         
         self.compile_expr(symbol, init)?;  // make sure to evaluate initializer first in order for shadowing to work
         
-        self.scope_mut().insert_local(decl, LocalName::Symbol(name))?;
-        self.emit_instr(symbol, OpCode::InsertLocal);
+        match self.scopes_mut().insert_local(decl, LocalName::Symbol(name))? {
+            InsertLocal::CreateNew => 
+                self.emit_instr(symbol, OpCode::InsertLocal),
+            
+            InsertLocal::HideExisting(local_index) =>
+                self.emit_assign_local(symbol, local_index),
+        }
+        
         Ok(())
     }
     
@@ -914,12 +1028,12 @@ impl CodeGenerator<'_> {
         
         // Generate assignment
         
-        if !self.scope().is_global_scope() {
+        if !self.scopes().is_global_scope() {
             
             let local_name = LocalName::Symbol(*name);
             
             // check if the name is found in the local scope...
-            let result = self.scope().resolve_local(&local_name);
+            let result = self.scopes().resolve_local(&local_name);
             
             if let Some(local) = result.cloned() {
                 if local.decl() != DeclType::Mutable {
@@ -932,13 +1046,13 @@ impl CodeGenerator<'_> {
             }
             
             // nonlocal keyword is not required in the global frame
-            if !assign.nonlocal && !self.scope().is_global_frame() {
+            if !assign.nonlocal && !self.scopes().is_global_frame() {
                 return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
             }
             
             // check if an upvalue is found or can be created...
-            if !self.scope().is_global_frame() {
-                if let Some(upval) = self.scope_mut().resolve_or_create_upval(&local_name)? {
+            if !self.scopes().is_global_frame() {
+                if let Some(upval) = self.scopes_mut().resolve_or_create_upval(&local_name)? {
                     if upval.decl() != DeclType::Mutable {
                         return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                     }
@@ -968,18 +1082,26 @@ impl CodeGenerator<'_> {
             self.emit_instr_data(symbol, OpCode::StoreLocal16, &offset.to_le_bytes());
         }
     }
-    
-    
-    ///////// Blocks and If-Expressions /////////
-    
+}
+
+///////// Blocks and If-Expressions /////////
+impl CodeGenerator<'_> {
     fn compile_expr_block(&mut self, symbol: Option<&DebugSymbol>, suite: &ExprBlock) -> CompileResult<()> {
-        self.compile_stmt_list(suite.stmt_list())?;
+        let stmt_list = suite.stmt_list();
+        self.compile_stmt_list(stmt_list)?;
         
-        // result expression
-        if let Some(expr) = suite.result() {
-            self.compile_expr_with_symbol(expr)?;
-        } else {
-            self.emit_instr(symbol, OpCode::Nil); // implicit nil
+        /*
+            continue -> unconditional jump, no result value
+            break -> supplied by break statement
+            return -> supplied by return statement
+        */
+        if stmt_list.end_control().is_none() {
+            // result expression
+            if let Some(expr) = suite.result() {
+                self.compile_expr_with_symbol(expr)?;
+            } else {
+                self.emit_instr(symbol, OpCode::Nil); // implicit nil
+            }
         }
         
         Ok(())
@@ -987,9 +1109,13 @@ impl CodeGenerator<'_> {
     
     fn compile_block_expression(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
         
-        self.emit_begin_scope(symbol);
+        self.emit_begin_scope(symbol, ScopeTag::Block, label);
         self.compile_expr_block(symbol, suite)?;
-        self.emit_end_scope();
+        let block_scope = self.emit_end_scope();
+        
+        // finalize scope
+        let break_target = self.current_offset();
+        self.finalize_scope(&block_scope, break_target)?;
         
         Ok(())
     }
@@ -1000,7 +1126,8 @@ impl CodeGenerator<'_> {
         // track the sites where we jump to the end, so we can patch them later
         let mut end_jump_sites = Vec::new();
         
-        // if there is no else branch, the last non-else branch won't have a jump to end, and won't pop the condition 
+        // if there is no else branch, the last non-else branch won't have a jump to end, and should not pop the condition
+        // this is because if-expressions without an else clause evaluate to their condition when not entered
         let (last_branch, rest) = branches.split_last().unwrap();
         let iter_branches = rest.iter()
             .map(|branch| (false, branch))
@@ -1017,7 +1144,7 @@ impl CodeGenerator<'_> {
             
             let branch_jump_site = self.emit_dummy_jump(symbol, branch_jump);
             
-            self.emit_begin_scope(symbol);
+            self.emit_begin_scope(symbol, ScopeTag::Branch, None);
             self.compile_expr_block(symbol, branch.suite())?;
             self.emit_end_scope();
             
@@ -1034,7 +1161,7 @@ impl CodeGenerator<'_> {
         // else clause
         if let Some(suite) = else_clause {
             
-            self.emit_begin_scope(symbol);
+            self.emit_begin_scope(symbol, ScopeTag::Branch, None);
             self.compile_expr_block(symbol, suite)?;
             self.emit_end_scope();
             
@@ -1048,10 +1175,10 @@ impl CodeGenerator<'_> {
         
         Ok(())
     }
-    
-    
-    ///////// Function Definitions /////////
-    
+}
+
+///////// Function Definitions /////////
+impl CodeGenerator<'_> {
     fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
         // create a new chunk for the function
         let info = ChunkInfo::Function {
@@ -1068,11 +1195,11 @@ impl CodeGenerator<'_> {
         
         // and a new local scope
         // don't need to emit new scope instructions, should handled by function call
-        chunk_gen.scope_mut().push_frame(symbol);
+        chunk_gen.scopes_mut().push_frame(symbol);
         
         // don't need to generate IN_LOCAL instructions for these, the VM should include them automatically
-        chunk_gen.scope_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
-        chunk_gen.scope_mut().insert_local(DeclType::Immutable, LocalName::NArgs)?;
+        chunk_gen.scopes_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
+        chunk_gen.scopes_mut().insert_local(DeclType::Immutable, LocalName::NArgs)?;
         
         // prepare argument list
         chunk_gen.compile_function_preamble(symbol, fundef)?;
@@ -1089,7 +1216,7 @@ impl CodeGenerator<'_> {
         
         // end the function scope
         // don't need to drop locals explicitly, that will be done when the VMCallFrame returns
-        let frame = chunk_gen.scope_mut().pop_frame();
+        let frame = chunk_gen.scopes_mut().pop_frame();
         
         // however we do still need to close upvalues before we return
         for local in frame.iter_locals().filter(|local| local.captured()) {
@@ -1124,7 +1251,7 @@ impl CodeGenerator<'_> {
         let signature = &fundef.signature;
         
         for param in signature.required.iter() {
-            self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
+            self.scopes_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
             //self.emit_instr(None, OpCode::InsertLocal);
         }
         
@@ -1133,7 +1260,7 @@ impl CodeGenerator<'_> {
             self.compile_default_args(signature)?;
             
             for param in signature.default.iter() {
-                self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
+                self.scopes_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
                 // self.emit_instr(symbol, OpCode::InsertLocal);
             }
         }
@@ -1141,7 +1268,7 @@ impl CodeGenerator<'_> {
         if let Some(param) = &signature.variadic {
             self.compile_variadic_arg(signature)?;
 
-            self.scope_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
+            self.scopes_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
             // self.emit_instr(symbol, OpCode::InsertLocal);
         }
 

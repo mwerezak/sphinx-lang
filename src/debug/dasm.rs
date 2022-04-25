@@ -214,7 +214,8 @@ impl<'c, 's> Disassembler<'c, 's> {
                 OpCode::PopJumpIfTrue  => {
                     let jmp = i16::from_le_bytes(instr[1..=2].try_into().unwrap());
                     let dest = i128::from(jmp) + i128::try_from(offset + opcode.instr_len()).expect("offset too large");
-                    write!(line, "{:16} {: >4} -> {:04X}", opcode, jmp, dest)?;
+                    let relative = i64::from(jmp) + i64::try_from(opcode.instr_len()).unwrap();
+                    write!(line, "{:16} {: >4} -> {:04X}", opcode, relative, dest)?;
                 }
                 
                 OpCode::LongJump           |
@@ -224,7 +225,8 @@ impl<'c, 's> Disassembler<'c, 's> {
                 OpCode::PopLongJumpIfTrue  => {
                     let jmp = i32::from_le_bytes(instr[1..=4].try_into().unwrap());
                     let dest = i128::from(jmp) + i128::try_from(offset + opcode.instr_len()).expect("offset too large");
-                    write!(line, "{:16} {: >4} -> {:04X}", opcode, jmp, dest)?;
+                    let relative = i64::from(jmp) + i64::try_from(opcode.instr_len()).unwrap();
+                    write!(line, "{:16} {: >4} -> {:04X}", opcode, relative, dest)?;
                 }
                 
                 opcode => write!(line, "{:16}", opcode)?,

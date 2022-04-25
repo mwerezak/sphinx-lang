@@ -3,7 +3,7 @@ use crate::debug::DebugSymbol;
 use crate::parser::expr::Expr;
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Label(InternSymbol);
 
 impl Label {
@@ -43,10 +43,33 @@ pub struct StmtList {
 
 #[derive(Debug, Clone)]
 pub enum ControlFlow {
-    Continue(Option<Label>, Option<DebugSymbol>),
-    Break(Option<Label>, Option<Box<Expr>>, Option<DebugSymbol>),
-    Return(Option<Box<Expr>>, Option<DebugSymbol>),
+    Continue {
+        symbol: Option<DebugSymbol>,
+        label: Option<Label>,
+    },
+    
+    Break {
+        symbol: Option<DebugSymbol>,
+        label: Option<Label>,
+        expr: Option<Box<Expr>>,
+    },
+    
+    Return {
+        symbol: Option<DebugSymbol>,
+        expr: Option<Box<Expr>>,
+    },
 }
+
+impl ControlFlow {
+    pub fn debug_symbol(&self) -> Option<&DebugSymbol> {
+        match self {
+            Self::Continue { symbol, .. } => symbol.as_ref(),
+            Self::Break { symbol, .. } => symbol.as_ref(),
+            Self::Return { symbol, .. } => symbol.as_ref(),
+        }
+    }
+}
+
 
 impl StmtList {
     pub fn new(suite: Vec<StmtMeta>, control: Option<ControlFlow>) -> Self {
