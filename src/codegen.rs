@@ -614,8 +614,9 @@ impl CodeGenerator<'_> {
         for scope in through_scopes.iter() {
             self.emit_scope_drop(symbol, scope);
             
-            // expression blocks expect their value to be on the stack when they exit
-            // so if we break through an expression block we need to drop its value
+            // expression blocks leave their value on the stack
+            // (this is helped by the fact that break/contine must come last in a list of statements)
+            // so if we break through an expression block we need to pop its value
             if scope.tag.is_expr_block() {
                 self.emit_instr(symbol, OpCode::Pop);
             }
@@ -1138,11 +1139,9 @@ impl CodeGenerator<'_> {
             
             self.compile_expr(symbol, branch.condition())?;
             
-            let branch_jump = 
-                if is_final_branch { Jump::IfFalse } // keep condition value
-                else { Jump::PopIfFalse };
-            
-            let branch_jump_site = self.emit_dummy_jump(symbol, branch_jump);
+            // need to keep condition value on the stack in case there is a break/continue
+            // inside the statement list
+            let branch_jump_site = self.emit_dummy_jump(symbol, Jump::IfFalse);
             
             self.emit_begin_scope(symbol, ScopeTag::Branch, None);
             self.compile_expr_block(symbol, branch.suite())?;
@@ -1150,6 +1149,7 @@ impl CodeGenerator<'_> {
             
             // site for the jump to the end of if-expression
             if !is_final_branch {
+                self.emit_instr(symbol, OpCode::Pop);
                 let jump_site = self.emit_dummy_jump(symbol, Jump::Uncond);
                 end_jump_sites.push(jump_site);
             }
