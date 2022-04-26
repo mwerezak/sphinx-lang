@@ -616,7 +616,7 @@ impl CodeGenerator<'_> {
             
             // expression blocks expect their value to be on the stack when they exit
             // so if we break through an expression block we need to drop its value
-            if target.tag.is_expr_block() {
+            if scope.tag.is_expr_block() {
                 self.emit_instr(symbol, OpCode::Pop);
             }
         }
