@@ -46,7 +46,7 @@ Right now `sphinx` will compile the code and execute it from memory. I plan to a
 
 # Some things that I like about the Implementation
 
-I have an internal type system built around a `MetaObject` trait which makes it easy to specify the behaviours that are supported by each of the core primitive types in the language. Thanks to Rust's enum types (and some macros) this is implemented without any vtables, using static dispatch based on the enum discriminant.
+I have an internal type system built around a `MetaObject` trait which makes it easy to specify the behaviours that are supported by each of the core primitive types in the language. Thanks to Rust's enum types (and some macros) this is implemented without any vtables, using runtime dispatch based on the enum discriminant.
 
 Different representations of string data. Short strings are "inlined" on the stack when possible (inspired by flexstr). All strings that are used as identifiers are interned. Only strings >40 bytes long are allocated using the GC. The bytecode compiler converts local variable names into indexes into the value stack, so strings are not used at all when referencing local variables.
 
