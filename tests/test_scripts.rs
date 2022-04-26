@@ -67,7 +67,8 @@ mod if_tests {
 mod loop_tests {
     use super::*;
     
-    test_script!(loop_, "tests/loop/loop.sph");  
+    test_script!(loop_, "tests/loop/loop.sph");
+    test_script!(continue_, "tests/loop/continue.sph");
 }
 
 mod tuple_tests {

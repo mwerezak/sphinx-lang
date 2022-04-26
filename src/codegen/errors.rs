@@ -14,6 +14,7 @@ pub enum ErrorKind {
     CantAssignNonLocal,
     TupleLenMismatch,
     CantUpdateAssignTuple,
+    CantResolveContinue(Option<Label>),
     CantResolveBreak(Option<Label>),
     InvalidBreakWithValue,
     InternalLimit(&'static str),
@@ -70,6 +71,10 @@ impl fmt::Display for CompileError {
             ErrorKind::CantResolveBreak(label) => 
                 if label.is_some() { "can't find loop or block with matching label for \"break\"" }
                 else { "\"break\" outside of loop or block" },
+            
+            ErrorKind::CantResolveContinue(label) => 
+                if label.is_some() { "can't find loop with matching label for \"continue;\"" }
+                else { "\"continue\" outside of loop" },
             
             ErrorKind::InvalidBreakWithValue => "\"break\" with value outside of block expression",
             

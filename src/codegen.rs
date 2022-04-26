@@ -451,8 +451,13 @@ impl From<&Scope> for ScopeDrop {
 
 impl CodeGenerator<'_> {
     fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<&Label>) {
+        let continue_target = self.current_offset();
+        
         let chunk_id = self.chunk_id;
         self.scopes_mut().push_scope(symbol, tag, label.copied());
+        
+        self.scopes_mut().local_scope_mut().unwrap()
+            .set_continue(continue_target);
     }
     
     fn emit_end_scope(&mut self) -> Scope {
@@ -599,15 +604,14 @@ impl CodeGenerator<'_> {
                 result?;
             }
         }
-        
         Ok(())
     }
     
     fn compile_control_flow(&mut self, control_flow: &ControlFlow) -> CompileResult<()> {
         match control_flow {
-            ControlFlow::Continue { label, symbol } => {
-                unimplemented!()
-            }
+            ControlFlow::Continue { label, symbol } => self.compile_continue_control(
+                symbol.as_ref(), label.as_ref()
+            )?,
             
             ControlFlow::Break { label, expr, symbol } => self.compile_break_control(
                 symbol.as_ref(), label.as_ref(), expr.as_deref()
@@ -674,6 +678,36 @@ impl CodeGenerator<'_> {
         
         Ok(())
         
+    }
+    
+    fn compile_continue_control(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>) -> CompileResult<()> {
+        // find the target scope
+        let (target_depth, continue_target) = match self.scopes().resolve_control_flow(ControlFlowTarget::Continue(label.copied())) {
+            Some(scope) => (scope.depth(), scope.continue_target()),
+            None => return Err(ErrorKind::CantResolveContinue(label.copied()).into()),
+        };
+        
+        // drop all scopes up to and including the target
+        let scope_drop: Vec<ScopeDrop> = self.scopes().iter_scopes()
+            .take_while(|scope| scope.depth() >= target_depth)
+            .map(ScopeDrop::from)
+            .collect();
+        
+        for scope in scope_drop.iter() {
+            self.emit_scope_drop(symbol, scope);
+            
+            // expression blocks leave their value on the stack
+            // (this is helped by the fact that break/contine must come last in a list of statements)
+            // so if we jump out of an expression block we need to pop its value
+            if scope.tag.is_expr_block() {
+                self.emit_instr(symbol, OpCode::Pop);
+            }
+        }
+        
+        // if continue_target is None by this point it's the compiler's fault
+        self.emit_jump_instr(symbol, Jump::Uncond, continue_target.unwrap())?;
+        
+        Ok(())
     }
     
     fn compile_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, body: &StmtList) -> CompileResult<()> {

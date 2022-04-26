@@ -133,6 +133,10 @@ impl Scope {
         self.symbol.as_ref()
     }
     
+    pub(super) fn continue_target(&self) -> Option<usize> {
+        self.control_flow.continue_target
+    }
+    
     pub(super) fn set_continue(&mut self, offset: usize) {
         self.control_flow.continue_target.replace(offset);
     }
@@ -368,6 +372,10 @@ impl ScopeTracker {
     
     pub(super) fn local_scope(&self) -> Option<&Scope> {
         self.local_scopes().current_scope()
+    }
+    
+    pub(super) fn local_scope_mut(&mut self) -> Option<&mut Scope> {
+        self.local_scopes_mut().current_scope_mut()
     }
     
     pub(super) fn push_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<Label>) {

@@ -1,0 +1,26 @@
+
+begin
+    var i = 0
+    ::outer loop
+        if i > 10 then
+            break
+        end
+        
+        i += 1
+        
+        var j = 0
+        loop
+            if j > 10 then
+                if i % 2 == 0 then
+                    continue ::outer
+                else 
+                    break
+                end
+            end
+            j += 1
+        end
+        
+        print(i)
+        assert i % 2 != 0
+    end
+end
