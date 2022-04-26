@@ -222,7 +222,7 @@ impl MetaObject for bool {
         }
     }
     fn op_rxor(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
-        self.op_and(lhs)
+        self.op_xor(lhs)
     }
     
     fn op_or(&self, rhs: &Variant) -> Option<ExecResult<Variant>> {
