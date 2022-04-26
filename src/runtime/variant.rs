@@ -8,7 +8,12 @@ use crate::runtime::strings::{StringValue, StringSymbol, InlineStr};
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
 
-#[cfg(target_arch = "x86_64")]
+
+// try to use less memory on 32-bit architectures
+#[cfg(target_pointer_width = "32")]
+const_assert_eq!(core::mem::size_of::<Variant>(), 8);
+
+#[cfg(target_pointer_width = "64")]
 const_assert_eq!(core::mem::size_of::<Variant>(), 16);
 
 // Fundamental data value type

@@ -7,13 +7,19 @@ use crate::lexer::rules::keywords::KeywordRule;
 use crate::lexer::rules::literals::*;
 use crate::lexer::rules::literals::string::*;
 
-#[cfg(target_arch = "x86_64")]
-pub type IntType = i64;    // internal representation for integers
+// internal representation for integers
 
-#[cfg(target_arch = "x86_64")]
-pub type FloatType = f64;  // internal representation for floats
+#[cfg(target_pointer_width = "32")]
+pub type IntType = i32;
+#[cfg(target_pointer_width = "64")]
+pub type IntType = i64;
 
-#[cfg(target_arch = "x86_64")]
+// internal representation for floats
+#[cfg(target_pointer_width = "32")]
+pub type FloatType = f32;
+#[cfg(target_pointer_width = "64")]
+pub type FloatType = f64;
+
 pub type InternSymbol = SymbolUsize;  // for interned strings
 
 pub static COMMENT_CHAR: char = '#';
