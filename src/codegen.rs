@@ -561,6 +561,35 @@ impl CodeGenerator<'_> {
             self.compile_stmt_with_symbol(stmt)?;
         }
         
+        Ok(())
+    }
+    
+    // compile a statment list that will not evaluate to a value
+    fn compile_stmt_block(&mut self, stmt_list: &StmtList) -> CompileResult<()> {
+        self.compile_stmt_list(stmt_list)?;
+        self.compile_end_control(stmt_list)?;
+        Ok(())
+    }
+    
+    fn compile_expr_block(&mut self, symbol: Option<&DebugSymbol>, suite: &ExprBlock) -> CompileResult<()> {
+        let stmt_list = suite.stmt_list();
+        self.compile_stmt_list(stmt_list)?;
+        
+        if stmt_list.end_control().is_none() {
+            // result expression
+            if let Some(expr) = suite.result() {
+                self.compile_expr_with_symbol(expr)?;
+            } else {
+                self.emit_instr(symbol, OpCode::Nil); // implicit nil
+            }
+        }
+        
+        self.compile_end_control(stmt_list)?;
+        
+        Ok(())
+    }
+    
+    fn compile_end_control(&mut self, stmt_list: &StmtList) -> CompileResult<()> {
         // handle control flow
         if let Some(control) = stmt_list.end_control() {
             let result = self.compile_control_flow(control);
@@ -652,7 +681,7 @@ impl CodeGenerator<'_> {
         let loop_target = self.current_offset();
         
         self.emit_begin_scope(symbol, ScopeTag::Loop, label);
-        self.compile_stmt_list(body)?;
+        self.compile_stmt_block(body)?;
         let loop_scope = self.emit_end_scope();
         
         self.emit_jump_instr(symbol, Jump::Uncond, loop_target)?;
@@ -674,7 +703,7 @@ impl CodeGenerator<'_> {
         let loop_target = self.current_offset();
         
         self.emit_begin_scope(symbol, ScopeTag::Loop, label);
-        self.compile_stmt_list(body)?;
+        self.compile_stmt_block(body)?;
         let loop_scope = self.emit_end_scope();
         
         // rest iteration conditional jump
@@ -1087,27 +1116,7 @@ impl CodeGenerator<'_> {
 
 ///////// Blocks and If-Expressions /////////
 impl CodeGenerator<'_> {
-    fn compile_expr_block(&mut self, symbol: Option<&DebugSymbol>, suite: &ExprBlock) -> CompileResult<()> {
-        let stmt_list = suite.stmt_list();
-        self.compile_stmt_list(stmt_list)?;
-        
-        /*
-            continue -> unconditional jump, no result value
-            break -> supplied by break statement
-            return -> supplied by return statement
-        */
-        if stmt_list.end_control().is_none() {
-            // result expression
-            if let Some(expr) = suite.result() {
-                self.compile_expr_with_symbol(expr)?;
-            } else {
-                self.emit_instr(symbol, OpCode::Nil); // implicit nil
-            }
-        }
-        
-        Ok(())
-    }
-    
+
     fn compile_block_expression(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
         
         self.emit_begin_scope(symbol, ScopeTag::Block, label);
@@ -1205,7 +1214,7 @@ impl CodeGenerator<'_> {
         chunk_gen.compile_function_preamble(symbol, fundef)?;
         
         // function body
-        chunk_gen.compile_stmt_list(fundef.body.stmt_list())?;
+        chunk_gen.compile_stmt_block(fundef.body.stmt_list())?;
         
         // function result
         if let Some(expr) = fundef.body.result() {
