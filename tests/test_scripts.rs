@@ -65,10 +65,9 @@ mod if_tests {
 }
 
 mod loop_tests {
-    // use super::*;
+    use super::*;
     
-    // break not yet implemented :(
-    // test_script!(loop_, "tests/loop/loop.sph");  
+    test_script!(loop_, "tests/loop/loop.sph");  
 }
 
 mod tuple_tests {
