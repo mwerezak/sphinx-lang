@@ -235,6 +235,14 @@ impl<'c> VMCallFrame<'c> {
         match opcode {
             OpCode::Nop => { },
             
+            OpCode::Exit => {
+                if stack.is_empty() {
+                    return Ok(Control::Exit(Variant::Nil))
+                }
+                let value = stack.pop();
+                return Ok(Control::Exit(value))
+            }
+            
             OpCode::Return => {
                 let value = stack.pop();
                 return Ok(Control::Return(value))

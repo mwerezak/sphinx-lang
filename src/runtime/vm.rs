@@ -255,6 +255,11 @@ impl ValueStack {
     }
     
     #[inline(always)]
+    fn is_empty(&self) -> bool {
+        self.stack.len() == 0
+    }
+    
+    #[inline(always)]
     fn clear(&mut self) {
         self.stack.clear()
     }

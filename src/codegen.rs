@@ -211,7 +211,7 @@ impl CodeGenerator<'_> {
     
     pub fn finish(mut self) {
         match self.chunk_id {
-            Chunk::Main => { }
+            Chunk::Main => self.emit_instr(None, OpCode::Exit),
             
             Chunk::Function(..) => self.emit_instr(None, OpCode::Return),
         }

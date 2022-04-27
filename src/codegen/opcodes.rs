@@ -15,7 +15,9 @@ pub type UpvalueIndex = u16;
 
                            // width set here so that the longest mnemonic is 16 chars
 const OP_NOP:              u8 = 0x00;
-const OP_RETURN:           u8 = 0x01;  // [ ...call frame... ret_value ] => [ ret_value ]
+const OP_EXIT:             u8 = 0x01;
+
+const OP_RETURN:           u8 = 0x02;  // [ ...call frame... ret_value ] => [ ret_value ]
 
 // The odd argument order is because the VM will swap "nargs" with "arg[n]" after reading "nargs".
 // This is because the function preamble will fill in any missing default arguments such that the
@@ -24,11 +26,11 @@ const OP_RETURN:           u8 = 0x01;  // [ ...call frame... ret_value ] => [ re
 // so swapping it to the beginning is the most efficient way to handle this.
 
 // [ callee arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
-const OP_CALL:             u8 = 0x02;
+const OP_CALL:             u8 = 0x03;
 
 // This instruction is needed because when unpacking, the final nargs value needs to be updated dynamically as we iterate.
 // [ callee arg[n] arg[0] ... arg[n-1] nargs arg_seq ] => [ ret_value ]  -- nargs does not include arg_seq! 
-const OP_CALL_UNPACK:      u8 = 0x03;
+const OP_CALL_UNPACK:      u8 = 0x04;
 
 // 0x10-17        Immediate Values
 
@@ -141,6 +143,8 @@ const DBG_DUMP_STRINGS:    u8 = 0xF4;
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum OpCode {
     Nop = OP_NOP,
+    Exit = OP_EXIT,
+    
     Return = OP_RETURN, 
     Call = OP_CALL,
     CallUnpack = OP_CALL_UNPACK,
@@ -230,6 +234,8 @@ impl OpCode {
     pub fn from_byte(byte: u8) -> Option<OpCode> {
         let opcode = match byte {
             OP_NOP => Self::Nop,
+            OP_EXIT => Self::Exit,
+            
             OP_RETURN => Self::Return,
             OP_CALL => Self::Call,
             OP_CALL_UNPACK => Self::CallUnpack,
@@ -384,6 +390,8 @@ impl core::fmt::Display for OpCode {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mnemonic = match *self {
             Self::Nop => "NOP",
+            Self::Exit => "EXIT",
+            
             Self::Return => "RETURN",
             Self::Call => "CALL",
             Self::CallUnpack => "CALL_UNPACK",
