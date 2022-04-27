@@ -6,6 +6,7 @@ use crate::runtime::strings::{StringValue, StringSymbol, static_symbol};
 use crate::runtime::types::{Type, MetaObject};
 use crate::runtime::errors::{ExecResult};
 
+
 pub struct Nil;
 
 // Nil
@@ -69,13 +70,47 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
     }
     
     fn fmt_echo(&self) -> ExecResult<StringValue> {
-        // TODO cache this in the signature struct
+        // TODO cache this in the signature struct?
         let result = format!(
-            "<{} at {:#X}>", self.signature().fmt_name(), Gc::as_id(self)
+            "<{} at {:#X}>", self.signature().fmt_name(), Gc::as_id(self),
         );
+        
         Ok(StringValue::new_uninterned(result))
     }
 }
+
+// Native Iterators
+// Similar to the Iterator trait, except the output type is fixed
+// and internal mutability is required
+pub trait NativeIterator: GcTrace {
+    fn next(&self) -> Option<ExecResult<Variant>>;
+}
+
+
+// unlike UserData, the MetaObject behaviour for NativeIterator is not customizable
+impl MetaObject for Gc<dyn NativeIterator> {
+    fn type_tag(&self) -> Type { Type::Iterator }
+    
+    fn fmt_echo(&self) -> ExecResult<StringValue> {
+        let result = format!(
+            "<{} at {:#X}>", self.type_name()?, Gc::as_id(self)
+        );
+        
+        Ok(StringValue::new_uninterned(result))
+    }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        match other {
+            Variant::Iterator(other) => Some(Ok(Gc::ptr_eq(self, other))),
+            _ => Some(Ok(false)),
+        }
+    }
+    
+    fn next(&self) -> Option<ExecResult<Variant>> {
+        <dyn NativeIterator>::next(&**self)
+    }
+}
+
 
 
 /// Trait for custom data

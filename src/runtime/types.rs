@@ -16,10 +16,13 @@ mod tuple;
 mod misc;
 
 pub use tuple::Tuple;
-pub use misc::{Marker, UserData};
+pub use misc::{Marker, NativeIterator, UserData};
 pub use numeric::{int_from_str, float_from_str};
 
 use misc::Nil;
+
+
+// TODO replace this
 
 // Type tag for Sphinx's "primitive" types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -32,6 +35,7 @@ pub enum Type {
     String,
     Tuple,
     Function,
+    Iterator,
     Metatable,
     Object,
     UserData,
@@ -48,6 +52,7 @@ impl Type {
             Self::String => "string",
             Self::Tuple => "tuple",
             Self::Function => "function",
+            Self::Iterator => "iterator",
             Self::Metatable => "metatable",
             Self::Object => "object",
             Self::UserData => "userdata",
