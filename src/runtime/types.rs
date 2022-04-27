@@ -3,7 +3,7 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::function::{Call, Callable};
-use crate::runtime::strings::{StringValue, static_symbol};
+use crate::runtime::strings::{StringValue, StringSymbol, static_symbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
@@ -25,6 +25,7 @@ pub use numeric::{int_from_str, float_from_str};
 pub enum Type {
     Nil,
     Boolean,
+    Marker,
     Integer,
     Float,
     String,
@@ -40,6 +41,7 @@ impl Type {
         match self {
             Self::Nil => "nil",
             Self::Boolean => "bool",
+            Self::Marker => "marker",
             Self::Integer => "int",
             Self::Float => "float",
             Self::String => "string",
@@ -186,6 +188,32 @@ impl MetaObject for () {
     
     fn fmt_echo(&self) -> ExecResult<StringValue> {
         Ok(StringValue::from(static_symbol!("nil")))
+    }
+}
+
+
+// Marker type - kind of like scheme's symbols
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Marker {
+    id: StringSymbol,
+}
+
+impl MetaObject for Marker {
+    fn type_tag(&self) -> Type { Type::Marker }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        match other {
+            Variant::Marker(other) => Some(Ok(self == other)),
+            _ => None,
+        }
+    }
+    
+    fn type_name(&self) -> ExecResult<StringValue> {
+        Ok(StringValue::from(self.id))
+    }
+    
+    fn fmt_echo(&self) -> ExecResult<StringValue> {
+        self.type_name()
     }
 }
 
