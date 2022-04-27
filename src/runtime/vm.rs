@@ -24,9 +24,10 @@ struct CallInfo {
 }
 
 enum Control {
-    Continue,
-    Call(CallInfo),
-    Return,
+    Next,            // keep executing
+    Call(CallInfo),  // setup a call
+    Return(Variant), // return from call
+    Exit(Variant),   // stop execution
 }
 
 
@@ -122,9 +123,13 @@ impl<'c> VirtualMachine<'c> {
     
     pub fn frame(&self) -> &VMCallFrame<'_> { &self.frame }
     
-    pub fn run(mut self) -> ExecResult<()> {
-        while !self.exec_next()? { }
-        Ok(())
+    // the return value is mostly of interest to the REPL
+    pub fn run(mut self) -> ExecResult<Variant> {
+        loop {
+            if let Control::Exit(value) = self.exec_next()? {
+                return Ok(value)
+            }
+        }
     }
     
     pub fn run_steps(self) -> impl Iterator<Item=ExecResult<VMSnapshot>> + 'c {
@@ -132,26 +137,30 @@ impl<'c> VirtualMachine<'c> {
     }
     
     #[inline]
-    fn exec_next(&mut self) -> ExecResult<bool> {
+    fn exec_next(&mut self) -> ExecResult<Control> {
         let control = self.frame.exec_next(&mut self.values, &mut self.upvalues)
             .map_err(|error| error.extend_trace(self.traceback.iter().rev().cloned()))?;
         
-        match control {
-            Control::Return if self.calls.is_empty() => return Ok(true),
+        match &control {
+            Control::Exit(..) => return Ok(control),
             
+            Control::Return(value) if self.calls.is_empty() =>
+                return Ok(Control::Exit(*value)),
+            
+            Control::Return(value) => self.return_call(*value),
             Control::Call(info) => self.setup_call(info)?,
-            Control::Return => self.return_call(),
-            Control::Continue => { }
+            
+            Control::Next => { }
         }
         
         self.upvalues.prune_invalid();
         gc_collect(self);
         
-        Ok(false)
+        Ok(control)
     }
     
-    fn setup_call(&mut self, call: CallInfo) -> ExecResult<()> {
-        self.traceback.push(call.site);
+    fn setup_call(&mut self, call: &CallInfo) -> ExecResult<()> {
+        self.traceback.push(call.site.clone());
         
         match call.call {
             Call::Native(func) => {
@@ -180,13 +189,12 @@ impl<'c> VirtualMachine<'c> {
         Ok(())
     }
     
-    fn return_call(&mut self) {
+    fn return_call(&mut self, retval: Variant) {
         let frame_idx = self.frame.start_index();
         
         let mut frame = self.calls.pop().expect("empty call stack");
         core::mem::swap(&mut self.frame, &mut frame);
         
-        let retval = self.values.pop();
         self.values.truncate(frame_idx);
         self.values.push(retval);
         self.traceback.pop();
@@ -421,12 +429,17 @@ impl From<&VirtualMachine<'_>> for VMSnapshot {
 
 struct VMStepper<'m> {
     vm: VirtualMachine<'m>,
+    start: bool,
     stop: bool,
 }
 
 impl<'m> From<VirtualMachine<'m>> for VMStepper<'m> {
     fn from(vm: VirtualMachine<'m>) -> Self {
-        Self { vm, stop: false }
+        Self {
+            vm, 
+            start: false,
+            stop: false,
+        }
     }
 }
 
@@ -434,17 +447,23 @@ impl<'m> Iterator for VMStepper<'m> {
     type Item = ExecResult<VMSnapshot>;
     
     fn next(&mut self) -> Option<Self::Item> {
-        if self.stop {
-            return None
+        if !self.start {
+            self.start = true;
+            return Some(Ok(VMSnapshot::from(&self.vm)))
         }
         
-        let status = self.vm.exec_next();
-        if let Err(error) = status {
-            self.stop = true;
-            return Some(Err(error));
+        if !self.stop {
+            let status = self.vm.exec_next();
+            if let Err(error) = status {
+                self.stop = true;
+                return Some(Err(error));
+            }
+            if let Ok(Control::Exit(..)) = status {
+                self.stop = true;
+            }
+            return Some(Ok(VMSnapshot::from(&self.vm)))
         }
         
-        self.stop = status.unwrap();
-        Some(Ok(VMSnapshot::from(&self.vm)))
+        None
     }
 }

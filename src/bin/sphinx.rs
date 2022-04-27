@@ -4,10 +4,11 @@ use clap::{Command, Arg, ArgMatches};
 
 use sphinx::frontend;
 use sphinx::source::{ModuleSource, SourceText};
+use sphinx::parser::stmt::{StmtMeta, Stmt, StmtList, ControlFlow};
 use sphinx::parser::expr::Expr;
-use sphinx::parser::stmt::{Stmt, StmtMeta};
+use sphinx::parser::primary::Atom;
 use sphinx::codegen::{Program, CompiledProgram};
-use sphinx::runtime::{Module, VirtualMachine, Gc};
+use sphinx::runtime::{Module, VirtualMachine, Gc, Variant};
 use sphinx::runtime::module::GlobalEnv;
 use sphinx::runtime::strings::StringInterner;
 use sphinx::debug::symbol::resolver::BufferedResolver;
@@ -165,12 +166,10 @@ fn parse_and_print_ast(_args: &ArgMatches, name: &str, source: &ModuleSource) {
 
 
 //////// REPL ////////
-
-
 const PROMT_START: &str = ">>> ";
 const PROMT_CONTINUE: &str = "... ";
 
-struct Repl {
+pub struct Repl {
     version: String,
     repl_env: Gc<GlobalEnv>,
 }
@@ -271,13 +270,10 @@ impl Repl {
                 },
             };
             
-            // if the last stmt is an expression statement, convert it into an inspect
-            if let Some(stmt) = ast.pop() {
-                let (mut stmt, symbol) = stmt.take();
-                if let Stmt::Expression(expr) = stmt {
-                    stmt = Stmt::Expression(Expr::Echo(Box::new(expr)));
-                }
-                ast.push(StmtMeta::new(stmt, symbol))
+            if let Some(stmt) = Self::repl_ast_transform(ast) {
+                ast = vec![ stmt ];
+            } else {
+                ast = Vec::new();
             }
             
             let build = match sphinx::compile_ast(interner, ast) {
@@ -295,11 +291,43 @@ impl Repl {
             let module = Module::with_env(None, program.data, self.repl_env);
             
             let vm = VirtualMachine::new(module, &program.main);
-            if let Err(error) = vm.run() {
-                println!("{}{}", error.traceback(), error);
+            match vm.run() {
+                Ok(value) => if !matches!(value, Variant::Nil) {
+                    println!("{}", value.display_echo())
+                }
+                
+                Err(error) => println!("{}{}", error.traceback(), error),
             }
             
         }
         
     }
+    
+    // dirty hack to make the REPL work
+    fn repl_ast_transform(mut ast: Vec<StmtMeta>) -> Option<StmtMeta> {
+        if ast.is_empty() {
+            return None;
+        }
+
+        let (stmt, symbol) = ast.pop().unwrap().take();
+        
+        let result_expr;
+        if let Stmt::Expression(expr) = stmt {
+            result_expr = expr;
+        } else {
+            result_expr = Expr::Atom(Atom::Nil);
+        }
+        
+        let return_result = ControlFlow::Return {
+            symbol: None, expr: Some(Box::new(result_expr)),
+        };
+        
+        let body = Stmt::Loop {
+            label: None,
+            body: StmtList::new(ast, Some(return_result)),
+        };
+        
+        Some(StmtMeta::new(body, symbol))
+    }
 }
+

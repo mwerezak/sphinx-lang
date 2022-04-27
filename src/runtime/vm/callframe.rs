@@ -235,7 +235,10 @@ impl<'c> VMCallFrame<'c> {
         match opcode {
             OpCode::Nop => { },
             
-            OpCode::Return => return Ok(Control::Return),
+            OpCode::Return => {
+                let value = stack.pop();
+                return Ok(Control::Return(value))
+            },
             
             OpCode::Call => {
                 const SYSTEM_ARGS: usize = 2; // [ callee, nargs, ... ]
@@ -471,7 +474,7 @@ impl<'c> VMCallFrame<'c> {
             }
         }
         
-        Ok(Control::Continue)
+        Ok(Control::Next)
     }
 }
 

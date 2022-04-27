@@ -176,7 +176,8 @@ impl Compiler {
     
     pub fn finish(mut self) -> Result<CompiledProgram, Vec<CompileError>> {
         if self.errors.is_empty() {
-            self.get_chunk(Chunk::Main).finish();
+            self.get_chunk(Chunk::Main)
+                .finish();
             
             let output = CompiledProgram {
                 program: self.builder.build(),
@@ -209,7 +210,11 @@ impl CodeGenerator<'_> {
     }
     
     pub fn finish(mut self) {
-        self.emit_instr(None, OpCode::Return);
+        match self.chunk_id {
+            Chunk::Main => { }
+            
+            Chunk::Function(..) => self.emit_instr(None, OpCode::Return),
+        }
     }
     
     fn chunk_id(&self) -> Chunk { self.chunk_id }
