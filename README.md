@@ -101,7 +101,7 @@ Person { value = 0xC }  # classy object
 
 # Functions, including default and variadic arguments
 
-# note: default arguments are re-evaluated with each invocation (unlike another scripting language that shall not be named)
+# note: default arguments are re-evaluated with each invocation (unlike Python)
 fun echo_default(thing = "default")
   echo thing
 end
