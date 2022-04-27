@@ -103,14 +103,14 @@ Person { value = 0xC }  # classy object
 
 # note: default arguments are re-evaluated with each invocation (unlike Python)
 fun echo_default(thing = "default")
-  echo thing
+    print(thing)
 end
 
 fun variadic_fun(normal_arg, variadic...)
-  echo normal_arg  
-  for variadic_arg in variadic do
-    echo variadic_arg
-  end
+    print(normal_arg  )
+    for variadic_arg in variadic do
+        print(variadic_arg)
+    end
 end
 
 variadic_fun("red", "blue", "green")  # prints "red" then "blue" then "green"
@@ -122,10 +122,10 @@ configure_something({ option1 = true, option2 = false })
 
 # Argument unpacking and wrapping decorators
 fun trace(wrapped)
-  return fun(args...)
-    echo "trace"
-    wrapped(args...)
-  end
+    return fun(args...)
+        print("trace")
+        wrapped(args...)
+    end
 end
 
 # "@decorator let/var name = value" is syntactic sugar for "let/var name = decorator(value)"
@@ -133,7 +133,7 @@ end
 # Put that together and we can do:
 @trace
 fun increment(x)
-  return x + 1
+    return x + 1
 end
 
 # Classes, Metatables
