@@ -5,7 +5,7 @@ use crate::runtime::Variant;
 use crate::runtime::gc::Gc;
 use crate::runtime::function::{Call, Function, NativeFunction};
 use crate::runtime::strings::StringValue;
-use crate::runtime::types::{Type, MetaObject, Tuple, UserData, Marker};
+use crate::runtime::types::{Type, MetaObject, Tuple, UserData, Nil, Marker};
 use crate::runtime::errors::ExecResult;
 
 
@@ -31,7 +31,7 @@ macro_rules! static_dispatch {
     { fn $name:tt ( $( $arg:tt : $argty:ty ),* ) -> $return:ty } => {
         fn $name (&self, $( $arg : $argty ),* ) -> $return {
             match self.0 {
-                Variant::Nil => <() as MetaObject>::$name(&(), $( $arg ),* ),
+                Variant::Nil => <Nil as MetaObject>::$name(&Nil, $( $arg ),* ),
                 Variant::BoolTrue => <bool as MetaObject>::$name(&true, $( $arg ),* ),
                 Variant::BoolFalse => <bool as MetaObject>::$name(&false, $( $arg ),* ),
                 

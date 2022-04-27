@@ -29,7 +29,9 @@ fn run_test_script(path: &Path) -> ExecResult<()> {
     let main_module = Module::with_env(Some(source), program.data, main_env);
     
     let vm = VirtualMachine::new(main_module, &program.main);
-    vm.run()
+    vm.run()?;
+    
+    Ok(())
 }
 
 macro_rules! test_script {
