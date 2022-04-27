@@ -325,6 +325,8 @@ contexts:
 
     - match: \,
       scope: punctuation.separator
+    - include: expression-keywords
+
     - match: \b(self)\b  # method descriptor syntax
       scope: variable.language
 
@@ -446,7 +448,9 @@ contexts:
       pop: true
     - match: '='
       scope: keyword.operator.assignment
-      set: object-initializer-rvalue
+
+    - include: expression-keywords
+      scope: keyword.declaration.other
     - match: '{{identifier}}'
       scope: variable.member
     - include: subscripts
