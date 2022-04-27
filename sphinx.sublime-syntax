@@ -60,8 +60,6 @@ contexts:
       scope: keyword.declaration.other
     - match: \b(nonlocal)\b
       scope: keyword.other
-    - match: \b(echo)\b
-      scope: keyword.other
 
   statement-keywords:
     - match: \b(del|assert)\b

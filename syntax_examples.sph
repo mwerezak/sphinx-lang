@@ -9,7 +9,7 @@
 }#
 
 # Your first Sphinx program!
-echo "Hello, world!"  # print() function will be available later once there is a builtin library
+print("Hello, world!")
 
 # Semicolons are optional. The syntax has been designed so that the end of a statement can always be inferred.
 "One Stmt"; "Two Stmt"
@@ -164,11 +164,11 @@ inc -= 1  # arithmetic assignment
 
 # variables can be freely redeclared (shadowed)
 let breakfast = "bagels"
-echo breakfast # "bagels".
+print(breakfast) # "bagels".
 
 var breakfast = breakfast
 breakfast = "beignets"
-echo breakfast # "beignets".
+print(breakfast) # "beignets".
 
 del a  # drop a variable from the current scope
 del collection[key]  # mostly useful for removing values from objects
@@ -309,7 +309,7 @@ fun identity(a)
   return a
 end
 
-echo identity(add_pair)(1, 2) # echos "3".
+print(identity(add_pair)(1, 2)) # echos "3".
 
 fun outer_function()
   fun local_function()
@@ -351,7 +351,7 @@ let a = anon_func(3)
 
 
 
-# Decorator Syntax
+# Decorator Syntax (Not implemented yet)
 
 # Using "@" syntax you can apply a function to any value being assigned in a declaration, essentially:
 
@@ -366,7 +366,7 @@ let name = decorator(value)
 
 fun trace(wrapped)
   return fun(args...)
-    echo "trace"
+    print("trace")
     wrapped(args...)
   end
 end
@@ -388,7 +388,7 @@ fun super_int(n) return 9001 * n end
 @super_int
 let super_seven = 7
 
-echo super_seven  # 63,007
+print(super_seven)  # 63,007
 
 # It could even work with regular assignment, although the usefulness of this is dubious
 # I'm debating whether or not this should even be allowed.
@@ -396,7 +396,7 @@ echo super_seven  # 63,007
 @super_int
 super_seven /= 1  # makes it un-super thanks to division
 
-echo super_seven  # 7
+print(super_seven)  # 7
 
 # Classes
 
@@ -446,7 +446,7 @@ let someVariable = Breakfast
 someFunction(Breakfast)
 
 let breakfast = Breakfast {}  # object initializer
-echo breakfast # "Breakfast instance".
+print(breakfast) # "Breakfast instance".
 
 # Instantiation and initialization
 
