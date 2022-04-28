@@ -7,6 +7,7 @@ use sphinx::source::{ModuleSource, SourceText};
 use sphinx::parser::stmt::{StmtMeta, Stmt, StmtList, ControlFlow};
 use sphinx::parser::expr::Expr;
 use sphinx::parser::primary::Atom;
+use sphinx::parser::lvalue::{Declaration, DeclType, LValue};
 use sphinx::codegen::{Program, CompiledProgram};
 use sphinx::runtime::{Module, VirtualMachine, Gc, Variant};
 use sphinx::runtime::module::GlobalEnv;
@@ -270,11 +271,7 @@ impl Repl {
                 },
             };
             
-            if let Some(stmt) = Self::repl_ast_transform(ast) {
-                ast = vec![ stmt ];
-            } else {
-                ast = Vec::new();
-            }
+            Self::repl_ast_transform(&mut interner, &mut ast);
             
             let build = match sphinx::compile_ast(interner, ast) {
                 Ok(build) => build,
@@ -304,30 +301,44 @@ impl Repl {
     }
     
     // dirty hack to make the REPL work
-    fn repl_ast_transform(mut ast: Vec<StmtMeta>) -> Option<StmtMeta> {
-        if ast.is_empty() {
-            return None;
-        }
+    fn repl_ast_transform(interner: &mut StringInterner, ast: &mut Vec<StmtMeta>) {
+        let last_stmt = match ast.pop() {
+            Some(stmt) => stmt,
+            None => return,
+        };
 
-        let (stmt, symbol) = ast.pop().unwrap().take();
+        let (stmt, symbol) = last_stmt.take();
         
         let result_expr;
         if let Stmt::Expression(expr) = stmt {
             result_expr = expr;
         } else {
+            ast.push(StmtMeta::new(stmt, symbol));
             result_expr = Expr::Atom(Atom::Nil);
         }
         
+        // bind the result expression to a global name
+        let result_name = interner.get_or_intern("_");
+        let result_decl = Expr::Declaration(Box::new(Declaration {
+            decl: DeclType::Immutable,
+            lhs: LValue::Identifier(result_name),
+            init: result_expr,
+        }));
+        ast.push(StmtMeta::new(Stmt::Expression(result_decl), symbol));
+        
         let return_result = ControlFlow::Return {
-            symbol: None, expr: Some(Box::new(result_expr)),
+            symbol: None, 
+            expr: Some(Box::new(
+                Expr::Atom(Atom::Identifier(result_name))
+            )),
         };
         
-        let body = Stmt::Loop {
+        let wrapper = Stmt::Loop {
             label: None,
-            body: StmtList::new(ast, Some(return_result)),
+            body: StmtList::new(Vec::new(), Some(return_result)),
         };
+        ast.push(StmtMeta::new(wrapper, symbol));
         
-        Some(StmtMeta::new(body, symbol))
     }
 }
 
