@@ -42,7 +42,25 @@ pub enum Variant {
     UserData(Gc<dyn UserData>),
 }
 
+unsafe impl GcTrace for Variant {
+    #[inline]
+    fn trace(&self) {
+        match self {
+            Self::Tuple(tuple) => tuple.trace(),
+            Self::Function(fun) => fun.mark_trace(),
+            Self::NativeFunction(fun) => fun.mark_trace(),
+            Self::Iterator(iter) => iter.mark_trace(),
+            Self::UserData(data) => data.mark_trace(),
+            _ => { },
+        };
+    }
+}
+
 impl Variant {
+    pub fn marker(id: StringSymbol) -> Self {
+        Self::Marker(Marker::new(id))
+    }
+    
     pub fn as_strval(&self) -> Option<StringValue> {
         match self {
             Self::InternStr(symbol) => Some(StringValue::from(*symbol)),
@@ -124,18 +142,6 @@ impl From<Function> for Variant {
 impl From<NativeFunction> for Variant {
     fn from(func: NativeFunction) -> Self {
         Self::NativeFunction(Gc::new(func))
-    }
-}
-
-unsafe impl GcTrace for Variant {
-    #[inline]
-    fn trace(&self) {
-        match self {
-            Self::Tuple(tuple) => tuple.trace(),
-            Self::Function(fun) => fun.mark_trace(),
-            Self::NativeFunction(fun) => fun.mark_trace(),
-            _ => { },
-        };
     }
 }
 
