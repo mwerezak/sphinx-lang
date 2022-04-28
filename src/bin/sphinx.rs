@@ -289,7 +289,7 @@ impl Repl {
             
             let vm = VirtualMachine::new(module, &program.main);
             match vm.run() {
-                Ok(value) => if !matches!(value, Variant::Nil) {
+                Ok(value) => if !value.is_nil() {
                     println!("{}", value.display_echo())
                 }
                 

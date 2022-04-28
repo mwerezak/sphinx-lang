@@ -61,6 +61,10 @@ impl Variant {
         Self::Marker(Marker::new(id))
     }
     
+    pub fn is_nil(&self) -> bool {
+        matches!(self, Variant::Nil)
+    }
+    
     pub fn as_strval(&self) -> Option<StringValue> {
         match self {
             Self::InternStr(symbol) => Some(StringValue::from(*symbol)),

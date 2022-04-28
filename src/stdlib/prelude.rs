@@ -2,7 +2,56 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::Gc;
 use crate::runtime::module::{GlobalEnv};
 use crate::runtime::types::{int_from_str, float_from_str};
-use crate::runtime::errors::{ErrorKind};
+use crate::runtime::errors::{ErrorKind, ExecResult};
+
+
+use core::cell::Cell;
+use crate::runtime::Variant;
+use crate::runtime::types::NativeIterator;
+use crate::runtime::gc::GcTrace;
+
+#[derive(Debug)]
+struct RangeIter {
+    start: IntType,
+    stop: IntType,
+    step: IntType,
+    state: Cell<Option<IntType>>,
+}
+
+unsafe impl GcTrace for RangeIter {
+    fn trace(&self) { }
+}
+
+impl RangeIter {
+    fn new(start: IntType, stop: IntType, step: IntType) -> Self {
+        Self {
+            start, stop, step,
+            state: Cell::new(None),
+        }
+    }
+}
+
+impl NativeIterator for RangeIter {
+    fn next(&self) -> Option<ExecResult<Variant>> {
+        let state = match self.state.get() {
+            Some(state) => state + self.step,
+            None => self.start,
+        };
+        
+        if self.step.is_positive() {
+            if state >= self.stop {
+                return Some(Ok(Variant::stop_iteration()));
+            }
+        } else {
+            if state <= self.stop {
+                return Some(Ok(Variant::stop_iteration()));
+            }
+        }
+        
+        self.state.set(Some(state));
+        Some(Ok(Variant::from(state)))
+    }
+}
 
 
 /// Create an Env containing the core builtins
@@ -18,6 +67,10 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
             Ok(len) => Ok(Variant::from(len)),
             Err(..) => Err(ErrorKind::OverflowError.into()),
         }
+    });
+    
+    let next = native_function!(next, env, params(value) => {
+        value.next()
     });
     
     // primitive type constructors
@@ -97,7 +150,7 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         Ok(Variant::from(value.fmt_echo()?))
     });
     
-    let print = native_function!(print, env, variadic(values)  => {
+    let print = native_function!(print, env, variadic(values) => {
         if let Some((first, rest)) = values.split_first() {
             print!("{}", first.fmt_str()?);
             for value in rest.iter() {
@@ -108,6 +161,26 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         println!();
         
         Ok(Variant::Nil)
+    });
+    
+    let range = native_function!(range, env, params(start), defaults(stop = Variant::Nil, step = 1) => {
+        let start_value;
+        let stop_value;
+        if stop.is_nil() {
+            start_value = 0;
+            stop_value = start.as_int()?;
+        } else {
+            start_value = start.as_int()?;
+            stop_value = stop.as_int()?;
+        }
+        
+        let step_value = step.as_int()?;
+        if step_value == 0 {
+            return Err(ErrorKind::Message("step cannot be zero".to_string()).into());
+        }
+        
+        let iter = Box::new(RangeIter::new(start_value, stop_value, step_value));
+        Ok(Variant::Iterator(Gc::from_box(iter)))
     });
     
     // Produces a tuple of the global names in the current call frame
@@ -123,12 +196,17 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
     });
     
     namespace!(env.borrow_mut(), {
+        let StopIteration = Variant::stop_iteration();
+        
         fun _ = len;
+        fun _ = next;
         
         fun _ = as_bool;
         fun _ = as_bits;
         fun _ = as_int;
         fun _ = as_float;
+        
+        fun _ = range;
         
         fun _ = globals;
         fun _ = to_str;

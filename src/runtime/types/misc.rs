@@ -34,6 +34,12 @@ pub struct Marker {
     id: StringSymbol,
 }
 
+impl Marker {
+    pub fn new(id: StringSymbol) -> Self {
+        Self { id }
+    }
+}
+
 impl MetaObject for Marker {
     fn type_tag(&self) -> Type { Type::Marker }
     

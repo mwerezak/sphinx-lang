@@ -2,7 +2,7 @@ use core::fmt;
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::function::Call;
-use crate::runtime::strings::StringValue;
+use crate::runtime::strings::{StringValue, static_symbol};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
@@ -159,7 +159,9 @@ impl Variant {
         self.as_meta().as_float()
             .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsFloat))?
     }
-    
+}
+
+impl Variant {
     pub fn len(&self) -> ExecResult<usize> {
         self.as_meta().len()
             .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Len))?
@@ -167,6 +169,15 @@ impl Variant {
     
     pub fn is_empty(&self) -> ExecResult<bool> {
         Ok(self.len()? == 0)
+    }
+    
+    pub fn next(&self) -> ExecResult<Variant> {
+        self.as_meta().next()
+            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Next))?
+    }
+    
+    pub fn stop_iteration() -> Self {
+        Variant::marker(static_symbol!("StopIteration"))
     }
     
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
