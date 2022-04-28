@@ -9,7 +9,7 @@ use sphinx::parser::expr::Expr;
 use sphinx::parser::primary::Atom;
 use sphinx::parser::lvalue::{Declaration, DeclType, LValue};
 use sphinx::codegen::{Program, CompiledProgram};
-use sphinx::runtime::{Module, VirtualMachine, Gc, Variant};
+use sphinx::runtime::{Module, VirtualMachine, Gc};
 use sphinx::runtime::module::GlobalEnv;
 use sphinx::runtime::strings::StringInterner;
 use sphinx::debug::symbol::resolver::BufferedResolver;
