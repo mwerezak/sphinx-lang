@@ -71,10 +71,10 @@ impl MetaObject for MetaDispatch<'_> {
     
     // iterators
     static_dispatch!{ fn next() -> Option<ExecResult<Variant>> }
-    
-    // data collections
-    static_dispatch!{ fn len() -> Option<ExecResult<usize>> }
     static_dispatch!{ fn iter() -> Option<ExecResult<Variant>> }
+    
+    // collections
+    static_dispatch!{ fn len() -> Option<ExecResult<usize>> }
     
     // callable
     static_dispatch!{ fn invoke(args: &[Variant]) -> Option<ExecResult<Call>> }

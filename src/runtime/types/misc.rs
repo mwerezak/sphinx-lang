@@ -86,10 +86,12 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
 }
 
 // Native Iterators
-// Similar to the Iterator trait, except the output type is fixed
-// and internal mutability is required
+// Similar to the Iterator trait, except that:
+// - the output type is fixed
+// - iteration may fail with a Runtim
+// - interior mutability is required
 pub trait NativeIterator: GcTrace {
-    fn next(&self) -> Option<ExecResult<Variant>>;
+    fn next(&self) -> ExecResult<Option<Variant>>;
 }
 
 
@@ -113,7 +115,15 @@ impl MetaObject for Gc<dyn NativeIterator> {
     }
     
     fn next(&self) -> Option<ExecResult<Variant>> {
-        <dyn NativeIterator>::next(&**self)
+        match <dyn NativeIterator>::next(&**self) {
+            Err(error) => Some(Err(error)),
+            Ok(Some(value)) => Some(Ok(value)),
+            Ok(None) => Some(Ok(Variant::stop_iteration())),
+        }
+    }
+    
+    fn iter(&self) -> Option<ExecResult<Variant>> {
+        Some(Ok(Variant::Iterator(*self)))
     }
 }
 

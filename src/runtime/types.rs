@@ -85,10 +85,10 @@ pub trait MetaObject {
     
     // iterators
     fn next(&self) -> Option<ExecResult<Variant>> { None }
-    
-    // data collections
-    fn len(&self) -> Option<ExecResult<usize>> { None }
     fn iter(&self) -> Option<ExecResult<Variant>> { None }
+    
+    // collections
+    fn len(&self) -> Option<ExecResult<usize>> { None }
     //fn getitem(&self, item: &Variant) -> Option<ExecResult<Variant>> { None }
     //fn setitem(&self, item: &Variant) -> Option<ExecResult<Variant>> { None }
     

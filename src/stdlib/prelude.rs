@@ -32,7 +32,7 @@ impl RangeIter {
 }
 
 impl NativeIterator for RangeIter {
-    fn next(&self) -> Option<ExecResult<Variant>> {
+    fn next(&self) -> ExecResult<Option<Variant>> {
         let state = match self.state.get() {
             Some(state) => state + self.step,
             None => self.start,
@@ -40,16 +40,16 @@ impl NativeIterator for RangeIter {
         
         if self.step.is_positive() {
             if state >= self.stop {
-                return Some(Ok(Variant::stop_iteration()));
+                return Ok(None);
             }
         } else {
             if state <= self.stop {
-                return Some(Ok(Variant::stop_iteration()));
+                return Ok(None);
             }
         }
         
         self.state.set(Some(state));
-        Some(Ok(Variant::from(state)))
+        Ok(Some(Variant::from(state)))
     }
 }
 
@@ -179,8 +179,8 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
             return Err(ErrorKind::Message("step cannot be zero".to_string()).into());
         }
         
-        let iter = Box::new(RangeIter::new(start_value, stop_value, step_value));
-        Ok(Variant::Iterator(Gc::from_box(iter)))
+        let range_iter = Box::new(RangeIter::new(start_value, stop_value, step_value));
+        Ok(Variant::Iterator(Gc::from_box(range_iter)))
     });
     
     // Produces a tuple of the global names in the current call frame
