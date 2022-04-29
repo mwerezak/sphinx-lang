@@ -15,7 +15,7 @@ struct RangeIter {
     start: IntType,
     stop: IntType,
     step: IntType,
-    state: Cell<Option<IntType>>,
+    next: Cell<IntType>,
 }
 
 unsafe impl GcTrace for RangeIter {
@@ -26,30 +26,27 @@ impl RangeIter {
     fn new(start: IntType, stop: IntType, step: IntType) -> Self {
         Self {
             start, stop, step,
-            state: Cell::new(None),
+            next: Cell::new(start),
         }
     }
 }
 
 impl NativeIterator for RangeIter {
     fn next(&self) -> ExecResult<Option<Variant>> {
-        let state = match self.state.get() {
-            Some(state) => state + self.step,
-            None => self.start,
-        };
+        let next = self.next.get();
         
         if self.step.is_positive() {
-            if state >= self.stop {
+            if next >= self.stop {
                 return Ok(None);
             }
         } else {
-            if state <= self.stop {
+            if next <= self.stop {
                 return Ok(None);
             }
         }
         
-        self.state.set(Some(state));
-        Ok(Some(Variant::from(state)))
+        self.next.set(next + self.step);
+        Ok(Some(Variant::from(next)))
     }
 }
 
