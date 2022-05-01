@@ -10,8 +10,9 @@ use crate::debug::traceback::TraceSite;
 use crate::debug::snapshot::{VMSnapshot, VMFrameSnapshot};
 
 mod callframe;
+mod instruction;
 
-use callframe::{VMCallFrame};
+use callframe::VMCallFrame;
 
 // Helpers
 
