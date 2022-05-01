@@ -5,7 +5,6 @@ use crate::runtime::types::{int_from_str, float_from_str};
 use crate::runtime::errors::{ErrorKind, ExecResult};
 
 
-use core::cell::Cell;
 use crate::runtime::Variant;
 use crate::runtime::types::NativeIterator;
 use crate::runtime::gc::GcTrace;
@@ -15,7 +14,6 @@ struct RangeIter {
     start: IntType,
     stop: IntType,
     step: IntType,
-    next: Cell<IntType>,
 }
 
 unsafe impl GcTrace for RangeIter {
@@ -24,16 +22,23 @@ unsafe impl GcTrace for RangeIter {
 
 impl RangeIter {
     fn new(start: IntType, stop: IntType, step: IntType) -> Self {
-        Self {
-            start, stop, step,
-            next: Cell::new(start),
-        }
+        Self { start, stop, step }
     }
 }
 
 impl NativeIterator for RangeIter {
-    fn next(&self) -> ExecResult<Option<Variant>> {
-        let next = self.next.get();
+    fn get_item(&self, state: &Variant) -> ExecResult<Variant> {
+        Ok(*state)
+    }
+    
+    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Option<Variant>> {
+        let next = match state {
+            Some(state) => state.as_int()?
+                .checked_add(self.step)
+                .ok_or(ErrorKind::OverflowError)?,
+            
+            None => self.start,
+        };
         
         if self.step.is_positive() {
             if next >= self.stop {
@@ -45,7 +50,6 @@ impl NativeIterator for RangeIter {
             }
         }
         
-        self.next.set(next + self.step);
         Ok(Some(Variant::from(next)))
     }
 }
@@ -66,8 +70,26 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         }
     });
     
-    let next = native_function!(next, env, params(value) => {
-        value.next()
+    // produces a tuple (item, next_state) for a given iterator state
+    let next = native_function!(next, env, params(value), defaults(state = Variant::Nil) => {
+        let result = vec![
+            value.iter_item(state)?,
+            value.iter_next(state)?,
+        ];
+        
+        Ok(Variant::from(result.into_boxed_slice()))
+    });
+    
+    // produces a tuple (iterator, init_state)
+    let iter = native_function!(iter, env, params(value) => {
+        let iter = value.iter_init()?;
+        
+        let result = vec![
+            iter.iter,
+            iter.state,
+        ];
+        
+        Ok(Variant::from(result.into_boxed_slice()))
     });
     
     // primitive type constructors
@@ -138,6 +160,15 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         Ok(Variant::from(value.as_float()?))
     });
     
+    // marker type constructor
+    let marker = native_function!(marker, env, params(marker) => {
+        let symbol = marker.as_strval()
+            .ok_or(ErrorKind::StaticMessage("marker discriminant must be a string"))?
+            .as_intern();
+            
+        Ok(Variant::marker(symbol))
+    });
+    
     // Misc
     let to_str = native_function!(str, env, params(value) => {
         Ok(Variant::from(value.fmt_str()?))
@@ -196,6 +227,7 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         let StopIteration = Variant::stop_iteration();
         
         fun _ = len;
+        fun _ = iter;
         fun _ = next;
         
         fun _ = as_bool;
@@ -206,6 +238,7 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         fun _ = range;
         
         fun _ = globals;
+        fun _ = marker;
         fun _ = to_str;
         fun _ = echo;
         fun _ = print;

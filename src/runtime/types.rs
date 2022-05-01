@@ -66,6 +66,19 @@ impl fmt::Display for Type {
     }
 }
 
+// Iterator helper
+pub struct IterState {
+    pub iter: Variant,
+    pub state: Variant,
+}
+
+impl Variant {
+    pub fn stop_iteration() -> Variant {
+        Variant::marker(static_symbol!("StopIteration"))
+    }
+}
+
+
 #[allow(unused_variables)]
 pub trait MetaObject {
     fn type_tag(&self) -> Type;
@@ -84,8 +97,13 @@ pub trait MetaObject {
     fn as_float(&self) -> Option<ExecResult<FloatType>> { None }
     
     // iterators
-    fn next(&self) -> Option<ExecResult<Variant>> { None }
-    fn iter(&self) -> Option<ExecResult<Variant>> { None }
+    
+    // take the current state, produce either the next state or the StopIteration marker
+    fn iter_item(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn iter_next(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }
+    
+    // produce an iterator (i.e. supports the next() metamethod) and the initial state
+    fn iter_init(&self) -> Option<ExecResult<IterState>> { None }
     
     // collections
     fn len(&self) -> Option<ExecResult<usize>> { None }
@@ -171,13 +189,19 @@ impl Variant {
         Ok(self.len()? == 0)
     }
     
-    pub fn next(&self) -> ExecResult<Variant> {
-        self.as_meta().next()
-            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Next))?
+    pub fn iter_init(&self) -> ExecResult<IterState> {
+        self.as_meta().iter_init()
+            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::IterInit))?
     }
     
-    pub fn stop_iteration() -> Self {
-        Variant::marker(static_symbol!("StopIteration"))
+    pub fn iter_next(&self, state: &Variant) -> ExecResult<Variant> {
+        self.as_meta().iter_next(state)
+            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::IterNext))?
+    }
+    
+    pub fn iter_item(&self, state: &Variant) -> ExecResult<Variant> {
+        self.as_meta().iter_item(state)
+            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::IterItem))?
     }
     
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
@@ -195,8 +219,9 @@ impl Variant {
 pub enum MethodTag {
     Invoke,
     Len,
-    Next,
-    Iter,
+    IterInit,
+    IterNext,
+    IterItem,
     AsBool,
     AsBits,
     AsInt,
@@ -210,8 +235,9 @@ impl MethodTag {
             Self::Invoke => "call",
             
             // iterators and iterables
-            Self::Next => "next",
-            Self::Iter => "iter",
+            Self::IterInit => "iter_init",
+            Self::IterNext => "iter_next",
+            Self::IterItem => "iter_item",
             
             // sequences
             Self::Len => "len",

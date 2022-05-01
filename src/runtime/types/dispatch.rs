@@ -5,7 +5,7 @@ use crate::runtime::Variant;
 use crate::runtime::gc::Gc;
 use crate::runtime::function::{Call, Function, NativeFunction};
 use crate::runtime::strings::StringValue;
-use crate::runtime::types::{Type, MetaObject, Tuple, UserData, Nil, Marker, NativeIterator};
+use crate::runtime::types::{Type, MetaObject, Tuple, UserData, Nil, Marker, IterState, NativeIterator};
 use crate::runtime::errors::ExecResult;
 
 
@@ -70,8 +70,9 @@ impl MetaObject for MetaDispatch<'_> {
     static_dispatch!{ fn as_float() -> Option<ExecResult<FloatType>> }
     
     // iterators
-    static_dispatch!{ fn next() -> Option<ExecResult<Variant>> }
-    static_dispatch!{ fn iter() -> Option<ExecResult<Variant>> }
+    static_dispatch!{ fn iter_init() -> Option<ExecResult<IterState>> }
+    static_dispatch!{ fn iter_item(state: &Variant) -> Option<ExecResult<Variant>> }
+    static_dispatch!{ fn iter_next(state: &Variant) -> Option<ExecResult<Variant>> }
     
     // collections
     static_dispatch!{ fn len() -> Option<ExecResult<usize>> }

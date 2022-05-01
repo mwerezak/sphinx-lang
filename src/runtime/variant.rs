@@ -149,6 +149,18 @@ impl From<NativeFunction> for Variant {
     }
 }
 
+impl From<Gc<dyn NativeIterator>> for Variant {
+    fn from(iter: Gc<dyn NativeIterator>) -> Self {
+        Self::Iterator(iter)
+    }
+}
+
+impl From<Gc<dyn UserData>> for Variant {
+    fn from(data: Gc<dyn UserData>) -> Self {
+        Self::UserData(data)
+    }
+}
+
 
 // Not all Variants are hashable
 impl Variant {

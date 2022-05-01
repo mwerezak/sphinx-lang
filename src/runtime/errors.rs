@@ -9,7 +9,7 @@ use crate::runtime::types::{Type, MethodTag};
 use crate::runtime::strings::StringSymbol;
 use crate::debug::traceback::{TraceSite, Traceback};
 
-// TODO box error
+
 pub type ExecResult<T> = Result<T, Box<RuntimeError>>;
 
 #[derive(Debug)]
@@ -27,6 +27,7 @@ pub enum ErrorKind {
     TooManyArguments { signature: Box<Signature>, nargs: usize },
     MethodNotSupported(Type, MethodTag),
     AssertFailed,
+    
     StaticMessage(&'static str),
     Message(String),
     Other(String),
@@ -140,8 +141,11 @@ impl fmt::Display for RuntimeError {
                     MethodTag::AsInt => format!("can't interpret '{}' as int", receiver),
                     MethodTag::AsFloat => format!("can't interpret '{}' as float", receiver),
                     MethodTag::Invoke => format!("type '{}' is not callable", receiver),
-                    MethodTag::Next => format!("type '{}' is not an iterator", receiver),
-                    MethodTag::Iter => format!("type '{}' is not iterable", receiver),
+                    
+                    MethodTag::IterInit => format!("type '{}' is not iterable", receiver),
+                    MethodTag::IterNext | MethodTag::IterItem
+                        => format!("type '{}' is not an iterator", receiver),
+                    
                     _ => format!("type '{}' does not support '__{}'", receiver, method),
                 }
             }

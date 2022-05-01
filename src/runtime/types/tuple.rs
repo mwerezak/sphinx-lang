@@ -2,7 +2,7 @@ use core::fmt::{self, Write};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::strings::{StringValue, static_symbol};
-use crate::runtime::types::{Type, MetaObject};
+use crate::runtime::types::{Type, MetaObject, IterState, NativeIterator};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 #[derive(Clone, Copy)]
@@ -75,6 +75,12 @@ impl MetaObject for Tuple {
         Some(Ok(Tuple::len(self)))
     }
     
+    fn iter_init(&self) -> Option<ExecResult<IterState>> {
+        let iter: Box<dyn NativeIterator> = Box::new(TupleIter(*self));
+        let iter = Gc::from_box(iter);
+        iter.iter_init()
+    }
+    
     fn fmt_echo(&self) -> ExecResult<StringValue> {
         match self {
             Self::Empty => Ok(StringValue::from(static_symbol!("()"))),
@@ -107,5 +113,43 @@ impl fmt::Debug for Tuple {
             tuple.field(item);
         }
         tuple.finish()
+    }
+}
+
+// Tuple Iterator
+#[derive(Debug)]
+struct TupleIter(Tuple);
+
+unsafe impl GcTrace for TupleIter {
+    fn trace(&self) {
+        self.0.trace()
+    }
+}
+
+impl NativeIterator for TupleIter {
+    fn get_item(&self, state: &Variant) -> ExecResult<Variant> {
+        let idx = usize::try_from(state.as_int()?)
+            .map_err(|_| ErrorKind::StaticMessage("invalid state"))?;
+        
+        let items = self.0.as_ref();
+        Ok(items[idx])
+    }
+    
+    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Option<Variant>> {
+        let next = match state {
+            Some(state) => state.as_int()?
+                .checked_add(1)
+                .ok_or(ErrorKind::OverflowError)?,
+            
+            None => 0,
+        };
+        
+        let next_idx = usize::try_from(next)
+            .map_err(|_| ErrorKind::StaticMessage("invalid state"))?;
+        
+        if next_idx >= self.0.len() {
+            return Ok(None)
+        }
+        Ok(Some(Variant::from(next)))
     }
 }
