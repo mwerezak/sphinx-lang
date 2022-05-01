@@ -6,7 +6,7 @@ use crate::runtime::errors::{ErrorKind, ExecResult};
 
 
 use crate::runtime::Variant;
-use crate::runtime::types::NativeIterator;
+use crate::runtime::types::UserIterator;
 use crate::runtime::gc::GcTrace;
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ impl RangeIter {
     }
 }
 
-impl NativeIterator for RangeIter {
+impl UserIterator for RangeIter {
     fn get_item(&self, state: &Variant) -> ExecResult<Variant> {
         Ok(*state)
     }
@@ -85,8 +85,8 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         let iter = value.iter_init()?;
         
         let result = vec![
-            iter.iter,
-            iter.state,
+            *iter.iter(),
+            *iter.state(),
         ];
         
         Ok(Variant::from(result.into_boxed_slice()))

@@ -3,7 +3,7 @@ use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::function::{Call, Callable};
 use crate::runtime::strings::{StringValue, StringSymbol, static_symbol};
-use crate::runtime::types::{Type, MetaObject, IterState};
+use crate::runtime::types::{Type, MetaObject};
 use crate::runtime::errors::{ExecResult};
 
 
@@ -84,62 +84,6 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
         Ok(StringValue::new_uninterned(result))
     }
 }
-
-/// Similar use case as UserData but a bit more limited in scope
-pub trait NativeIterator: GcTrace {
-    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Option<Variant>>;
-    fn get_item(&self, state: &Variant) -> ExecResult<Variant>;
-}
-
-
-// unlike UserData, the MetaObject impl for NativeIterator is not customizable
-impl MetaObject for Gc<dyn NativeIterator> {
-    fn type_tag(&self) -> Type { Type::Iterator }
-    
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
-        let result = format!(
-            "<{} at {:#X}>", self.type_name()?, Gc::as_id(self)
-        );
-        
-        Ok(StringValue::new_uninterned(result))
-    }
-    
-    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
-        match other {
-            Variant::Iterator(other) => Some(Ok(Gc::ptr_eq(self, other))),
-            _ => Some(Ok(false)),
-        }
-    }
-    
-    fn iter_item(&self, state: &Variant) -> Option<ExecResult<Variant>> {
-        Some(self.get_item(state))
-    }
-    
-    fn iter_next(&self, state: &Variant) -> Option<ExecResult<Variant>> {
-        match self.next_state(Some(state)) {
-            Err(error) => Some(Err(error)),
-            Ok(Some(value)) => Some(Ok(value)),
-            Ok(None) => Some(Ok(Variant::stop_iteration())),
-        }
-    }
-    
-    fn iter_init(&self) -> Option<ExecResult<IterState>> {
-        let state = match self.next_state(None) {
-            Err(error) => return Some(Err(error)),
-            
-            Ok(Some(value)) => value,
-            Ok(None) => Variant::stop_iteration(),
-        };
-        
-        let iter = IterState {
-            iter: (*self).into(),
-            state,
-        };
-        
-        Some(Ok(iter))
-    }
-}
-
 
 
 /// Trait for custom data

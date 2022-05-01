@@ -13,11 +13,13 @@ mod boolean;
 mod numeric;
 mod string;
 mod tuple;
+mod iterator;
 mod misc;
 
 pub use tuple::Tuple;
-pub use misc::{Marker, NativeIterator, UserData};
+pub use misc::{Marker, UserData};
 pub use numeric::{int_from_str, float_from_str};
+pub use iterator::{IterState, UserIterator};
 
 use misc::Nil;
 
@@ -66,11 +68,6 @@ impl fmt::Display for Type {
     }
 }
 
-// Iterator helper
-pub struct IterState {
-    pub iter: Variant,
-    pub state: Variant,
-}
 
 impl Variant {
     pub fn stop_iteration() -> Variant {
@@ -97,23 +94,6 @@ pub trait MetaObject {
     fn as_float(&self) -> Option<ExecResult<FloatType>> { None }
     
     // iterators
-    
-    /*
-        iter_init() - produces an iterator and the initial state
-        
-        Values that support iter_init() are said to be iterable (e.g. collections)
-        
-        
-        iter_item(state) - get the value for the current iterator state
-        iter_next(state) - advance the iterator, producing the next state
-        
-        Values that support iter_item() and iter_next() are said to be iterators.
-        Iterators are not required to support repeated calls to iter_item() for the same state
-        
-        Using the state argument is optional. The alternative is interior mutability.
-        Iterators that mutate themselves when iter_next() is called are said to be stateful iterators
-        and are free to produce any state value and accept any state value
-    */
     
     // take the current state, produce either the next state or the StopIteration marker
     fn iter_item(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }

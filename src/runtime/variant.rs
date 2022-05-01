@@ -2,7 +2,7 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 use static_assertions::const_assert_eq;
 use crate::language::{IntType, FloatType};
-use crate::runtime::types::{Tuple, UserData, NativeIterator, Marker};
+use crate::runtime::types::{Tuple, UserData, UserIterator, Marker};
 use crate::runtime::function::{Function, NativeFunction};
 use crate::runtime::strings::{StringValue, StringSymbol, InlineStr};
 use crate::runtime::gc::{Gc, GcTrace};
@@ -37,7 +37,7 @@ pub enum Variant {
     Function(Gc<Function>),
     NativeFunction(Gc<NativeFunction>),
     
-    Iterator(Gc<dyn NativeIterator>),
+    Iterator(Gc<dyn UserIterator>),
     
     UserData(Gc<dyn UserData>),
 }
@@ -149,8 +149,8 @@ impl From<NativeFunction> for Variant {
     }
 }
 
-impl From<Gc<dyn NativeIterator>> for Variant {
-    fn from(iter: Gc<dyn NativeIterator>) -> Self {
+impl From<Gc<dyn UserIterator>> for Variant {
+    fn from(iter: Gc<dyn UserIterator>) -> Self {
         Self::Iterator(iter)
     }
 }

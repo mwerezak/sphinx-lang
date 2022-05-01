@@ -5,7 +5,7 @@ use crate::runtime::Variant;
 use crate::runtime::gc::Gc;
 use crate::runtime::function::{Call, Function, NativeFunction};
 use crate::runtime::strings::StringValue;
-use crate::runtime::types::{Type, MetaObject, Tuple, UserData, Nil, Marker, IterState, NativeIterator};
+use crate::runtime::types::{Type, MetaObject, Tuple, UserData, Nil, Marker, IterState, UserIterator};
 use crate::runtime::errors::ExecResult;
 
 
@@ -49,7 +49,7 @@ macro_rules! static_dispatch {
                 Variant::Function(fun) => <Gc<Function> as MetaObject>::$name(fun, $( $arg ),* ),
                 Variant::NativeFunction(fun) => <Gc<NativeFunction> as MetaObject>::$name(fun, $( $arg ),* ),
                 
-                Variant::Iterator(iter) => <Gc<dyn NativeIterator> as MetaObject>::$name(iter, $( $arg ),* ),
+                Variant::Iterator(iter) => <Gc<dyn UserIterator> as MetaObject>::$name(iter, $( $arg ),* ),
                 
                 Variant::UserData(data) => <(dyn UserData + 'static) as MetaObject>::$name(&**data, $( $arg ),* ),
             }

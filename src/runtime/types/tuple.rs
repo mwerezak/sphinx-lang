@@ -2,7 +2,7 @@ use core::fmt::{self, Write};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::strings::{StringValue, static_symbol};
-use crate::runtime::types::{Type, MetaObject, IterState, NativeIterator};
+use crate::runtime::types::{Type, MetaObject, IterState, UserIterator};
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 #[derive(Clone, Copy)]
@@ -76,7 +76,7 @@ impl MetaObject for Tuple {
     }
     
     fn iter_init(&self) -> Option<ExecResult<IterState>> {
-        let iter: Box<dyn NativeIterator> = Box::new(TupleIter(*self));
+        let iter: Box<dyn UserIterator> = Box::new(TupleIter(*self));
         let iter = Gc::from_box(iter);
         iter.iter_init()
     }
@@ -126,7 +126,7 @@ unsafe impl GcTrace for TupleIter {
     }
 }
 
-impl NativeIterator for TupleIter {
+impl UserIterator for TupleIter {
     fn get_item(&self, state: &Variant) -> ExecResult<Variant> {
         let idx = usize::try_from(state.as_int()?)
             .map_err(|_| ErrorKind::StaticMessage("invalid state"))?;
