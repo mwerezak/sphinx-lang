@@ -202,19 +202,15 @@ impl<'c> VMCallFrame<'c> {
             
             OpCode::IterInit => {
                 let IterState { iter, state } = stack.peek().iter_init()?;
-                let value = iter.iter_get(&state)?;
-                stack.replace(iter);
+                stack.push(iter);
                 stack.push(state);
-                stack.push(value);
             }
             
             OpCode::IterNext => {
-                let state = stack.peek_many(2);
-                let (iter, state) = (state[0], state[1]);
-                let state = iter.iter_next(&state)?;
-                stack.replace(state);
-                
-                let value = iter.iter_get(&state)?;
+                let state = stack.pop();
+                let value = stack.peek().iter_get(&state)?;
+                let next_state = stack.peek().iter_next(&state)?;
+                stack.push(next_state);
                 stack.push(value);
             }
             

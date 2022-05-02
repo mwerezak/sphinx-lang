@@ -43,8 +43,8 @@ const OP_TUPLEN:           u8 = 0x14;  // [ item[0] ... item[N] N ] => [ tuple ]
 
 // 0x18-1F        Iteration
 
-const OP_ITER_INIT:        u8 = 0x18;  // [ iterable ] => [ iter state value ]
-const OP_ITER_NEXT:        u8 = 0x19;  // [ iter state ] => [ iter next_state value ]
+const OP_ITER_INIT:        u8 = 0x18;  // [ iterable ] => [ iterable iter state[0] ]
+const OP_ITER_NEXT:        u8 = 0x19;  // [ iter state[N] ] => [ iter state[N+1] value[N] ]
 
 // 0x40-5F        Load/Store
 
