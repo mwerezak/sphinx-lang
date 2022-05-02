@@ -12,13 +12,13 @@ use crate::runtime::errors::{ExecResult};
     These values support the `iter_init()` method which produces an "iterator state".
     
     An iterator state is just a pair: an "iterator" and a state. The state can be any value, including nil.
-    The iterator is a value that supports the `iter_item()` and `iter_next()` methods. 
+    The iterator is a value that supports the `iter_get()` and `iter_next()` methods. 
     
     Both of these methods take the state value as their argument.
     
     `iter_next()` takes a state value and produces the next state value.
     
-    `iter_item()` gets the item for a given state.
+    `iter_get()` gets the item for a given state.
     This method is expected to succeed when called for the first time with the current state, but is not
     required to succeed when called with the same state subsequent times or when called with a past state.
     
@@ -30,22 +30,9 @@ use crate::runtime::errors::{ExecResult};
 */
 
 pub struct IterState {
-    iter: Variant,
-    state: Variant,
+    pub iter: Variant,
+    pub state: Variant,
 }
-
-impl IterState {
-    pub fn new(iter: Variant, state: Variant) -> Self {
-        Self { iter, state }
-    }
-    
-    #[inline]
-    pub fn iter(&self) -> &Variant { &self.iter }
-    
-    #[inline]
-    pub fn state(&self) -> &Variant { &self.state }
-}
-
 
 /// Similar use case as UserData but a bit more limited in scope
 pub trait UserIterator: GcTrace {
@@ -73,7 +60,7 @@ impl MetaObject for Gc<dyn UserIterator> {
         }
     }
     
-    fn iter_item(&self, state: &Variant) -> Option<ExecResult<Variant>> {
+    fn iter_get(&self, state: &Variant) -> Option<ExecResult<Variant>> {
         Some(self.get_item(state))
     }
     

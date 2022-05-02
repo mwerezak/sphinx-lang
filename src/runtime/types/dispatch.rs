@@ -71,7 +71,7 @@ impl MetaObject for MetaDispatch<'_> {
     
     // iterators
     static_dispatch!{ fn iter_init() -> Option<ExecResult<IterState>> }
-    static_dispatch!{ fn iter_item(state: &Variant) -> Option<ExecResult<Variant>> }
+    static_dispatch!{ fn iter_get(state: &Variant) -> Option<ExecResult<Variant>> }
     static_dispatch!{ fn iter_next(state: &Variant) -> Option<ExecResult<Variant>> }
     
     // collections

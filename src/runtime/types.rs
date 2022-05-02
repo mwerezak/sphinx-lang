@@ -96,7 +96,7 @@ pub trait MetaObject {
     // iterators
     
     // take the current state, produce either the next state or the StopIteration marker
-    fn iter_item(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn iter_get(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }
     fn iter_next(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }
     
     // produce an iterator (i.e. supports the next() metamethod) and the initial state
@@ -196,8 +196,8 @@ impl Variant {
             .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::IterNext))?
     }
     
-    pub fn iter_item(&self, state: &Variant) -> ExecResult<Variant> {
-        self.as_meta().iter_item(state)
+    pub fn iter_get(&self, state: &Variant) -> ExecResult<Variant> {
+        self.as_meta().iter_get(state)
             .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::IterItem))?
     }
     
@@ -234,7 +234,7 @@ impl MethodTag {
             // iterators and iterables
             Self::IterInit => "iter_init",
             Self::IterNext => "iter_next",
-            Self::IterItem => "iter_item",
+            Self::IterItem => "iter_get",
             
             // sequences
             Self::Len => "len",

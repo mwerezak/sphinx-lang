@@ -43,8 +43,8 @@ const OP_TUPLEN:           u8 = 0x14;  // [ item[0] ... item[N] N ] => [ tuple ]
 
 // 0x18-1F        Iteration
 
-const OP_ITER_INIT:        u8 = 0x18;  // [ iter ] => [ iter first_item ]
-const OP_ITER_NEXT:        u8 = 0x19;  // [ iter item ] => [ iter next_item ]
+const OP_ITER_INIT:        u8 = 0x18;  // [ iterable ] => [ iter state value ]
+const OP_ITER_NEXT:        u8 = 0x19;  // [ iter state ] => [ iter next_state value ]
 
 // 0x40-5F        Load/Store
 
@@ -156,6 +156,9 @@ pub enum OpCode {
     Tuple = OP_TUPLE,
     TupleN = OP_TUPLEN,
     
+    IterInit = OP_ITER_INIT,
+    IterNext = OP_ITER_NEXT,
+    
     LoadFunction = OP_LD_FUN,
     LoadFunction16 = OP_LD_FUN_16,
     
@@ -246,6 +249,9 @@ impl OpCode {
             
             OP_TUPLE => Self::Tuple,
             OP_TUPLEN => Self::TupleN,
+            
+            OP_ITER_INIT => Self::IterInit,
+            OP_ITER_NEXT => Self::IterNext,
             
             OP_LD_FUN => Self::LoadFunction,
             OP_LD_FUN_16 => Self::LoadFunction16,
@@ -402,6 +408,9 @@ impl core::fmt::Display for OpCode {
             
             Self::Tuple => "TUPLE",
             Self::TupleN => "TUPLEN",
+            
+            Self::IterInit => "ITER_INIT",
+            Self::IterNext => "ITER_NEXT",
             
             Self::LoadFunction => "OP_LD_FUN",
             Self::LoadFunction16 => "OP_LD_FUN_16",

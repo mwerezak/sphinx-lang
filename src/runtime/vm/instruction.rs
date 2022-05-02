@@ -6,6 +6,7 @@ use crate::runtime::gc::Gc;
 use crate::runtime::function::{Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Access, ConstID, FunctionID, FunctionProto};
+use crate::runtime::types::IterState;
 use crate::runtime::errors::{ExecResult, ErrorKind};
 use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control, VMCallFrame};
 
@@ -197,6 +198,24 @@ impl<'c> VMCallFrame<'c> {
             }
             OpCode::Clone => {
                 stack.push(*stack.peek());
+            }
+            
+            OpCode::IterInit => {
+                let IterState { iter, state } = stack.peek().iter_init()?;
+                let value = iter.iter_get(&state)?;
+                stack.replace(iter);
+                stack.push(state);
+                stack.push(value);
+            }
+            
+            OpCode::IterNext => {
+                let state = stack.peek_many(2);
+                let (iter, state) = (state[0], state[1]);
+                let state = iter.iter_next(&state)?;
+                stack.replace(state);
+                
+                let value = iter.iter_get(&state)?;
+                stack.push(value);
             }
             
             OpCode::LoadFunction => {
