@@ -3,7 +3,7 @@ use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::strings::{StringValue, static_symbol};
 use crate::runtime::types::{Type, MetaObject, IterState, UserIterator};
-use crate::runtime::errors::{ExecResult, ErrorKind};
+use crate::runtime::errors::{ExecResult, RuntimeError};
 
 #[derive(Clone, Copy)]
 pub enum Tuple {
@@ -79,11 +79,11 @@ impl MetaObject for Tuple {
                 let mut buf = String::new();
                 
                 write!(&mut buf, "({}", first.fmt_echo()?)
-                    .map_err(ErrorKind::from)?;
+                    .map_err(|err| RuntimeError::other(err.to_string()))?;
                 
                 for item in rest.iter() {
                     write!(&mut buf, ", {}", item.fmt_echo()?)
-                        .map_err(ErrorKind::from)?;
+                        .map_err(|err| RuntimeError::other(err.to_string()))?;
                 }
                 buf.push(')');
 
@@ -117,7 +117,7 @@ unsafe impl GcTrace for TupleIter {
 impl UserIterator for TupleIter {
     fn get_item(&self, state: &Variant) -> ExecResult<Variant> {
         let idx = usize::try_from(state.as_int()?)
-            .map_err(|_| ErrorKind::StaticMessage("invalid state"))?;
+            .map_err(|_| RuntimeError::invalid_value("invalid state"))?;
         
         let items = self.0.as_ref();
         Ok(items[idx])
@@ -127,13 +127,13 @@ impl UserIterator for TupleIter {
         let next = match state {
             Some(state) => state.as_int()?
                 .checked_add(1)
-                .ok_or(ErrorKind::OverflowError)?,
+                .ok_or(RuntimeError::overflow_error())?,
             
             None => 0,
         };
         
         let next_idx = usize::try_from(next)
-            .map_err(|_| ErrorKind::StaticMessage("invalid state"))?;
+            .map_err(|_| RuntimeError::invalid_value("invalid state"))?;
         
         if next_idx >= self.0.len() {
             return Ok(Variant::Nil)

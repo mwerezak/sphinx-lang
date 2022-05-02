@@ -6,7 +6,7 @@ use crate::runtime::types::{Tuple, UserData, UserIterator, Marker};
 use crate::runtime::function::{Function, NativeFunction};
 use crate::runtime::strings::{StringValue, StringSymbol, InlineStr};
 use crate::runtime::gc::{Gc, GcTrace};
-use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
+use crate::runtime::errors::{ExecResult, RuntimeError};
 
 
 // try to use less memory on 32-bit architectures
@@ -194,7 +194,7 @@ impl Variant {
             Self::InternStr(..) | Self::InlineStr(..) | Self::GCStr(..) =>
                 self.as_strval().unwrap().hash(state),
             
-            _ => return Err(ErrorKind::UnhashableValue(*self).into()),
+            _ => return Err(RuntimeError::unhashable_value(self)),
         }
         Ok(())
     }
@@ -210,7 +210,7 @@ impl<'a> TryFrom<&'a Variant> for VariantKey<'a> {
     type Error = Box<RuntimeError>;
     fn try_from(value: &'a Variant) -> ExecResult<Self> {
         if !value.can_hash() {
-            return Err(ErrorKind::UnhashableValue(*value).into());
+            return Err(RuntimeError::unhashable_value(value));
         }
         Ok(Self(value))
     }

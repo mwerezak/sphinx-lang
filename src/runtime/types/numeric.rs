@@ -4,24 +4,26 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::strings::{StringValue, StrBuffer};
 use crate::runtime::types::{MetaObject, Type};
-use crate::runtime::errors::{ExecResult, ErrorKind};
+use crate::runtime::errors::{ExecResult, RuntimeError};
 
 macro_rules! checked_int_math {
     ( $method:tt, $lhs:expr, $rhs:expr ) => {
         match $lhs.$method($rhs) {
             Some(value) => Ok(Variant::Integer(value)),
-            None => Err(ErrorKind::OverflowError.into()),
+            None => Err(RuntimeError::overflow_error()),
         }
     };
 }
 
 pub fn int_from_str(s: &str, radix: IntType) -> ExecResult<IntType> {
     if !(2..=36).contains(&radix) {
-        return Err(ErrorKind::StaticMessage("invalid radix").into());
+        return Err(RuntimeError::invalid_value("invalid radix"));
     }
     
     let value = IntType::from_str_radix(s, radix.try_into().unwrap())
-        .map_err(|_| ErrorKind::Message(format!("could not parse \"{}\" as int with radix {}", s, radix)))?;
+        .map_err(|_| RuntimeError::invalid_value(format!(
+            "could not parse \"{}\" as int with radix {}", s, radix)
+        ))?;
     Ok(value)
 }
 
@@ -52,7 +54,7 @@ impl MetaObject for IntType {
         rhs.as_meta().as_int().map(|rhs| {
             let rhs = rhs?;
             if rhs == 0 {
-                Err(ErrorKind::DivideByZero.into())
+                Err(RuntimeError::divide_by_zero())
             } else {
                 checked_int_math!(checked_div, *self, rhs)
             }
@@ -62,7 +64,7 @@ impl MetaObject for IntType {
     fn op_rdiv(&self, lhs: &Variant) -> Option<ExecResult<Variant>> {
         lhs.as_meta().as_int().map(|lhs| {
             if *self == 0 {
-                Err(ErrorKind::DivideByZero.into())
+                Err(RuntimeError::divide_by_zero())
             } else {
                 checked_int_math!(checked_div, lhs?, *self)
             }
@@ -164,7 +166,7 @@ impl MetaObject for IntType {
         
         rhs.map(|rhs| {
             if rhs < 0 {
-                return Err(ErrorKind::NegativeShiftCount.into());
+                return Err(RuntimeError::negative_shift_count());
             }
             return checked_int_math!(checked_shl, *self, rhs.try_into().unwrap());
         })
@@ -174,7 +176,7 @@ impl MetaObject for IntType {
         lhs.as_meta().as_bits().map(|lhs| {
             let lhs = lhs?;
             if *self < 0 {
-                return Err(ErrorKind::NegativeShiftCount.into());
+                return Err(RuntimeError::negative_shift_count());
             }
             return checked_int_math!(checked_shl, lhs, (*self).try_into().unwrap());
         })
@@ -194,7 +196,7 @@ impl MetaObject for IntType {
         
         rhs.map(|rhs| {
             if rhs < 0 {
-                return Err(ErrorKind::NegativeShiftCount.into());
+                return Err(RuntimeError::negative_shift_count());
             }
             return checked_int_math!(checked_shr, *self, rhs.try_into().unwrap());
         })
@@ -204,7 +206,7 @@ impl MetaObject for IntType {
         lhs.as_meta().as_bits().map(|lhs| {
             let lhs = lhs?;
             if *self < 0 {
-                return Err(ErrorKind::NegativeShiftCount.into());
+                return Err(RuntimeError::negative_shift_count());
             }
             return checked_int_math!(checked_shr, lhs, (*self).try_into().unwrap());
         })
@@ -248,7 +250,9 @@ impl MetaObject for IntType {
 
 pub fn float_from_str(s: &str) -> ExecResult<FloatType> {
     let value = FloatType::from_str(s)
-        .map_err(|_| ErrorKind::Message(format!("could not parse \"{}\" as float", s)))?;
+        .map_err(|_| RuntimeError::invalid_value(format!(
+            "could not parse \"{}\" as float", s
+        )))?;
     Ok(value)
 }
 
@@ -326,7 +330,8 @@ impl MetaObject for FloatType {
             Ok(StringValue::new_maybe_interned(buf))
         } else {
             let mut buf = String::new();
-            write_float(*self, &mut buf).map_err(ErrorKind::from)?;
+            write_float(*self, &mut buf)
+                .map_err(|error| RuntimeError::other(error.to_string()))?;
             Ok(StringValue::new_maybe_interned(buf))
         }
     }

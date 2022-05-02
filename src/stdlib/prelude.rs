@@ -2,7 +2,7 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::Gc;
 use crate::runtime::module::{GlobalEnv};
 use crate::runtime::types::{int_from_str, float_from_str};
-use crate::runtime::errors::{ErrorKind, ExecResult};
+use crate::runtime::errors::{RuntimeError, ExecResult};
 
 
 use crate::runtime::Variant;
@@ -35,7 +35,7 @@ impl UserIterator for RangeIter {
         let next = match state {
             Some(state) => state.as_int()?
                 .checked_add(self.step)
-                .ok_or(ErrorKind::OverflowError)?,
+                .ok_or(RuntimeError::overflow_error())?,
             
             None => self.start,
         };
@@ -66,7 +66,7 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         let len = value.len()?;
         match IntType::try_from(len) {
             Ok(len) => Ok(Variant::from(len)),
-            Err(..) => Err(ErrorKind::OverflowError.into()),
+            Err(..) => Err(RuntimeError::overflow_error()),
         }
     });
     
@@ -142,7 +142,7 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
                 if IntType::MIN as FloatType <= value && value <= IntType::MAX as FloatType {
                     Ok(Variant::from(value as IntType))
                 } else {
-                    Err(ErrorKind::OverflowError.into())
+                    Err(RuntimeError::overflow_error())
                 }
             }
             
@@ -204,7 +204,7 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         
         let step_value = step.as_int()?;
         if step_value == 0 {
-            return Err(ErrorKind::Message("step cannot be zero".to_string()).into());
+            return Err(RuntimeError::invalid_value("step cannot be zero"));
         }
         
         let range_iter = Box::new(RangeIter::new(start_value, stop_value, step_value));

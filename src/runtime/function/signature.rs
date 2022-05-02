@@ -2,7 +2,7 @@ use core::fmt;
 use crate::parser::lvalue::DeclType;
 use crate::runtime::Variant;
 use crate::runtime::strings::{StringValue, StringSymbol, StrBuffer, STRING_TABLE};
-use crate::runtime::errors::{ExecResult, ErrorKind};
+use crate::runtime::errors::{ExecResult, RuntimeError};
 
 
 #[derive(Clone, Debug)]
@@ -71,17 +71,11 @@ impl Signature {
     
     pub fn check_args(&self, args: &[Variant]) -> ExecResult<()> {
         if args.len() < self.required.len() {
-            return Err(ErrorKind::MissingArguments { 
-                signature: Box::new(self.clone()),
-                nargs: args.len() 
-            }.into())
+            return Err(RuntimeError::missing_arguments(self, args.len()))
         }
         
         if matches!(self.max_arity(), Some(max_arity) if args.len() > max_arity) {
-            return Err(ErrorKind::TooManyArguments {
-                signature: Box::new(self.clone()),
-                nargs: args.len()
-            }.into())
+            return Err(RuntimeError::too_many_arguments(self, args.len()))
         }
         
         Ok(())

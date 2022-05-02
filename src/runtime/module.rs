@@ -16,7 +16,7 @@ use crate::language::FloatType;
 use crate::runtime::{Variant, HashMap, DefaultBuildHasher};
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::strings::StringSymbol;
-use crate::runtime::errors::{ExecResult, RuntimeError, ErrorKind};
+use crate::runtime::errors::{ExecResult, RuntimeError};
 
 pub use crate::codegen::{ProgramData, Constant, Chunk, FunctionProto, ConstID, FunctionID};
 
@@ -64,7 +64,7 @@ impl Namespace {
     
     pub fn delete(&mut self, name: &StringSymbol) -> ExecResult<()> {
         if self.store.remove(name).is_none() {
-            return Err(ErrorKind::NameNotDefined(name.to_string()).into())
+            return Err(RuntimeError::name_not_defined(*name))
         }
         Ok(())
     }
@@ -72,15 +72,15 @@ impl Namespace {
     pub fn lookup<'a>(&'a self, name: &StringSymbol) -> ExecResult<&'a Variant> {
         self.store.get(name)
             .map(|var| &var.value)
-            .ok_or_else(|| ErrorKind::NameNotDefined(name.to_string()).into())
+            .ok_or_else(|| RuntimeError::name_not_defined(*name))
     }
     
     pub fn lookup_mut<'a>(&'a mut self, name: &StringSymbol) -> ExecResult<&'a mut Variant> {
         let variable = self.store.get_mut(name)
-            .ok_or_else(|| RuntimeError::from(ErrorKind::NameNotDefined(name.to_string())))?;
+            .ok_or_else(|| RuntimeError::name_not_defined(*name))?;
             
         if variable.access != Access::ReadWrite {
-            return Err(ErrorKind::CantAssignImmutable.into());
+            return Err(RuntimeError::cant_assign_immutable(*name));
         }
         
         Ok(&mut variable.value)

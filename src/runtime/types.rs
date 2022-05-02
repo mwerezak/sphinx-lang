@@ -3,7 +3,7 @@ use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::function::Call;
 use crate::runtime::strings::StringValue;
-use crate::runtime::errors::{ExecResult, ErrorKind};
+use crate::runtime::errors::{ExecResult, RuntimeError};
 
 
 mod ops;
@@ -155,24 +155,24 @@ impl Variant {
     
     pub fn as_bits(&self) -> ExecResult<IntType> {
         self.as_meta().as_bits()
-            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsBits))?
+            .ok_or_else(|| RuntimeError::metamethod_not_supported(self, MethodTag::AsBits))?
     }
     
     pub fn as_int(&self) -> ExecResult<IntType> {
         self.as_meta().as_int()
-            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsInt))?
+            .ok_or_else(|| RuntimeError::metamethod_not_supported(self, MethodTag::AsInt))?
     }
     
     pub fn as_float(&self) -> ExecResult<FloatType> {
         self.as_meta().as_float()
-            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::AsFloat))?
+            .ok_or_else(|| RuntimeError::metamethod_not_supported(self, MethodTag::AsFloat))?
     }
 }
 
 impl Variant {
     pub fn len(&self) -> ExecResult<usize> {
         self.as_meta().len()
-            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Len))?
+            .ok_or_else(|| RuntimeError::metamethod_not_supported(self, MethodTag::Len))?
     }
     
     pub fn is_empty(&self) -> ExecResult<bool> {
@@ -181,22 +181,22 @@ impl Variant {
     
     pub fn iter_init(&self) -> ExecResult<IterState> {
         self.as_meta().iter_init()
-            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::IterInit))?
+            .ok_or_else(|| RuntimeError::metamethod_not_supported(self, MethodTag::IterInit))?
     }
     
     pub fn iter_next(&self, state: &Variant) -> ExecResult<Variant> {
         self.as_meta().iter_next(state)
-            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::IterNext))?
+            .ok_or_else(|| RuntimeError::metamethod_not_supported(self, MethodTag::IterNext))?
     }
     
     pub fn iter_get(&self, state: &Variant) -> ExecResult<Variant> {
         self.as_meta().iter_get(state)
-            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::IterItem))?
+            .ok_or_else(|| RuntimeError::metamethod_not_supported(self, MethodTag::IterItem))?
     }
     
     pub fn invoke(&self, args: &[Variant]) -> ExecResult<Call> {
         self.as_meta().invoke(args)
-            .ok_or_else(|| ErrorKind::MethodNotSupported(self.type_tag(), MethodTag::Invoke))?
+            .ok_or_else(|| RuntimeError::metamethod_not_supported(self, MethodTag::Invoke))?
     }
     
     pub fn fmt_echo(&self) -> ExecResult<StringValue> {

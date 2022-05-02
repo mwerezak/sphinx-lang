@@ -7,7 +7,7 @@ use crate::runtime::function::{Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{Access, ConstID, FunctionID, FunctionProto};
 use crate::runtime::types::IterState;
-use crate::runtime::errors::{ExecResult, ErrorKind};
+use crate::runtime::errors::{ExecResult, RuntimeError};
 use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control, VMCallFrame};
 
 
@@ -127,7 +127,7 @@ impl<'c> VMCallFrame<'c> {
         let data = self.chunk.get(data_slice).expect("truncated instruction");
         
         self.exec_instruction(current_offset, opcode, data, stack, upvalues)
-            .map_err(|error| error.push_frame(self.get_trace(current_offset)))
+            .map_err(|error| error.push_trace(self.get_trace(current_offset)))
     }
     
     #[inline]
@@ -409,7 +409,7 @@ impl<'c> VMCallFrame<'c> {
             OpCode::Inspect => println!("{}", stack.peek().display_echo()),
             OpCode::Assert => {
                 if !stack.peek().as_bool()? {
-                    return Err(ErrorKind::AssertFailed.into());
+                    return Err(RuntimeError::assert_failed(None));
                 }
             }
         }

@@ -1,12 +1,12 @@
 use crate::runtime::Variant;
 use crate::runtime::types::MetaObject;
-use crate::runtime::errors::{ExecResult, ErrorKind};
+use crate::runtime::errors::{ExecResult, RuntimeError};
 
 
 macro_rules! meta_eval_unary {
     ( $operand:expr, $unary_method:tt ) => {
         $operand.as_meta().$unary_method()
-            .unwrap_or_else(|| Err(ErrorKind::InvalidUnaryOperand($operand.type_tag()).into()))
+            .unwrap_or_else(|| Err(RuntimeError::invalid_unary_operand($operand)))
     };
 }
 
@@ -23,7 +23,7 @@ macro_rules! meta_eval_binary {
                 }
             }
             
-            Err(ErrorKind::InvalidBinaryOperand($lhs.type_tag(), $rhs.type_tag()).into())
+            Err(RuntimeError::invalid_binary_operands($lhs, $rhs))
         }
     };
 }
@@ -41,7 +41,7 @@ macro_rules! meta_eval_inequality {
                 }
             }
             
-            Err(ErrorKind::InvalidBinaryOperand($lhs.type_tag(), $rhs.type_tag()).into())
+            Err(RuntimeError::invalid_binary_operands($lhs, $rhs))
         }
     };
 }

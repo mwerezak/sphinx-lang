@@ -2,87 +2,50 @@ use core::fmt;
 use std::error::Error;
 
 use crate::utils;
-use crate::runtime::Variant;
-use crate::runtime::function::Signature;
 use crate::runtime::gc::GcTrace;
-use crate::runtime::types::{Type, MethodTag};
-use crate::runtime::strings::StringSymbol;
+use crate::runtime::strings::StringValue;
 use crate::debug::traceback::{TraceSite, Traceback};
+
+mod errorkinds;
 
 
 pub type ExecResult<T> = Result<T, Box<RuntimeError>>;
 
-#[derive(Debug)]
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ErrorKind {
-    // TODO replace variant with type name
-    InvalidUnaryOperand(Type),  // unsupported operand for type
-    InvalidBinaryOperand(Type, Type),
+    InvalidUnaryOperand,
+    InvalidBinaryOperand,
     OverflowError,
     DivideByZero,
     NegativeShiftCount,
-    NameNotDefined(String),
-    CantAssignImmutable,  // can't assign to immutable global variable
-    UnhashableValue(Variant),
-    MissingArguments { signature: Box<Signature>, nargs: usize },
-    TooManyArguments { signature: Box<Signature>, nargs: usize },
-    MethodNotSupported(Type, MethodTag),
+    NameNotDefined,
+    CantAssignImmutable,
+    UnhashableValue,
+    MissingArguments,
+    TooManyArguments,
+    MethodNotSupported,
     AssertFailed,
-    
-    StaticMessage(&'static str),
-    Message(String),
-    Other(String),
+    InvalidValue,
+    Unspecified,
 }
-
-impl<E: Error> From<E> for ErrorKind {
-    fn from(error: E) -> Self {
-        Self::Other(format!("{}", error))
-    }
-}
-
-impl From<ErrorKind> for RuntimeError {
-    fn from(kind: ErrorKind) -> Self {
-        RuntimeError { kind, traceback: Vec::new(), cause: None }
-    }
-}
-
-impl From<ErrorKind> for Box<RuntimeError> {
-    fn from(kind: ErrorKind) -> Self {
-        Box::new(kind.into())
-    }
-}
-
-unsafe impl GcTrace for ErrorKind {
-    fn trace(&self) {
-        match self {
-            Self::UnhashableValue(value) => value.trace(),
-            _ => { },
-        }
-    }
-    
-    fn size_hint(&self) -> usize {
-        match self {
-            Self::MissingArguments { .. } => core::mem::size_of::<Signature>(),
-            Self::TooManyArguments { .. } => core::mem::size_of::<Signature>(),
-            _ => 0,
-        }
-    }
-}
-
-
 
 #[derive(Debug)]
 pub struct RuntimeError {
     kind: ErrorKind,
+    message: StringValue,
     traceback: Vec<TraceSite>,
     cause: Option<Box<RuntimeError>>,
 }
 
 unsafe impl GcTrace for RuntimeError {
     fn trace(&self) {
-        self.kind.trace();
+        self.message.trace();
+        
         for site in self.traceback.iter() {
             site.trace();
         }
+        
         if let Some(error) = self.cause.as_ref() {
             error.trace();
         }
@@ -90,6 +53,14 @@ unsafe impl GcTrace for RuntimeError {
 }
 
 impl RuntimeError {
+    pub fn new(kind: ErrorKind, message: StringValue) -> Box<Self> {
+        Box::new(Self {
+            kind, message,
+            traceback: Vec::new(),
+            cause: None,
+        })
+    }
+    
     pub fn caused_by(mut self: Box<Self>, cause: Box<RuntimeError>) -> Box<Self> {
         self.cause.replace(cause); self
     }
@@ -98,7 +69,7 @@ impl RuntimeError {
         self.traceback.extend(trace); self
     }
     
-    pub fn push_frame(mut self: Box<Self>, site: TraceSite) -> Box<Self> {
+    pub fn push_trace(mut self: Box<Self>, site: TraceSite) -> Box<Self> {
         self.traceback.push(site); self
     }
     
@@ -120,78 +91,7 @@ impl Error for RuntimeError {
 #[allow(clippy::useless_format)]
 impl fmt::Display for RuntimeError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        let message = match self.kind() {
-            // TODO
-            ErrorKind::InvalidUnaryOperand(operand) => format!("unsupported operand: '{}'", operand),
-            ErrorKind::InvalidBinaryOperand(lhs, rhs) => format!("unsupported operands: '{}' and '{}'", lhs, rhs),
-            ErrorKind::DivideByZero => format!("divide by zero"),
-            ErrorKind::OverflowError => format!("integer overflow"),
-            ErrorKind::NegativeShiftCount => format!("negative bitshift count"),
-            ErrorKind::NameNotDefined(name) => format!("undefined variable \"{}\"", name),
-            ErrorKind::CantAssignImmutable => format!("can't assign to an immutable variable"),
-            ErrorKind::UnhashableValue(value) => format!("{} is not hashable", value.display_echo()),
-            ErrorKind::AssertFailed => format!("assertion failed"),
-            ErrorKind::StaticMessage(message) => message.to_string(),
-            ErrorKind::Message(message) => message.to_string(),
-            ErrorKind::Other(message) => message.to_string(),
-            
-            ErrorKind::MethodNotSupported(receiver, method) => {
-                match method {
-                    MethodTag::AsBits => format!("can't interpret '{}' as bitfield", receiver),
-                    MethodTag::AsInt => format!("can't interpret '{}' as int", receiver),
-                    MethodTag::AsFloat => format!("can't interpret '{}' as float", receiver),
-                    MethodTag::Invoke => format!("type '{}' is not callable", receiver),
-                    
-                    MethodTag::IterInit => format!("type '{}' is not iterable", receiver),
-                    MethodTag::IterNext | MethodTag::IterItem
-                        => format!("type '{}' is not an iterator", receiver),
-                    
-                    _ => format!("type '{}' does not support '__{}'", receiver, method),
-                }
-            }
-            
-            ErrorKind::MissingArguments { signature, nargs } => {
-                let missing = signature.required().iter()
-                    .skip(*nargs)
-                    .map(|param| *param.name())
-                    .collect::<Vec<StringSymbol>>();
-                
-                let count = signature.min_arity() - nargs;
-                
-                format!(
-                    "{} missing {} required {}: {}",
-                    signature.fmt_name(), 
-                    count, 
-                    if count == 1 { "argument" }
-                    else { "arguments" },
-                    utils::fmt_join(", ", &missing),
-                )
-            },
-            
-            ErrorKind::TooManyArguments { signature, nargs } => {
-                format!(
-                    "{} takes {} arguments but {} were given", 
-                    signature.fmt_name(), 
-                    signature.max_arity().unwrap(), 
-                    nargs,
-                )
-            },
-
-        };
-        
+        let message = format!("{}", self.message);
         utils::format_error(fmt, "Runtime error", Some(&message), self.source())
     }
 }
-
-/*
-Probably declare these in the debug module...
-
-pub struct Frame {
-    symbol: DebugSymbol,
-    context: ...,
-}
-
-pub struct Traceback {
-    frames: Vec<Frame>,
-}
-*/
