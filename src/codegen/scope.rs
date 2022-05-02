@@ -18,6 +18,8 @@ pub(super) enum LocalName {
     // special local variables
     Receiver,  // inside a function call, this refers to the object that was called
     NArgs,     // inside a function call, the number of arguments passed at the call site
+    
+    Temp,      // anonymous temporaries
 }
 
 
@@ -162,6 +164,9 @@ impl Scope {
     }
     
     fn find_local_mut(&mut self, name: &LocalName) -> Option<&mut Local> {
+        if matches!(name, LocalName::Temp) {
+            return None; // temporaries should not be referenced
+        }
         self.locals.iter_mut().find(|local| local.name == *name)
     }
     

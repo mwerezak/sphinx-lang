@@ -11,18 +11,6 @@ pub enum Tuple {
     NonEmpty(Gc<[Variant]>),
 }
 
-unsafe impl GcTrace for Box<[Variant]> {
-    fn trace(&self) {
-        for item in self.iter() {
-            item.trace();
-        }
-    }
-    
-    fn size_hint(&self) -> usize {
-        core::mem::size_of::<Variant>() * self.len()
-    }
-}
-
 impl Default for Tuple {
     fn default() -> Self { Self::Empty }
 }

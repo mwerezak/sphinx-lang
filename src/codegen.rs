@@ -6,7 +6,7 @@ use crate::language::{IntType, FloatType, InternSymbol};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary, AccessItem};
-use crate::parser::lvalue::{Assignment, Declaration, LValue, DeclType};
+use crate::parser::lvalue::{LValue, DeclType};
 use crate::parser::fundefs::{FunctionDef, SignatureDef};
 use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::strings::{StringInterner};
@@ -32,41 +32,6 @@ use funproto::{UnloadedFunction, UnloadedSignature, UnloadedParam};
 
 
 // Helpers
-
-struct AssignmentRef<'a> {
-    lhs: &'a LValue,
-    op: Option<BinaryOp>,
-    rhs: &'a Expr,
-    nonlocal: bool,
-}
-
-impl<'a> From<&'a Assignment> for AssignmentRef<'a> {
-    fn from(assign: &'a Assignment) -> Self {
-        Self {
-            lhs: &assign.lhs,
-            op: assign.op,
-            rhs: &assign.rhs,
-            nonlocal: assign.nonlocal,
-        }
-    }
-}
-
-struct DeclarationRef<'a> {
-    decl: DeclType,
-    lhs: &'a LValue,
-    init: &'a Expr,
-}
-
-impl<'a> From<&'a Declaration> for DeclarationRef<'a> {
-    fn from(decl: &'a Declaration) -> Self {
-        Self {
-            decl: decl.decl,
-            lhs: &decl.lhs,
-            init: &decl.init,
-        }
-    }
-}
-
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum JumpOffset {
@@ -785,8 +750,19 @@ impl CodeGenerator<'_> {
                 self.emit_binary_op(symbol, op);
             },
             
-            Expr::Declaration(decl) => self.compile_declaration(symbol, (&**decl).into())?,
-            Expr::Assignment(assign) => self.compile_assignment(symbol, (&**assign).into())?,
+            Expr::Declaration(decl) => {
+                self.compile_expr(symbol, &decl.init)?;
+                self.compile_declaration(symbol, decl.decl, &decl.lhs)?;
+            },
+            
+            Expr::Assignment(assign) => {
+                if let Some(op) = assign.op {
+                    self.compile_update_assignment(symbol, op, &assign.lhs, &assign.rhs, assign.nonlocal)?;
+                } else {
+                    self.compile_expr(symbol, &assign.rhs)?;
+                    self.compile_assignment(symbol, &assign.lhs, assign.nonlocal)?;
+                }
+            },
             
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list)?,
             
@@ -959,54 +935,23 @@ impl CodeGenerator<'_> {
 
 ///////// Declarations and Assignments /////////
 impl CodeGenerator<'_> {
-    fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclarationRef) -> CompileResult<()> {
-        match &decl.lhs {
+    fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, lhs: &LValue) -> CompileResult<()> {
+        match lhs {
             LValue::Identifier(name) => if self.scopes().is_global_scope() {
-                self.compile_decl_global_name(symbol, decl.decl, *name, decl.init)
+                self.compile_decl_global_name(symbol, decl, *name)
             } else {
-                self.compile_decl_local_name(symbol, decl.decl, *name, decl.init)
+                self.compile_decl_local_name(symbol, decl, *name)
             },
             
             LValue::Attribute(target) => unimplemented!(),
+            
             LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple(target_list) => match &decl.init {
-                
-                Expr::Tuple(init_list) => {
-                    if target_list.len() != init_list.len() {
-                        return Err(ErrorKind::TupleLenMismatch.into());
-                    }
-                    
-                    for (inner_lhs, inner_expr) in target_list.iter().zip(init_list.iter()) {
-                        let inner_symbol = inner_expr.debug_symbol();
-                        let inner_init = inner_expr.variant();
-                        
-                        let inner_decl = DeclarationRef {
-                            decl: decl.decl,
-                            lhs: inner_lhs,
-                            init: inner_init,
-                        };
-                        
-                        self.compile_declaration(Some(inner_symbol), inner_decl)
-                            .map_err(|err| err.with_symbol(*inner_symbol))?;
-                    }
-                    
-                    // declarations are also expressions
-                    let tuple_len = u8::try_from(init_list.len())
-                        .map_err(|_| ErrorKind::InternalLimit("max tuple length exceeded"))?;
-                    self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
-                    
-                    Ok(())
-                },
-                
-                _ => unimplemented!(), // dynamic declaration
-            },
+            LValue::Tuple(target_list) => self.compile_decl_tuple(symbol, decl, target_list),
         }
     }
     
-    fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
-        
-        self.compile_expr(symbol, init)?;  // make sure to evaluate initializer first in order for shadowing to work
+    fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
         
         match self.scopes_mut().insert_local(decl, LocalName::Symbol(name))? {
             InsertLocal::CreateNew => 
@@ -1019,9 +964,7 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol, init: &Expr) -> CompileResult<()> {
-        
-        self.compile_expr(symbol, init)?;
+    fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
         
         self.emit_load_const(symbol, Constant::from(name))?;
         match decl {
@@ -1031,69 +974,81 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_assignment(&mut self, symbol: Option<&DebugSymbol>, assign: AssignmentRef) -> CompileResult<()> {
-        match assign.lhs {
-            // LValue::Identifier(name) if self.state.is_global_scope() => self.compile_assign_global_name(symbol, op, *name, &rhs),
-            LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, assign),
+    fn compile_decl_tuple(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, targets: &[LValue]) -> CompileResult<()> {
+        
+        let mut error_jump_sites = Vec::new();
+        
+        self.emit_instr(symbol, OpCode::IterInit);  // iterate to yield values
+        
+        // compile to unrolled iteration
+        for target in targets.iter() {
+            // check if there is an item left for this target
+            let error_jump = self.emit_dummy_jump(symbol, Jump::IfFalse);
+            error_jump_sites.push(error_jump);
+            
+            // advance the iterator and put the item on the stack
+            self.emit_instr(symbol, OpCode::IterNext);
+            self.compile_declaration(symbol, decl, target)?;
+            
+            self.emit_instr(symbol, OpCode::Pop);
+        }
+        
+        // if the iterator is finished we've succeeded
+        let done_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
+        
+        // too many items
+        self.emit_instr(symbol, OpCode::False);
+        self.emit_instr(symbol, OpCode::Assert); // TODO implement dynamic errors
+        
+        // not enough items
+        let error_target = self.current_offset();
+        for jump_site in error_jump_sites.iter() {
+            self.patch_jump_instr(jump_site, error_target)?;
+        }
+        
+        self.emit_instr(symbol, OpCode::False);
+        self.emit_instr(symbol, OpCode::Assert); // TODO implement dynamic errors
+        
+        // cleanup
+        self.patch_jump_instr(&done_jump_site, self.current_offset())?;
+        self.emit_instr(symbol, OpCode::Pop); // pop iter
+        
+        Ok(())
+    }
+    
+    fn compile_update_assignment(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp, lhs: &LValue, rhs: &Expr, nonlocal: bool) -> CompileResult<()> {
+        
+        // TODO suport Attribute and Index LValues as well
+        match lhs {
+            LValue::Identifier(name) => {
+                self.compile_name_lookup(symbol, name)?;
+                self.compile_expr(symbol, rhs)?;
+                self.emit_binary_op(symbol, &op);
+                
+                self.compile_assign_identifier(symbol, name, nonlocal)
+            },
             
             LValue::Attribute(target) => unimplemented!(),
             LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple(..) if assign.op.is_some() => {
-                Err(ErrorKind::CantUpdateAssignTuple.into())
-            },
-            
-            LValue::Tuple(target_list) => match assign.rhs {
-                
-                Expr::Tuple(rhs_list) => {
-                    if target_list.len() != rhs_list.len() {
-                        return Err(ErrorKind::TupleLenMismatch.into())
-                    }
-                    
-                    for (inner_lhs, inner_expr) in target_list.iter().zip(rhs_list.iter()) {
-                        let inner_symbol = inner_expr.debug_symbol();
-                        let inner_rhs = inner_expr.variant();
-                        
-                        let inner_assign = AssignmentRef {
-                            lhs: inner_lhs,
-                            op: None,
-                            rhs: inner_rhs,
-                            nonlocal: assign.nonlocal,
-                        };
-                        
-                        self.compile_assignment(Some(inner_symbol), inner_assign)
-                            .map_err(|err| err.with_symbol(*inner_symbol))?;
-                    }
-                    
-                    // assignments are also expressions
-                    let tuple_len = u8::try_from(rhs_list.len())
-                        .map_err(|_| ErrorKind::InternalLimit("max tuple length exceeded"))?;
-                    self.emit_instr_byte(symbol, OpCode::Tuple, tuple_len);
-                    
-                    Ok(())
-                },
-                
-                _ => unimplemented!(), // dynamic declaration
-                
-            },
+            LValue::Tuple(..) => Err(ErrorKind::CantUpdateAssignTuple.into()),
         }
     }
     
-    fn compile_assign_identifier(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol, assign: AssignmentRef) -> CompileResult<()> {
+    fn compile_assignment(&mut self, symbol: Option<&DebugSymbol>, lhs: &LValue, nonlocal: bool) -> CompileResult<()> {
         
-        // Compile RHS
-        
-        if let Some(op) = assign.op {
-            // update assignment
-            self.compile_name_lookup(symbol, name)?;
-            self.compile_expr(symbol, assign.rhs)?;
-            self.emit_binary_op(symbol, &op);
+        match lhs {
+            LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, nonlocal),
             
-        } else {
-            // normal assignment
-            self.compile_expr(symbol, assign.rhs)?;
+            LValue::Attribute(target) => unimplemented!(),
             
+            LValue::Index(target) => unimplemented!(),
+            
+            LValue::Tuple(target_list) => self.compile_assign_tuple(symbol, target_list, nonlocal),
         }
+    }
+    
+    fn compile_assign_identifier(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol, nonlocal: bool) -> CompileResult<()> {
         
         // Generate assignment
         
@@ -1115,7 +1070,7 @@ impl CodeGenerator<'_> {
             }
             
             // nonlocal keyword is not required in the global frame
-            if !assign.nonlocal && !self.scopes().is_global_frame() {
+            if !nonlocal && !self.scopes().is_global_frame() {
                 return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
             }
             
@@ -1150,6 +1105,48 @@ impl CodeGenerator<'_> {
         } else {
             self.emit_instr_data(symbol, OpCode::StoreLocal16, &offset.to_le_bytes());
         }
+    }
+    
+    fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, targets: &[LValue], nonlocal: bool) -> CompileResult<()> {
+        
+        let mut error_jump_sites = Vec::new();
+        
+        self.emit_instr(symbol, OpCode::IterInit);  // iterate to yield values
+        
+        // compile to unrolled iteration
+        for target in targets.iter() {
+            // check if there is an item left for this target
+            let error_jump = self.emit_dummy_jump(symbol, Jump::IfFalse);
+            error_jump_sites.push(error_jump);
+            
+            // advance the iterator and put the item on the stack
+            self.emit_instr(symbol, OpCode::IterNext);
+            self.compile_assignment(symbol, target, nonlocal)?;
+            
+            self.emit_instr(symbol, OpCode::Pop);
+        }
+        
+        // if the iterator is finished we've succeeded
+        let done_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
+        
+        // too many items
+        self.emit_instr(symbol, OpCode::False);
+        self.emit_instr(symbol, OpCode::Assert); // TODO implement dynamic errors
+        
+        // not enough items
+        let error_target = self.current_offset();
+        for jump_site in error_jump_sites.iter() {
+            self.patch_jump_instr(jump_site, error_target)?;
+        }
+        
+        self.emit_instr(symbol, OpCode::False);
+        self.emit_instr(symbol, OpCode::Assert); // TODO implement dynamic errors
+        
+        // cleanup
+        self.patch_jump_instr(&done_jump_site, self.current_offset())?;
+        self.emit_instr(symbol, OpCode::Pop); // pop iter
+        
+        Ok(())
     }
 }
 
