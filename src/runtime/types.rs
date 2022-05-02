@@ -2,7 +2,7 @@ use core::fmt;
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::function::Call;
-use crate::runtime::strings::{StringValue, static_symbol};
+use crate::runtime::strings::StringValue;
 use crate::runtime::errors::{ExecResult, ErrorKind};
 
 
@@ -65,13 +65,6 @@ impl Type {
 impl fmt::Display for Type {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.write_str(self.name())
-    }
-}
-
-
-impl Variant {
-    pub fn stop_iteration() -> Variant {
-        Variant::marker(static_symbol!("StopIteration"))
     }
 }
 

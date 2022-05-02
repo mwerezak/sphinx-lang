@@ -11,7 +11,8 @@ use crate::runtime::errors::{ExecResult};
     Certain values are "iterables" and can be iterated. For example: containers, strings, streams, etc.
     These values support the `iter_init()` method which produces an "iterator state".
     
-    An iterator state is just a pair: an "iterator" and a state. The state can be any value, including nil.
+    An iterator state is just a pair: an "iterator" and a state. The state can be any value, 
+    however falsey values are interpeted as the end of the iteration.
     The iterator is a value that supports the `iter_get()` and `iter_next()` methods. 
     
     Both of these methods take the state value as their argument.
@@ -24,8 +25,7 @@ use crate::runtime::errors::{ExecResult};
     
     Note: it is not required for an iterator to actually use the state argument.
     The alternative is interior mutability: the iterator can just mutate itself when `iter_next()` is called.
-    Such iterators are called "stateful" and it is recommended that iterators use a state value
-    of "nil" to indicate that they are stateful.
+    Such iterators are called "stateful" and the state is only needed to signal the end of iteration.
     
 */
 
@@ -36,7 +36,7 @@ pub struct IterState {
 
 /// Similar use case as UserData but a bit more limited in scope
 pub trait UserIterator: GcTrace {
-    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Option<Variant>>;
+    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Variant>;
     fn get_item(&self, state: &Variant) -> ExecResult<Variant>;
 }
 
@@ -65,19 +65,13 @@ impl MetaObject for Gc<dyn UserIterator> {
     }
     
     fn iter_next(&self, state: &Variant) -> Option<ExecResult<Variant>> {
-        match self.next_state(Some(state)) {
-            Err(error) => Some(Err(error)),
-            Ok(Some(value)) => Some(Ok(value)),
-            Ok(None) => Some(Ok(Variant::stop_iteration())),
-        }
+        Some(self.next_state(Some(state)))
     }
     
     fn iter_init(&self) -> Option<ExecResult<IterState>> {
         let state = match self.next_state(None) {
+            Ok(value) => value,
             Err(error) => return Some(Err(error)),
-            
-            Ok(Some(value)) => value,
-            Ok(None) => Variant::stop_iteration(),
         };
         
         let iter = IterState {

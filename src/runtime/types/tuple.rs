@@ -135,7 +135,7 @@ impl UserIterator for TupleIter {
         Ok(items[idx])
     }
     
-    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Option<Variant>> {
+    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Variant> {
         let next = match state {
             Some(state) => state.as_int()?
                 .checked_add(1)
@@ -148,8 +148,8 @@ impl UserIterator for TupleIter {
             .map_err(|_| ErrorKind::StaticMessage("invalid state"))?;
         
         if next_idx >= self.0.len() {
-            return Ok(None)
+            return Ok(Variant::Nil)
         }
-        Ok(Some(Variant::from(next)))
+        Ok(Variant::from(next))
     }
 }

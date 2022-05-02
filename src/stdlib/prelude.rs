@@ -31,7 +31,7 @@ impl UserIterator for RangeIter {
         Ok(*state)
     }
     
-    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Option<Variant>> {
+    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Variant> {
         let next = match state {
             Some(state) => state.as_int()?
                 .checked_add(self.step)
@@ -42,15 +42,15 @@ impl UserIterator for RangeIter {
         
         if self.step.is_positive() {
             if next >= self.stop {
-                return Ok(None);
+                return Ok(Variant::Nil);
             }
         } else {
             if next <= self.stop {
-                return Ok(None);
+                return Ok(Variant::Nil);
             }
         }
         
-        Ok(Some(Variant::from(next)))
+        Ok(Variant::from(next))
     }
 }
 
@@ -161,13 +161,13 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
     });
     
     // marker type constructor
-    let marker = native_function!(marker, env, params(marker) => {
-        let symbol = marker.as_strval()
-            .ok_or(ErrorKind::StaticMessage("marker discriminant must be a string"))?
-            .as_intern();
+    // let marker = native_function!(marker, env, params(marker) => {
+    //     let symbol = marker.as_strval()
+    //         .ok_or(ErrorKind::StaticMessage("marker discriminant must be a string"))?
+    //         .as_intern();
             
-        Ok(Variant::marker(symbol))
-    });
+    //     Ok(Variant::marker(symbol))
+    // });
     
     // Misc
     let to_str = native_function!(str, env, params(value) => {
@@ -224,8 +224,6 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
     });
     
     namespace!(env.borrow_mut(), {
-        let StopIteration = Variant::stop_iteration();
-        
         fun _ = len;
         fun _ = iter;
         fun _ = next;
@@ -238,7 +236,7 @@ pub fn create_prelude() -> Gc<GlobalEnv> {
         fun _ = range;
         
         fun _ = globals;
-        fun _ = marker;
+        // fun _ = marker;
         fun _ = to_str;
         fun _ = echo;
         fun _ = print;
