@@ -5,7 +5,19 @@ use crate::parser::operator::BinaryOp;
 use crate::parser::expr::{Expr, ExprMeta};
 
 
-// LValues
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LValueMod {
+    LocalAssign,
+    NonLocalAssign,
+    DeclImmutable,
+    DeclMutable,
+}
+
+#[derive(Debug, Clone)]
+pub struct LValueExpr {
+    pub lvalue: LValue,
+    pub modifier: LValueMod,
+}
 
 #[derive(Debug, Clone)]
 pub enum LValue {
@@ -15,6 +27,8 @@ pub enum LValue {
     Tuple(Box<[LValue]>),
     // Unpack(Box<LValue>),
 }
+
+// LValue Data
 
 #[derive(Debug, Clone)]
 pub struct AttributeTarget {
@@ -32,27 +46,21 @@ pub struct IndexTarget {
 
 #[derive(Debug, Clone)]
 pub struct Assignment {
-    pub lhs: LValue,
+    pub lhs: LValueExpr,
     pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     pub rhs: Expr,
     pub nonlocal: bool,
 }
 
 // Declarations
-
-// TODO rename
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DeclType {
-    Immutable,
-    Mutable,
-}
-
+/*
 #[derive(Debug, Clone)]
 pub struct Declaration {
     pub decl: DeclType,
     pub lhs: LValue,
     pub init: Expr,
 }
+*/
 
 // Convert expressions to LValues...
 

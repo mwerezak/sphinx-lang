@@ -1,7 +1,6 @@
 // Scope Tracking
 
-use crate::language::InternSymbol;
-use crate::parser::lvalue::DeclType;
+use crate::language::{InternSymbol, Access};
 use crate::parser::stmt::Label;
 use crate::debug::symbol::DebugSymbol;
 use crate::codegen::JumpSite;
@@ -25,14 +24,14 @@ pub(super) enum LocalName {
 
 #[derive(Debug, Clone)]
 pub(super) struct Local {
-    decl: DeclType,
+    mode: Access,
     name: LocalName,
     index: LocalIndex,
     captured: bool, // tracks whether the local is being referenced by an upvalue
 }
 
 impl Local {
-    pub(super) fn decl(&self) -> DeclType { self.decl }
+    pub(super) fn mode(&self) -> Access { self.mode }
     pub(super) fn name(&self) -> LocalName { self.name }
     pub(super) fn index(&self) -> LocalIndex { self.index }
     pub(super) fn captured(&self) -> bool { self.captured }
@@ -170,7 +169,7 @@ impl Scope {
         self.locals.iter_mut().find(|local| local.name == *name)
     }
     
-    fn push_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<&Local> {
+    fn push_local(&mut self, mode: Access, name: LocalName) -> CompileResult<&Local> {
         let index = self.last_index().map_or(
             Ok(0),
             |index| index.checked_add(1)
@@ -178,7 +177,7 @@ impl Scope {
         )?;
         
         let local = Local {
-            decl, name, index, 
+            mode, name, index, 
             captured: false,
         };
         
@@ -186,13 +185,13 @@ impl Scope {
         Ok(self.locals.last().unwrap())
     }
     
-    fn insert_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<InsertLocal> {
+    fn insert_local(&mut self, mode: Access, name: LocalName) -> CompileResult<InsertLocal> {
         // see if this local already exists in the current scope
         if let Some(mut local) = self.find_local_mut(&name) {
-            (*local).decl = decl; // redeclare with new mutability
+            (*local).mode = mode; // redeclare with new mutability
             Ok(InsertLocal::HideExisting(local.index))
         } else {
-            self.push_local(decl, name)?;
+            self.push_local(mode, name)?;
             Ok(InsertLocal::CreateNew)
         }
     }
@@ -253,14 +252,14 @@ impl NestedScopes {
 
 #[derive(Debug, Clone)]
 pub(super) struct Upvalue {
-    decl: DeclType,
+    mode: Access,
     name: LocalName,
     index: UpvalueIndex,
     target: UpvalueTarget,
 }
 
 impl Upvalue {
-    pub(super) fn decl(&self) -> DeclType { self.decl }
+    pub(super) fn mode(&self) -> Access { self.mode }
     pub(super) fn name(&self) -> LocalName { self.name }
     pub(super) fn index(&self) -> UpvalueIndex { self.index }
     pub(super) fn target(&self) -> UpvalueTarget { self.target }
@@ -304,7 +303,7 @@ impl CallFrame {
         
         let upval = Upvalue {
             index,
-            decl: local.decl,
+            mode: local.mode,
             name: local.name,
             target: UpvalueTarget::Local(local.index),
         };
@@ -321,7 +320,7 @@ impl CallFrame {
         
         let upval = Upvalue {
             index,
-            decl: upval.decl,
+            mode: upval.mode,
             name: upval.name,
             target: UpvalueTarget::Upvalue(upval.index),
         };
@@ -395,9 +394,9 @@ impl ScopeTracker {
     
     // local variables
     
-    pub(super) fn insert_local(&mut self, decl: DeclType, name: LocalName) -> CompileResult<InsertLocal> {
+    pub(super) fn insert_local(&mut self, mode: Access, name: LocalName) -> CompileResult<InsertLocal> {
         let scope = self.local_scopes_mut().current_scope_mut().expect("insert local in global scope");
-        scope.insert_local(decl, name)
+        scope.insert_local(mode, name)
     }
     
     pub(super) fn resolve_local(&self, name: &LocalName) -> Option<&Local> {

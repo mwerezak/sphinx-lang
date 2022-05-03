@@ -7,26 +7,46 @@ use crate::lexer::rules::keywords::KeywordRule;
 use crate::lexer::rules::literals::*;
 use crate::lexer::rules::literals::string::*;
 
-// internal representation for integers
 
+// Internal representation for integers
 #[cfg(target_pointer_width = "32")]
 pub type IntType = i32;
 #[cfg(target_pointer_width = "64")]
 pub type IntType = i64;
 
-// internal representation for floats
+
+// Internal representation for floats
 #[cfg(target_pointer_width = "32")]
 pub type FloatType = f32;
 #[cfg(target_pointer_width = "64")]
 pub type FloatType = f64;
 
-pub type InternSymbol = SymbolUsize;  // for interned strings
 
+// Interned string symbol representation
+pub type InternSymbol = SymbolUsize;
+
+
+// Comment markers
 pub static COMMENT_CHAR: char = '#';
-
 pub static NESTED_COMMENT_START: &str = "#{";
 pub static NESTED_COMMENT_END:   &str = "}#";
 
+
+// Variable access modes
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Access {
+    ReadOnly,
+    ReadWrite,
+}
+
+impl Access {
+    pub fn can_write(&self) -> bool {
+        matches!(self, Self::ReadWrite)
+    }
+}
+
+
+// String literal escape sequences
 static ESCAPE_SEQUENCES: OnceCell<Vec<Box<dyn EscapeSequence>>> = OnceCell::new();
 
 pub fn all_escape_sequences() -> impl Iterator<Item=&'static dyn EscapeSequence> {
@@ -51,6 +71,8 @@ pub fn all_escape_sequences() -> impl Iterator<Item=&'static dyn EscapeSequence>
         .iter().map(|esc| &**esc)
 }
 
+
+// Tokens
 pub fn create_default_lexer_rules() -> LexerBuilder {
     LexerBuilder::new()
     

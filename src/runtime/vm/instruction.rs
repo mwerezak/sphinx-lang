@@ -1,15 +1,14 @@
-use crate::language::IntType;
+use crate::language::{IntType, Access};
 use crate::codegen::{OpCode, LocalIndex, UpvalueTarget};
 use crate::debug::traceback::TraceSite;
 use crate::runtime::Variant;
 use crate::runtime::gc::Gc;
 use crate::runtime::function::{Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
-use crate::runtime::module::{Access, ConstID, FunctionID, FunctionProto};
+use crate::runtime::module::{ConstID, FunctionID, FunctionProto};
 use crate::runtime::types::IterState;
 use crate::runtime::errors::{ExecResult, RuntimeError};
 use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control, VMCallFrame};
-
 
 
 // Operand casts

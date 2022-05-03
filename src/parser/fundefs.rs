@@ -1,5 +1,4 @@
-use crate::language::InternSymbol;
-use crate::parser::lvalue::DeclType;
+use crate::language::{InternSymbol, Access};
 use crate::parser::expr::{ExprMeta, ExprBlock};
 
 
@@ -21,12 +20,12 @@ pub struct SignatureDef {
 #[derive(Debug, Clone)]
 pub struct ParamDef {
     pub name: InternSymbol,
-    pub decl: DeclType,
+    pub mode: Access,
 }
 
 #[derive(Debug, Clone)]
 pub struct DefaultDef {
     pub name: InternSymbol,
-    pub decl: DeclType,
+    pub mode: Access,
     pub default: Box<ExprMeta>,
 }

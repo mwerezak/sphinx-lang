@@ -2,11 +2,11 @@
 
 use core::iter;
 
-use crate::language::{IntType, FloatType, InternSymbol};
+use crate::language::{IntType, FloatType, InternSymbol, Access};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary, AccessItem};
-use crate::parser::lvalue::{LValue, DeclType};
+use crate::parser::lvalue::{LValue};
 use crate::parser::fundefs::{FunctionDef, SignatureDef};
 use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::strings::{StringInterner};
@@ -762,18 +762,19 @@ impl CodeGenerator<'_> {
                 self.emit_binary_op(symbol, op);
             },
             
-            Expr::Declaration(decl) => {
-                self.compile_expr(symbol, &decl.init)?;
-                self.compile_declaration(symbol, decl.decl, &decl.lhs)?;
-            },
+            // Expr::Declaration(decl) => {
+            //     self.compile_expr(symbol, &decl.init)?;
+            //     self.compile_declaration(symbol, decl.decl, &decl.lhs)?;
+            // },
             
             Expr::Assignment(assign) => {
-                if let Some(op) = assign.op {
-                    self.compile_update_assignment(symbol, op, &assign.lhs, &assign.rhs, assign.nonlocal)?;
-                } else {
-                    self.compile_expr(symbol, &assign.rhs)?;
-                    self.compile_assignment(symbol, &assign.lhs, assign.nonlocal)?;
-                }
+                todo!()
+                // if let Some(op) = assign.op {
+                //     self.compile_update_assignment(symbol, op, &assign.lhs, &assign.rhs, assign.nonlocal)?;
+                // } else {
+                //     self.compile_expr(symbol, &assign.rhs)?;
+                //     self.compile_assignment(symbol, &assign.lhs, assign.nonlocal)?;
+                // }
             },
             
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list)?,
@@ -947,51 +948,51 @@ impl CodeGenerator<'_> {
 
 ///////// Declarations and Assignments /////////
 impl CodeGenerator<'_> {
-    fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, lhs: &LValue) -> CompileResult<()> {
-        match lhs {
-            LValue::Identifier(name) => if self.scopes().is_global_scope() {
-                self.compile_decl_global_name(symbol, decl, *name)
-            } else {
-                self.compile_decl_local_name(symbol, decl, *name)
-            },
+    // fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, lhs: &LValue) -> CompileResult<()> {
+    //     match lhs {
+    //         LValue::Identifier(name) => if self.scopes().is_global_scope() {
+    //             self.compile_decl_global_name(symbol, decl, *name)
+    //         } else {
+    //             self.compile_decl_local_name(symbol, decl, *name)
+    //         },
             
-            LValue::Attribute(target) => unimplemented!(),
+    //         LValue::Attribute(target) => unimplemented!(),
             
-            LValue::Index(target) => unimplemented!(),
+    //         LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple(target_list) => self.compile_decl_tuple(symbol, decl, target_list),
-        }
-    }
+    //         LValue::Tuple(target_list) => self.compile_decl_tuple(symbol, decl, target_list),
+    //     }
+    // }
     
-    fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
+    // fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
         
-        match self.scopes_mut().insert_local(decl, LocalName::Symbol(name))? {
-            InsertLocal::CreateNew => 
-                self.emit_instr(symbol, OpCode::InsertLocal),
+    //     match self.scopes_mut().insert_local(decl, LocalName::Symbol(name))? {
+    //         InsertLocal::CreateNew => 
+    //             self.emit_instr(symbol, OpCode::InsertLocal),
             
-            InsertLocal::HideExisting(local_index) =>
-                self.emit_assign_local(symbol, local_index),
-        }
+    //         InsertLocal::HideExisting(local_index) =>
+    //             self.emit_assign_local(symbol, local_index),
+    //     }
         
-        Ok(())
-    }
+    //     Ok(())
+    // }
     
-    fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
+    // fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
         
-        self.emit_load_const(symbol, Constant::from(name))?;
-        match decl {
-            DeclType::Immutable => self.emit_instr(symbol, OpCode::InsertGlobal),
-            DeclType::Mutable => self.emit_instr(symbol, OpCode::InsertGlobalMut),
-        }
-        Ok(())
-    }
+    //     self.emit_load_const(symbol, Constant::from(name))?;
+    //     match decl {
+    //         DeclType::Immutable => self.emit_instr(symbol, OpCode::InsertGlobal),
+    //         DeclType::Mutable => self.emit_instr(symbol, OpCode::InsertGlobalMut),
+    //     }
+    //     Ok(())
+    // }
     
-    fn compile_decl_tuple(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, targets: &[LValue]) -> CompileResult<()> {
-        self.compile_tuple_unpack(
-            symbol, targets, 
-            |self_, target| self_.compile_declaration(symbol, decl, target)
-        )
-    }
+    // fn compile_decl_tuple(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, targets: &[LValue]) -> CompileResult<()> {
+    //     self.compile_tuple_unpack(
+    //         symbol, targets, 
+    //         |self_, target| self_.compile_declaration(symbol, decl, target)
+    //     )
+    // }
     
     fn compile_update_assignment(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp, lhs: &LValue, rhs: &Expr, nonlocal: bool) -> CompileResult<()> {
         
@@ -1037,7 +1038,7 @@ impl CodeGenerator<'_> {
             let result = self.scopes().resolve_local(&local_name);
             
             if let Some(local) = result.cloned() {
-                if local.decl() != DeclType::Mutable {
+                if !local.mode().can_write() {
                     return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                 }
                 
@@ -1054,7 +1055,7 @@ impl CodeGenerator<'_> {
             // check if an upvalue is found or can be created...
             if !self.scopes().is_global_frame() {
                 if let Some(upval) = self.scopes_mut().resolve_or_create_upval(&local_name)? {
-                    if upval.decl() != DeclType::Mutable {
+                    if !upval.mode().can_write() {
                         return Err(CompileError::from(ErrorKind::CantAssignImmutable));
                     }
                     
@@ -1229,8 +1230,8 @@ impl CodeGenerator<'_> {
         chunk_gen.scopes_mut().push_frame(symbol);
         
         // don't need to generate IN_LOCAL instructions for these, the VM should include them automatically
-        chunk_gen.scopes_mut().insert_local(DeclType::Immutable, LocalName::Receiver)?;
-        chunk_gen.scopes_mut().insert_local(DeclType::Immutable, LocalName::NArgs)?;
+        chunk_gen.scopes_mut().insert_local(Access::ReadOnly, LocalName::Receiver)?;
+        chunk_gen.scopes_mut().insert_local(Access::ReadOnly, LocalName::NArgs)?;
         
         // prepare argument list
         chunk_gen.compile_function_preamble(symbol, fundef)?;
@@ -1282,7 +1283,7 @@ impl CodeGenerator<'_> {
         let signature = &fundef.signature;
         
         for param in signature.required.iter() {
-            self.scopes_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
+            self.scopes_mut().insert_local(param.mode, LocalName::Symbol(param.name))?;
             //self.emit_instr(None, OpCode::InsertLocal);
         }
         
@@ -1291,7 +1292,7 @@ impl CodeGenerator<'_> {
             self.compile_default_args(signature)?;
             
             for param in signature.default.iter() {
-                self.scopes_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
+                self.scopes_mut().insert_local(param.mode, LocalName::Symbol(param.name))?;
                 // self.emit_instr(symbol, OpCode::InsertLocal);
             }
         }
@@ -1299,7 +1300,7 @@ impl CodeGenerator<'_> {
         if let Some(param) = &signature.variadic {
             self.compile_variadic_arg(signature)?;
 
-            self.scopes_mut().insert_local(param.decl, LocalName::Symbol(param.name))?;
+            self.scopes_mut().insert_local(param.mode, LocalName::Symbol(param.name))?;
             // self.emit_instr(symbol, OpCode::InsertLocal);
         }
 
@@ -1415,19 +1416,19 @@ impl CodeGenerator<'_> {
         let mut required = Vec::new();
         for param in signature.required.iter() {
             let name = self.get_or_make_const(Constant::from(param.name))?;
-            required.push(UnloadedParam { name, decl: param.decl });
+            required.push(UnloadedParam { name, mode: param.mode });
         }
         
         let mut default = Vec::new();
         for param in signature.default.iter() {
             let name = self.get_or_make_const(Constant::from(param.name))?;
-            default.push(UnloadedParam { name, decl: param.decl });
+            default.push(UnloadedParam { name, mode: param.mode });
         }
         
         let mut variadic = None;
         if let Some(param) = &signature.variadic {
             let name = self.get_or_make_const(Constant::from(param.name))?;
-            variadic.replace(UnloadedParam { name, decl: param.decl });
+            variadic.replace(UnloadedParam { name, mode: param.mode });
         }
         
         let signature = UnloadedSignature {

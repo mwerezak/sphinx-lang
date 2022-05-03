@@ -1,4 +1,4 @@
-use crate::parser::lvalue::DeclType;
+use crate::language::Access;
 use crate::codegen::consts::ConstID;
 use crate::codegen::opcodes::{LocalIndex, UpvalueIndex};
 use crate::runtime::function::Signature;
@@ -54,5 +54,5 @@ pub struct UnloadedSignature {
 #[derive(Clone, Debug)]
 pub struct UnloadedParam {
     pub name: ConstID,
-    pub decl: DeclType,
+    pub mode: Access,
 }

@@ -439,7 +439,7 @@ impl Program {
     
     fn load_parameter(param: UnloadedParam, consts: &[Constant], strings: &[StringSymbol]) -> Parameter {
         let name = Self::load_name(param.name, consts, strings);
-        Parameter::new(name, param.decl)
+        Parameter::new(name, param.mode)
     }
 }
 

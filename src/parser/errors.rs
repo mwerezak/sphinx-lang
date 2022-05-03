@@ -39,7 +39,6 @@ pub enum ContextTag {
     IfExpr,
     FunDefExpr,
     FunParam,
-    DeclarationExpr,
     AssignmentExpr,
     BinaryOpExpr,
     UnaryOpExpr,
@@ -52,6 +51,7 @@ pub enum ContextTag {
     Atom,
     Group,
     Label,
+    LValueExpr,
 }
 
 impl From<ErrorKind> for ParserError {

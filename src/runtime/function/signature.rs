@@ -1,5 +1,5 @@
 use core::fmt;
-use crate::parser::lvalue::DeclType;
+use crate::language::Access;
 use crate::runtime::Variant;
 use crate::runtime::strings::{StringValue, StringSymbol, StrBuffer, STRING_TABLE};
 use crate::runtime::errors::{ExecResult, RuntimeError};
@@ -132,24 +132,16 @@ pub struct BoundArgs<'a> {
 #[derive(Clone, Debug)]
 pub struct Parameter {
     name: StringSymbol,
-    decl: DeclType,
+    mode: Access,
 }
 
 impl Parameter {
-    pub fn new(name: impl Into<StringSymbol>, decl: DeclType) -> Self {
-        Self { name: name.into(), decl }
-    }
-    
-    pub fn new_let(name: impl Into<StringSymbol>) -> Self {
-        Self::new(name, DeclType::Immutable)
-    }
-    
-    pub fn new_var(name: impl Into<StringSymbol>) -> Self {
-        Self::new(name, DeclType::Mutable)
+    pub fn new(name: impl Into<StringSymbol>, mode: Access) -> Self {
+        Self { name: name.into(), mode }
     }
     
     pub fn name(&self) -> &StringSymbol { &self.name }
-    pub fn decl(&self) -> &DeclType { &self.decl }
+    pub fn mode(&self) -> &Access { &self.mode }
 }
 
 

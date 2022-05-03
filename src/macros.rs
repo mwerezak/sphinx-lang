@@ -24,7 +24,7 @@ macro_rules! __namespace_item {
         let name = func.signature().name().unwrap();
         $namespace.create(
             name, 
-            crate::runtime::module::Access::ReadOnly, 
+            crate::language::Access::ReadOnly, 
             crate::runtime::Variant::from(func)
         );
     };
@@ -62,7 +62,11 @@ macro_rules! __count {
 #[macro_export]
 macro_rules! __variadic {
     () => { None };
-    ( $name:tt ) => { Some(crate::runtime::function::Parameter::new_var(stringify!($name))) };
+    ( $name:tt ) => {
+        Some(crate::runtime::function::Parameter::new(
+            stringify!($name), crate::language::Access::ReadWrite
+        ))
+    };
 }
 
 #[doc(hidden)]
@@ -89,8 +93,8 @@ macro_rules! native_function {
             
             let signature = Signature::new(
                 Some(stringify!($func_name)),
-                vec![ $( $( Parameter::new_var(stringify!($required)) ),+ )? ],
-                vec![ $( $( Parameter::new_var(stringify!($default)) ),+ )? ],
+                vec![ $( $( Parameter::new(stringify!($required), crate::language::Access::ReadWrite) ),+ )? ],
+                vec![ $( $( Parameter::new(stringify!($default), crate::language::Access::ReadWrite) ),+ )? ],
                 __variadic!( $( $variadic )? ),
             );
             

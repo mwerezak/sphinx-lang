@@ -12,7 +12,7 @@ use core::hash::{Hash, Hasher, BuildHasher};
 use std::path::PathBuf;
 use once_cell::sync::Lazy;
 use crate::source::ModuleSource;
-use crate::language::FloatType;
+use crate::language::{FloatType, Access};
 use crate::runtime::{Variant, HashMap, DefaultBuildHasher};
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::strings::StringSymbol;
@@ -20,12 +20,6 @@ use crate::runtime::errors::{ExecResult, RuntimeError};
 
 pub use crate::codegen::{ProgramData, Constant, Chunk, FunctionProto, ConstID, FunctionID};
 
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Access {
-    ReadOnly,
-    ReadWrite,
-}
 
 #[derive(Debug, Clone)]
 pub struct Variable {
