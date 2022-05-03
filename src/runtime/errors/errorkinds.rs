@@ -10,7 +10,7 @@ use crate::runtime::errors::{RuntimeError, ErrorKind};
 
 fn format_type(value: &Variant) -> StringValue {
     value.type_name().unwrap_or_else(
-        |_| StringValue::new_maybe_interned(value.type_tag().name()),
+        |_| value.type_tag().name(),
     )
 }
 
@@ -37,21 +37,21 @@ impl RuntimeError {
     pub fn overflow_error() -> Box<RuntimeError> {
         RuntimeError::new(
             ErrorKind::OverflowError,
-            StringValue::new_maybe_interned("integer overflow"),
+            static_symbol!("integer overflow").into(),
         )
     }
 
     pub fn divide_by_zero() -> Box<RuntimeError> {
         RuntimeError::new(
             ErrorKind::DivideByZero,
-            StringValue::new_maybe_interned("divide by zero"),
+            static_symbol!("divide by zero").into(),
         )
     }
 
     pub fn negative_shift_count() -> Box<RuntimeError> {
         RuntimeError::new(
             ErrorKind::NegativeShiftCount,
-            StringValue::new_maybe_interned("negative bitshift count"),
+            static_symbol!("negative bitshift count").into(),
         )
     }
 
@@ -81,7 +81,7 @@ impl RuntimeError {
             ErrorKind::AssertFailed,
             match message {
                 Some(message) => StringValue::new_uninterned(format!("assertion failed: {}", message)),
-                None => StringValue::new_maybe_interned("assertion failed"),
+                None => static_symbol!("assertion failed").into(),
             },
         )
     }

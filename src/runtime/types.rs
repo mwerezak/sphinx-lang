@@ -2,7 +2,7 @@ use core::fmt;
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
 use crate::runtime::function::Call;
-use crate::runtime::strings::StringValue;
+use crate::runtime::strings::{StringValue, static_symbol};
 use crate::runtime::errors::{ExecResult, RuntimeError};
 
 
@@ -44,27 +44,29 @@ pub enum Type {
 }
 
 impl Type {
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Nil => "nil",
-            Self::Boolean => "bool",
-            Self::Marker => "marker",
-            Self::Integer => "int",
-            Self::Float => "float",
-            Self::String => "string",
-            Self::Tuple => "tuple",
-            Self::Function => "function",
-            Self::Iterator => "iterator",
-            Self::Metatable => "metatable",
-            Self::Object => "object",
-            Self::UserData => "userdata",
-        }
+    pub fn name(&self) -> StringValue {
+        let name = match self {
+            Self::Nil => static_symbol!("nil"),
+            Self::Boolean => static_symbol!("bool"),
+            Self::Marker => static_symbol!("marker"),
+            Self::Integer => static_symbol!("int"),
+            Self::Float => static_symbol!("float"),
+            Self::String => static_symbol!("string"),
+            Self::Tuple => static_symbol!("tuple"),
+            Self::Function => static_symbol!("function"),
+            Self::Iterator => static_symbol!("iterator"),
+            Self::Metatable => static_symbol!("metatable"),
+            Self::Object => static_symbol!("object"),
+            Self::Error => static_symbol!("error"),
+            Self::UserData => static_symbol!("userdata"),
+        };
+        name.into()
     }
 }
 
 impl fmt::Display for Type {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.write_str(self.name())
+        self.name().with_str(|s| fmt.write_str(s))
     }
 }
 
@@ -74,7 +76,7 @@ pub trait MetaObject {
     fn type_tag(&self) -> Type;
     
     fn type_name(&self) -> ExecResult<StringValue> {
-        Ok(StringValue::new_maybe_interned(self.type_tag().name()))
+        Ok(self.type_tag().name())
     }
     
     // formatting

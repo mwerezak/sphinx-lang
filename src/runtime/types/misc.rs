@@ -28,7 +28,7 @@ impl MetaObject for Nil {
 }
 
 
-// Marker type - kind of like scheme's symbols
+// Marker type - kind of like scheme's symbols -- currently unused
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Marker {
     id: StringSymbol,
