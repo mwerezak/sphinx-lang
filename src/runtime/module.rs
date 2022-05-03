@@ -186,6 +186,11 @@ impl Module {
             Constant::Float(bytes) => FloatType::from_le_bytes(*bytes).into(),
             
             Constant::String(idx) => Variant::from(*self.data.get_string(*idx)),
+            
+            Constant::Error { error, message: idx } => {
+                let message = *self.data.get_string(*idx);
+                Variant::Error(Gc::new(RuntimeError::new(*error, message.into())))
+            }
         }
     }
     

@@ -36,24 +36,12 @@ unsafe impl GcTrace for RuntimeError {
 }
 
 impl RuntimeError {
-    pub fn new(kind: ErrorKind, message: StringValue) -> Box<Self> {
-        Box::new(Self {
+    pub fn new(kind: ErrorKind, message: StringValue) -> Self {
+        Self {
             kind, message,
             traceback: Vec::new(),
             cause: None,
-        })
-    }
-    
-    pub fn caused_by(mut self: Box<Self>, cause: Box<RuntimeError>) -> Box<Self> {
-        self.cause.replace(cause); self
-    }
-    
-    pub fn extend_trace(mut self: Box<Self>, trace: impl Iterator<Item=TraceSite>) -> Box<Self> {
-        self.traceback.extend(trace); self
-    }
-    
-    pub fn push_trace(mut self: Box<Self>, site: TraceSite) -> Box<Self> {
-        self.traceback.push(site); self
+        }
     }
     
     pub fn kind(&self) -> &ErrorKind { &self.kind }
@@ -68,6 +56,21 @@ impl Error for RuntimeError {
         self.cause.as_ref().map(
             |error| &*error as &RuntimeError as &dyn Error
         )
+    }
+}
+
+// traceback construction
+impl RuntimeError {
+    pub fn caused_by(mut self: Box<Self>, cause: Box<RuntimeError>) -> Box<Self> {
+        self.cause.replace(cause); self
+    }
+    
+    pub fn extend_trace(mut self: Box<Self>, trace: impl Iterator<Item=TraceSite>) -> Box<Self> {
+        self.traceback.extend(trace); self
+    }
+    
+    pub fn push_trace(mut self: Box<Self>, site: TraceSite) -> Box<Self> {
+        self.traceback.push(site); self
     }
 }
 

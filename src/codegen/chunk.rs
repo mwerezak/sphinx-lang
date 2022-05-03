@@ -6,6 +6,7 @@ use crate::language::InternSymbol;
 use crate::runtime::{DefaultBuildHasher, STRING_TABLE};
 use crate::runtime::strings::{StringInterner, StringSymbol};
 use crate::runtime::function::{Signature, Parameter};
+use crate::runtime::errors::ErrorKind as RuntimeErrorKind;
 use crate::codegen::consts::{Constant, ConstID, StringID};
 use crate::codegen::funproto::{FunctionProto, UnloadedFunction, UnloadedSignature, UnloadedParam, FunctionID};
 use crate::codegen::errors::{CompileResult, ErrorKind};
@@ -167,9 +168,14 @@ impl ChunkBuilder {
         }
     }
     
-    pub fn get_or_insert_str(&mut self, string: &str) -> CompileResult<ConstID> {
+    pub fn get_or_insert_str(&mut self, string: &str) -> StringID {
         let symbol = self.strings.get_or_intern(string);
-        self.get_or_insert_const(Constant::String(symbol.to_usize()))
+        symbol.to_usize()
+    }
+    
+    pub fn get_or_insert_error(&mut self, error: RuntimeErrorKind, message: &str) -> CompileResult<ConstID> {
+        let message = self.get_or_insert_str(message);
+        self.get_or_insert_const(Constant::Error { error, message })
     }
     
     pub fn insert_function(&mut self, fun_proto: UnloadedFunction) {
@@ -408,11 +414,16 @@ impl Program {
         }
     }
     
+    fn load_name(const_id: ConstID, consts: &[Constant], strings: &[StringSymbol]) -> StringSymbol {
+        let string_id = match consts[usize::from(const_id)] {
+            Constant::String(symbol) => symbol,
+            _ => panic!("invalid name constant")
+        };
+        strings[usize::from(string_id)]
+    }
+    
     fn load_signature(signature: UnloadedSignature, consts: &[Constant], strings: &[StringSymbol]) -> Signature {
-        let name = signature.name.map(|const_id| {
-            let string_id = consts[usize::from(const_id)].try_into_string_id().unwrap();
-            strings[usize::from(string_id)]
-        });
+        let name = signature.name.map(|const_id| Self::load_name(const_id, consts, strings));
         
         let required = signature.required.into_vec().into_iter()
             .map(|param| Self::load_parameter(param, consts, strings)).collect();
@@ -427,8 +438,7 @@ impl Program {
     }
     
     fn load_parameter(param: UnloadedParam, consts: &[Constant], strings: &[StringSymbol]) -> Parameter {
-        let string_id = consts[usize::from(param.name)].try_into_string_id().unwrap();
-        let name = strings[usize::from(string_id)];
+        let name = Self::load_name(param.name, consts, strings);
         Parameter::new(name, param.decl)
     }
 }

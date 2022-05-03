@@ -57,78 +57,78 @@ fn format_type(value: &Variant) -> StringValue {
 }
 
 impl RuntimeError {
-    pub fn invalid_unary_operand(operand: &Variant) -> Box<RuntimeError> {
-        Self::new(
+    pub fn invalid_unary_operand(operand: &Variant) -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::InvalidUnaryOperand,
             StringValue::new_uninterned(format!(
                 "unsupported operand: '{}'", format_type(operand)
             )),
-        )
+        ))
     }
 
-    pub fn invalid_binary_operands(lhs: &Variant, rhs: &Variant) -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn invalid_binary_operands(lhs: &Variant, rhs: &Variant) -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::InvalidUnaryOperand,
             StringValue::new_uninterned(format!(
                 "unsupported operands: '{}' and '{}'", 
                 format_type(lhs), format_type(rhs)
             )),
-        )
+        ))
     }
 
-    pub fn overflow_error() -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn overflow_error() -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::OverflowError,
             static_symbol!("integer overflow").into(),
-        )
+        ))
     }
 
-    pub fn divide_by_zero() -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn divide_by_zero() -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::DivideByZero,
             static_symbol!("divide by zero").into(),
-        )
+        ))
     }
 
-    pub fn negative_shift_count() -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn negative_shift_count() -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::NegativeShiftCount,
             static_symbol!("negative bitshift count").into(),
-        )
+        ))
     }
 
-    pub fn name_not_defined(name: StringSymbol) -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn name_not_defined(name: StringSymbol) -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::NameNotDefined,
             StringValue::new_uninterned(format!("undefined variable \"{}\"", name)),
-        )
+        ))
     }
 
-    pub fn cant_assign_immutable(name: StringSymbol) -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn cant_assign_immutable(name: StringSymbol) -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::CantAssignImmutable,
             StringValue::new_uninterned(format!("can't assign to immutable name \"{}\"", name)),
-        )
+        ))
     }
 
-    pub fn unhashable_value(value: &Variant) -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn unhashable_value(value: &Variant) -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::UnhashableValue,
             StringValue::new_uninterned(format!("{} is not hashable", value.display_echo())),
-        )
+        ))
     }
 
-    pub fn assert_failed(message: Option<StringValue>) -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn assert_failed(message: Option<StringValue>) -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::AssertFailed,
             match message {
                 Some(message) => StringValue::new_uninterned(format!("assertion failed: {}", message)),
                 None => static_symbol!("assertion failed").into(),
             },
-        )
+        ))
     }
 
-    pub fn missing_arguments(signature: &Signature, nargs: usize) -> Box<RuntimeError> {
+    pub fn missing_arguments(signature: &Signature, nargs: usize) -> Box<Self> {
         let missing = signature.required().iter()
             .skip(nargs)
             .map(|param| *param.name())
@@ -145,13 +145,13 @@ impl RuntimeError {
             utils::fmt_join(", ", &missing),
         );
         
-        RuntimeError::new(
+        Box::new(Self::new(
             ErrorKind::MissingArguments,
             StringValue::new_uninterned(message),
-        )
+        ))
     }
 
-    pub fn too_many_arguments(signature: &Signature, nargs: usize) -> Box<RuntimeError> {
+    pub fn too_many_arguments(signature: &Signature, nargs: usize) -> Box<Self> {
         let message = format!(
             "{} takes {} arguments but {} were given", 
             signature.fmt_name(), 
@@ -159,13 +159,13 @@ impl RuntimeError {
             nargs,
         );
         
-        RuntimeError::new(
+        Box::new(Self::new(
             ErrorKind::TooManyArguments,
             StringValue::new_uninterned(message),
-        )
+        ))
     }
 
-    pub fn metamethod_not_supported(receiver: &Variant, method: MethodTag) -> Box<RuntimeError> {
+    pub fn metamethod_not_supported(receiver: &Variant, method: MethodTag) -> Box<Self> {
         let receiver = format_type(receiver);
         
         let message = match method {
@@ -181,23 +181,23 @@ impl RuntimeError {
             _ => format!("type '{}' does not support '__{}'", receiver, method),
         };
         
-        RuntimeError::new(
+        Box::new(Self::new(
             ErrorKind::MethodNotSupported,
             StringValue::new_uninterned(message),
-        )
+        ))
     }
 
-    pub fn invalid_value(message: impl AsRef<str>) -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn invalid_value(message: impl AsRef<str>) -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::InvalidValue,
             StringValue::new_uninterned(message.as_ref()),
-        )
+        ))
     }
 
-    pub fn other(message: impl AsRef<str>) -> Box<RuntimeError> {
-        RuntimeError::new(
+    pub fn other(message: impl AsRef<str>) -> Box<Self> {
+        Box::new(Self::new(
             ErrorKind::Unspecified,
             StringValue::new_uninterned(message.as_ref()),
-        )
+        ))
     }
 }
