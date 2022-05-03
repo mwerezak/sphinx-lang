@@ -40,6 +40,7 @@ pub enum Type {
     Iterator,
     Metatable,
     Object,
+    Error,
     UserData,
 }
 

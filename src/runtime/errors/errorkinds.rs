@@ -4,8 +4,50 @@ use crate::utils;
 use crate::runtime::Variant;
 use crate::runtime::function::Signature;
 use crate::runtime::types::MethodTag;
-use crate::runtime::strings::{StringValue, StringSymbol};
-use crate::runtime::errors::{RuntimeError, ErrorKind};
+use crate::runtime::strings::{StringValue, StringSymbol, static_symbol};
+use crate::runtime::errors::RuntimeError;
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ErrorKind {
+    InvalidUnaryOperand,
+    InvalidBinaryOperand,
+    OverflowError,
+    DivideByZero,
+    NegativeShiftCount,
+    NameNotDefined,
+    CantAssignImmutable,
+    UnhashableValue,
+    MissingArguments,
+    TooManyArguments,
+    MethodNotSupported,
+    AssertFailed,
+    InvalidValue,
+    Unspecified,
+}
+
+impl ErrorKind {
+    pub fn name(&self) -> StringValue {
+        let name = match self {
+            ErrorKind::InvalidUnaryOperand => static_symbol!("InvalidUnaryOperandError"),
+            ErrorKind::InvalidBinaryOperand => static_symbol!("InvalidBinaryOperandError"),
+            ErrorKind::OverflowError => static_symbol!("OverflowError"),
+            ErrorKind::DivideByZero => static_symbol!("DivideByZeroError"),
+            ErrorKind::NegativeShiftCount => static_symbol!("NegativeShiftCountError"),
+            ErrorKind::NameNotDefined => static_symbol!("NameNotDefinedError"),
+            ErrorKind::CantAssignImmutable => static_symbol!("CantAssignImmutableError"),
+            ErrorKind::UnhashableValue => static_symbol!("UnhashableValueError"),
+            ErrorKind::MissingArguments => static_symbol!("MissingArgumentsError"),
+            ErrorKind::TooManyArguments => static_symbol!("TooManyArgumentsError"),
+            ErrorKind::MethodNotSupported => static_symbol!("MethodNotSupportedError"),
+            ErrorKind::AssertFailed => static_symbol!("AssertFailedError"),
+            ErrorKind::InvalidValue => static_symbol!("InvalidValueError"),
+            ErrorKind::Unspecified => static_symbol!("UnspecifiedError"),
+        };
+        name.into()
+    }
+}
+
 
 
 fn format_type(value: &Variant) -> StringValue {

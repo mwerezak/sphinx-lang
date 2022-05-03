@@ -7,28 +7,11 @@ use crate::runtime::strings::StringValue;
 use crate::debug::traceback::{TraceSite, Traceback};
 
 mod errorkinds;
+pub use errorkinds::ErrorKind;
 
 
 pub type ExecResult<T> = Result<T, Box<RuntimeError>>;
 
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ErrorKind {
-    InvalidUnaryOperand,
-    InvalidBinaryOperand,
-    OverflowError,
-    DivideByZero,
-    NegativeShiftCount,
-    NameNotDefined,
-    CantAssignImmutable,
-    UnhashableValue,
-    MissingArguments,
-    TooManyArguments,
-    MethodNotSupported,
-    AssertFailed,
-    InvalidValue,
-    Unspecified,
-}
 
 #[derive(Debug)]
 pub struct RuntimeError {

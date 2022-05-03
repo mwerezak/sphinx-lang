@@ -75,7 +75,7 @@ impl MetaObject for Gc<dyn UserIterator> {
         };
         
         let iter = IterState {
-            iter: (*self).into(),
+            iter: Variant::Iterator(*self),
             state,
         };
         

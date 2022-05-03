@@ -39,6 +39,8 @@ pub enum Variant {
     
     Iterator(Gc<dyn UserIterator>),
     
+    Error(Gc<RuntimeError>),
+    
     UserData(Gc<dyn UserData>),
 }
 
@@ -146,18 +148,6 @@ impl From<Function> for Variant {
 impl From<NativeFunction> for Variant {
     fn from(func: NativeFunction) -> Self {
         Self::NativeFunction(Gc::new(func))
-    }
-}
-
-impl From<Gc<dyn UserIterator>> for Variant {
-    fn from(iter: Gc<dyn UserIterator>) -> Self {
-        Self::Iterator(iter)
-    }
-}
-
-impl From<Gc<dyn UserData>> for Variant {
-    fn from(data: Gc<dyn UserData>) -> Self {
-        Self::UserData(data)
     }
 }
 

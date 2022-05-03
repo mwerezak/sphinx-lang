@@ -4,7 +4,7 @@ use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::function::{Call, Callable};
 use crate::runtime::strings::{StringValue, StringSymbol, static_symbol};
 use crate::runtime::types::{Type, MetaObject};
-use crate::runtime::errors::{ExecResult};
+use crate::runtime::errors::{ExecResult, RuntimeError};
 
 
 pub struct Nil;
@@ -82,6 +82,17 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
         );
         
         Ok(StringValue::new_uninterned(result))
+    }
+}
+
+
+// Errors
+
+impl MetaObject for Gc<RuntimeError> {
+    fn type_tag(&self) -> Type { Type::Error }
+    
+    fn fmt_echo(&self) -> ExecResult<StringValue> {
+        Ok(self.kind().name())
     }
 }
 

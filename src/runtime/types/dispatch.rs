@@ -6,7 +6,7 @@ use crate::runtime::gc::Gc;
 use crate::runtime::function::{Call, Function, NativeFunction};
 use crate::runtime::strings::StringValue;
 use crate::runtime::types::{Type, MetaObject, Tuple, UserData, Nil, Marker, IterState, UserIterator};
-use crate::runtime::errors::ExecResult;
+use crate::runtime::errors::{ExecResult, RuntimeError};
 
 
 /// Newtype wrapper for `Variant` that impls `MetaObject` using enum-based static dispatch.
@@ -48,6 +48,8 @@ macro_rules! static_dispatch {
                 
                 Variant::Function(fun) => <Gc<Function> as MetaObject>::$name(fun, $( $arg ),* ),
                 Variant::NativeFunction(fun) => <Gc<NativeFunction> as MetaObject>::$name(fun, $( $arg ),* ),
+                
+                Variant::Error(error) => <Gc<RuntimeError> as MetaObject>::$name(error, $( $arg ),* ),
                 
                 Variant::Iterator(iter) => <Gc<dyn UserIterator> as MetaObject>::$name(iter, $( $arg ),* ),
                 
