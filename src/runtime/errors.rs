@@ -13,7 +13,7 @@ pub use errorkinds::ErrorKind;
 pub type ExecResult<T> = Result<T, Box<RuntimeError>>;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RuntimeError {
     kind: ErrorKind,
     message: StringValue,

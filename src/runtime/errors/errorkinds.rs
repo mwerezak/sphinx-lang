@@ -23,26 +23,28 @@ pub enum ErrorKind {
     MethodNotSupported,
     AssertFailed,
     InvalidValue,
+    UnpackError,
     Unspecified,
 }
 
 impl ErrorKind {
     pub fn name(&self) -> StringValue {
         let name = match self {
-            ErrorKind::InvalidUnaryOperand => static_symbol!("InvalidUnaryOperandError"),
-            ErrorKind::InvalidBinaryOperand => static_symbol!("InvalidBinaryOperandError"),
-            ErrorKind::OverflowError => static_symbol!("OverflowError"),
-            ErrorKind::DivideByZero => static_symbol!("DivideByZeroError"),
-            ErrorKind::NegativeShiftCount => static_symbol!("NegativeShiftCountError"),
-            ErrorKind::NameNotDefined => static_symbol!("NameNotDefinedError"),
-            ErrorKind::CantAssignImmutable => static_symbol!("CantAssignImmutableError"),
-            ErrorKind::UnhashableValue => static_symbol!("UnhashableValueError"),
-            ErrorKind::MissingArguments => static_symbol!("MissingArgumentsError"),
-            ErrorKind::TooManyArguments => static_symbol!("TooManyArgumentsError"),
-            ErrorKind::MethodNotSupported => static_symbol!("MethodNotSupportedError"),
-            ErrorKind::AssertFailed => static_symbol!("AssertFailedError"),
-            ErrorKind::InvalidValue => static_symbol!("InvalidValueError"),
-            ErrorKind::Unspecified => static_symbol!("UnspecifiedError"),
+            Self::InvalidUnaryOperand => static_symbol!("InvalidUnaryOperandError"),
+            Self::InvalidBinaryOperand => static_symbol!("InvalidBinaryOperandError"),
+            Self::OverflowError => static_symbol!("OverflowError"),
+            Self::DivideByZero => static_symbol!("DivideByZeroError"),
+            Self::NegativeShiftCount => static_symbol!("NegativeShiftCountError"),
+            Self::NameNotDefined => static_symbol!("NameNotDefinedError"),
+            Self::CantAssignImmutable => static_symbol!("CantAssignImmutableError"),
+            Self::UnhashableValue => static_symbol!("UnhashableValueError"),
+            Self::MissingArguments => static_symbol!("MissingArgumentsError"),
+            Self::TooManyArguments => static_symbol!("TooManyArgumentsError"),
+            Self::MethodNotSupported => static_symbol!("MethodNotSupportedError"),
+            Self::AssertFailed => static_symbol!("AssertFailedError"),
+            Self::InvalidValue => static_symbol!("InvalidValueError"),
+            Self::UnpackError => static_symbol!("UnpackError"),
+            Self::Unspecified => static_symbol!("UnspecifiedError"),
         };
         name.into()
     }

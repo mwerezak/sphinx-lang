@@ -166,6 +166,14 @@ impl<'c> VMCallFrame<'c> {
                 return Ok(Control::Return(value))
             },
             
+            OpCode::Error => {
+                let value = stack.pop();
+                if let Variant::Error(error) = value {
+                    return Err(Box::new((*error).clone()));
+                }
+                panic!("non-error value")
+            },
+            
             OpCode::Call => {
                 const SYSTEM_ARGS: usize = 2; // [ callee, nargs, ... ]
                 

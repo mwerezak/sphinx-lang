@@ -10,6 +10,7 @@ use crate::parser::lvalue::{LValue, DeclType};
 use crate::parser::fundefs::{FunctionDef, SignatureDef};
 use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::strings::{StringInterner};
+use crate::runtime::errors::ErrorKind as RuntimeErrorKind;
 use crate::debug::symbol::{DebugSymbol, ChunkSymbols, DebugSymbolTable};
 
 mod scope;
@@ -284,6 +285,17 @@ impl CodeGenerator<'_> {
     
     fn emit_load_const(&mut self, symbol: Option<&DebugSymbol>, value: Constant) -> CompileResult<()> {
         let cid = self.get_or_make_const(value)?;
+        
+        if cid <= u8::MAX.into() {
+            self.emit_instr_byte(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap());
+        } else {
+            self.emit_instr_data(symbol, OpCode::LoadConst16, &cid.to_le_bytes());
+        }
+        Ok(())
+    }
+    
+    fn emit_load_error(&mut self, symbol: Option<&DebugSymbol>, error: RuntimeErrorKind, message: &str) -> CompileResult<()> {
+        let cid = self.builder_mut().get_or_insert_error(error, message)?;
         
         if cid <= u8::MAX.into() {
             self.emit_instr_byte(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap());
@@ -975,45 +987,10 @@ impl CodeGenerator<'_> {
     }
     
     fn compile_decl_tuple(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, targets: &[LValue]) -> CompileResult<()> {
-        
-        let mut error_jump_sites = Vec::new();
-        
-        self.emit_instr(symbol, OpCode::IterInit);  // iterate to yield values
-        
-        // compile to unrolled iteration
-        for target in targets.iter() {
-            // check if there is an item left for this target
-            let error_jump = self.emit_dummy_jump(symbol, Jump::IfFalse);
-            error_jump_sites.push(error_jump);
-            
-            // advance the iterator and put the item on the stack
-            self.emit_instr(symbol, OpCode::IterNext);
-            self.compile_declaration(symbol, decl, target)?;
-            
-            self.emit_instr(symbol, OpCode::Pop);
-        }
-        
-        // if the iterator is finished we've succeeded
-        let done_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
-        
-        // too many items
-        self.emit_instr(symbol, OpCode::False);
-        self.emit_instr(symbol, OpCode::Assert); // TODO implement dynamic errors
-        
-        // not enough items
-        let error_target = self.current_offset();
-        for jump_site in error_jump_sites.iter() {
-            self.patch_jump_instr(jump_site, error_target)?;
-        }
-        
-        self.emit_instr(symbol, OpCode::False);
-        self.emit_instr(symbol, OpCode::Assert); // TODO implement dynamic errors
-        
-        // cleanup
-        self.patch_jump_instr(&done_jump_site, self.current_offset())?;
-        self.emit_instr(symbol, OpCode::Pop); // pop iter
-        
-        Ok(())
+        self.compile_tuple_unpack(
+            symbol, targets, 
+            |self_, target| self_.compile_declaration(symbol, decl, target)
+        )
     }
     
     fn compile_update_assignment(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp, lhs: &LValue, rhs: &Expr, nonlocal: bool) -> CompileResult<()> {
@@ -1108,6 +1085,13 @@ impl CodeGenerator<'_> {
     }
     
     fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, targets: &[LValue], nonlocal: bool) -> CompileResult<()> {
+        self.compile_tuple_unpack(
+            symbol, targets,
+            |self_, target| self_.compile_assignment(symbol, target, nonlocal)
+        )
+    }
+    
+    fn compile_tuple_unpack(&mut self, symbol: Option<&DebugSymbol>, targets: &[LValue], func: impl Fn(&mut Self, &LValue) -> CompileResult<()>) -> CompileResult<()> {
         
         let mut error_jump_sites = Vec::new();
         
@@ -1121,7 +1105,7 @@ impl CodeGenerator<'_> {
             
             // advance the iterator and put the item on the stack
             self.emit_instr(symbol, OpCode::IterNext);
-            self.compile_assignment(symbol, target, nonlocal)?;
+            func(self, target)?;
             
             self.emit_instr(symbol, OpCode::Pop);
         }
@@ -1130,8 +1114,9 @@ impl CodeGenerator<'_> {
         let done_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
         
         // too many items
-        self.emit_instr(symbol, OpCode::False);
-        self.emit_instr(symbol, OpCode::Assert); // TODO implement dynamic errors
+        let message = format!("too many values to unpack (expected {})", targets.len());
+        self.emit_load_error(symbol, RuntimeErrorKind::UnpackError, message.as_str())?;
+        self.emit_instr(symbol, OpCode::Error);
         
         // not enough items
         let error_target = self.current_offset();
@@ -1139,8 +1124,9 @@ impl CodeGenerator<'_> {
             self.patch_jump_instr(jump_site, error_target)?;
         }
         
-        self.emit_instr(symbol, OpCode::False);
-        self.emit_instr(symbol, OpCode::Assert); // TODO implement dynamic errors
+        let message = format!("not enough values to unpack (expected {})", targets.len());
+        self.emit_load_error(symbol, RuntimeErrorKind::UnpackError, message.as_str())?;
+        self.emit_instr(symbol, OpCode::Error);
         
         // cleanup
         self.patch_jump_instr(&done_jump_site, self.current_offset())?;

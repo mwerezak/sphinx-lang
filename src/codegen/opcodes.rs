@@ -15,9 +15,10 @@ pub type UpvalueIndex = u16;
 
                            // width set here so that the longest mnemonic is 16 chars
 const OP_NOP:              u8 = 0x00;
-const OP_EXIT:             u8 = 0x01;
+const OP_EXIT:             u8 = 0x01;  // _ => !
+const OP_ERROR:            u8 = 0x02;  // [ error ] => !
 
-const OP_RETURN:           u8 = 0x02;  // [ ...call frame... ret_value ] => [ ret_value ]
+const OP_RETURN:           u8 = 0x08;  // [ ...call frame... ret_value ] => [ ret_value ]
 
 // The odd argument order is because the VM will swap "nargs" with "arg[n]" after reading "nargs".
 // This is because the function preamble will fill in any missing default arguments such that the
@@ -26,11 +27,11 @@ const OP_RETURN:           u8 = 0x02;  // [ ...call frame... ret_value ] => [ re
 // so swapping it to the beginning is the most efficient way to handle this.
 
 // [ callee arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
-const OP_CALL:             u8 = 0x03;
+const OP_CALL:             u8 = 0x09;
 
 // This instruction is needed because when unpacking, the final nargs value needs to be updated dynamically as we iterate.
 // [ callee arg[n] arg[0] ... arg[n-1] nargs arg_seq ] => [ ret_value ]  -- nargs does not include arg_seq! 
-const OP_CALL_UNPACK:      u8 = 0x04;
+const OP_CALL_UNPACK:      u8 = 0x0A;
 
 // 0x10-17        Immediate Values
 
@@ -144,6 +145,7 @@ const DBG_DUMP_STRINGS:    u8 = 0xF4;
 pub enum OpCode {
     Nop = OP_NOP,
     Exit = OP_EXIT,
+    Error = OP_ERROR,
     
     Return = OP_RETURN, 
     Call = OP_CALL,
@@ -238,6 +240,7 @@ impl OpCode {
         let opcode = match byte {
             OP_NOP => Self::Nop,
             OP_EXIT => Self::Exit,
+            OP_ERROR => Self::Error,
             
             OP_RETURN => Self::Return,
             OP_CALL => Self::Call,
@@ -378,7 +381,7 @@ impl From<OpCode> for u8 {
 
 impl TryFrom<u8> for OpCode {
     type Error = u8;
-    fn try_from(byte: u8) -> Result<Self, Self::Error> {
+    fn try_from(byte: u8) -> Result<Self, u8> {
         if let Some(opcode) = OpCode::from_byte(byte) {
             Ok(opcode)
         } else {
@@ -397,6 +400,7 @@ impl core::fmt::Display for OpCode {
         let mnemonic = match *self {
             Self::Nop => "NOP",
             Self::Exit => "EXIT",
+            Self::Error => "ERROR",
             
             Self::Return => "RETURN",
             Self::Call => "CALL",
