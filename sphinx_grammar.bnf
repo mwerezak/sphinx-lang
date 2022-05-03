@@ -24,7 +24,6 @@ expression ::= primary
              | UNARY_OP expression
              | expression BINARY_OP expression
              | assignment_expression
-             | declaration_expression
              | decorator_expression
              | function_def
              | class_def
@@ -61,17 +60,14 @@ block_expression ::= ( label )? "begin" ( statement )* ( control_flow )? "end" ;
 (* right associative *)
 lvalue ::= IDENTIFIER | primary index_access | primary member_access ;
 
-lvalue_expression ::= lvalue | lvalue_list | "(" lvalue_expression ")" ;   (* lvalues, tuples of lvalues, and grouped lvalues *)
+lvalue_modifier ::= "let" | "var" ;
+lvalue_expression ::= lvalue_modifier? ( lvalue | lvalue_list | "(" lvalue_expression ")" ) ;   (* lvalues, tuples of lvalues, and grouped lvalues *)
 lvalue_list ::= lvalue_expression ( "," lvalue_expression )* ;
 
-lvalue_annotated ::= lvalue ( ":" type_expression )? ;
-lvalue_expr_annotated ::= lvalue_expression ( ":" type_expression )? ; 
-
+lvalue_annotated ::= lvalue_expression ( ":" type_expression )? ; 
 
 assignment_op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-assignment_expression ::= ( "nonlocal" )? ( lvalue_annotated assignment_op | lvalue_expr_annotated "=" ) expression ;
-
-declaration_expression ::= ( "let" | "var" ) lvalue_expr_annotated "=" expression ;
+assignment_expression ::= ( "nonlocal" )? lvalue_annotated assignment_op expression ;
 
 decorator_expression ::= "@" expression ( assignment_expression | declaration_expression ) ;
 
