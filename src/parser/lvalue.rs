@@ -6,7 +6,7 @@ use crate::parser::expr::{Expr, ExprMeta};
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum LValueMod {
+pub enum LVModifier {
     LocalAssign,
     NonLocalAssign,
     DeclImmutable,
@@ -14,9 +14,9 @@ pub enum LValueMod {
 }
 
 #[derive(Debug, Clone)]
-pub struct LValueExpr {
+pub struct AssignmentTarget {
     pub lvalue: LValue,
-    pub modifier: LValueMod,
+    pub modifier: LVModifier,
 }
 
 #[derive(Debug, Clone)]
@@ -24,8 +24,15 @@ pub enum LValue {
     Identifier(InternSymbol),
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
-    Tuple(Box<[LValue]>),
+    Tuple(Box<[LValueItem]>),
+    Group(Box<AssignmentTarget>),
     // Unpack(Box<LValue>),
+}
+
+#[derive(Debug, Clone)]
+pub struct LValueItem {
+    pub lvalue: LValue,
+    pub unpack: bool,
 }
 
 // LValue Data
@@ -46,7 +53,7 @@ pub struct IndexTarget {
 
 #[derive(Debug, Clone)]
 pub struct Assignment {
-    pub lhs: LValueExpr,
+    pub lhs: AssignmentTarget,
     pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     pub rhs: Expr,
     pub nonlocal: bool,

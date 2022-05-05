@@ -160,6 +160,14 @@ var c = 1
 let a = b += c = let d = 1  # chaining assignment (right associative)
 let a = (b += (c = (let d = 1))) # previous expression is equivalent to this
 
+# Normally, the let/var keywords apply to the entire left-hand side of the assignment
+# If you want to apply a different keyword to an inner item, you can surround it in parens
+
+let a, b, (var c) = "a", "b", "c"
+
+# another example combined with tuple destructuring
+a, (let b, (var c), d), e, (let f), (var g) = "a", ("b", "c", "d"), "e", "f", "g"
+
 # assignment versions of all binary operators are supported for assignment expressions only
 inc = 0
 inc -= 1  # arithmetic assignment
@@ -384,6 +392,42 @@ print(super_seven)  # 63,007
 super_seven /= 1  # makes it un-super thanks to division
 
 print(super_seven)  # 7
+
+
+# Errors
+
+#{
+  One of the goals I have for Sphinx is to not use exceptions for control flow in the way
+  that Python does, where try/catch constructs are used to branch based on whether an
+  operation succeeded or not.
+  
+  The default is to fail fast. If you do something that causes an error (and it wasn't intentional),
+  the program exits with a traceback. There will be a Lua-style "protected call" mechanism because
+  that is useful for top-level error handling, but it won't be the primary error handling mechanism.
+  
+  Instead, when you are expecting an expression to cause an error, you can apply the "try operator"
+  to the expression. If the expression fails, the try operator instead forces it to evaluate to
+  an error object. This is similar to how Lua uses nil to indicate that a value doesn't exist in
+  a table, but unlike nil, the error object contains within itself a complete traceback and other 
+  information that describes the error and the place where it originated.
+  
+  This allows you to capture detailed error information similar to what Python provides with 
+  exceptions, without causing the control flow jumps that sometimes draws criticism of try/catch
+  error handling. Instead you get an error value, and control flow proceeds normally. 
+  
+  Also, since receiving an error value is explicitly "opt-in" using the try operator, you control
+  exactly where an error value might be generated and you know where to expect them.
+  
+  Once you have an error value, attempting to perform operations on an error value propagates the 
+  error instead of failing fast, preserving the original error info and traceback. 
+  While this is a departure from the explicit opt-in, it requires you to explicitly opt-in 
+  somewhere first, and the error object will always preserve the source of the error so that it 
+  can be traced.
+}#
+
+# TODO examples
+
+
 
 # Classes
 

@@ -22,7 +22,7 @@ pub use errors::{ParserError, ParseResult};
 use expr::{ExprMeta, Expr, ExprBlock, ConditionalBranch};
 use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
 use primary::{Primary, Atom, AccessItem};
-use lvalue::{LValue, LValueMod, LValueExpr, Assignment};
+use lvalue::{LValue, LValueItem, LVModifier, AssignmentTarget, Assignment};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
 use errors::{ErrorKind, ErrorContext, ContextTag};
@@ -37,7 +37,7 @@ pub struct Parser<'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     errors: VecDeque<ParserError>,
 }
 
-impl<'h, T> Iterator for Parser<'h, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
+impl<T> Iterator for Parser<'_, T> where T: Iterator<Item=Result<TokenMeta, LexerError>> {
     type Item = Result<StmtMeta, ParserError>;
     fn next(&mut self) -> Option<Self::Item> { self.next_stmt() }
 }
@@ -51,7 +51,9 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             errors: VecDeque::new(),
         }
     }
+}
     
+impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     /// for debugging
     fn current_index(&mut self) -> TokenIndex { 
         let token = self.peek().unwrap();
@@ -92,7 +94,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
     fn intern_str(&mut self, string: impl AsRef<str>) -> InternSymbol {
         self.interner.get_or_intern(string)
     }
-    
+
     pub fn next_stmt(&mut self) -> Option<Result<StmtMeta, ParserError>> {
         let mut ctx = ErrorContext::new(ContextTag::TopLevel);
         
@@ -213,8 +215,8 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         debug!("done.");
     }
-    
-    /*** Statement Parsing ***/
+
+    /* Statement Parsing */
     
     fn parse_stmt(&mut self, ctx: &mut ErrorContext) -> ParseResult<StmtMeta> {
         // skip statement separators
@@ -456,8 +458,8 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         ctx.pop_extend();
         Ok(Some(control_flow))
     }
-    
-    /*** Expression Parsing ***/
+
+    /* Expression Parsing */
     
     fn parse_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<ExprMeta> {
         ctx.push(ContextTag::ExprMeta);
@@ -576,15 +578,6 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         Ok(Expr::Declaration(decl))
     }*/
     
-    fn is_lvalue_valid_for_decl(lvalue: &LValue) -> bool {
-        match lvalue {
-            LValue::Identifier(..) => true,
-            LValue::Tuple(lvalue_list) 
-                => lvalue_list.iter().all(|lvalue| Self::is_lvalue_valid_for_decl(lvalue)),
-            _ => false,
-        }
-    }
-    
     fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         
         // if this inner expression ends up being captured as the first
@@ -635,6 +628,8 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         }
     }
     
+
+
     /*
         Binary operator syntax:
         
@@ -1361,19 +1356,58 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         ctx.pop_extend();
         Ok(Atom::Group(Box::new(expr)))
     }
+}
 
-    /*** LValue Parsing ***/
+/* LValue Parsing */
 
-    fn parse_lvalue_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<LValueExpr> {
-        ctx.push(ContextTag::LValueExpr);
+enum MaybeLValue {
+    LValue(AssignmentTarget),
+    Expr(Expr),
+}
+
+impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
+    fn try_parse_lvalue_modifier(&mut self, ctx: &mut ErrorContext) -> ParseResult<Option<LVModifier>> {
+        let next = self.peek()?;
+
+        // if we see any of these, then this is definitely an LValue
+        let modifier = match next.token {
+            Token::Let => Some(LVModifier::DeclImmutable),
+            Token::Var => Some(LVModifier::DeclMutable),
+            Token::NonLocal => Some(LVModifier::NonLocalAssign),
+            _ => None,
+        };
+
+        if modifier.is_some() {
+            ctx.push(ContextTag::LValue);
+            ctx.set_start(&self.advance().unwrap());
+            ctx.pop_extend();
+            return Ok(modifier);
+        }
+        Ok(None)
+    }
+
+    fn parse_lvalue_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<MaybeLValue> {
+
+
+        unimplemented!()
+    }
+
+
+
+
+
+
+/*
+    fn parse_lvalue_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<AssignmentTarget> {
+        ctx.push(ContextTag::AssignmentTarget);
 
         let next = self.peek()?;
         ctx.set_start(&next);
 
         let modifier = match next.token {
-            Token::Let => Some(LValueMod::DeclImmutable),
-            Token::Var => Some(LValueMod::DeclMutable),
-            Token::NonLocal => Some(LValueMod::NonLocalAssign),
+            Token::Let => Some(LVModifier::DeclImmutable),
+            Token::Var => Some(LVModifier::DeclMutable),
+            Token::NonLocal => Some(LVModifier::NonLocalAssign),
             _ => None,
         };
 
@@ -1381,7 +1415,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
             let next = self.advance().unwrap(); // consume modifier token
             ctx.set_end(&next);
         }
-        let modifier = modifier.unwrap_or(LValueMod::LocalAssign);
+        let modifier = modifier.unwrap_or(LVModifier::LocalAssign);
 
 
         
@@ -1464,7 +1498,7 @@ impl<'h, I> Parser<'h, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> 
         
         ctx.pop_extend();
         Ok(lvalue)
-    }
+    }*/
 
 
 }

@@ -57,20 +57,20 @@ block_expression ::= ( label )? "begin" ( statement )* ( control_flow )? "end" ;
 (*** Assignment ***)
 
 lvalue_primary ::= IDENTIFIER | primary index_access | primary member_access ;
-lvalue_modifier ::= "let" | "var" | "nonlocal" ;
+assign_modifier ::= "let" | "var" | "nonlocal" ;
 
-(* There are three principle types of lvalues: primary lvalues, tuples of lvalues, and grouped lvalues *)
+(* There are three principal types of lvalues: primary lvalues, tuples of lvalues, and grouped lvalues *)
 
 (* these productions are set up so that modifiers only appear either at toplevel, or inside parens *)
-lvalue ::= lvalue_modifier? lvalue_inner ;
+assign_target ::= assign_modifier? lvalue_inner ;
 lvalue_inner ::= lvalue_item | lvalue_list ;
-lvalue_item ::= lvalue_primary | "(" lvalue ")" ;
+lvalue_item ::= lvalue_primary | "(" assign_target ")" ;
 lvalue_list ::= lvalue_item ( "," lvalue_item )* ;
 
 (* lvalue_annotated ::= ... ( ":" type_expression )? ; TODO work out type annotations later *)
 
 assignment_op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-assignment_expression ::= lvalue assignment_op expression ;
+assignment_expression ::= assign_target assignment_op expression ;
 
 decorator_expression ::= "@" expression assignment_expression ;
 
@@ -182,6 +182,6 @@ binary_op ::= operand[10] ;
 (* top_level tuples don't require parens - however, single element tuples are not allowed here, use tuple_constructor instead *)
 naked_tuple ::= binary_op ( "," binary_op )*;
 
-assignment ::= naked_tuple | assignment_expression | declaration_expression ;
+assignment ::= naked_tuple | assignment_expression ;
 
 expression ::= assignment (* top level of recursive descent *)

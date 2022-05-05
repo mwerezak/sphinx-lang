@@ -50,8 +50,8 @@ pub enum ContextTag {
     TupleCtor,
     Atom,
     Group,
+    LValue,
     Label,
-    LValueExpr,
 }
 
 impl From<ErrorKind> for ParserError {
