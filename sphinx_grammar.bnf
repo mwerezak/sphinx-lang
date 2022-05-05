@@ -32,6 +32,8 @@ expression ::= primary
 
 expression_list ::= expression ( "," expression )* ;
 
+
+
 (*** Primary expressions ***)
 
 atom ::= LITERAL | IDENTIFIER | "self" | "super" | group ;
@@ -43,44 +45,47 @@ member_access ::= "." IDENTIFIER ;
 
 group ::= "(" expression ( ":" type_expression )? ")" ; (* can be type annotated *)
 
+
+
 (*** if/block Expressions ***)
 
 if_expression ::= "if" expression "then" statement_list ( "elif" expression "then" statement_list )* ( "else" statement_list )? "end" ;
 block_expression ::= ( label )? "begin" ( statement )* ( control_flow )? "end" ;  (* break can be supplied a value inside of begin_blocks *)
 
+
+
 (*** Assignment ***)
 
-(* 
-    The "var" keyword creates the variable in current scope, otherwise the global scope is searched for an 
-    existing variable if cannot be not found locally. If it still can't be found, then the assignment is an error.
-    
-    Assignment statements support sequence destructuring, assignment expressions do not.
-*)
-
-(* right associative *)
+lvalue_primary ::= IDENTIFIER | primary index_access | primary member_access ;
 lvalue_modifier ::= "let" | "var" | "nonlocal" ;
-lvalue ::= IDENTIFIER | primary index_access | primary member_access ;
 
-lvalue_expression ::= lvalue_modifier? ( lvalue | lvalue_list | "(" lvalue_expression ")" ) ;   (* lvalues, tuples of lvalues, and grouped lvalues *)
-lvalue_list ::= lvalue_expression ( "," lvalue_expression )* ;
+(* There are three principle types of lvalues: primary lvalues, tuples of lvalues, and grouped lvalues *)
 
-lvalue_annotated ::= lvalue_expression ( ":" type_expression )? ; 
+(* these productions are set up so that modifiers only appear either at toplevel, or inside parens *)
+lvalue ::= lvalue_modifier? lvalue_inner ;
+lvalue_inner ::= lvalue_item | lvalue_list ;
+lvalue_item ::= lvalue_primary | "(" lvalue ")" ;
+lvalue_list ::= lvalue_item ( "," lvalue_item )* ;
+
+(* lvalue_annotated ::= ... ( ":" type_expression )? ; TODO work out type annotations later *)
 
 assignment_op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-assignment_expression ::= lvalue_annotated assignment_op expression ;
+assignment_expression ::= lvalue assignment_op expression ;
 
-decorator_expression ::= "@" expression ( assignment_expression | declaration_expression ) ;
+decorator_expression ::= "@" expression assignment_expression ;
+
 
 
 (*** Function/Method Calls ***)
 
 invocation ::= "(" ")" | "(" expression_list ( "..." )? ")" ; 
 
+
+
 (*** Constructors ***)
 
 object_constructor ::= "{" member_initializer ( "," member_initializer )* "}" ;
 member_initializer ::= ( IDENTIFIER | "[" primary "]" ) ( ":" type_expression )? "=" expression ;
-
 
 (* syntax for tuple_constructor has special casing for single_element tuples and the empty tuple *)
 tuple_constructor ::= expression_list | "(" expression "," ")" | "(" ")" ;
@@ -107,6 +112,7 @@ for_loop ::= ( label )? "for" lvalue_list "in" expression "end" ;
 label ::= "::" LABELNAME ;
 
 
+
 (*** Function Defs ***)
 
 function_def ::= "fun" lvalue parameter_list ( "->" type_expression ":" )?  statement_list "end" ;
@@ -125,6 +131,7 @@ parameter ::= ( "var" )? IDENTIFIER ( ":" type_expression )? ;
 default_parameter ::= parameter ( "=" expression ) ;
 
 variadic_parameter ::= ( "var" )? IDENTIFIER "..." ( ":" type_expression )? ;
+
 
 
 (*** Class Defs ***)
