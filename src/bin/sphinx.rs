@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 use std::path::PathBuf;
-use clap::{Command, Arg, ArgMatches};
+use clap::{Command, Arg};
 
 use sphinx::frontend;
 use sphinx::source::{ModuleSource, SourceText};
@@ -40,11 +40,6 @@ fn main() {
             .help("Drop into an interactive REPL after executing")
         )
         .arg(
-            Arg::new("parse_only")
-            .short('P')
-            .help("Parse and print AST instead of executing")
-        )
-        .arg(
             Arg::new("compile_only")
             .short('d')
             .help("Produce compiled bytecode instead of executing (not implemented)")
@@ -59,13 +54,10 @@ fn main() {
     let args = app.get_matches();
     
     let source;
-    let name;
     if let Some(s) = args.value_of("cmd") {
         source = ModuleSource::String(s.to_string());
-        name = "<cmd>";
     } else if let Some(s) = args.value_of("file") {
         source = ModuleSource::File(PathBuf::from(s));
-        name = s;
     } else {
         let repl_env = stdlib::create_prelude();
         Repl::new(version.to_string(), repl_env).run();
@@ -73,10 +65,7 @@ fn main() {
         return;
     }
     
-    if args.is_present("parse_only") {
-        parse_and_print_ast(&args, name, &source);
-    }
-    else if args.is_present("compile_only") {
+    if args.is_present("compile_only") {
         unimplemented!()
     }
     else if args.is_present("interactive") {
@@ -142,29 +131,6 @@ fn run_debugger(vm: VirtualMachine) {
     
     println!("Execution stopped.");
 }
-
-fn parse_and_print_ast(_args: &ArgMatches, name: &str, source: &ModuleSource) {
-    let source_text = match source.read_text() {
-        Ok(source_text) => source_text,
-        
-        Err(error) => {
-            println!("Error reading source: {}.", error);
-            return;
-        },
-    };
-    
-    let mut interner = StringInterner::new();
-    let parse_result = sphinx::parse_source(&mut interner, source_text);
-    
-    match parse_result {
-        Err(errors) => {
-            println!("Errors in file \"{}\":\n", name);
-            frontend::print_source_errors(source, &errors);
-        },
-        Ok(ast) => println!("{:#?}", ast),
-    }
-}
-
 
 //////// REPL ////////
 const PROMT_START: &str = ">>> ";
