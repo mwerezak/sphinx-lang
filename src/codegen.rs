@@ -6,7 +6,7 @@ use crate::language::{IntType, FloatType, InternSymbol, Access};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary, AccessItem};
-use crate::parser::lvalue::{LValue};
+use crate::parser::lvalue::{LValue, AssignType};
 use crate::parser::fundefs::{FunctionDef, SignatureDef};
 use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::strings::{StringInterner};
@@ -773,13 +773,12 @@ impl CodeGenerator<'_> {
             },
             
             Expr::Assignment(assign) => {
-                todo!()
-                // if let Some(op) = assign.op {
-                //     self.compile_update_assignment(symbol, op, &assign.lhs, &assign.rhs, assign.nonlocal)?;
-                // } else {
-                //     self.compile_expr(symbol, &assign.rhs)?;
-                //     self.compile_assignment(symbol, &assign.lhs, assign.nonlocal)?;
-                // }
+                if let Some(op) = assign.op {
+                    self.compile_update_assignment(symbol, op, assign.assign, &assign.lhs, &assign.rhs)?;
+                } else {
+                    self.compile_expr(symbol, &assign.rhs)?;
+                    self.compile_assignment(symbol, assign.assign, &assign.lhs)?;
+                }
             },
             
             Expr::Unpack(..) => return Err("unpack operator \"...\" is not allowed here".into()),
@@ -961,87 +960,119 @@ impl CodeGenerator<'_> {
 
 ///////// Declarations and Assignments /////////
 impl CodeGenerator<'_> {
-    // fn compile_declaration(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, lhs: &LValue) -> CompileResult<()> {
-    //     match lhs {
-    //         LValue::Identifier(name) => if self.scopes().is_global_scope() {
-    //             self.compile_decl_global_name(symbol, decl, *name)
-    //         } else {
-    //             self.compile_decl_local_name(symbol, decl, *name)
-    //         },
-            
-    //         LValue::Attribute(target) => unimplemented!(),
-            
-    //         LValue::Index(target) => unimplemented!(),
-            
-    //         LValue::Tuple(target_list) => self.compile_decl_tuple(symbol, decl, target_list),
-    //     }
-    // }
+
     
-    // fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
+    fn compile_update_assignment(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp, assign: AssignType, lhs: &LValue, rhs: &Expr) -> CompileResult<()> {
         
-    //     match self.scopes_mut().insert_local(decl, LocalName::Symbol(name))? {
-    //         InsertLocal::CreateNew => 
-    //             self.emit_instr(symbol, OpCode::InsertLocal),
+        let local_only = match assign {
+            AssignType::AssignLocal => true,
+            AssignType::AssignNonLocal => false,
             
-    //         InsertLocal::HideExisting(local_index) =>
-    //             self.emit_assign_local(symbol, local_index),
-    //     }
+            AssignType::DeclImmutable | AssignType::DeclMutable
+                => return Err("update-assignment is invalid when declaring a variable".into()),
+        };
         
-    //     Ok(())
-    // }
+        // TODO suport Attribute and Index LValues as well
+        match lhs {
+            LValue::Identifier(name) => {
+                self.compile_name_lookup(symbol, name)?;
+                self.compile_expr(symbol, rhs)?;
+                self.emit_binary_op(symbol, &op);
+                
+                self.compile_assign_identifier(symbol, name, local_only)
+            },
+            
+            LValue::Attribute(target) => unimplemented!(),
+            
+            LValue::Index(target) => unimplemented!(),
+            
+            LValue::Tuple(..) => Err("can't use update-assigment when assigning to a tuple".into()),
+            
+            LValue::Modifier{..} => unreachable!(),
+        }
+    }
     
-    // fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, name: InternSymbol) -> CompileResult<()> {
+    fn compile_assignment(&mut self, symbol: Option<&DebugSymbol>, mut assign: AssignType, mut lhs: &LValue) -> CompileResult<()> {
         
-    //     self.emit_load_const(symbol, Constant::from(name))?;
-    //     match decl {
-    //         DeclType::Immutable => self.emit_instr(symbol, OpCode::InsertGlobal),
-    //         DeclType::Mutable => self.emit_instr(symbol, OpCode::InsertGlobalMut),
-    //     }
-    //     Ok(())
-    // }
+        while let LValue::Modifier { modifier, lvalue } = lhs {
+            assign = *modifier;
+            lhs = lvalue;
+        }
+        
+        if let LValue::Tuple(target_list) = lhs {
+            self.compile_assign_tuple(symbol, assign, target_list)
+            
+        } else {
+            
+            match assign {
+                AssignType::AssignLocal => self.compile_assign_variable(symbol, lhs, false),
+                AssignType::AssignNonLocal => self.compile_assign_variable(symbol, lhs, true),
+                AssignType::DeclImmutable => self.compile_decl_variable(symbol, Access::ReadOnly, lhs),
+                AssignType::DeclMutable => self.compile_decl_variable(symbol, Access::ReadWrite, lhs),
+            }
+        }
+    }
+
+    fn compile_decl_variable(&mut self, symbol: Option<&DebugSymbol>, access: Access, lhs: &LValue) -> CompileResult<()> {
+        match lhs {
+            LValue::Identifier(name) => if self.scopes().is_global_scope() {
+                self.compile_decl_global_name(symbol, access, *name)
+            } else {
+                self.compile_decl_local_name(symbol, access, *name)
+            },
+            
+            LValue::Tuple(..) => unreachable!(),
+            LValue::Modifier {..} => unreachable!(),
+            
+            _ => Err("not a variable name".into()),
+        }
+    }
     
-    // fn compile_decl_tuple(&mut self, symbol: Option<&DebugSymbol>, decl: DeclType, targets: &[LValue]) -> CompileResult<()> {
+    fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, access: Access, name: InternSymbol) -> CompileResult<()> {
+        
+        self.emit_load_const(symbol, Constant::from(name))?;
+        match access {
+            Access::ReadOnly => self.emit_instr(symbol, OpCode::InsertGlobal),
+            Access::ReadWrite => self.emit_instr(symbol, OpCode::InsertGlobalMut),
+        }
+        Ok(())
+    }
+    
+    fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, access: Access, name: InternSymbol) -> CompileResult<()> {
+        
+        match self.scopes_mut().insert_local(access, LocalName::Symbol(name))? {
+            InsertLocal::CreateNew => 
+                self.emit_instr(symbol, OpCode::InsertLocal),
+            
+            InsertLocal::HideExisting(local_index) =>
+                self.emit_assign_local(symbol, local_index),
+        }
+        
+        Ok(())
+    }
+    
+    // fn compile_decl_tuple(&mut self, symbol: Option<&DebugSymbol>, access: Access, targets: &[LValue]) -> CompileResult<()> {
     //     self.compile_tuple_unpack(
     //         symbol, targets, 
-    //         |self_, target| self_.compile_declaration(symbol, decl, target)
+    //         |self_, target| self_.compile_declaration(symbol, access, target)
     //     )
     // }
     
-    fn compile_update_assignment(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp, lhs: &LValue, rhs: &Expr, nonlocal: bool) -> CompileResult<()> {
+    fn compile_assign_variable(&mut self, symbol: Option<&DebugSymbol>, lhs: &LValue, allow_nonlocal: bool) -> CompileResult<()> {
         
-        // TODO suport Attribute and Index LValues as well
-        // match lhs {
-        //     LValue::Identifier(name) => {
-        //         self.compile_name_lookup(symbol, name)?;
-        //         self.compile_expr(symbol, rhs)?;
-        //         self.emit_binary_op(symbol, &op);
-                
-        //         self.compile_assign_identifier(symbol, name, nonlocal)
-        //     },
+        match lhs {
+            LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, allow_nonlocal),
             
-        //     LValue::Attribute(target) => unimplemented!(),
-        //     LValue::Index(target) => unimplemented!(),
+            LValue::Attribute(target) => unimplemented!(),
             
-        //     LValue::Tuple(..) => Err(ErrorKind::CantUpdateAssignTuple.into()),
-        // }
-        todo!()
+            LValue::Index(target) => unimplemented!(),
+            
+            LValue::Tuple(..) => unreachable!(),
+            LValue::Modifier {..} => unreachable!(),
+        }
     }
     
-    fn compile_assignment(&mut self, symbol: Option<&DebugSymbol>, lhs: &LValue, nonlocal: bool) -> CompileResult<()> {
-        
-        // match lhs {
-        //     LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, nonlocal),
-            
-        //     LValue::Attribute(target) => unimplemented!(),
-            
-        //     LValue::Index(target) => unimplemented!(),
-            
-        //     LValue::Tuple(target_list) => self.compile_assign_tuple(symbol, target_list, nonlocal),
-        // }
-        todo!()
-    }
-    
-    fn compile_assign_identifier(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol, nonlocal: bool) -> CompileResult<()> {
+    fn compile_assign_identifier(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol, allow_nonlocal: bool) -> CompileResult<()> {
         
         // Generate assignment
         
@@ -1063,7 +1094,7 @@ impl CodeGenerator<'_> {
             }
             
             // nonlocal keyword is not required in the global frame
-            if !nonlocal && !self.scopes().is_global_frame() {
+            if !allow_nonlocal && !self.scopes().is_global_frame() {
                 return Err("can't assign to a non-local variable without the \"nonlocal\" keyword".into());
             }
             
@@ -1100,14 +1131,14 @@ impl CodeGenerator<'_> {
         }
     }
     
-    fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, targets: &[LValue], nonlocal: bool) -> CompileResult<()> {
-        self.compile_tuple_unpack(
-            symbol, targets,
-            |self_, target| self_.compile_assignment(symbol, target, nonlocal)
-        )
-    }
+    // fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, targets: &[LValue], allow_nonlocal: bool) -> CompileResult<()> {
+    //     self.compile_tuple_unpack(
+    //         symbol, targets,
+    //         |self_, target| self_.compile_assign_variable(symbol, target, allow_nonlocal)
+    //     )
+    // }
     
-    fn compile_tuple_unpack(&mut self, symbol: Option<&DebugSymbol>, targets: &[LValue], func: impl Fn(&mut Self, &LValue) -> CompileResult<()>) -> CompileResult<()> {
+    fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, targets: &[LValue]) -> CompileResult<()> {
         
         let mut error_jump_sites = Vec::new();
         
@@ -1121,7 +1152,7 @@ impl CodeGenerator<'_> {
             
             // advance the iterator and put the item on the stack
             self.emit_instr(symbol, OpCode::IterNext);
-            func(self, target)?;
+            self.compile_assignment(symbol, assign, target)?;
             
             self.emit_instr(symbol, OpCode::Pop);
         }
@@ -1146,6 +1177,7 @@ impl CodeGenerator<'_> {
         
         // cleanup
         self.patch_jump_instr(&done_jump_site, self.current_offset())?;
+        self.emit_instr(symbol, OpCode::Pop);
         
         Ok(())
     }

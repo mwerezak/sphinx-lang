@@ -535,14 +535,14 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             let assign = Assignment {
                 lhs, op, rhs,
-                assign: assign.unwrap_or(AssignType::LocalAssign),
+                assign: assign.unwrap_or(AssignType::AssignLocal),
             };
             return Ok(Expr::Assignment(Box::new(assign)));
             
         } else if let Some(assign) = assign {
             let assign = match assign {
-                AssignType::LocalAssign => "local",
-                AssignType::NonLocalAssign => "nonlocal",
+                AssignType::AssignLocal => "local",
+                AssignType::AssignNonLocal => "nonlocal",
                 AssignType::DeclImmutable => "let",
                 AssignType::DeclMutable => "var",
             };
@@ -1349,8 +1349,8 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         let modifier = match next.token {
             Token::Let => Some(AssignType::DeclImmutable),
             Token::Var => Some(AssignType::DeclMutable),
-            Token::Local => Some(AssignType::LocalAssign),
-            Token::NonLocal => Some(AssignType::NonLocalAssign),
+            Token::Local => Some(AssignType::AssignLocal),
+            Token::NonLocal => Some(AssignType::AssignNonLocal),
             _ => None,
         };
 

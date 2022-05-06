@@ -7,8 +7,8 @@ use crate::parser::expr::{Expr, ExprMeta};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AssignType {
-    LocalAssign,
-    NonLocalAssign,
+    AssignLocal,
+    AssignNonLocal,
     DeclImmutable,
     DeclMutable,
 }
@@ -18,7 +18,7 @@ pub enum LValue {
     Identifier(InternSymbol),
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
-    Tuple(Box<[LValueItem]>),
+    Tuple(Box<[LValue]>),
     Modifier {
         modifier: AssignType,
         lvalue: Box<LValue>,
@@ -26,11 +26,11 @@ pub enum LValue {
 }
 
 /// LValues that are items in a sequence
-#[derive(Debug, Clone)]
-pub struct LValueItem {
-    pub lvalue: LValue,
-    pub unpack: bool,
-}
+// #[derive(Debug, Clone)]
+// pub struct LValueItem {
+//     pub lvalue: LValue,
+//     pub unpack: bool,
+// }
 
 // LValue Data
 
@@ -119,13 +119,15 @@ impl TryFrom<Expr> for LValue {
             
             Expr::Primary(primary) => primary.try_into(),
             
+            Expr::Unpack(expr) => (*expr).try_into(),
+            
             Expr::Tuple(expr_list) => {
                 let mut lvalue_list = Vec::new();
                 
                 for expr in expr_list.into_vec().into_iter() {
-                    let unpack = matches!(expr.variant(), Expr::Unpack(..));
+                    // let unpack = matches!(expr.variant(), Expr::Unpack(..));
                     let lvalue = LValue::try_from(expr.take_variant())?;
-                    lvalue_list.push(LValueItem { unpack, lvalue });
+                    lvalue_list.push(lvalue);
                 }
                 
                 Ok(Self::Tuple(lvalue_list.into_boxed_slice()))
