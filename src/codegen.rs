@@ -772,11 +772,6 @@ impl CodeGenerator<'_> {
                 self.emit_binary_op(symbol, op);
             },
             
-            // Expr::Declaration(decl) => {
-            //     self.compile_expr(symbol, &decl.init)?;
-            //     self.compile_declaration(symbol, decl.decl, &decl.lhs)?;
-            // },
-            
             Expr::Assignment(assign) => {
                 todo!()
                 // if let Some(op) = assign.op {
@@ -786,6 +781,8 @@ impl CodeGenerator<'_> {
                 //     self.compile_assignment(symbol, &assign.lhs, assign.nonlocal)?;
                 // }
             },
+            
+            Expr::Unpack(..) => return Err("unpack operator \"...\" is not allowed here".into()),
             
             Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list)?,
             

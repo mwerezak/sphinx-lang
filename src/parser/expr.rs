@@ -18,7 +18,9 @@ pub enum Expr {
     BinaryOp(BinaryOp, Box<(Expr, Expr)>),
     
     Assignment(Box<Assignment>),
-        
+    
+    Unpack(Box<Expr>),
+    
     Tuple(Box<[ExprMeta]>),
     
     // ObjectCtor(Box<ObjectConstructor>),

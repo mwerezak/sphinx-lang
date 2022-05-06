@@ -35,6 +35,7 @@ pub enum ContextTag {
     WhileLoop,
     ExprMeta,
     ExprList,
+    Expr,
     BlockExpr,
     IfExpr,
     FunDefExpr,

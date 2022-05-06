@@ -18,8 +18,7 @@ pub enum LValue {
     Identifier(InternSymbol),
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
-    Tuple(Box<[LValue]>),
-    // Unpack(Box<LValue>),
+    Tuple(Box<[LValueItem]>),
     Modifier {
         modifier: LVModifier,
         lvalue: Box<LValue>,
@@ -121,11 +120,12 @@ impl TryFrom<Expr> for LValue {
             Expr::Primary(primary) => primary.try_into(),
             
             Expr::Tuple(expr_list) => {
-                let mut lvalue_list = Vec::<LValue>::new();
+                let mut lvalue_list = Vec::new();
                 
                 for expr in expr_list.into_vec().into_iter() {
-                    let lvalue = expr.take_variant().try_into()?;
-                    lvalue_list.push(lvalue);
+                    let unpack = matches!(expr.variant(), Expr::Unpack(..));
+                    let lvalue = LValue::try_from(expr.take_variant())?;
+                    lvalue_list.push(LValueItem { unpack, lvalue });
                 }
                 
                 Ok(Self::Tuple(lvalue_list.into_boxed_slice()))

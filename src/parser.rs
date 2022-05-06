@@ -263,10 +263,16 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
                 };
                 
                 let message = format!("\"{}\" is not allowed here", name);
-                return Err(ErrorKind::SyntaxError(message).into());
-            },
+                return Err(message.as_str().into());
+            }
             
-            _ => Stmt::Expression(self.parse_expr_variant(ctx)?),
+            _ => {
+                let expr = self.parse_expr_variant(ctx)?;
+                if matches!(expr, Expr::Unpack(..)) {
+                    return Err("the unpack operator \"...\" is not allowed here".into());
+                }
+                Stmt::Expression(expr)
+            }
         };
         Ok(stmt)
     }
@@ -473,7 +479,21 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
     // the top of the recursive descent stack for expressions
     fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
-        self.parse_assignment_expr(ctx)
+        ctx.push(ContextTag::Expr);
+        
+        let mut expr = self.parse_assignment_expr(ctx)?;
+        
+        let next = self.peek()?;
+        if matches!(next.token, Token::Ellipsis) {
+            ctx.set_end(&self.advance().unwrap());
+            if matches!(expr, Expr::Unpack(..)) {
+                return Err("nested use of the unpacking operator \"...\" must be enclosed in parentheses".into());
+            }
+            expr = Expr::Unpack(Box::new(expr))
+        }
+        
+        ctx.pop_extend();
+        Ok(expr)
     }
     
     /*
