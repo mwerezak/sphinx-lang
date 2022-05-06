@@ -10,7 +10,7 @@ use crate::parser::lvalue::{LValue};
 use crate::parser::fundefs::{FunctionDef, SignatureDef};
 use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::strings::{StringInterner};
-use crate::runtime::errors::ErrorKind as RuntimeErrorKind;
+use crate::runtime::errors::ErrorKind;
 use crate::debug::symbol::{DebugSymbol, ChunkSymbols, DebugSymbolTable};
 
 mod scope;
@@ -25,7 +25,7 @@ pub use opcodes::{OpCode, LocalIndex};
 pub use chunk::{UnloadedProgram, Program, ProgramData, Chunk};
 pub use consts::{ConstID, Constant};
 pub use funproto::{FunctionID, FunctionProto, UpvalueTarget};
-pub use errors::{CompileResult, CompileError, ErrorKind};
+pub use errors::{CompileResult, CompileError};
 
 use scope::{ScopeTracker, ScopeTag, Scope, LocalName, InsertLocal, ControlFlowTarget};
 use chunk::{ChunkBuilder, ChunkInfo, ChunkBuf};
@@ -294,7 +294,7 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn emit_load_error(&mut self, symbol: Option<&DebugSymbol>, error: RuntimeErrorKind, message: &str) -> CompileResult<()> {
+    fn emit_load_error(&mut self, symbol: Option<&DebugSymbol>, error: ErrorKind, message: &str) -> CompileResult<()> {
         let cid = self.builder_mut().get_or_insert_error(error, message)?;
         
         if cid <= u8::MAX.into() {
@@ -335,7 +335,7 @@ impl CodeGenerator<'_> {
             
             // if we *still* don't have the right width, just abort
             if new_width != new_opcode.instr_len() {
-                return Err(ErrorKind::InternalLimit("could not calculate jump offset").into());
+                return Err("could not calculate jump offset".into());
             }
             
             jump_offset = new_offset;
@@ -377,7 +377,7 @@ impl CodeGenerator<'_> {
             
             // if we *still* don't have the right width, just abort
             if new_width != new_opcode.instr_len() {
-                return Err(ErrorKind::InternalLimit("could not calculate jump offset").into());
+                return Err("could not calculate jump offset".into());
             }
             
             jump_offset = new_offset;
@@ -406,7 +406,7 @@ impl CodeGenerator<'_> {
             return Ok(JumpOffset::Long(offset));
         }
         
-        Err(ErrorKind::InternalLimit("could not calculate jump offset").into())
+        Err("could not calculate jump offset".into())
     }
 }
 
@@ -616,7 +616,12 @@ impl CodeGenerator<'_> {
         // find the target scope
         let target_depth = match self.scopes().resolve_control_flow(ControlFlowTarget::Break(label.copied())) {
             Some(scope) => scope.depth(),
-            None => return Err(ErrorKind::CantResolveBreak(label.copied()).into()),
+            None => {
+                let message =
+                    if label.is_some() { "can't find loop or block with matching label for \"break\"" }
+                    else { "\"break\" outside of loop or block" };
+                return Err(message.into());
+            },
         };
         
         // drop all scopes up to and including the target
@@ -647,7 +652,7 @@ impl CodeGenerator<'_> {
                 self.emit_instr(symbol, OpCode::Nil);
             }
         } else if expr.is_some() {
-            return Err(CompileError::new(ErrorKind::InvalidBreakWithValue))
+            return Err("\"break\" with value outside of block expression".into())
         }
         
         // emit jump site, register with scope
@@ -666,7 +671,12 @@ impl CodeGenerator<'_> {
         // find the target scope
         let (target_depth, continue_target) = match self.scopes().resolve_control_flow(ControlFlowTarget::Continue(label.copied())) {
             Some(scope) => (scope.depth(), scope.continue_target()),
-            None => return Err(ErrorKind::CantResolveContinue(label.copied()).into()),
+            None => {
+                let message =
+                    if label.is_some() { "can't find loop with matching label for \"continue\"" }
+                    else { "\"continue\" outside of loop" };
+                return Err(message.into());
+            }
         };
         
         // drop all scopes up to and including the target
@@ -794,7 +804,7 @@ impl CodeGenerator<'_> {
     
     fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, expr_list: &[ExprMeta]) -> CompileResult<()> {
         let len = u8::try_from(expr_list.len())
-            .map_err(|_| ErrorKind::InternalLimit("tuple length limit exceeded"))?;
+            .map_err(|_| "tuple length limit exceeded")?;
         
         for expr in expr_list.iter() {
             self.compile_expr_with_symbol(expr)?;
@@ -823,7 +833,7 @@ impl CodeGenerator<'_> {
             Atom::Group { modifier, inner } => {
                 // modifiers are not allowed outside of assignment
                 if let Some(modifier) = modifier {
-                    return Err(ErrorKind::InvalidLValueModifier.into())
+                    return Err("assignment modifier is not allowed here".into())
                 }
                 self.compile_expr(symbol, inner)?
             },
@@ -896,7 +906,7 @@ impl CodeGenerator<'_> {
             }
             
             arg_len = u8::try_from(args.len() + 1)
-                .map_err(|_| ErrorKind::InternalLimit("argument count limit exceeded"))?;
+                .map_err(|_| "argument count limit exceeded")?;
             
         } else {
             
@@ -1047,7 +1057,7 @@ impl CodeGenerator<'_> {
             
             if let Some(local) = result.cloned() {
                 if !local.mode().can_write() {
-                    return Err(CompileError::from(ErrorKind::CantAssignImmutable));
+                    return Err("can't assign to immutable local variable".into());
                 }
                 
                 self.emit_assign_local(symbol, local.index());
@@ -1057,14 +1067,14 @@ impl CodeGenerator<'_> {
             
             // nonlocal keyword is not required in the global frame
             if !nonlocal && !self.scopes().is_global_frame() {
-                return Err(CompileError::from(ErrorKind::CantAssignNonLocal));
+                return Err("can't assign to a non-local variable without the \"nonlocal\" keyword".into());
             }
             
             // check if an upvalue is found or can be created...
             if !self.scopes().is_global_frame() {
                 if let Some(upval) = self.scopes_mut().resolve_or_create_upval(&local_name)? {
                     if !upval.mode().can_write() {
-                        return Err(CompileError::from(ErrorKind::CantAssignImmutable));
+                        return Err("can't assign to immutable local variable".into());
                     }
                     
                     let index = upval.index();
@@ -1124,7 +1134,7 @@ impl CodeGenerator<'_> {
         
         // too many items
         let message = format!("too many values to unpack (expected {})", targets.len());
-        self.emit_load_error(symbol, RuntimeErrorKind::UnpackError, message.as_str())?;
+        self.emit_load_error(symbol, ErrorKind::UnpackError, message.as_str())?;
         self.emit_instr(symbol, OpCode::Error);
         
         // not enough items
@@ -1134,7 +1144,7 @@ impl CodeGenerator<'_> {
         }
         
         let message = format!("not enough values to unpack (expected {})", targets.len());
-        self.emit_load_error(symbol, RuntimeErrorKind::UnpackError, message.as_str())?;
+        self.emit_load_error(symbol, ErrorKind::UnpackError, message.as_str())?;
         self.emit_instr(symbol, OpCode::Error);
         
         // cleanup
@@ -1323,9 +1333,9 @@ impl CodeGenerator<'_> {
         
         // depending on the number of arguments, jump into the default argument sequence
         let required_count = u8::try_from(signature.required.len())
-            .map_err(|_| ErrorKind::InternalLimit("parameter count limit exceeded"))?;
+            .map_err(|_| "parameter count limit exceeded")?;
         let default_count = u8::try_from(signature.default.len())
-            .map_err(|_| ErrorKind::InternalLimit("parameter count limit exceeded"))?;
+            .map_err(|_| "parameter count limit exceeded")?;
         
         // "defaults passed" = NArgs - required_count
         self.try_emit_load_local(None, &LocalName::NArgs).unwrap();
@@ -1384,7 +1394,7 @@ impl CodeGenerator<'_> {
         debug_assert!(signature.variadic.is_some());
         
         let positional_count = u8::try_from(signature.required.len() + signature.default.len())
-            .map_err(|_| ErrorKind::InternalLimit("parameter count limit exceeded"))?;
+            .map_err(|_| "parameter count limit exceeded")?;
         
         // "variadic count" = NArgs - required_count - default_count
         self.try_emit_load_local(None, &LocalName::NArgs).unwrap();

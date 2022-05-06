@@ -6,7 +6,7 @@ use crate::debug::symbol::DebugSymbol;
 use crate::codegen::JumpSite;
 use crate::codegen::opcodes::{LocalIndex, UpvalueIndex};
 use crate::codegen::funproto::UpvalueTarget;
-use crate::codegen::errors::{CompileResult, ErrorKind};
+use crate::codegen::errors::CompileResult;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -173,7 +173,7 @@ impl Scope {
         let index = self.last_index().map_or(
             Ok(0),
             |index| index.checked_add(1)
-                .ok_or(ErrorKind::InternalLimit("local variable limit reached"))
+                .ok_or("local variable limit reached")
         )?;
         
         let local = Local {
@@ -299,7 +299,7 @@ impl CallFrame {
     
     fn create_upval_for_local(&mut self, local: &mut Local) -> CompileResult<&Upvalue> {
         let index = UpvalueIndex::try_from(self.upvalues.len())
-            .map_err(|_| ErrorKind::InternalLimit("upvalue limit reached"))?;
+            .map_err(|_| "upvalue limit reached")?;
         
         let upval = Upvalue {
             index,
@@ -316,7 +316,7 @@ impl CallFrame {
     
     fn create_upval_for_upval(&mut self, upval: &Upvalue) -> CompileResult<&Upvalue> {
         let index = UpvalueIndex::try_from(self.upvalues.len())
-            .map_err(|_| ErrorKind::InternalLimit("upvalue limit reached"))?;
+            .map_err(|_| "upvalue limit reached")?;
         
         let upval = Upvalue {
             index,

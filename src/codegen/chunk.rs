@@ -6,10 +6,10 @@ use crate::language::InternSymbol;
 use crate::runtime::{DefaultBuildHasher, STRING_TABLE};
 use crate::runtime::strings::{StringInterner, StringSymbol};
 use crate::runtime::function::{Signature, Parameter};
-use crate::runtime::errors::ErrorKind as RuntimeErrorKind;
+use crate::runtime::errors::ErrorKind;
 use crate::codegen::consts::{Constant, ConstID, StringID};
 use crate::codegen::funproto::{FunctionProto, UnloadedFunction, UnloadedSignature, UnloadedParam, FunctionID};
-use crate::codegen::errors::{CompileResult, ErrorKind};
+use crate::codegen::errors::CompileResult;
 use crate::debug::DebugSymbol;
 
 
@@ -127,7 +127,7 @@ impl ChunkBuilder {
     
     pub fn new_chunk(&mut self, info: ChunkInfo) -> CompileResult<Chunk> {
         let chunk_id = FunctionID::try_from(self.chunks.len())
-            .map_err(|_| ErrorKind::InternalLimit("function count limit reached"))?;
+            .map_err(|_| "function count limit reached")?;
         
         self.chunks.push(ChunkBuf::new(info));
         self.functions.push(None);
@@ -161,7 +161,7 @@ impl ChunkBuilder {
             Ok(*cid)
         } else {
             let cid = ConstID::try_from(self.consts.len())
-                .map_err(|_| ErrorKind::InternalLimit("constant pool limit reached"))?;
+                .map_err(|_| "constant pool limit reached")?;
             self.consts.push(value);
             self.dedup.insert(value, cid);
             Ok(cid)
@@ -173,7 +173,7 @@ impl ChunkBuilder {
         symbol.to_usize()
     }
     
-    pub fn get_or_insert_error(&mut self, error: RuntimeErrorKind, message: &str) -> CompileResult<ConstID> {
+    pub fn get_or_insert_error(&mut self, error: ErrorKind, message: &str) -> CompileResult<ConstID> {
         let message = self.get_or_insert_str(message);
         self.get_or_insert_const(Constant::Error { error, message })
     }

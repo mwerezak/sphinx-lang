@@ -2,35 +2,21 @@ use core::fmt;
 use std::error::Error;
 
 use crate::utils;
-use crate::parser::stmt::Label;
 use crate::debug::{DebugSymbol, SourceError};
 
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
 #[derive(Debug)]
-pub enum ErrorKind {
-    CantAssignImmutable,
-    CantAssignNonLocal,
-    TupleLenMismatch,
-    CantUpdateAssignTuple,
-    CantResolveContinue(Option<Label>),
-    CantResolveBreak(Option<Label>),
-    InvalidBreakWithValue,
-    InvalidLValueModifier,
-    InternalLimit(&'static str),
-}
-
-#[derive(Debug)]
 pub struct CompileError {
-    kind: ErrorKind,
+    message: String,
     symbol: Option<DebugSymbol>,
     cause: Option<Box<dyn Error>>,
 }
 
 impl CompileError {
-    pub fn new(kind: ErrorKind) -> Self {
-        Self { kind, symbol: None, cause: None }
+    pub fn new(message: &str) -> Self {
+        Self { message: message.to_string(), symbol: None, cause: None }
     }
     
     pub fn with_symbol(mut self, symbol: DebugSymbol) -> Self {
@@ -40,13 +26,11 @@ impl CompileError {
     pub fn caused_by(mut self, error: impl Error + 'static) -> Self {
         self.cause.replace(Box::new(error)); self
     }
-    
-    pub fn kind(&self) -> &ErrorKind { &self.kind }
 }
 
-impl From<ErrorKind> for CompileError {
-    fn from(kind: ErrorKind) -> Self {
-        Self::new(kind)
+impl<S> From<S> for CompileError where S: AsRef<str> {
+    fn from(message: S) -> Self {
+        Self::new(message.as_ref())
     }
 }
 
@@ -62,26 +46,10 @@ impl SourceError for CompileError {
 
 impl fmt::Display for CompileError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let message =
+            if self.message.is_empty() { None }
+            else { Some(self.message.as_str()) };
         
-        let message = match self.kind() {
-            ErrorKind::CantAssignImmutable => "can't assign to immutable local variable",
-            ErrorKind::CantAssignNonLocal => "can't assign to a non-local variable without the \"nonlocal\" keyword",
-            ErrorKind::TupleLenMismatch => "can't assign tuples of different lengths",
-            ErrorKind::CantUpdateAssignTuple => "can't use update-assigment when assigning to a tuple",
-            
-            ErrorKind::CantResolveBreak(label) => 
-                if label.is_some() { "can't find loop or block with matching label for \"break\"" }
-                else { "\"break\" outside of loop or block" },
-            
-            ErrorKind::CantResolveContinue(label) => 
-                if label.is_some() { "can't find loop with matching label for \"continue;\"" }
-                else { "\"continue\" outside of loop" },
-            
-            ErrorKind::InvalidBreakWithValue => "\"break\" with value outside of block expression",
-            ErrorKind::InvalidLValueModifier => "assignment modifier is not allowed here",
-            ErrorKind::InternalLimit(message) => message,
-        };
-        
-        utils::format_error(fmt, "Compile error", Some(message), self.source())
+        utils::format_error(fmt, "Compile error", message, self.source())
     }
 }
