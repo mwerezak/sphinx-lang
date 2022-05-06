@@ -48,7 +48,7 @@ const OP_TUPLEN:           u8 = 0x19;  // [ item[0] ... item[N] N ] => [ tuple ]
 
 const OP_ITER_INIT:        u8 = 0x1A;  // [ iterable ] => [ iter state[0] ]
 const OP_ITER_NEXT:        u8 = 0x1B;  // [ iter state[N] ] => [ iter state[N+1] value[N] ]
-const OP_ITER_UNPACK:      u8 = 0x1C;  // [ iterable ] => [ value[0] ... value[N] ]
+const OP_ITER_UNPACK:      u8 = 0x1C;  // [ iter state[N] ] => [ value[N] ... value[M] (M-N) ]
 
 // 0x40-5F        Load/Store
 
