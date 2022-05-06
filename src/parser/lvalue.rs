@@ -6,7 +6,7 @@ use crate::parser::expr::{Expr, ExprMeta};
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum LVModifier {
+pub enum AssignType {
     LocalAssign,
     NonLocalAssign,
     DeclImmutable,
@@ -20,7 +20,7 @@ pub enum LValue {
     Index(Box<IndexTarget>), // receiver, index expression
     Tuple(Box<[LValueItem]>),
     Modifier {
-        modifier: LVModifier,
+        modifier: AssignType,
         lvalue: Box<LValue>,
     },
 }
@@ -51,7 +51,7 @@ pub struct IndexTarget {
 #[derive(Debug, Clone)]
 pub struct Assignment {
     pub lhs: LValue,
-    pub modifier: LVModifier,
+    pub assign: AssignType,
     pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     pub rhs: Expr,
 }

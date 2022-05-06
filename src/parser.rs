@@ -22,7 +22,7 @@ pub use errors::{ParserError, ParseResult};
 use expr::{ExprMeta, Expr, ExprBlock, ConditionalBranch};
 use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
 use primary::{Primary, Atom, AccessItem};
-use lvalue::{LValue, LVModifier, Assignment};
+use lvalue::{LValue, AssignType, Assignment};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
 use errors::{ErrorKind, ErrorContext, ContextTag};
@@ -513,7 +513,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         
         // check for lvalue modifier
-        let modifier = self.try_parse_lvalue_modifier(ctx)?;
+        let assign = self.try_parse_assign_keyword(ctx)?;
         
         // parse LHS
         let expr = self.parse_tuple_expr(ctx)?;
@@ -535,18 +535,18 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             let assign = Assignment {
                 lhs, op, rhs,
-                modifier: modifier.unwrap_or(LVModifier::LocalAssign),
+                assign: assign.unwrap_or(AssignType::LocalAssign),
             };
             return Ok(Expr::Assignment(Box::new(assign)));
             
-        } else if let Some(modifier) = modifier {
-            let modifier = match modifier {
-                LVModifier::LocalAssign => "local",
-                LVModifier::NonLocalAssign => "nonlocal",
-                LVModifier::DeclImmutable => "let",
-                LVModifier::DeclMutable => "var",
+        } else if let Some(assign) = assign {
+            let assign = match assign {
+                AssignType::LocalAssign => "local",
+                AssignType::NonLocalAssign => "nonlocal",
+                AssignType::DeclImmutable => "let",
+                AssignType::DeclMutable => "var",
             };
-            let message = format!("expected an assignment expression after \"{}\"", modifier);
+            let message = format!("expected an assignment expression after \"{}\"", assign);
             return Err(message.as_str().into())
         }
         
@@ -1323,7 +1323,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
 
         // Check for lvalue modifier
-        let modifier = self.try_parse_lvalue_modifier(ctx)?;
+        let modifier = self.try_parse_assign_keyword(ctx)?;
 
         // Parse inner expression
         let expr = self.parse_expr_variant(ctx)?;
@@ -1342,15 +1342,15 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     }
 
     /* LValue Parsing */
-    fn try_parse_lvalue_modifier(&mut self, ctx: &mut ErrorContext) -> ParseResult<Option<LVModifier>> {
+    fn try_parse_assign_keyword(&mut self, ctx: &mut ErrorContext) -> ParseResult<Option<AssignType>> {
         let next = self.peek()?;
 
         // if we see any of these, then this is definitely an LValue
         let modifier = match next.token {
-            Token::Let => Some(LVModifier::DeclImmutable),
-            Token::Var => Some(LVModifier::DeclMutable),
-            Token::Local => Some(LVModifier::LocalAssign),
-            Token::NonLocal => Some(LVModifier::NonLocalAssign),
+            Token::Let => Some(AssignType::DeclImmutable),
+            Token::Var => Some(AssignType::DeclMutable),
+            Token::Local => Some(AssignType::LocalAssign),
+            Token::NonLocal => Some(AssignType::NonLocalAssign),
             _ => None,
         };
 
