@@ -168,6 +168,10 @@ let a, b, (var c) = "a", "b", "c"
 # another example combined with tuple destructuring
 a, (let b, (var c), d), e, (let f), (var g) = "a", ("b", "c", "d"), "e", "f", "g"
 
+# local assignment is the default, but if you are using let/var/nonlocal for a
+# destructuring assignment and need to do a local assignment somewhere in there, you can
+let a, b, (c, d, (local e), f) = get_tuple()
+
 # assignment versions of all binary operators are supported for assignment expressions only
 inc = 0
 inc -= 1  # arithmetic assignment

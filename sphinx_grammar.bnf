@@ -57,7 +57,7 @@ block_expression ::= ( label )? "begin" ( statement )* ( control_flow )? "end" ;
 (*** Assignment ***)
 
 lvalue_primary ::= IDENTIFIER | primary index_access | primary member_access ;
-assign_modifier ::= "let" | "var" | "nonlocal" ;
+assign_modifier ::= "let" | "var" | "local" | "nonlocal" ;
 
 (* There are three principal types of lvalues: primary lvalues, tuples of lvalues, and grouped lvalues *)
 

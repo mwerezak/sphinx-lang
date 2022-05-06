@@ -521,10 +521,10 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
         } else if let Some(modifier) = modifier {
             let modifier = match modifier {
+                LVModifier::LocalAssign => "local",
                 LVModifier::NonLocalAssign => "nonlocal",
                 LVModifier::DeclImmutable => "let",
                 LVModifier::DeclMutable => "var",
-                _ => unreachable!(),
             };
             let message = format!("expected an assignment expression after \"{}\"", modifier);
             return Err(message.as_str().into())
@@ -1265,6 +1265,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
                         Token::Fun => "function definitions",
                         Token::Let => "\"let\"",
                         Token::Var => "\"var\"",
+                        Token::Local => "\"local\"",
                         Token::NonLocal => "\"nonlocal\"",
                         Token::Begin => "block expressions",
                         _ => "this expression",
@@ -1328,6 +1329,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         let modifier = match next.token {
             Token::Let => Some(LVModifier::DeclImmutable),
             Token::Var => Some(LVModifier::DeclMutable),
+            Token::Local => Some(LVModifier::LocalAssign),
             Token::NonLocal => Some(LVModifier::NonLocalAssign),
             _ => None,
         };

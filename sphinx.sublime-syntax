@@ -58,7 +58,7 @@ contexts:
   expression-keywords:
     - match: \b(let|var)\b
       scope: keyword.declaration.other
-    - match: \b(nonlocal)\b
+    - match: \b(local|nonlocal)\b
       scope: keyword.other
 
   statement-keywords:
