@@ -1149,7 +1149,6 @@ impl CodeGenerator<'_> {
         
         // cleanup
         self.patch_jump_instr(&done_jump_site, self.current_offset())?;
-        self.emit_instr(symbol, OpCode::Pop); // pop iter
         
         Ok(())
     }

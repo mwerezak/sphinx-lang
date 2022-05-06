@@ -38,14 +38,17 @@ const OP_CALL_UNPACK:      u8 = 0x0A;
 const OP_POP:              u8 = 0x10;  // [ _ ] => []
 const OP_DROP:             u8 = 0x11;  // (u8); [ value[0] ... value[N] ] => []
 const OP_CLONE:            u8 = 0x12;  // [ value ] => [ value value ]
+const OP_SWAP:             u8 = 0x13;  // (u8); [ value[A] ... value[B] ] => [ value[B] ... value[A] ]
+const OP_SHIFT:            u8 = 0x14;  // (u8); [ value[A] ... value[B] ] => [ ... value[B] value[A] ]
 
-const OP_TUPLE:            u8 = 0x13;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
-const OP_TUPLEN:           u8 = 0x14;  // [ item[0] ... item[N] N ] => [ tuple ]
+const OP_TUPLE:            u8 = 0x18;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
+const OP_TUPLEN:           u8 = 0x19;  // [ item[0] ... item[N] N ] => [ tuple ]
 
 // 0x18-1F        Iteration
 
-const OP_ITER_INIT:        u8 = 0x18;  // [ iterable ] => [ iterable iter state[0] ]
-const OP_ITER_NEXT:        u8 = 0x19;  // [ iter state[N] ] => [ iter state[N+1] value[N] ]
+const OP_ITER_INIT:        u8 = 0x1A;  // [ iterable ] => [ iter state[0] ]
+const OP_ITER_NEXT:        u8 = 0x1B;  // [ iter state[N] ] => [ iter state[N+1] value[N] ]
+const OP_ITER_UNPACK:      u8 = 0x1C;  // [ iterable ] => [ value[0] ... value[N] ]
 
 // 0x40-5F        Load/Store
 
