@@ -18,19 +18,17 @@ pub enum LValue {
     Identifier(InternSymbol),
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
-    Tuple(Box<[LValue]>),
+    
+    Tuple {
+        items: Box<[LValue]>,
+        pack: Option<Box<LValue>>,
+    },
+    
     Modifier {
         modifier: AssignType,
         lvalue: Box<LValue>,
     },
 }
-
-/// LValues that are items in a sequence
-// #[derive(Debug, Clone)]
-// pub struct LValueItem {
-//     pub lvalue: LValue,
-//     pub unpack: bool,
-// }
 
 // LValue Data
 
@@ -119,18 +117,26 @@ impl TryFrom<Expr> for LValue {
             
             Expr::Primary(primary) => primary.try_into(),
             
-            Expr::Unpack(expr) => (*expr).try_into(),
-            
-            Expr::Tuple(expr_list) => {
-                let mut lvalue_list = Vec::new();
+            Expr::Tuple { items, ellipsis } if !items.is_empty() => {
+                let mut target_items = Vec::new();
+                let mut pack = None;
                 
-                for expr in expr_list.into_vec().into_iter() {
+                for expr in items.into_vec().into_iter() {
                     // let unpack = matches!(expr.variant(), Expr::Unpack(..));
                     let lvalue = LValue::try_from(expr.take_variant())?;
-                    lvalue_list.push(lvalue);
+                    target_items.push(lvalue);
                 }
                 
-                Ok(Self::Tuple(lvalue_list.into_boxed_slice()))
+                if ellipsis {
+                    let pack_item = target_items.pop()
+                        .ok_or(IntoLValueError)?;
+                    pack.replace(Box::new(pack_item));
+                }
+                
+                Ok(Self::Tuple {
+                    items: target_items.into_boxed_slice(),
+                    pack,
+                }) 
             },
             
             _ => Err(IntoLValueError),

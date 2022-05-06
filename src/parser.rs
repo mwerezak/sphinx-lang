@@ -266,13 +266,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
                 return Err(message.as_str().into());
             }
             
-            _ => {
-                let expr = self.parse_expr_variant(ctx)?;
-                if matches!(expr, Expr::Unpack(..)) {
-                    return Err("the unpack operator \"...\" is not allowed here".into());
-                }
-                Stmt::Expression(expr)
-            }
+            _ => Stmt::Expression(self.parse_expr_variant(ctx)?),
         };
         Ok(stmt)
     }
@@ -318,7 +312,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         ctx.set_end(&next);
         
         if !matches!(next.token, Token::Do) {
-            return Err("missing \"do\" after condition in while-loop".into());
+            return Err("expected \"do\" after condition in while-loop".into());
         }
         
         let body = self.parse_stmt_list(ctx, |token| matches!(token, Token::End))?;
@@ -479,21 +473,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
     // the top of the recursive descent stack for expressions
     fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
-        ctx.push(ContextTag::Expr);
-        
-        let mut expr = self.parse_assignment_expr(ctx)?;
-        
-        let next = self.peek()?;
-        if matches!(next.token, Token::Ellipsis) {
-            ctx.set_end(&self.advance().unwrap());
-            if matches!(expr, Expr::Unpack(..)) {
-                return Err("nested use of the unpacking operator \"...\" must be enclosed in parentheses".into());
-            }
-            expr = Expr::Unpack(Box::new(expr))
-        }
-        
-        ctx.pop_extend();
-        Ok(expr)
+        self.parse_assignment_expr(ctx)
     }
     
     /*
@@ -537,7 +517,8 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
                 lhs, op, rhs,
                 assign: assign.unwrap_or(AssignType::AssignLocal),
             };
-            return Ok(Expr::Assignment(Box::new(assign)));
+            
+            Ok(Expr::Assignment(Box::new(assign)))
             
         } else if let Some(assign) = assign {
             let assign = match assign {
@@ -547,10 +528,14 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
                 AssignType::DeclMutable => "var",
             };
             let message = format!("expected an assignment expression after \"{}\"", assign);
-            return Err(message.as_str().into())
+            
+            Err(message.as_str().into())
+            
+        } else {
+            
+            Ok(expr)
         }
         
-        Ok(expr)
     }
     
     fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
@@ -566,6 +551,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         let mut tuple_exprs = Vec::new();
         loop {
             let next = self.peek()?;
+            
             if !matches!(next.token, Token::Comma) {
                 break;
             }
@@ -594,12 +580,26 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             tuple_exprs.push(ExprMeta::new(next_expr, symbol));
         }
         
-        ctx.pop_extend();
         
         if let Some(expr) = first_expr {
+            ctx.pop_extend();
             Ok(expr)
+            
         } else {
-            Ok(Expr::Tuple(tuple_exprs.into_boxed_slice()))
+            let ellipsis;
+            if matches!(self.peek()?.token, Token::Ellipsis) {
+                ctx.set_end(&self.advance().unwrap());
+                ellipsis = true;
+            } else {
+                ellipsis = false;
+            }
+            
+            ctx.pop_extend();
+            
+            Ok(Expr::Tuple {
+                items: tuple_exprs.into_boxed_slice(),
+                ellipsis
+            })
         }
     }
     
@@ -809,7 +809,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             ctx.set_end(&next);
             
             if !matches!(next.token, Token::Then) {
-                return Err("missing \"then\" after condition in if-expression".into());
+                return Err("expected \"then\" after condition in if-expression".into());
             }
             
             let stmt_list = self.parse_stmt_list(ctx, |token| matches!(token, Token::Elif | Token::Else | Token::End))?;
@@ -922,14 +922,14 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         // function parameter list
         
         if !matches!(next.token, Token::OpenParen) {
-            return Err("missing opening \"(\" before parameter list".into());
+            return Err("expected opening \"(\" before parameter list".into());
         }
         
         let signature = self.parse_function_param_list(ctx)?;
         
         let next = self.advance()?;
         if !matches!(next.token, Token::CloseParen) {
-            return Err("missing closing \")\" after parameter list".into());
+            return Err("expected closing \")\" after parameter list".into());
         }
         
         // function body
@@ -1183,7 +1183,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         ctx.set_end(&next);
         
         if !matches!(next.token, Token::CloseSquare) {
-            return Err("missing closing \"]\"".into());
+            return Err("expected closing \"]\"".into());
         }
         
         ctx.pop_extend();
@@ -1214,28 +1214,27 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             let (expr, symbol) = self.parse_expr(ctx)?.take();
             
-            if let Expr::Tuple(arg_list) = expr {
-                args.extend(arg_list.into_vec().into_iter());
+            if let Expr::Tuple { items, ellipsis } = expr {
+                args.extend(items.into_vec().into_iter());
+                
+                // argument unpacking
+                if ellipsis {
+                    if let Some(expr) = args.pop() {
+                        unpack.replace(expr);
+                    } else {
+                        return Err("no argument to unpack".into());
+                    }
+                }
+                
             } else {
                 args.push(ExprMeta::new(expr, symbol));
-            }
-            
-            // check for unpack syntax
-            if matches!(self.peek()?.token, Token::Ellipsis) {
-                ctx.set_end(&self.advance().unwrap());
-                
-                if let Some(expr) = args.pop() {
-                    unpack.replace(expr);
-                } else {
-                    return Err("no argument to unpack".into());
-                }
             }
             
             // check for close paren
             let next = self.advance()?;
             ctx.set_end(&next);
             if !matches!(next.token, Token::CloseParen) {
-                return Err("missing closing \")\" after argument list".into());
+                return Err("expected closing \")\" after argument list".into());
             }
         }
         
@@ -1298,6 +1297,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
                 Token::CloseParen => return Err("unmatched \")\"".into()),
                 Token::CloseSquare => return Err("unmatched \"]\"".into()),
                 Token::CloseBrace => return Err("unmatched \"}\"".into()),
+                Token::Ellipsis => return Err("the unpack operator \"...\" is not allowed here".into()),
                 
                 _ => { return Err("expected an expression here".into()) },
             };
@@ -1332,7 +1332,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         let next = self.advance()?;
         ctx.set_end(&next);
         if !matches!(next.token, Token::CloseParen) {
-            return Err("missing closing \")\"".into());
+            return Err("expected closing \")\"".into());
         }
         
         ctx.pop_extend();

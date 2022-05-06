@@ -781,9 +781,12 @@ impl CodeGenerator<'_> {
                 }
             },
             
-            Expr::Unpack(..) => return Err("unpack operator \"...\" is not allowed here".into()),
-            
-            Expr::Tuple(expr_list) => self.compile_tuple(symbol, expr_list)?,
+            Expr::Tuple { items, ellipsis } => {
+                if *ellipsis {
+                    return Err("\"...\" is not allowed here".into());
+                }
+                self.compile_tuple(symbol, items)?
+            },
             
             Expr::Block { label, suite } => self.compile_block_expression(symbol, label.as_ref(), suite)?,
             Expr::IfExpr { branches, else_clause } => self.compile_if_expression(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
@@ -986,9 +989,9 @@ impl CodeGenerator<'_> {
             
             LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple(..) => Err("can't use update-assigment when assigning to a tuple".into()),
+            LValue::Tuple {..} => Err("can't use update-assigment when assigning to a tuple".into()),
             
-            LValue::Modifier{..} => unreachable!(),
+            LValue::Modifier {..} => unreachable!(),
         }
     }
     
@@ -999,8 +1002,11 @@ impl CodeGenerator<'_> {
             lhs = lvalue;
         }
         
-        if let LValue::Tuple(target_list) = lhs {
-            self.compile_assign_tuple(symbol, assign, target_list)
+        if let LValue::Tuple { items, pack } = lhs {
+            if pack.is_some() {
+                unimplemented!()
+            }
+            self.compile_assign_tuple(symbol, assign, items)
             
         } else {
             
@@ -1021,7 +1027,7 @@ impl CodeGenerator<'_> {
                 self.compile_decl_local_name(symbol, access, *name)
             },
             
-            LValue::Tuple(..) => unreachable!(),
+            LValue::Tuple {..} => unreachable!(),
             LValue::Modifier {..} => unreachable!(),
             
             _ => Err("not a variable name".into()),
@@ -1067,7 +1073,7 @@ impl CodeGenerator<'_> {
             
             LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple(..) => unreachable!(),
+            LValue::Tuple {..} => unreachable!(),
             LValue::Modifier {..} => unreachable!(),
         }
     }

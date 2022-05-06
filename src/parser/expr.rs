@@ -19,9 +19,10 @@ pub enum Expr {
     
     Assignment(Box<Assignment>),
     
-    Unpack(Box<Expr>),
-    
-    Tuple(Box<[ExprMeta]>),
+    Tuple {
+        items: Box<[ExprMeta]>,
+        ellipsis: bool,
+    },
     
     // ObjectCtor(Box<ObjectConstructor>),
     
