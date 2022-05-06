@@ -7,7 +7,7 @@ use sphinx::source::{ModuleSource, SourceText};
 use sphinx::parser::stmt::{StmtMeta, Stmt, StmtList, ControlFlow};
 use sphinx::parser::expr::Expr;
 use sphinx::parser::primary::Atom;
-use sphinx::parser::lvalue::{LValue};
+use sphinx::parser::lvalue::{LValue, LVModifier, Assignment};
 use sphinx::codegen::{Program, CompiledProgram};
 use sphinx::runtime::{Module, VirtualMachine, Gc};
 use sphinx::runtime::module::GlobalEnv;
@@ -319,26 +319,26 @@ impl Repl {
         
         // bind the result expression to a global name
         let result_name = interner.get_or_intern("_");
-        todo!()
-        // let result_decl = Expr::Declaration(Box::new(Declaration {
-        //     decl: DeclType::Immutable,
-        //     lhs: LValue::Identifier(result_name),
-        //     init: result_expr,
-        // }));
-        // ast.push(StmtMeta::new(Stmt::Expression(result_decl), symbol));
+        let result_decl = Expr::Assignment(Box::new(Assignment {
+            modifier: LVModifier::DeclImmutable,
+            lhs: LValue::Identifier(result_name),
+            rhs: result_expr,
+            op: None,
+        }));
+        ast.push(StmtMeta::new(Stmt::Expression(result_decl), symbol));
         
-        // let return_result = ControlFlow::Return {
-        //     symbol: None, 
-        //     expr: Some(Box::new(
-        //         Expr::Atom(Atom::Identifier(result_name))
-        //     )),
-        // };
+        let return_result = ControlFlow::Return {
+            symbol: None, 
+            expr: Some(Box::new(
+                Expr::Atom(Atom::Identifier(result_name))
+            )),
+        };
         
-        // let wrapper = Stmt::Loop {
-        //     label: None,
-        //     body: StmtList::new(Vec::new(), Some(return_result)),
-        // };
-        // ast.push(StmtMeta::new(wrapper, symbol));
+        let wrapper = Stmt::Loop {
+            label: None,
+            body: StmtList::new(Vec::new(), Some(return_result)),
+        };
+        ast.push(StmtMeta::new(wrapper, symbol));
         
     }
 }

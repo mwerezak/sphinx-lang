@@ -820,7 +820,13 @@ impl CodeGenerator<'_> {
             // Atom::Self_ => unimplemented!(),
             // Atom::Super => unimplemented!(),
             
-            Atom::Group(expr) => self.compile_expr(symbol, expr)?,
+            Atom::Group { modifier, inner } => {
+                // modifiers are not allowed outside of assignment
+                if let Some(modifier) = modifier {
+                    return Err(ErrorKind::InvalidLValueModifier.into())
+                }
+                self.compile_expr(symbol, inner)?
+            },
         }
         Ok(())
     }
@@ -997,33 +1003,35 @@ impl CodeGenerator<'_> {
     fn compile_update_assignment(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp, lhs: &LValue, rhs: &Expr, nonlocal: bool) -> CompileResult<()> {
         
         // TODO suport Attribute and Index LValues as well
-        match lhs {
-            LValue::Identifier(name) => {
-                self.compile_name_lookup(symbol, name)?;
-                self.compile_expr(symbol, rhs)?;
-                self.emit_binary_op(symbol, &op);
+        // match lhs {
+        //     LValue::Identifier(name) => {
+        //         self.compile_name_lookup(symbol, name)?;
+        //         self.compile_expr(symbol, rhs)?;
+        //         self.emit_binary_op(symbol, &op);
                 
-                self.compile_assign_identifier(symbol, name, nonlocal)
-            },
+        //         self.compile_assign_identifier(symbol, name, nonlocal)
+        //     },
             
-            LValue::Attribute(target) => unimplemented!(),
-            LValue::Index(target) => unimplemented!(),
+        //     LValue::Attribute(target) => unimplemented!(),
+        //     LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple(..) => Err(ErrorKind::CantUpdateAssignTuple.into()),
-        }
+        //     LValue::Tuple(..) => Err(ErrorKind::CantUpdateAssignTuple.into()),
+        // }
+        todo!()
     }
     
     fn compile_assignment(&mut self, symbol: Option<&DebugSymbol>, lhs: &LValue, nonlocal: bool) -> CompileResult<()> {
         
-        match lhs {
-            LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, nonlocal),
+        // match lhs {
+        //     LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, nonlocal),
             
-            LValue::Attribute(target) => unimplemented!(),
+        //     LValue::Attribute(target) => unimplemented!(),
             
-            LValue::Index(target) => unimplemented!(),
+        //     LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple(target_list) => self.compile_assign_tuple(symbol, target_list, nonlocal),
-        }
+        //     LValue::Tuple(target_list) => self.compile_assign_tuple(symbol, target_list, nonlocal),
+        // }
+        todo!()
     }
     
     fn compile_assign_identifier(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol, nonlocal: bool) -> CompileResult<()> {

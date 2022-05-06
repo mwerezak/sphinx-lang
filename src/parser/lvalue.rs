@@ -14,21 +14,19 @@ pub enum LVModifier {
 }
 
 #[derive(Debug, Clone)]
-pub struct AssignmentTarget {
-    pub lvalue: LValue,
-    pub modifier: LVModifier,
-}
-
-#[derive(Debug, Clone)]
 pub enum LValue {
     Identifier(InternSymbol),
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
-    Tuple(Box<[LValueItem]>),
-    Group(Box<AssignmentTarget>),
+    Tuple(Box<[LValue]>),
     // Unpack(Box<LValue>),
+    Modifier {
+        modifier: LVModifier,
+        lvalue: Box<LValue>,
+    },
 }
 
+/// LValues that are items in a sequence
 #[derive(Debug, Clone)]
 pub struct LValueItem {
     pub lvalue: LValue,
@@ -53,21 +51,11 @@ pub struct IndexTarget {
 
 #[derive(Debug, Clone)]
 pub struct Assignment {
-    pub lhs: AssignmentTarget,
+    pub lhs: LValue,
+    pub modifier: LVModifier,
     pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     pub rhs: Expr,
-    pub nonlocal: bool,
 }
-
-// Declarations
-/*
-#[derive(Debug, Clone)]
-pub struct Declaration {
-    pub decl: DeclType,
-    pub lhs: LValue,
-    pub init: Expr,
-}
-*/
 
 // Convert expressions to LValues...
 
@@ -85,7 +73,20 @@ impl TryFrom<Atom> for LValue {
     fn try_from(atom: Atom) -> Result<Self, Self::Error> {
         match atom {
             Atom::Identifier(name) => Ok(LValue::Identifier(name)),
-            Atom::Group(expr) => (*expr).try_into(),
+            
+            Atom::Group { modifier, inner } => {
+                let lvalue = (*inner).try_into()?;
+
+                if let Some(modifier) = modifier {
+                    Ok(Self::Modifier {
+                        modifier,
+                        lvalue: Box::new(lvalue),
+                    })
+                } else {
+                    Ok(lvalue)
+                }
+            },
+
             _ => Err(IntoLValueError)
         }
     }

@@ -17,6 +17,7 @@ pub enum ErrorKind {
     CantResolveContinue(Option<Label>),
     CantResolveBreak(Option<Label>),
     InvalidBreakWithValue,
+    InvalidLValueModifier,
     InternalLimit(&'static str),
 }
 
@@ -77,7 +78,7 @@ impl fmt::Display for CompileError {
                 else { "\"continue\" outside of loop" },
             
             ErrorKind::InvalidBreakWithValue => "\"break\" with value outside of block expression",
-            
+            ErrorKind::InvalidLValueModifier => "assignment modifier is not allowed here",
             ErrorKind::InternalLimit(message) => message,
         };
         

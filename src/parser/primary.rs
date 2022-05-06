@@ -1,5 +1,6 @@
 use crate::language::{IntType, FloatType, InternSymbol};
 use crate::parser::expr::{ExprMeta, Expr};
+use crate::parser::lvalue::LVModifier;
 
 
 // Primary Expressions
@@ -15,7 +16,10 @@ pub enum Atom {
     IntegerLiteral(IntType),
     FloatLiteral(FloatType),
     StringLiteral(InternSymbol),
-    Group(Box<Expr>), // type annotation
+    Group {
+        modifier: Option<LVModifier>,
+        inner: Box<Expr>,
+    }
 }
 
 // These are the highest precedence operations in the language

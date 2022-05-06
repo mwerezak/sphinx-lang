@@ -22,7 +22,7 @@ pub use errors::{ParserError, ParseResult};
 use expr::{ExprMeta, Expr, ExprBlock, ConditionalBranch};
 use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
 use primary::{Primary, Atom, AccessItem};
-use lvalue::{LValue, LValueItem, LVModifier, AssignmentTarget, Assignment};
+use lvalue::{LValue, LVModifier, Assignment};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
 use errors::{ErrorKind, ErrorContext, ContextTag};
@@ -473,11 +473,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
     // the top of the recursive descent stack for expressions
     fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
-        todo!()
-        // match self.peek()?.token {
-        //     Token::Var | Token::Let => self.parse_declaration_expr(ctx),
-        //     _ => self.parse_assignment_expr(ctx)
-        // }
+        self.parse_assignment_expr(ctx)
     }
     
     /*
@@ -496,10 +492,10 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
     fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         
-        let optional_token = 
-            if let Token::NonLocal = self.peek()?.token { Some(self.advance().unwrap()) }
-            else { None };
+        // check for lvalue modifier
+        let modifier = self.try_parse_lvalue_modifier(ctx)?;
         
+        // parse LHS
         let expr = self.parse_tuple_expr(ctx)?;
         
         let next = self.peek()?;
@@ -508,75 +504,34 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             ctx.push_continuation(ContextTag::AssignmentExpr, None);
             ctx.set_end(&self.advance().unwrap());
             
-            if let Some(token) = optional_token.as_ref() {
-                ctx.set_start(token);
-            }
+            // LHS of assignment must be an lvalue
+            let lhs = LValue::try_from(expr)
+                .map_err(|_| ParserError::from("can't assign to this"))?;
             
-            // LHS of assignment has to be an lvalue
-            let lhs = LValue::try_from(expr).map_err(|_| ParserError::from("can't assign to this"))?;
-            
-            // update-assignment not allowed with tuples
-            if op.is_some() && matches!(lhs, LValue::Tuple(..)) {
-                return Err("can't combine tuple-assignment with update-assignment".into());
-            }
-            
+            // Parse RHS
             let rhs = self.parse_expr_variant(ctx)?;
             
             ctx.pop_extend();
             
-            let nonlocal = matches!(optional_token.map(|tok| tok.token), Some(Token::NonLocal));
+            let assign = Assignment {
+                lhs, op, rhs,
+                modifier: modifier.unwrap_or(LVModifier::LocalAssign),
+            };
+            return Ok(Expr::Assignment(Box::new(assign)));
             
-            todo!()
-            // let assign = Box::new(Assignment { lhs, op, rhs, nonlocal });
-            // return Ok(Expr::Assignment(assign));
-            
-        } else if optional_token.is_some() {
-            return Err("expected an assignment expression after \"nonlocal\"".into())
+        } else if let Some(modifier) = modifier {
+            let modifier = match modifier {
+                LVModifier::NonLocalAssign => "nonlocal",
+                LVModifier::DeclImmutable => "let",
+                LVModifier::DeclMutable => "var",
+                _ => unreachable!(),
+            };
+            let message = format!("expected an assignment expression after \"{}\"", modifier);
+            return Err(message.as_str().into())
         }
         
         Ok(expr)
     }
-    
-    /*
-    /*
-        declaration_expression ::= ( "let" | "var" ) lvalue_expr_annotated "=" expression ;
-    */
-    fn parse_declaration_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
-        let next = self.advance()?;
-        
-        ctx.push(ContextTag::DeclarationExpr);
-        ctx.set_start(&next);
-        
-        let decl = match next.token {
-            Token::Let => DeclType::Immutable,
-            Token::Var => DeclType::Mutable,
-            _ => panic!("invalid decl token"),
-        };
-        
-        let expr = self.parse_tuple_expr(ctx)?;
-        let lhs = LValue::try_from(expr).map_err(|_| ParserError::from("can't assign to this"))?;
-        if !Self::is_lvalue_valid_for_decl(&lhs) {
-            return Err("only names can be declared as variables".into());
-        }
-        
-        // check for and consume "="
-        let next = self.advance()?;
-        ctx.set_end(&next);
-        
-        match Self::which_assignment_op(&next.token) {
-            None => return Err("missing \"=\" in variable declaration".into()),
-            Some(op) => if op.is_some() {
-                return Err("update-assignment is not allowed in a variable declaration".into());
-            }
-        }
-        
-        let init = self.parse_expr_variant(ctx)?;
-        
-        ctx.pop_extend();
-        
-        let decl = Box::new(Declaration { decl, lhs, init });
-        Ok(Expr::Declaration(decl))
-    }*/
     
     fn parse_tuple_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         
@@ -1308,7 +1263,9 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
                     let name = match next.token {
                         Token::Class => "class definitions",
                         Token::Fun => "function definitions",
-                        Token::Let | Token::Var => "variable declarations",
+                        Token::Let => "\"let\"",
+                        Token::Var => "\"var\"",
+                        Token::NonLocal => "\"nonlocal\"",
                         Token::Begin => "block expressions",
                         _ => "this expression",
                     };
@@ -1328,7 +1285,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             Ok(atom)
         }
     }
-    
+
     fn parse_group_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Atom> {
         ctx.push(ContextTag::Group);
         
@@ -1343,7 +1300,11 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             ctx.pop_extend();
             return Ok(Atom::EmptyTuple);
         }
-        
+
+        // Check for lvalue modifier
+        let modifier = self.try_parse_lvalue_modifier(ctx)?;
+
+        // Parse inner expression
         let expr = self.parse_expr_variant(ctx)?;
         
         // Consume and check closing paren
@@ -1354,18 +1315,12 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
         
         ctx.pop_extend();
-        Ok(Atom::Group(Box::new(expr)))
+        Ok(Atom::Group {
+            modifier, inner: Box::new(expr),
+        })
     }
-}
 
-/* LValue Parsing */
-
-enum MaybeLValue {
-    LValue(AssignmentTarget),
-    Expr(Expr),
-}
-
-impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
+    /* LValue Parsing */
     fn try_parse_lvalue_modifier(&mut self, ctx: &mut ErrorContext) -> ParseResult<Option<LVModifier>> {
         let next = self.peek()?;
 
@@ -1385,120 +1340,5 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
         Ok(None)
     }
-
-    fn parse_lvalue_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<MaybeLValue> {
-
-
-        unimplemented!()
-    }
-
-
-
-
-
-
-/*
-    fn parse_lvalue_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<AssignmentTarget> {
-        ctx.push(ContextTag::AssignmentTarget);
-
-        let next = self.peek()?;
-        ctx.set_start(&next);
-
-        let modifier = match next.token {
-            Token::Let => Some(LVModifier::DeclImmutable),
-            Token::Var => Some(LVModifier::DeclMutable),
-            Token::NonLocal => Some(LVModifier::NonLocalAssign),
-            _ => None,
-        };
-
-        if modifier.is_some() {
-            let next = self.advance().unwrap(); // consume modifier token
-            ctx.set_end(&next);
-        }
-        let modifier = modifier.unwrap_or(LVModifier::LocalAssign);
-
-
-        
-
-
-
-        unimplemented!()
-    }
-    
-    fn parse_lvalue(&mut self, ctx: &mut ErrorContext) -> ParseResult<LValue> {
-        // parse lvalue
-        let mut first_lvalue = self.parse_lvalue_primary(ctx)?;
-
-        // check for tuple constructor
-        let mut tuple_lvalues = Vec::new();
-        loop {
-            let next = self.peek()?;
-            if !matches!(next.token, Token::Comma) {
-                break;
-            }
-            
-            if let Some(first_lvalue) = first_lvalue.take() {
-                // retroactivly get debug symbol
-                let frame = ctx.pop();
-                let symbol = frame.as_debug_symbol().unwrap();
-                tuple_lvalues.push(ExprMeta::new(first_expr, symbol));
-                
-                ctx.push_continuation(ContextTag::TupleCtor, Some(frame)); // enter the tuple context
-            }
-            
-            ctx.set_end(&self.advance().unwrap()); // consume comma
-            
-            let next = self.peek()?;
-            if matches!(next.token, Token::CloseParen) {
-                break;
-            }
-            
-            ctx.push(ContextTag::ExprMeta);
-            let next_expr = self.parse_binop_expr(ctx)?;
-            let symbol = ctx.frame().as_debug_symbol().unwrap();
-            ctx.pop_extend();
-            
-            tuple_lvalues.push(ExprMeta::new(next_expr, symbol));
-        }
-        
-        ctx.pop_extend();
-    }
-
-    fn parse_lvalue_primary(&mut self, ctx: &mut ErrorContext) -> ParseResult<LValue> {
-        if let Token::OpenParen = self.peek()?.token {
-            return self.parse_lvalue_group(ctx);
-        }
-
-        let expr = self.parse_primary_expr(ctx)?;
-        LValue::try_from(expr)
-            .map_err(|_| ParserError::from("can't assign to this"))
-    }
-
-    fn parse_lvalue_group(&mut self, ctx: &mut ErrorContext) -> ParseResult<LValue> {
-        ctx.push(ContextTag::Group);
-        
-        let next = self.advance().unwrap(); // consume the "("
-        ctx.set_start(&next);
-        debug_assert!(matches!(next.token, Token::OpenParen));
-        
-        // Check for the empty tuple
-        let next = self.peek()?;
-        if let Token::CloseParen = next.token {
-            return Err(ParserError::from("can't assign to this"));
-        }
-        
-        let lvalue = self.parse_lvalue_primary(ctx)?;
-        
-        // Consume and check closing paren
-        let next = self.advance()?;
-        ctx.set_end(&next);
-        if !matches!(next.token, Token::CloseParen) {
-            return Err("missing closing \")\"".into());
-        }
-        
-        ctx.pop_extend();
-        Ok(lvalue)
-    }*/
-
 
 }
