@@ -1,20 +1,26 @@
 # Sphinx
 
-*The lastest version (0.5) requires nightly Rust. This is because pointer metadata is being used to GC unsized types, whereas before a double-indirection was required.*
-
 Sphinx is a dynamically typed programming language that is inspired by Lua and Python, and implemented entirely in Rust!
 
-Sphinx is not complete! There is still a lot to do before it is a functional language. Some things on my radar:
+Sphinx is not complete! It is in a pre-alpha state of development and there is still a lot to do before it is a fully functional language. Some things on my radar:
 
  - import system
  - a basic standard library
  - work out the details of the class/object system
 
+# Why did you misspell "Sphinx"?
+
+Sphynx is named after the [cat](https://en.wikipedia.org/wiki/Sphynx_cat), which is apparently actually spelled that way. And definitely not to avoid confusion with a well-known [documentation generator](https://www.sphinx-doc.org/en/master/).
+
 # Goals
 
-My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be decently fast, and I aim to balance these two goals.
+My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be reasonably fast.
 
-Finally, this whole project started just as a way to learn Rust, and I have definitely been doing a lot of that. While I would love for this to someday be an actual, practical, and complete development tool for someone, that's a pretty long road to walk.
+As well, this whole project started as a way to learn Rust, and I have definitely been doing a lot of that. I would also love for this to be an actual, practical, and complete development tool for someone someday, and that's still a fairly long road to walk.
+
+# Is it a compiled language or an interpreted language?
+
+Both, at the moment. Sphinx is compiled to SIR, which stands for Sphinx Intermediate Representation and is the bytecode instruction set for the Sphinx virtual machine. The VM that interprets the bytecode is implemented in Rust and should be reasonably fast. In the future I would like to move to a JIT implementation but there are a lot of other things to deal with first.
 
 # Ok, how do I run it?
 
@@ -32,14 +38,30 @@ fun make_inc()
     end
 end
 
-# Warning - very slow! This was intended for a stress test
-# Try this: compile Sphinx in release mode and note the massive speedup when executing fib(30)
+# Warning - very slow! This was intended for a stress test.
+# You will definitely notice a speedup if compile Sphinx in release mode.
 fun fib(n)
     if n < 2 then 
         return n 
     end
+    
     fib(n - 2) + fib(n - 1)
 end
+
+# Some fun with variadic arguments and assignment destructuring
+fun example(items...)
+    if len(items) < 3 then
+        return items
+    end
+    
+    let first, second, third, rest... = items
+    return rest + ( (first, second), third )  # TODO implement using ... in tuple constructor
+end
+
+# declare "e" and "f" as mutable, the rest as immutable
+let a, b, c, d, (var e, f), g = example("a", "b", "c", "d", "e", "f", "g") 
+e += (f *= 2)
+
 ```
 
 Right now `sphinx` will compile the code and execute it from memory. I plan to add support for binary bytecode input/output, but right now even the file format for that is TBD 🙃

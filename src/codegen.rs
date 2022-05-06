@@ -781,12 +781,9 @@ impl CodeGenerator<'_> {
                 }
             },
             
-            Expr::Tuple { items, ellipsis } => {
-                if *ellipsis {
-                    return Err("\"...\" is not allowed here".into());
-                }
-                self.compile_tuple(symbol, items)?
-            },
+            Expr::Tuple(items) => self.compile_tuple(symbol, items)?,
+            
+            Expr::Unpack(..) => return Err("\"...\" is not allowed here".into()),
             
             Expr::Block { label, suite } => self.compile_block_expression(symbol, label.as_ref(), suite)?,
             Expr::IfExpr { branches, else_clause } => self.compile_if_expression(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,

@@ -117,12 +117,18 @@ impl TryFrom<Expr> for LValue {
             
             Expr::Primary(primary) => primary.try_into(),
             
-            Expr::Tuple { items, ellipsis } if !items.is_empty() => {
+            Expr::Unpack(..) => todo!(),
+            
+            Expr::Tuple(items) if !items.is_empty() => {
+                let mut items = items.into_vec();
+                let last = items.pop().ok_or(IntoLValueError)?;
+                
+                // convert to LValue
+                
                 let mut target_items = Vec::new();
                 let mut pack = None;
                 
                 for expr in items.into_vec().into_iter() {
-                    // let unpack = matches!(expr.variant(), Expr::Unpack(..));
                     let lvalue = LValue::try_from(expr.take_variant())?;
                     target_items.push(lvalue);
                 }

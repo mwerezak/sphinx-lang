@@ -266,7 +266,13 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
                 return Err(message.as_str().into());
             }
             
-            _ => Stmt::Expression(self.parse_expr_variant(ctx)?),
+            _ => {
+                let expr = self.parse_expr_variant(ctx)?;
+                if matches!(expr, Expr::Unpack(..)) {
+                    return Err("\"...\" is not allowed here".into());
+                }
+                Stmt::Expression(expr)
+            }
         };
         Ok(stmt)
     }
@@ -473,7 +479,24 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
     // the top of the recursive descent stack for expressions
     fn parse_expr_variant(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
-        self.parse_assignment_expr(ctx)
+        ctx.push(ContextTag::Expr);
+        
+        let mut expr = self.parse_assignment_expr(ctx)?;
+        
+        // Having multiple "..."s next to each other is really bad for readability
+        // So require that they are separated by parens, e.g. (((foo...)...)...)
+        let next = self.peek()?;
+        if matches!(next.token, Token::Ellipsis) {
+            ctx.set_end(&self.advance().unwrap());
+            if matches!(expr, Expr::Unpack(..)) {
+                return Err("nested use of the unpack
+                    ing operator \"...\" must be enclosed in parentheses".into());
+            }
+            expr = Expr::Unpack(Box::new(expr))
+        }
+        
+        ctx.pop_extend();
+        Ok(expr)
     }
     
     /*
@@ -580,26 +603,12 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             tuple_exprs.push(ExprMeta::new(next_expr, symbol));
         }
         
+        ctx.pop_extend();
         
         if let Some(expr) = first_expr {
-            ctx.pop_extend();
             Ok(expr)
-            
         } else {
-            let ellipsis;
-            if matches!(self.peek()?.token, Token::Ellipsis) {
-                ctx.set_end(&self.advance().unwrap());
-                ellipsis = true;
-            } else {
-                ellipsis = false;
-            }
-            
-            ctx.pop_extend();
-            
-            Ok(Expr::Tuple {
-                items: tuple_exprs.into_boxed_slice(),
-                ellipsis
-            })
+            Ok(Expr::Tuple(tuple_exprs.into_boxed_slice()))
         }
     }
     
@@ -1246,6 +1255,73 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         ctx.pop_extend();
         Ok(invocation)
     }
+    
+    /*
+    fn parse_argument_list(&mut self, ctx, &mut ErrorContext) -> ParseResult<Vec<ExprMeta>> {
+        
+        // if this inner expression ends up being captured as the first
+        // element of a tuple, we will want to get its debug symbol.
+        ctx.push(ContextTag::ExprMeta);
+        
+        // descend recursively into binops
+        let mut first_expr = Some(self.parse_binop_expr(ctx)?); // might be taken into tuple later
+        
+        // check for tuple constructor
+        let mut arg_list = Vec::new();
+        loop {
+            let next = self.peek()?;
+            
+            if !matches!(next.token, Token::Comma) {
+                break;
+            }
+            
+            if let Some(first_expr) = first_expr.take() {
+                // retroactivly get debug symbol
+                let frame = ctx.pop();
+                let symbol = frame.as_debug_symbol().unwrap();
+                arg_list.push(ExprMeta::new(first_expr, symbol));
+                
+                ctx.push_continuation(ContextTag::TupleCtor, Some(frame)); // enter the tuple context
+            }
+            
+            ctx.set_end(&self.advance().unwrap()); // consume comma
+            
+            let next = self.peek()?;
+            if matches!(next.token, Token::CloseParen) {
+                break;
+            }
+            
+            ctx.push(ContextTag::ExprMeta);
+            let next_expr = self.parse_binop_expr(ctx)?;
+            let symbol = ctx.frame().as_debug_symbol().unwrap();
+            ctx.pop_extend();
+            
+            arg_list.push(ExprMeta::new(next_expr, symbol));
+        }
+        
+        
+        if let Some(expr) = first_expr {
+            ctx.pop_extend();
+            Ok(expr)
+            
+        } else {
+            let ellipsis;
+            if matches!(self.peek()?.token, Token::Ellipsis) {
+                ctx.set_end(&self.advance().unwrap());
+                ellipsis = true;
+            } else {
+                ellipsis = false;
+            }
+            
+            ctx.pop_extend();
+            
+            Ok(Expr::Tuple {
+                items: arg_list.into_boxed_slice(),
+                ellipsis
+            })
+        }
+    }
+    */
     
     // atom ::= LITERAL | IDENTIFIER | "(" expression ")" ;
     fn parse_atom(&mut self, ctx: &mut ErrorContext) -> ParseResult<Atom> { 
