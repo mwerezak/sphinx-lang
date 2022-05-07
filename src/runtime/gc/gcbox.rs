@@ -165,7 +165,6 @@ impl fmt::Debug for GcBoxHeader {
 
 // repr(C) is used to control memory layout to alloc for unsized data, and for GcBoxPtr type punning
 #[repr(C)]
-#[derive(Debug)]
 pub struct GcBox<T> where T: GcTrace + ?Sized + 'static {
     header: GcBoxHeader,
     data: T,

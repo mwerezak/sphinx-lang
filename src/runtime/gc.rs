@@ -99,7 +99,7 @@ impl GcState {
     fn insert<T>(&mut self, mut gcbox: NonNull<GcBox<T>>) where T: GcTrace + ?Sized {
         unsafe {
             let size = gcbox.as_ref().header().size();
-            log::debug!("{:#X} allocate {} bytes for {:?}", gcbox.as_ptr() as *const () as usize, size, gcbox.as_ref().value());
+            log::debug!("{:#X} allocate {} bytes", gcbox.as_ptr() as *const () as usize, size);
             
             gcbox.as_mut().header_mut().set_next(self.boxes_start.take());
             self.boxes_start = Some(gcbox.into());
