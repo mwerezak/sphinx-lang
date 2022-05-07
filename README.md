@@ -8,10 +8,6 @@ Sphinx is not complete! It is in a pre-alpha state of development and there is s
  - a basic standard library
  - work out the details of the class/object system
 
-# Why did you misspell "Sphinx"?
-
-Sphynx is named after the [cat](https://en.wikipedia.org/wiki/Sphynx_cat), which is apparently actually spelled that way. And definitely not to avoid confusion with a well-known [documentation generator](https://www.sphinx-doc.org/en/master/).
-
 # Goals
 
 My goal is to have a lightweight, expressive language. At the same time, I also want the language runtime to be reasonably fast.
