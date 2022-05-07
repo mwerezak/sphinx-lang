@@ -170,7 +170,7 @@ impl<'c> VMCallFrame<'c> {
                 if let Variant::Error(error) = value {
                     return Err(Box::new((*error).clone()));
                 }
-                panic!("non-error value")
+                panic!("invalid operand")
             },
             
             OpCode::Call => {
