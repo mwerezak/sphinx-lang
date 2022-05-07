@@ -33,6 +33,7 @@ pub enum ContextTag {
     ControlFlow,
     Loop,
     WhileLoop,
+    ForLoop,
     ExprMeta,
     ExprList,
     Expr,

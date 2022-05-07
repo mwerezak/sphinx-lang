@@ -526,7 +526,7 @@ impl CodeGenerator<'_> {
             
             Stmt::WhileLoop { label, condition, body } => self.compile_while_loop(symbol, label.as_ref(), condition, body)?,
             
-            Stmt::ForLoop { } => unimplemented!(),
+            Stmt::ForLoop { label, lvalue, iter_expr, body } => unimplemented!(),
             
             Stmt::Assert(expr) => {
                 self.compile_expr(symbol, expr)?;

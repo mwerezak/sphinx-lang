@@ -240,7 +240,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             Token::Loop => self.parse_loop(ctx, None)?,
             Token::While => self.parse_while_loop(ctx, None)?,
-            Token::For => unimplemented!(),
+            Token::For => self.parse_for_loop(ctx, None)?,
             
             Token::Label(..) => self.parse_stmt_label(ctx)?,
             
@@ -284,7 +284,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         match self.peek()?.token {
             Token::Loop => self.parse_loop(ctx, Some(label)),
             Token::While => self.parse_while_loop(ctx, Some(label)),
-            Token::For => unimplemented!(),
+            Token::For => self.parse_for_loop(ctx, Some(label)),
             
             _ => Err("labels must be followed by either a block or a loop".into()),
         }
@@ -328,6 +328,62 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         
         ctx.pop_extend();
         Ok(Stmt::WhileLoop { label, condition, body })
+    }
+    
+    fn parse_for_loop(&mut self, ctx: &mut ErrorContext, label: Option<Label>) -> ParseResult<Stmt> {
+        let next = self.advance()?;
+        
+        ctx.push(ContextTag::ForLoop);
+        ctx.set_start(&next);
+        debug_assert!(matches!(next.token, Token::For));
+        
+        // parse lvalue list
+        let lvalue = self.parse_lvalue_list(ctx)?;
+        
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        if !matches!(next.token, Token::In) {
+            return Err("expected \"do\" after condition in while-loop".into());
+        }
+        
+        // parse iterator expression
+        let iter_expr = self.parse_expr_variant(ctx)?;
+        
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        if !matches!(next.token, Token::Do) {
+            return Err("expected \"do\" after condition in while-loop".into());
+        }
+        
+        let body = self.parse_stmt_list(ctx, |token| matches!(token, Token::End))?;
+        
+        ctx.set_end(&self.advance().unwrap()); // consume "end"
+        
+        let for_loop = Stmt::ForLoop {
+            label,
+            lvalue,
+            iter_expr,
+            body,
+        };
+        
+        ctx.pop_extend();
+        Ok(for_loop)
+    }
+    
+    fn parse_lvalue_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<LValue> {
+        let modifier = self.try_parse_assign_keyword(ctx)?;
+        
+        let lvalue = self.parse_tuple_expr(ctx)?
+            .try_into()
+            .map_err(|_| ParserError::from("can't assign to this"))?;
+        
+        if let Some(modifier) = modifier {
+            Ok(LValue::Modifier { modifier, lvalue: Box::new(lvalue) })
+        } else {
+            Ok(lvalue)
+        }
     }
     
     /// Parses a list of statements, stopping when the given closure returns true. The final token is not consumed.
