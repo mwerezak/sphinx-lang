@@ -21,7 +21,7 @@ pub enum Expr {
     
     Tuple(Box<[ExprMeta]>),
     
-    Unpack(Box<Expr>),
+    Ellipsis(Option<Box<Expr>>),
     
     // ObjectCtor(Box<ObjectConstructor>),
     

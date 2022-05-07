@@ -11,11 +11,13 @@ pub enum Atom {
     EmptyTuple,
     // Self_,
     // Super,
+    
     Identifier(InternSymbol),
     BooleanLiteral(bool),
     IntegerLiteral(IntType),
     FloatLiteral(FloatType),
     StringLiteral(InternSymbol),
+    
     Group {
         modifier: Option<AssignType>,
         inner: Box<Expr>,
@@ -29,10 +31,7 @@ pub enum AccessItem {
     
     Index(ExprMeta),
     
-    Invoke { 
-        args: Box<[ExprMeta]>, 
-        unpack: Option<ExprMeta> 
-    },
+    Invoke(Box<[ExprMeta]>),
     
     // Construct(ObjectConstructor),
 }

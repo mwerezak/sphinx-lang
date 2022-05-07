@@ -783,7 +783,7 @@ impl CodeGenerator<'_> {
             
             Expr::Tuple(items) => self.compile_tuple(symbol, items)?,
             
-            Expr::Unpack(..) => return Err("\"...\" is not allowed here".into()),
+            Expr::Ellipsis(..) => return Err("\"...\" is not allowed here".into()),
             
             Expr::Block { label, suite } => self.compile_block_expression(symbol, label.as_ref(), suite)?,
             Expr::IfExpr { branches, else_clause } => self.compile_if_expression(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
@@ -880,28 +880,48 @@ impl CodeGenerator<'_> {
             match item {
                 AccessItem::Attribute(name) => unimplemented!(),
                 AccessItem::Index(index) => unimplemented!(),
-                AccessItem::Invoke { args, unpack } => self.compile_invocation(symbol, args, unpack.as_ref())?,
+                AccessItem::Invoke(args) => self.compile_invocation(symbol, args)?,
             }
         }
         
         Ok(())
     }
     
-    fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, args: &[ExprMeta], unpack: Option<&ExprMeta>) -> CompileResult<()> {
+    fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, mut args: &[ExprMeta]) -> CompileResult<()> {
         // prepare argument list:
         // [ callobj arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
 
         let arg_len;
+        let mut unpack = None;
         
-        if let Some((arg_last, args)) = args.split_last() {
+        // process argument unpacking
+        if let Some((last, rest)) = args.split_last() {
+            let (expr, symbol) = last.clone().take();
+            match expr {
+                Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
+                
+                Expr::Ellipsis(Some(inner)) => {
+                    args = rest;
+                    unpack.replace(ExprMeta::new(*inner, symbol));
+                }
+                
+                _ => { }
+            }
+            
+            if args.iter().any(|arg| matches!(arg.variant(), Expr::Ellipsis(..))) {
+                return Err("\"...\" can only be used to unpack the last argument".into());
+            }
+        }
+        
+        // compile non-variadic arguments
+        if let Some((arg_last, args_rest)) = args.split_last() {
             
             self.compile_expr_with_symbol(arg_last)?;
-            
-            for arg_expr in args.iter() {
+            for arg_expr in args_rest.iter() {
                 self.compile_expr_with_symbol(arg_expr)?;
             }
             
-            arg_len = u8::try_from(args.len() + 1)
+            arg_len = u8::try_from(args.len())
                 .map_err(|_| "argument count limit exceeded")?;
             
         } else {
@@ -910,7 +930,7 @@ impl CodeGenerator<'_> {
         }
         
         if let Some(seq_expr) = unpack {
-            self.compile_expr_with_symbol(seq_expr)?;
+            self.compile_expr_with_symbol(&seq_expr)?;
             self.emit_instr_byte(symbol, OpCode::UInt8, arg_len);
             self.emit_instr(symbol, OpCode::CallUnpack);
         } else {
@@ -986,7 +1006,8 @@ impl CodeGenerator<'_> {
             
             LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple {..} => Err("can't use update-assigment when assigning to a tuple".into()),
+            LValue::Tuple {..} | LValue::PackItem(..)
+                => Err("can't update-assign to this".into()),
             
             LValue::Modifier {..} => unreachable!(),
         }
@@ -999,16 +1020,21 @@ impl CodeGenerator<'_> {
             lhs = lvalue;
         }
         
-        if let LValue::Tuple { items, pack } = lhs {
-            self.compile_assign_tuple(symbol, assign, items, pack.as_deref())
+        match lhs {
+            LValue::Tuple(items) => self.compile_assign_tuple(symbol, assign, items),
             
-        } else {
+            LValue::PackItem(..) => {
+                let item = std::slice::from_ref(lhs);
+                self.compile_assign_tuple(symbol, assign, item)
+            }
             
-            match assign {
-                AssignType::AssignLocal => self.compile_assign_variable(symbol, lhs, false),
-                AssignType::AssignNonLocal => self.compile_assign_variable(symbol, lhs, true),
-                AssignType::DeclImmutable => self.compile_decl_variable(symbol, Access::ReadOnly, lhs),
-                AssignType::DeclMutable => self.compile_decl_variable(symbol, Access::ReadWrite, lhs),
+            lhs => {
+                match assign {
+                    AssignType::AssignLocal => self.compile_assign_variable(symbol, lhs, false),
+                    AssignType::AssignNonLocal => self.compile_assign_variable(symbol, lhs, true),
+                    AssignType::DeclImmutable => self.compile_decl_variable(symbol, Access::ReadOnly, lhs),
+                    AssignType::DeclMutable => self.compile_decl_variable(symbol, Access::ReadWrite, lhs),
+                }
             }
         }
     }
@@ -1067,8 +1093,7 @@ impl CodeGenerator<'_> {
             
             LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple {..} => unreachable!(),
-            LValue::Modifier {..} => unreachable!(),
+            _ => panic!("invalid assignment target"),
         }
     }
     
@@ -1131,14 +1156,30 @@ impl CodeGenerator<'_> {
         }
     }
     
-    fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, item_targets: &[LValue], pack_target: Option<&LValue>) -> CompileResult<()> {
+    fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, item_targets: &[LValue]) -> CompileResult<()> {
         
         let mut error_jump_sites = Vec::new();
         
         self.emit_instr(symbol, OpCode::IterInit);  // iterate to yield values
         
         // compile to unrolled iteration
-        for target in item_targets.iter() {
+        let mut pack_target = None;
+        for (idx, target) in item_targets.iter().enumerate() {
+            let is_last = item_targets.len() == idx+1;
+            
+            match target {
+                LValue::PackItem(pack_item) if is_last => {
+                    pack_target.replace(pack_item);
+                    break;
+                }
+                
+                LValue::PackItem(..) => {
+                    return Err("\"...\" can only be used with the last item in tuple assignment".into());
+                }
+                
+                _ => { }
+            }
+            
             // check if there is an item left for this target
             let error_jump = self.emit_dummy_jump(symbol, Jump::IfFalse);
             error_jump_sites.push(error_jump);
@@ -1151,13 +1192,17 @@ impl CodeGenerator<'_> {
         }
         
         let done_jump_site;
-        if let Some(pack_target) = pack_target {
-            // exhaust the rest of the iterator
+        if let Some(Some(pack_target)) = pack_target {
+            // exhaust the rest of the iterator and assign to pack_target
             unimplemented!();
             
             // self.emit_instr(symbol, OpCode::TupleN);
             // self.compile_assignment(symbol, assign, pack_target)?;
             // done_jump_site = self.emit_dummy_jump(symbol, Jump::Uncond);
+        
+        } else if let Some(None) = pack_target {
+            // exhaust the rest of the iterator and discard
+            unimplemented!()
             
         } else {
             // if the iterator is finished we've succeeded

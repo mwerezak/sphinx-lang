@@ -20,7 +20,7 @@ As well, this whole project started as a way to learn Rust, and I have definitel
 
 # Is it a compiled language or an interpreted language?
 
-Both, at the moment. Sphinx is compiled to SIR, which stands for Sphinx Intermediate Representation and is the bytecode instruction set for the Sphinx virtual machine. The VM that interprets the bytecode is implemented in Rust and should be reasonably fast. In the future I would like to move to a JIT implementation but there are a lot of other things to deal with first.
+Sphinx is compiled to a bytecode intermediate representation which is run on a virtual machine. In the future I would like to move to a JIT implementation but there are a lot of other things to deal with first.
 
 # Ok, how do I run it?
 

@@ -18,11 +18,8 @@ pub enum LValue {
     Identifier(InternSymbol),
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
-    
-    Tuple {
-        items: Box<[LValue]>,
-        pack: Option<Box<LValue>>,
-    },
+    Tuple(Box<[LValue]>),
+    PackItem(Option<Box<LValue>>),
     
     Modifier {
         modifier: AssignType,
@@ -117,32 +114,20 @@ impl TryFrom<Expr> for LValue {
             
             Expr::Primary(primary) => primary.try_into(),
             
-            Expr::Unpack(..) => todo!(),
+            Expr::Ellipsis(Some(expr)) => {
+                let inner = LValue::try_from(*expr)?;
+                Ok(Self::PackItem(Some(Box::new(inner))))
+            }
+            Expr::Ellipsis(None) => Ok(Self::PackItem(None)),
             
             Expr::Tuple(items) if !items.is_empty() => {
-                let mut items = items.into_vec();
-                let last = items.pop().ok_or(IntoLValueError)?;
-                
-                // convert to LValue
-                
-                let mut target_items = Vec::new();
-                let mut pack = None;
-                
+                let mut lvalue_items = Vec::new();
                 for expr in items.into_vec().into_iter() {
                     let lvalue = LValue::try_from(expr.take_variant())?;
-                    target_items.push(lvalue);
+                    lvalue_items.push(lvalue);
                 }
                 
-                if ellipsis {
-                    let pack_item = target_items.pop()
-                        .ok_or(IntoLValueError)?;
-                    pack.replace(Box::new(pack_item));
-                }
-                
-                Ok(Self::Tuple {
-                    items: target_items.into_boxed_slice(),
-                    pack,
-                }) 
+                Ok(Self::Tuple(lvalue_items.into_boxed_slice()))
             },
             
             _ => Err(IntoLValueError),
