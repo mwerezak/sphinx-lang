@@ -812,6 +812,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         // check for plain ellipsis
         let next = self.peek()?;
         if matches!(next.token, Token::Ellipsis) {
+            ctx.set_end(&self.advance().unwrap());
             return Ok(Expr::Ellipsis(None));
         }
         
