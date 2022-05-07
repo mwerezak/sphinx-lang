@@ -1,7 +1,7 @@
 use crate::language::IntType;
 use crate::runtime::{Gc, Variant};
 use crate::runtime::gc::GcTrace;
-use crate::runtime::module::GlobalEnv;
+use crate::runtime::module::NamespaceEnv;
 use crate::runtime::types::UserIterator;
 use crate::runtime::errors::{RuntimeError, ExecResult};
 
@@ -50,7 +50,7 @@ impl UserIterator for RangeIter {
     }
 }
 
-pub fn create_range_builtins(env: Gc<GlobalEnv>) {
+pub fn create_range_builtins(env: Gc<NamespaceEnv>) {
     let range = native_function!(range, env, params(start), defaults(stop = Variant::Nil, step = 1) => {
         let start_value;
         let stop_value;

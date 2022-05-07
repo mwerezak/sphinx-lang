@@ -1,12 +1,12 @@
 use crate::language::{IntType, FloatType};
 use crate::runtime::Gc;
-use crate::runtime::module::GlobalEnv;
+use crate::runtime::module::NamespaceEnv;
 use crate::runtime::types::{int_from_str, float_from_str};
 use crate::runtime::errors::RuntimeError;
 
 
 // primitive type constructors
-pub fn create_primitive_ctors(env: Gc<GlobalEnv>) {
+pub fn create_primitive_ctors(env: Gc<NamespaceEnv>) {
     
     let as_bool = native_function!(bool, env, params(value) => {
         Ok(Variant::from(value.as_bool()?))
@@ -92,7 +92,7 @@ pub fn create_primitive_ctors(env: Gc<GlobalEnv>) {
 }
 
 
-pub fn create_metamethod_builtins(env: Gc<GlobalEnv>) {
+pub fn create_metamethod_builtins(env: Gc<NamespaceEnv>) {
     
     // Get the length of a container using the `__len` metamethod.
     let len = native_function!(len, env, params(value) => {

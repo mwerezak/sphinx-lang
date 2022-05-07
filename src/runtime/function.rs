@@ -2,7 +2,7 @@ use core::fmt;
 use core::cell::Cell;
 use crate::codegen::{FunctionID, FunctionProto};
 use crate::runtime::Variant;
-use crate::runtime::module::{Module, GlobalEnv};
+use crate::runtime::module::{Module, NamespaceEnv};
 use crate::runtime::vm::VirtualMachine;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::errors::ExecResult;
@@ -145,18 +145,18 @@ pub type NativeFn = fn(self_fun: &NativeFunction, vm: &mut VirtualMachine<'_>, a
 pub struct NativeFunction {
     signature: Signature,
     defaults: Option<Box<[Variant]>>,
-    env: Gc<GlobalEnv>,
+    env: Gc<NamespaceEnv>,
     func: NativeFn,
 }
 
 impl NativeFunction {
-    pub fn new(signature: Signature, defaults: Option<Box<[Variant]>>, env: Gc<GlobalEnv>, func: NativeFn) -> Self {
+    pub fn new(signature: Signature, defaults: Option<Box<[Variant]>>, env: Gc<NamespaceEnv>, func: NativeFn) -> Self {
         Self { signature, defaults, env, func }
     }
     
     pub fn signature(&self) -> &Signature { &self.signature }
     
-    pub fn env(&self) -> Gc<GlobalEnv> { self.env }
+    pub fn env(&self) -> Gc<NamespaceEnv> { self.env }
     
     pub fn defaults(&self) -> &[Variant] {
         match self.defaults.as_ref() {

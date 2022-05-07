@@ -1,5 +1,5 @@
 use crate::runtime::Gc;
-use crate::runtime::module::GlobalEnv;
+use crate::runtime::module::NamespaceEnv;
 
 mod range;
 mod primitive;
@@ -10,7 +10,7 @@ use range::create_range_builtins;
 use misc::create_misc_builtins;
 
 // thread_local! {
-//     pub static PRELUDE: Gc<GlobalEnv> = {
+//     pub static PRELUDE: Gc<NamespaceEnv> = {
 //         let prelude = create_prelude();
 //         prelude
 //     }
@@ -19,8 +19,8 @@ use misc::create_misc_builtins;
 
 /// Create an Env containing the core builtins
 /// Fairly expensive, should be used sparingly
-pub fn create_prelude() -> Gc<GlobalEnv> {
-    let env = GlobalEnv::new();
+pub fn create_prelude() -> Gc<NamespaceEnv> {
+    let env = NamespaceEnv::new();
     
     create_metamethod_builtins(env);
     create_primitive_ctors(env);

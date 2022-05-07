@@ -1,8 +1,8 @@
 use crate::runtime::Gc;
-use crate::runtime::module::GlobalEnv;
+use crate::runtime::module::NamespaceEnv;
 
 
-pub fn create_misc_builtins(env: Gc<GlobalEnv>) {
+pub fn create_misc_builtins(env: Gc<NamespaceEnv>) {
     
     let to_str = native_function!(str, env, params(value) => {
         Ok(Variant::from(value.fmt_str()?))

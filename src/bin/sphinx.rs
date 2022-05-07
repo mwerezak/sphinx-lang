@@ -10,7 +10,7 @@ use sphinx::parser::primary::Atom;
 use sphinx::parser::lvalue::{LValue, AssignType, Assignment};
 use sphinx::codegen::{Program, CompiledProgram};
 use sphinx::runtime::{Module, VirtualMachine, Gc};
-use sphinx::runtime::module::GlobalEnv;
+use sphinx::runtime::module::NamespaceEnv;
 use sphinx::runtime::strings::StringInterner;
 use sphinx::debug::symbol::resolver::BufferedResolver;
 use sphinx::builtins;
@@ -138,7 +138,7 @@ const PROMT_CONTINUE: &str = "... ";
 
 pub struct Repl {
     version: String,
-    repl_env: Gc<GlobalEnv>,
+    repl_env: Gc<NamespaceEnv>,
 }
 
 enum ReadLine {
@@ -149,7 +149,7 @@ enum ReadLine {
 }
 
 impl Repl {
-    pub fn new(version: String, repl_env: Gc<GlobalEnv>) -> Self {
+    pub fn new(version: String, repl_env: Gc<NamespaceEnv>) -> Self {
         Self {
             version, repl_env,
         }
