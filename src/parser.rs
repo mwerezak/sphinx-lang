@@ -81,9 +81,8 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             }
         }
         
-        // This craziness is needed to finagle a reference in one branch 
-        // while advancing the token iterator and taking ownership of the ParserError in the other
-        // otherwise the borrow checker will have a heart attack over the immutable borrow in &mut self.
+        // This is needed to finagle a reference in one branch while advancing the 
+        // token iterator and taking ownership of the ParserError in the other
         if self.next.as_ref().unwrap().is_ok() {
             Ok(self.next.as_ref().unwrap().as_ref().unwrap()) // yes, the repetition is required
         } else {
