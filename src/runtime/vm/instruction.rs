@@ -8,7 +8,7 @@ use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{ConstID, FunctionID, FunctionProto};
 use crate::runtime::types::IterState;
 use crate::runtime::errors::{ExecResult, RuntimeError};
-use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control, VMCallFrame};
+use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control, VMCallFrame, SYSTEM_ARGS};
 
 
 // Operand casts
@@ -174,19 +174,29 @@ impl<'c> VMCallFrame<'c> {
             },
             
             OpCode::Call => {
-                const SYSTEM_ARGS: usize = 2; // [ callee, nargs, ... ]
-                
                 let nargs = into_usize(*stack.peek());
                 let call_locals = SYSTEM_ARGS + nargs;
-                
-                stack.swap_last(stack.len() - call_locals + 1);
-                
                 let frame = stack.len() - call_locals;
+                stack.swap_last(frame + 1);
+                
                 let callee = stack.peek_at(frame);
+                let args = stack.peek_many(nargs);
+                
+                let call = CallInfo {
+                    // nargs,
+                    frame,
+                    call: callee.invoke(args)?,
+                    site: self.get_trace(current_offset),
+                };
+                return Ok(Control::Call(call))
+            },
+            
+                let frame = stack.len() - call_locals;
+                stack.swap_last(frame + 1);
                 
                 let args = stack.peek_many(nargs);
                 let call = CallInfo {
-                    nargs,
+                    // nargs,
                     frame,
                     call: callee.invoke(args)?,
                     site: self.get_trace(current_offset),

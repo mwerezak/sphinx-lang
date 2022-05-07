@@ -913,7 +913,7 @@ impl CodeGenerator<'_> {
             }
         }
         
-        // compile non-variadic arguments
+        // compile arguments
         if let Some((arg_last, args_rest)) = args.split_last() {
             
             self.compile_expr_with_symbol(arg_last)?;

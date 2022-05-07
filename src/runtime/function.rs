@@ -16,8 +16,15 @@ pub use crate::codegen::opcodes::UpvalueIndex;
 /// Call directive
 
 pub enum Call {
-    Chunk(Gc<Module>, FunctionID),
-    Native(Gc<NativeFunction>),
+    Chunk {
+        module: Gc<Module>,
+        chunk_id: FunctionID,
+        fixed_nargs: usize,
+    },
+    Native {
+        func: Gc<NativeFunction>,
+        nargs: usize,
+    },
 }
 
 pub trait Callable {
@@ -54,13 +61,25 @@ impl Function {
     pub fn signature(&self) -> &Signature {
         self.proto().signature()
     }
+    
+    fn fixed_args_count(&self) -> usize {
+        let signature = self.signature();
+        
+        signature.required().len()
+        + signature.default().len()
+        + if signature.variadic().is_some() { 1 } else { 0 }
+    }
 }
 
 impl Callable for Function {
     fn signature(&self) -> &Signature { self.proto().signature() }
     
     fn raw_call(&self, _args: &[Variant]) -> Call {
-        Call::Chunk(self.module, self.fun_id)
+        Call::Chunk {
+            module: self.module,
+            chunk_id: self.fun_id,
+            fixed_nargs: self.fixed_args_count(),
+        }
     }
 }
 
@@ -164,8 +183,11 @@ impl NativeFunction {
 impl Callable for Gc<NativeFunction> {
     fn signature(&self) -> &Signature { &self.signature }
     
-    fn raw_call(&self, _args: &[Variant]) -> Call {
-        Call::Native(*self)
+    fn raw_call(&self, args: &[Variant]) -> Call {
+        Call::Native {
+            func: *self,
+            nargs: args.len(),
+        }
     }
 }
 

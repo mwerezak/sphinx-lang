@@ -14,11 +14,13 @@ mod instruction;
 
 use callframe::VMCallFrame;
 
+
+pub const SYSTEM_ARGS: usize = 2; // [ callee, nargs, ... ]
+
 // Helpers
 
 // data used to set up a new call
 struct CallInfo {
-    nargs: usize,
     frame: usize,
     call: Call,
     site: TraceSite,
@@ -164,8 +166,8 @@ impl<'c> VirtualMachine<'c> {
         self.traceback.push(call.site.clone());
         
         match call.call {
-            Call::Native(func) => {
-                let args = self.values.peek_many(call.nargs)
+            Call::Native { func, nargs } => {
+                let args = self.values.peek_many(nargs)
                     .iter().copied().collect::<Vec<Variant>>();
                 
                 let retval = func.exec_fun(self, &args)?;
@@ -174,8 +176,8 @@ impl<'c> VirtualMachine<'c> {
                 self.traceback.pop();
             },
             
-            Call::Chunk(module, chunk_id) => {
-                let locals = LocalIndex::try_from(self.values.len() - call.frame)
+            Call::Chunk { module, chunk_id, fixed_nargs } => {
+                let locals = LocalIndex::try_from(SYSTEM_ARGS + fixed_nargs)
                     .expect("local index overflow");
                 
                 let mut frame = VMCallFrame::call_frame(module, chunk_id, call.frame, locals);
