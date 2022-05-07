@@ -162,25 +162,25 @@ impl<'c> VirtualMachine<'c> {
         Ok(control)
     }
     
-    fn setup_call(&mut self, call: &CallInfo) -> ExecResult<()> {
-        self.traceback.push(call.site.clone());
+    fn setup_call(&mut self, callinfo: &CallInfo) -> ExecResult<()> {
+        self.traceback.push(callinfo.site.clone());
         
-        match call.call {
+        match callinfo.call {
             Call::Native { func, nargs } => {
                 let args = self.values.peek_many(nargs)
                     .iter().copied().collect::<Vec<Variant>>();
                 
                 let retval = func.exec_fun(self, &args)?;
-                self.values.truncate(call.frame);
+                self.values.truncate(callinfo.frame);
                 self.values.push(retval);
                 self.traceback.pop();
             },
             
-            Call::Chunk { module, chunk_id, fixed_nargs } => {
-                let locals = LocalIndex::try_from(SYSTEM_ARGS + fixed_nargs)
+            Call::Chunk { module, chunk_id, nparams } => {
+                let locals = LocalIndex::try_from(SYSTEM_ARGS + nparams)
                     .expect("local index overflow");
                 
-                let mut frame = VMCallFrame::call_frame(module, chunk_id, call.frame, locals);
+                let mut frame = VMCallFrame::call_frame(module, chunk_id, callinfo.frame, locals);
                 core::mem::swap(&mut self.frame, &mut frame);
                 self.calls.push(frame);
                 

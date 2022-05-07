@@ -14,15 +14,11 @@ My goal is to have a lightweight, expressive language. At the same time, I also 
 
 As well, this whole project started as a way to learn Rust, and I have definitely been doing a lot of that. I would also love for this to be an actual, practical, and complete development tool for someone someday, and that's still a fairly long road to walk.
 
-# Is it a compiled language or an interpreted language?
-
-Sphinx is compiled to a bytecode intermediate representation which is run on a virtual machine. In the future I would like to move to a JIT implementation but there are a lot of other things to deal with first.
-
 # Ok, how do I run it?
 
 Sphinx makes use of Rust's [pointer metadata API](https://github.com/rust-lang/rust/issues/81513), which has not yet been stabilized. So in order to build it you will need nightly Rust. Probably if you're here you're interested in looking at the internals of a compiler/VM (since the language itself is pretty WIP), so you probably already know how to set that up, but if you don't, you can get it with `rustup`. 
 
-Once built, you can run the REPL with `sphinx` and the disassembler with `sphinx-dasm`. Both executables have `--help` to list the command line options.
+Once built, you can run the REPL with `sphinx` and the disassembler with `sphinx-dasm`. Both executables have `--help` to list the command line options. Also check out the `--debug` option on `sphinx` which starts up a step-through debugger.
 
 Here is some example code you can run to get started:
 ```
@@ -51,7 +47,7 @@ c += (d *= 2)
 
 ```
 
-Right now `sphinx` will compile the code and execute it from memory. I plan to add support for binary bytecode input/output, but right now even the file format for that is TBD 🙃
+Right now `sphinx` will compile the code and execute it from memory. I plan to add support for binary bytecode input/output, but right now even the file format for that is TBD
 
 # Some things that I like about the Implementation
 
@@ -64,6 +60,10 @@ The Sphinx language uses a simple Mark-Trace GC inspired by `rust-gc`. The *runt
 The GC also supports allocating dynamically sized types without double-indirection (i.e. the `Gc<T>` smart pointer used for GCed data points directly to the DST, not a Box). It also uses *thin pointers* to refer to the dynamically sized allocation, which keeps the size of each `Gc<T>` down to a single `usize`. The GC also supports weak references!
 
 In the future I would like to support incremental GC and *maybe* generational GC as well, but the current implementation is simple and works pretty well.
+
+# Is it a compiled language or an interpreted language?
+
+Sphinx is compiled to a bytecode intermediate representation which is run on a virtual machine. In the future I would like to move to a JIT implementation but there are a lot of other things to deal with first.
 
 # Safe Rust FFI
 
@@ -149,3 +149,4 @@ end
 # WIP/TBD
 
 ```
+

@@ -19,7 +19,7 @@ pub enum Call {
     Chunk {
         module: Gc<Module>,
         chunk_id: FunctionID,
-        fixed_nargs: usize,
+        nparams: usize,
     },
     Native {
         func: Gc<NativeFunction>,
@@ -61,14 +61,6 @@ impl Function {
     pub fn signature(&self) -> &Signature {
         self.proto().signature()
     }
-    
-    fn fixed_args_count(&self) -> usize {
-        let signature = self.signature();
-        
-        signature.required().len()
-        + signature.default().len()
-        + if signature.variadic().is_some() { 1 } else { 0 }
-    }
 }
 
 impl Callable for Function {
@@ -78,7 +70,7 @@ impl Callable for Function {
         Call::Chunk {
             module: self.module,
             chunk_id: self.fun_id,
-            fixed_nargs: self.fixed_args_count(),
+            nparams: self.signature().param_count(),
         }
     }
 }
