@@ -30,7 +30,7 @@ const OP_RETURN:           u8 = 0x08;  // [ ...call frame... ret_value ] => [ re
 const OP_CALL:             u8 = 0x09;
 
 // This instruction is needed because when unpacking, the final nargs value needs to be updated dynamically as we iterate.
-// [ callee arg[n] arg[0] ... arg[n-1] nargs arg_seq ] => [ ret_value ]  -- nargs does not include arg_seq! 
+// [ callee arg[n] arg[0] ... arg[n-1] nargs arg_unpack ] => [ ret_value ]  -- nargs does not include arg_unpack! 
 const OP_CALL_UNPACK:      u8 = 0x0A;
 
 // 0x10-17        Immediate Values

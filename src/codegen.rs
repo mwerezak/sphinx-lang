@@ -929,12 +929,12 @@ impl CodeGenerator<'_> {
             arg_len = 0;
         }
         
+        self.emit_instr_byte(symbol, OpCode::UInt8, arg_len);
+        
         if let Some(seq_expr) = unpack {
             self.compile_expr_with_symbol(&seq_expr)?;
-            self.emit_instr_byte(symbol, OpCode::UInt8, arg_len);
             self.emit_instr(symbol, OpCode::CallUnpack);
         } else {
-            self.emit_instr_byte(symbol, OpCode::UInt8, arg_len);
             self.emit_instr(symbol, OpCode::Call);
         }
 
@@ -1459,7 +1459,7 @@ impl CodeGenerator<'_> {
             let symbol = Some(param.default.debug_symbol());
             let expr = param.default.variant();
             self.compile_expr(symbol, expr)?;
-            self.emit_instr(None, OpCode::InsertLocal);
+            // self.emit_instr(None, OpCode::InsertLocal);
         }
         
         jump_targets.insert(default_count.into(), self.current_offset());
@@ -1502,7 +1502,7 @@ impl CodeGenerator<'_> {
         
         self.patch_jump_instr(&tuple_jump_site, self.current_offset())?;
         self.emit_instr(None, OpCode::TupleN);
-        self.emit_instr(None, OpCode::InsertLocal);
+        // self.emit_instr(None, OpCode::InsertLocal);
         
         self.patch_jump_instr(&end_jump_site, self.current_offset())?;
         
