@@ -760,16 +760,11 @@ impl CodeGenerator<'_> {
             
             Expr::Primary(primary) => self.compile_primary(symbol, primary)?,
             
-            Expr::UnaryOp(op, expr) => {
-                self.compile_expr(symbol, expr)?;
-                self.emit_unary_op(symbol, op);
-            },
+            Expr::UnaryOp(op, expr) => self.compile_unary_op(symbol, *op, expr)?,
             
             Expr::BinaryOp(op, exprs) => {
-                let (ref lhs, ref rhs) = **exprs;
-                self.compile_expr(symbol, lhs)?;
-                self.compile_expr(symbol, rhs)?;
-                self.emit_binary_op(symbol, op);
+                let (lhs, rhs) = &**exprs;
+                self.compile_binary_op(symbol, *op, lhs, rhs)?;
             },
             
             Expr::Assignment(assign) => {
@@ -941,19 +936,36 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn emit_unary_op(&mut self, symbol: Option<&DebugSymbol>, op: &UnaryOp) {
+    fn compile_unary_op(&mut self, symbol: Option<&DebugSymbol>, op: UnaryOp, expr: &Expr) -> CompileResult<()> {
+        self.compile_expr(symbol, expr)?;
         match op {
             UnaryOp::Neg => self.emit_instr(symbol, OpCode::Neg),
             UnaryOp::Pos => self.emit_instr(symbol, OpCode::Pos),
             UnaryOp::Inv => self.emit_instr(symbol, OpCode::Inv),
             UnaryOp::Not => self.emit_instr(symbol, OpCode::Not),
-        }
+        };
+        Ok(())
     }
     
-    fn emit_binary_op(&mut self, symbol: Option<&DebugSymbol>, op: &BinaryOp) {
+    fn compile_binary_op(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp, lhs: &Expr, rhs: &Expr) -> CompileResult<()> {
+        
+        if matches!(op, BinaryOp::And) {
+            return self.compile_shortcircuit_and(symbol, lhs, rhs);
+        }
+        if matches!(op, BinaryOp::Or) {
+            return self.compile_shortcircuit_or(symbol, lhs, rhs);
+        }
+        
+        self.compile_expr(symbol, lhs)?;
+        self.compile_expr(symbol, rhs)?;
+        self.emit_binary_op(symbol, op);
+        
+        Ok(())
+    }
+    
+    fn emit_binary_op(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp) {
         match op {
-            BinaryOp::And => unimplemented!(),
-            BinaryOp::Or => unimplemented!(),
+            BinaryOp::And | BinaryOp::Or => unreachable!(),
             
             BinaryOp::Mul => self.emit_instr(symbol, OpCode::Mul),
             BinaryOp::Div => self.emit_instr(symbol, OpCode::Div),
@@ -974,7 +986,7 @@ impl CodeGenerator<'_> {
             BinaryOp::GE => self.emit_instr(symbol, OpCode::GE),
             BinaryOp::EQ => self.emit_instr(symbol, OpCode::EQ),
             BinaryOp::NE => self.emit_instr(symbol, OpCode::NE),
-        }
+        };
     }
 }
 
@@ -997,7 +1009,7 @@ impl CodeGenerator<'_> {
             LValue::Identifier(name) => {
                 self.compile_name_lookup(symbol, name)?;
                 self.compile_expr(symbol, rhs)?;
-                self.emit_binary_op(symbol, &op);
+                self.emit_binary_op(symbol, op);
                 
                 self.compile_assign_identifier(symbol, name, local_only)
             },
@@ -1306,6 +1318,32 @@ impl CodeGenerator<'_> {
         for jump_site in end_jump_sites.iter() {
             self.patch_jump_instr(jump_site, end_target)?;
         }
+        
+        Ok(())
+    }
+    
+    fn compile_shortcircuit_and(&mut self, symbol: Option<&DebugSymbol>, lhs: &Expr, rhs: &Expr) -> CompileResult<()> {
+        self.compile_expr(symbol, lhs)?;
+        
+        let shortcircuit = self.emit_dummy_jump(symbol, Jump::IfFalse);
+        
+        self.emit_instr(symbol, OpCode::Pop);
+        self.compile_expr(symbol, rhs)?;
+        
+        self.patch_jump_instr(&shortcircuit, self.current_offset())?;
+        
+        Ok(())
+    }
+    
+    fn compile_shortcircuit_or(&mut self, symbol: Option<&DebugSymbol>, lhs: &Expr, rhs: &Expr) -> CompileResult<()> {
+        self.compile_expr(symbol, lhs)?;
+        
+        let shortcircuit = self.emit_dummy_jump(symbol, Jump::IfTrue);
+        
+        self.emit_instr(symbol, OpCode::Pop);
+        self.compile_expr(symbol, rhs)?;
+        
+        self.patch_jump_instr(&shortcircuit, self.current_offset())?;
         
         Ok(())
     }
