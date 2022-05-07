@@ -319,6 +319,13 @@ impl GcBoxPtr {
     }
 }
 
+impl<T> fmt::Debug for GcBox<T> where T: GcTrace + ?Sized + fmt::Debug {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("GcBox")
+            .field("data", &&self.data)
+            .finish_non_exhaustive()
+    }
+}
 
 #[cfg(test)]
 mod tests {

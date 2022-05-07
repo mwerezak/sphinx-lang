@@ -1,7 +1,7 @@
 begin
-    let local = "local"
+    let value = "local"
     fun f()
-        echo local
+        print(value)
     end
     f()
 end

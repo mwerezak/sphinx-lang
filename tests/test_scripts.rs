@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use sphinx;
-use sphinx::stdlib;
+use sphinx::builtins;
 use sphinx::source::ModuleSource;
 use sphinx::codegen::{Program, CompiledProgram};
 use sphinx::runtime::{Module, VirtualMachine};
@@ -25,7 +25,7 @@ fn run_test_script(path: &Path) -> ExecResult<()> {
     
     let program = Program::load(build.program);
     
-    let main_env = stdlib::create_prelude();
+    let main_env = builtins::create_prelude();
     let main_module = Module::with_env(Some(source), program.data, main_env);
     
     let vm = VirtualMachine::new(main_module, &program.main);

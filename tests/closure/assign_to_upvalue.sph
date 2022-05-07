@@ -2,18 +2,18 @@ var f = nil
 var g = nil
 
 begin
-    var local = "local"
+    var value = "local"
     fun f_()
-        echo local
-        nonlocal local = "after f"
-        echo local
+        print(echo(value))
+        nonlocal value = "after f"
+        print(echo(value))
     end
     f = f_
     
     fun g_()
-        echo local
-        nonlocal local = "after g"
-        echo local
+        print(echo(value))
+        nonlocal value = "after g"
+        print(echo(value))
     end
     g = g_
 end
