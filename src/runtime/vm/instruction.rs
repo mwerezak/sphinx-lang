@@ -191,9 +191,29 @@ impl<'c> VMCallFrame<'c> {
                 return Ok(Control::Call(call))
             },
             
+            OpCode::CallUnpack => {
+                let unpack = stack.pop();
+                
+                let mut nargs = into_usize(*stack.peek());
+                let call_locals = SYSTEM_ARGS + nargs;
                 let frame = stack.len() - call_locals;
                 stack.swap_last(frame + 1);
                 
+                let IterState { iter, mut state } = unpack.iter_init()?;
+                while state.as_bool()? {
+                    stack.push(iter.iter_get(&state)?);
+                    state = iter.iter_next(&state)?;
+                    nargs += 1;
+                }
+                
+                // write nargs
+                stack.replace_at(frame + 1, {
+                    let nargs = IntType::try_from(nargs)
+                        .map_err(|_| RuntimeError::overflow_error())?;
+                    nargs.into()
+                });
+                
+                let callee = stack.peek_at(frame);
                 let args = stack.peek_many(nargs);
                 let call = CallInfo {
                     // nargs,
@@ -203,8 +223,6 @@ impl<'c> VMCallFrame<'c> {
                 };
                 return Ok(Control::Call(call))
             },
-            
-            OpCode::CallUnpack => unimplemented!(),
             
             OpCode::Pop => { 
                 stack.pop(); 
