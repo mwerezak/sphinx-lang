@@ -8,8 +8,8 @@ pub fn create_misc_builtins(env: Gc<NamespaceEnv>) {
         Ok(Variant::from(value.fmt_str()?))
     });
     
-    let echo = native_function!(echo, env, params(value) => {
-        Ok(Variant::from(value.fmt_echo()?))
+    let repr = native_function!(repr, env, params(value) => {
+        Ok(Variant::from(value.fmt_repr()?))
     });
     
     let print = native_function!(print, env, variadic(values) => {
@@ -40,7 +40,7 @@ pub fn create_misc_builtins(env: Gc<NamespaceEnv>) {
     namespace_insert!(env.borrow_mut(), {
         fun _ = globals;
         fun _ = to_str;
-        fun _ = echo;
+        fun _ = repr;
         fun _ = print;
     });
 }

@@ -7,9 +7,9 @@ fun f1()
         fun f3()
             let c = "c";
             fun f4()
-                print("a:", echo(a))
-                print("b:", echo(b))
-                print("c:", echo(c))
+                print("a:", repr(a))
+                print("b:", repr(b))
+                print("c:", repr(c))
                 assert "a" == a
                 assert "b" == b
                 assert "c" == c

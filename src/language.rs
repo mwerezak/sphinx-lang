@@ -158,7 +158,6 @@ pub fn create_default_lexer_rules() -> LexerBuilder {
     .add_rule(KeywordRule::new(Token::Class,              "class"))
     // .add_rule(KeywordRule::new(Token::Self_,              "self"))
     // .add_rule(KeywordRule::new(Token::Super,              "super"))
-    // .add_rule(KeywordRule::new(Token::Echo,               "echo"))
     .add_rule(KeywordRule::new(Token::Assert,             "assert"))
     .add_rule(KeywordRule::new(Token::End,                "end"))
     

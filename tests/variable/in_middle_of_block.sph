@@ -1,17 +1,17 @@
 begin
     var a = "a"
-    print("a:", echo(a))
+    print("a:", repr(a))
     assert a == "a"
     
     var b = a + " b"
-    print("b:", echo(b))
+    print("b:", repr(b))
     assert b == "a b"
     
     var c = a + " c"
-    print("c:", echo(c))
+    print("c:", repr(c))
     assert c == "a c"
     
     var d = b + " d"
-    print("d:", echo(d))
+    print("d:", repr(d))
     assert d == "a b d"
 end

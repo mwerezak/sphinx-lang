@@ -69,7 +69,7 @@ impl MetaObject for Tuple {
         iter.iter_init()
     }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn fmt_repr(&self) -> ExecResult<StringValue> {
         match self {
             Self::Empty => Ok(StringValue::from(static_symbol!("()"))),
             
@@ -78,11 +78,11 @@ impl MetaObject for Tuple {
                 
                 let mut buf = String::new();
                 
-                write!(&mut buf, "({}", first.fmt_echo()?)
+                write!(&mut buf, "({}", first.fmt_repr()?)
                     .map_err(|err| RuntimeError::other(err.to_string()))?;
                 
                 for item in rest.iter() {
-                    write!(&mut buf, ", {}", item.fmt_echo()?)
+                    write!(&mut buf, ", {}", item.fmt_repr()?)
                         .map_err(|err| RuntimeError::other(err.to_string()))?;
                 }
                 buf.push(')');

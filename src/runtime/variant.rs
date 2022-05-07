@@ -80,7 +80,7 @@ impl Variant {
         struct Display<'a>(&'a Variant);
         impl fmt::Display for Display<'_> {
             fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                match self.0.fmt_echo() {
+                match self.0.fmt_repr() {
                     Ok(strval) => write!(fmt, "{}", strval),
                     Err(error) => write!(fmt, "{}", error),
                 }
@@ -94,7 +94,7 @@ impl Variant {
         if let Some(strval) = self.as_strval() {
             Ok(strval)
         } else {
-            self.fmt_echo()
+            self.fmt_repr()
         }
     }
 }
@@ -221,7 +221,7 @@ impl Eq for VariantKey<'_> { }
 
 impl fmt::Display for Variant {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self.fmt_echo() {
+        match self.fmt_repr() {
             Ok(strval) => write!(fmt, "{}", strval),
             Err(error) => write!(fmt, "{}", error),
         }

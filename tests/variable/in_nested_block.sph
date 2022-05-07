@@ -1,7 +1,7 @@
 begin
     let a = "outer"
     begin
-        print("a:", echo(a))
+        print("a:", repr(a))
         assert "outer" == a
     end
 end

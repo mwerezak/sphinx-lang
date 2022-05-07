@@ -1,6 +1,6 @@
 # Single-expression body.
 var c = 0;
-while c < 3 do echo c += 1 end
+while c < 3 do print(c += 1) end
 # expect: 1
 # expect: 2
 # expect: 3
@@ -8,7 +8,7 @@ while c < 3 do echo c += 1 end
 # Block body.
 var a = 0;
 while a < 3 do
-  echo a
+  print(a)
   a += 1;
 end
 # expect: 0
@@ -17,8 +17,8 @@ end
 
 # Statement bodies.
 while false do 
-  echo if true then 1 else 2 end 
+  print(if true then 1 else 2 end)
 end
 while false do 
-  while true do echo 1 end
+  while true do print(1) end
 end

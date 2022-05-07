@@ -81,7 +81,7 @@ pub trait MetaObject {
     }
     
     // formatting
-    fn fmt_echo(&self) -> ExecResult<StringValue>;
+    fn fmt_repr(&self) -> ExecResult<StringValue>;
     
     // primitive coercions
     fn as_bool(&self) -> ExecResult<bool> { Ok(true) }
@@ -200,8 +200,8 @@ impl Variant {
             .ok_or_else(|| RuntimeError::metamethod_not_supported(self, MethodTag::Invoke))?
     }
     
-    pub fn fmt_echo(&self) -> ExecResult<StringValue> {
-        self.as_meta().fmt_echo()
+    pub fn fmt_repr(&self) -> ExecResult<StringValue> {
+        self.as_meta().fmt_repr()
     }
 }
 
@@ -217,7 +217,7 @@ pub enum MethodTag {
     AsBits,
     AsInt,
     AsFloat,
-    Echo,
+    FmtRepr,
 }
 
 impl MethodTag {
@@ -240,7 +240,7 @@ impl MethodTag {
             Self::AsFloat => "float",
             
             // misc
-            Self::Echo => "echo",
+            Self::FmtRepr => "repr",
         }
     }
 }

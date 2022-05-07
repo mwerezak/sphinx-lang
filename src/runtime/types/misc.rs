@@ -22,7 +22,7 @@ impl MetaObject for Nil {
         }
     }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn fmt_repr(&self) -> ExecResult<StringValue> {
         Ok(StringValue::from(static_symbol!("nil")))
     }
 }
@@ -54,7 +54,7 @@ impl MetaObject for Marker {
         Ok(StringValue::from(self.id))
     }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn fmt_repr(&self) -> ExecResult<StringValue> {
         self.type_name()
     }
 }
@@ -75,7 +75,7 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
         }
     }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn fmt_repr(&self) -> ExecResult<StringValue> {
         // TODO cache this in the signature struct?
         let result = format!(
             "<{} at {:#X}>", self.signature().fmt_name(), Gc::as_id(self),
@@ -91,7 +91,7 @@ impl<F> MetaObject for Gc<F> where F: GcTrace, Gc<F>: Callable {
 impl MetaObject for Gc<RuntimeError> {
     fn type_tag(&self) -> Type { Type::Error }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn fmt_repr(&self) -> ExecResult<StringValue> {
         Ok(self.kind().name())
     }
 }

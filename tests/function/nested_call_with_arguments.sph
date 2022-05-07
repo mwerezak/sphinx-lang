@@ -5,7 +5,7 @@ fun return_call_with_arg(func, arg)
 end
 
 fun print_arg(arg)
-    echo arg
+    repr(arg)
 end
 
-assert return_call_with_arg(print_arg, "hello world") == "hello world"
+assert return_call_with_arg(print_arg, "hello world") == "\"hello world\""

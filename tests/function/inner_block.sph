@@ -3,10 +3,10 @@ fun f()
     let a = "1"
     begin
         let a = "2"
-        print("inner a:", echo(a))
+        print("inner a:", repr(a))
         assert "2" == a
     end
-    print("outer a:", echo(a))
+    print("outer a:", repr(a))
     assert "1" == a
 end
 

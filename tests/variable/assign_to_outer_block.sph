@@ -3,15 +3,15 @@ begin
     if true then
         var b = "b"
         if true then
-            print("a:", echo(a))
-            print("b:", echo(b))
+            print("a:", repr(a))
+            print("b:", repr(b))
             assert "a" == a
             assert "b" == b
             
             a = b = "c"
             
-            print("a:", echo(a))
-            print("b:", echo(b))
+            print("a:", repr(a))
+            print("b:", repr(b))
             assert "c" == a
             assert "c" == b
         end

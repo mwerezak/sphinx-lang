@@ -1,7 +1,7 @@
 let a = "outer"
 begin
     fun foo()
-        print(echo(a))
+        print(repr(a))
         a
     end
     

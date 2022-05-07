@@ -1,20 +1,20 @@
 # Evaluate the 'then' expression if the condition is true.
-if true then echo "good" end  # expect: good
+if true then print("good") end  # expect: good
 if false then assert false end
 
 # Assignment in if condition.
 var a = false
 
 if a = true then 
-    echo a  # expect: true
+    print(a)  # expect: true
 end 
 
 # Declaration in if condition.
-if let b = true then echo b end # expect: true
+if let b = true then print(b) end # expect: true
 
 # If-expressions evaluate to the last item of the branch that they enter
 if (if a then true end) then
-    echo "if-ception"
+    print("if-ception")
 end
 
 # If-expressions evaluate to their condition if they don't enter a branch

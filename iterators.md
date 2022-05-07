@@ -28,7 +28,7 @@ An *iterable* is one of the following:
 Iterators can be used in a `for` loop like so:
 ```
 for item in create_iter() do
-  echo item
+  print(item)
 end
 ```
 

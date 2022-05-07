@@ -60,7 +60,7 @@ impl MetaObject for bool {
         }
     }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn fmt_repr(&self) -> ExecResult<StringValue> {
         match self {
             true => Ok(static_symbol!("true").into()),
             false => Ok(static_symbol!("false").into()),

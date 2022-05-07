@@ -236,7 +236,7 @@ impl MetaObject for IntType {
         }
     }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn fmt_repr(&self) -> ExecResult<StringValue> {
         let mut buf = StrBuffer::<32>::new();
         if write!(buf, "{}", *self).is_ok() {
             Ok(StringValue::new_maybe_interned(buf))
@@ -316,7 +316,7 @@ impl MetaObject for FloatType {
         other.as_meta().as_float().map(|other| Ok(*self <= other?))
     }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn fmt_repr(&self) -> ExecResult<StringValue> {
         fn write_float(value: FloatType, fmt: &mut impl fmt::Write) -> fmt::Result {
             if !value.is_finite() || value.trunc() != value {
                 write!(fmt, "{}", value)

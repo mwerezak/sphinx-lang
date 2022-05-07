@@ -46,7 +46,7 @@ pub trait UserIterator: GcTrace {
 impl MetaObject for Gc<dyn UserIterator> {
     fn type_tag(&self) -> Type { Type::Iterator }
     
-    fn fmt_echo(&self) -> ExecResult<StringValue> {
+    fn fmt_repr(&self) -> ExecResult<StringValue> {
         let result = format!(
             "<{} at {:#X}>", self.type_name()?, Gc::as_id(self)
         );

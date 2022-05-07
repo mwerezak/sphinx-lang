@@ -1,11 +1,11 @@
 # False and nil are false.
 if false then assert false 
-else echo "false" end
+else print("false") end
 
 if nil then assert false
-else echo "nil" end
+else print("nil") end
 
 # Everything else is true.
-if true then echo "true" end
-if 0 then echo 0 end
-if "" then echo "empty" end
+if true then print("true") end
+if 0 then print(0) end
+if "" then print("empty") end

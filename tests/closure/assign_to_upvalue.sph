@@ -4,16 +4,16 @@ var g = nil
 begin
     var value = "local"
     fun f_()
-        print(echo(value))
+        print(repr(value))
         nonlocal value = "after f"
-        print(echo(value))
+        print(repr(value))
     end
     f = f_
     
     fun g_()
-        print(echo(value))
+        print(repr(value))
         nonlocal value = "after g"
-        print(echo(value))
+        print(repr(value))
     end
     g = g_
 end
