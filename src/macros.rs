@@ -41,7 +41,7 @@ macro_rules! __namespace_item {
 
 /// Helper to create a namespace
 #[macro_export]
-macro_rules! namespace {
+macro_rules! namespace_insert {
     ( $namespace:expr, { $( $item:tt $name:tt = $value:expr ; )* } ) => {
         $(
             __namespace_item!($namespace, $item $name $value );

@@ -13,7 +13,7 @@ use sphinx::runtime::{Module, VirtualMachine, Gc};
 use sphinx::runtime::module::GlobalEnv;
 use sphinx::runtime::strings::StringInterner;
 use sphinx::debug::symbol::resolver::BufferedResolver;
-use sphinx::stdlib;
+use sphinx::builtins;
 
 fn main() {
     env_logger::init();
@@ -59,7 +59,7 @@ fn main() {
     } else if let Some(s) = args.value_of("file") {
         source = ModuleSource::File(PathBuf::from(s));
     } else {
-        let repl_env = stdlib::create_prelude();
+        let repl_env = builtins::create_prelude();
         Repl::new(version.to_string(), repl_env).run();
         
         return;
@@ -72,7 +72,7 @@ fn main() {
         if let Some(build) = build_program(&source) {
             let program = Program::load(build.program);
             
-            let repl_env = stdlib::create_prelude();
+            let repl_env = builtins::create_prelude();
             let main_module = Module::with_env(Some(source), program.data, repl_env);
             
             let vm = VirtualMachine::new(main_module, &program.main);
@@ -88,7 +88,7 @@ fn main() {
     else if let Some(build) = build_program(&source) {
         let program = Program::load(build.program);
         
-        let main_env = stdlib::create_prelude();
+        let main_env = builtins::create_prelude();
         let main_module = Module::with_env(Some(source), program.data, main_env);
         
         let vm = VirtualMachine::new(main_module, &program.main);

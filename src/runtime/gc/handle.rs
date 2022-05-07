@@ -64,6 +64,10 @@ impl<T> Gc<T> where T: GcTrace + ?Sized {
         }
     }
     
+    pub(super) fn as_raw(self_gc: &Gc<T>) -> GcBoxPtr {
+        self_gc.ptr
+    }
+    
     pub fn ptr_eq<U>(self_gc: &Gc<T>, other_gc: &Gc<U>) -> bool where U: GcTrace + ?Sized {
         ptr::eq(
             self_gc.ptr.as_ptr() as *const (),

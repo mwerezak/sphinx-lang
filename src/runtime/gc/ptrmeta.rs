@@ -3,6 +3,7 @@
 use core::ptr::DynMetadata;
 use core::convert::Infallible;
 use crate::runtime::types::{UserData, UserIterator};
+use crate::runtime::gc::trace::GcTrace;
 
 
 /// Because `GcBoxHeader` must not be generic this enum is used to represent the ptr metadata
@@ -13,6 +14,7 @@ use crate::runtime::types::{UserData, UserIterator};
 pub enum PtrMetadata {
     None,
     Size(usize),
+    Trace(DynMetadata<dyn GcTrace>),
     Iterator(DynMetadata<dyn UserIterator>),
     UserData(DynMetadata<dyn UserData>),
 }
@@ -48,6 +50,24 @@ impl TryInto<usize> for PtrMetadata {
     fn try_into(self) -> Result<usize, Self::Error> {
         match self {
             Self::Size(size) => Ok(size),
+            _ => Err(PtrMetadataError),
+        }
+    }
+}
+
+// dyn GcTrace
+
+impl From<DynMetadata<dyn GcTrace>> for PtrMetadata {
+    fn from(meta: DynMetadata<dyn GcTrace>) -> Self {
+        Self::Trace(meta)
+    }
+}
+
+impl TryInto<DynMetadata<dyn GcTrace>> for PtrMetadata {
+    type Error = PtrMetadataError;
+    fn try_into(self) -> Result<DynMetadata<dyn GcTrace>, Self::Error> {
+        match self {
+            Self::Trace(meta) => Ok(meta),
             _ => Err(PtrMetadataError),
         }
     }
