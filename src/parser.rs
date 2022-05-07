@@ -886,14 +886,15 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
                 function_def.signature.name.replace(*name);
             }
             
-            // let function_decl = Declaration {
-            //     decl: DeclType::Immutable,
-            //     lhs: lvalue,
-            //     init: Expr::FunctionDef(function_def),
-            // };
+            let fun_decl = Assignment {
+                assign: AssignType::DeclImmutable,
+                op: None,
+                lhs: lvalue,
+                rhs: Expr::FunctionDef(function_def),
+            };
+            
+            Ok(Expr::Assignment(Box::new(fun_decl)))
 
-            // Ok(Expr::Declaration(Box::new(function_decl)))
-            todo!()
         } else {
 
             Ok(Expr::FunctionDef(function_def))
