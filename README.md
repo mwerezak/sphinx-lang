@@ -48,19 +48,10 @@ fun fib(n)
     fib(n - 2) + fib(n - 1)
 end
 
-# Some fun with variadic arguments and assignment destructuring
-fun example(items...)
-    if len(items) < 3 then
-        return items
-    end
-    
-    let first, second, third, rest... = items
-    return rest + ( (first, second), third )  # TODO implement using ... in tuple constructor
-end
-
-# declare "e" and "f" as mutable, the rest as immutable
-let a, b, c, d, (var e, f), g = example("a", "b", "c", "d", "e", "f", "g") 
-e += (f *= 2)
+# Some fun with tuple assignment
+# declare "c" and "d" as mutable, the rest as immutable, and capture any excess in a tuple
+let a, b, (var c, d), g, rest...  = example("a", "b", "c", "d", "e", "f", "g") 
+c += (d *= 2)
 
 ```
 
