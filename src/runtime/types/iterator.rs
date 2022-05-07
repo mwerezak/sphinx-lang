@@ -12,7 +12,7 @@ use crate::runtime::errors::{ExecResult};
     These values support the `iter_init()` method which produces an "iterator state".
     
     An iterator state is just a pair: an "iterator" and a state. The state can be any value, 
-    however falsey values are interpeted as the end of the iteration.
+    however false values are interpeted as indicating that the iterator is exhausted.
     The iterator is a value that supports the `iter_get()` and `iter_next()` methods. 
     
     Both of these methods take the state value as their argument.
@@ -20,8 +20,9 @@ use crate::runtime::errors::{ExecResult};
     `iter_next()` takes a state value and produces the next state value.
     
     `iter_get()` gets the item for a given state.
-    This method is expected to succeed when called for the first time with the current state, but is not
-    required to succeed when called with the same state subsequent times or when called with a past state.
+    This method is expected to succeed when called for the first time with the current state (assuming
+    that the state is true), but is not required to succeed when called with the same state subsequent 
+    times or when called with a past state.
     
     Note: it is not required for an iterator to actually use the state argument.
     The alternative is interior mutability: the iterator can just mutate itself when `iter_next()` is called.

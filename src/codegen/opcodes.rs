@@ -163,6 +163,7 @@ pub enum OpCode {
     
     IterInit = OP_ITER_INIT,
     IterNext = OP_ITER_NEXT,
+    IterUnpack = OP_ITER_UNPACK,
     
     LoadFunction = OP_LD_FUN,
     LoadFunction16 = OP_LD_FUN_16,
@@ -258,6 +259,7 @@ impl OpCode {
             
             OP_ITER_INIT => Self::IterInit,
             OP_ITER_NEXT => Self::IterNext,
+            OP_ITER_UNPACK => Self::IterUnpack,
             
             OP_LD_FUN => Self::LoadFunction,
             OP_LD_FUN_16 => Self::LoadFunction16,
@@ -418,9 +420,10 @@ impl core::fmt::Display for OpCode {
             
             Self::IterInit => "ITER_INIT",
             Self::IterNext => "ITER_NEXT",
+            Self::IterUnpack => "ITER_UNPACK",
             
-            Self::LoadFunction => "OP_LD_FUN",
-            Self::LoadFunction16 => "OP_LD_FUN_16",
+            Self::LoadFunction => "LD_FUN",
+            Self::LoadFunction16 => "LD_FUN_16",
             
             Self::LoadConst => "LD_CONST",
             Self::LoadConst16 => "LD_CONST_16",

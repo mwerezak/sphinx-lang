@@ -91,12 +91,10 @@ pub trait MetaObject {
     
     // iterators
     
-    // take the current state, produce either the next state or the StopIteration marker
-    fn iter_get(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }
-    fn iter_next(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }
-    
-    // produce an iterator (i.e. supports the next() metamethod) and the initial state
+    // see iterator.rs for more detail on the iterator API
     fn iter_init(&self) -> Option<ExecResult<IterState>> { None }
+    fn iter_next(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }
+    fn iter_get(&self, state: &Variant) -> Option<ExecResult<Variant>> { None }
     
     // collections
     fn len(&self) -> Option<ExecResult<usize>> { None }

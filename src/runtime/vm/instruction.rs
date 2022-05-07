@@ -221,6 +221,20 @@ impl<'c> VMCallFrame<'c> {
                 stack.push(value);
             }
             
+            OpCode::IterUnpack => {
+                let mut state = stack.pop();
+                let iter = stack.pop();
+                
+                let mut count = IntType::from(0);
+                while state.as_bool()? {
+                    stack.push(iter.iter_get(&state)?);
+                    state = iter.iter_next(&state)?;
+                    count = count.checked_add(1)
+                        .ok_or_else(RuntimeError::overflow_error)?;
+                }
+                stack.push(count.into());
+            }
+            
             OpCode::LoadFunction => {
                 let fun_id = FunctionID::from(data[0]);
                 let proto = self.module.get_function(fun_id);
@@ -354,8 +368,12 @@ impl<'c> VMCallFrame<'c> {
             OpCode::TupleN => {
                 let tuple_len = into_usize(stack.pop());
                 
-                let items = stack.pop_many(tuple_len).into_boxed_slice();
-                stack.push(Variant::from(items));
+                if tuple_len > 0 {
+                    let items = stack.pop_many(tuple_len).into_boxed_slice();
+                    stack.push(Variant::from(items));
+                } else {
+                    stack.push(Variant::Tuple(Default::default()));
+                }
             },
             
             OpCode::UInt8 => {
