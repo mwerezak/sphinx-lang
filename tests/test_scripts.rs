@@ -77,6 +77,7 @@ mod tuple_tests {
     use super::*;
     
     test_script!(assignment, "tests/tuple/assignment.sph");
+    test_script!(comparison, "tests/tuple/comparison.sph");
 }
 
 mod while_tests {

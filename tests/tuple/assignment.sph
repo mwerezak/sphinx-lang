@@ -1,3 +1,13 @@
 var first, second = "abc", "def"
 second, first = first, second
 assert "def", "abc" == first, second
+
+var a, b, c, d, e = nil, nil, nil, nil, nil
+let tuple = 1, ("a", "b", "c"), 2, 3
+a, (b, c, d...), e... = tuple
+
+assert a == 1
+assert b == "a"
+assert c == "b"
+assert d == ("c",)
+assert e == 2, 3
