@@ -103,6 +103,7 @@ mod function_tests {
     test_script!(nested_call_with_arguments, "tests/function/nested_call_with_arguments.sph");
     test_script!(inner_block, "tests/function/inner_block.sph");
     test_script!(missing_arguments, "tests/function/missing_arguments.sph", error: ErrorKind::MissingArguments {..});
+    test_script!(argument_unpack, "tests/function/argument_unpack.sph");
 }
 
 mod closure_tests {

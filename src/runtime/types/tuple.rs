@@ -1,3 +1,4 @@
+use core::cmp::Ordering;
 use core::fmt::{self, Write};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
@@ -27,10 +28,7 @@ impl From<Box<[Variant]>> for Tuple {
 
 impl AsRef<[Variant]> for Tuple {
     fn as_ref(&self) -> &[Variant] {
-        match self {
-            Self::Empty => &[] as &[Variant],
-            Self::NonEmpty(items) => &**items,
-        }
+        self.items()
     }
 }
 
@@ -54,6 +52,60 @@ impl Tuple {
             Self::NonEmpty(..) => false,
         }
     }
+    
+    pub fn items(&self) -> &[Variant] {
+        match self {
+            Self::Empty => &[] as &[Variant],
+            Self::NonEmpty(items) => &**items,
+        }
+    }
+}
+
+
+// helpers
+impl Tuple {
+    fn eq(&self, other: &Self) -> ExecResult<bool> {
+        if self.len() != other.len() {
+            return Ok(false);
+        }
+        
+        let pairs = self.items().iter()
+            .zip(other.items().iter());
+        
+        for (a, b) in pairs {
+            if !a.cmp_eq(b)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+    
+    // compare two tuple lexicographically
+    fn cmp(&self, other: &Self) -> ExecResult<Ordering> {
+        let pairs = self.items().iter()
+            .zip(other.items().iter());
+        
+        for (a, b) in pairs {
+            if a.cmp_lt(b)? {
+                return Ok(Ordering::Less)
+            }
+            if !a.cmp_eq(b)? {
+                return Ok(Ordering::Greater)
+            }
+        }
+        
+        // if we get here then all tested elements were equal
+        // in which case the longer tuple is considered greater
+        Ok(self.len().cmp(&other.len()))
+    }
+    
+    fn cmp_lt(&self, other: &Self) -> ExecResult<bool> {
+        Ok(self.cmp(other)? == Ordering::Less)
+    }
+    
+    fn cmp_le(&self, other: &Self) -> ExecResult<bool> {
+        Ok(matches!(self.cmp(other)?, Ordering::Equal|Ordering::Less))
+    }
 }
 
 impl MetaObject for Tuple {
@@ -67,6 +119,27 @@ impl MetaObject for Tuple {
         let iter: Box<dyn UserIterator> = Box::new(TupleIter(*self));
         let iter = Gc::from_box(iter);
         iter.iter_init()
+    }
+    
+    fn cmp_eq(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        if let Variant::Tuple(other) = other {
+            return Some(self.eq(other));
+        }
+        None
+    }
+    
+    fn cmp_lt(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        if let Variant::Tuple(other) = other {
+            return Some(self.cmp_lt(other));
+        }
+        None
+    }
+    
+    fn cmp_le(&self, other: &Variant) -> Option<ExecResult<bool>> {
+        if let Variant::Tuple(other) = other {
+            return Some(self.cmp_le(other));
+        }
+        None
     }
     
     fn fmt_repr(&self) -> ExecResult<StringValue> {
@@ -97,7 +170,7 @@ impl MetaObject for Tuple {
 impl fmt::Debug for Tuple {
     fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut tuple = fmt.debug_tuple("");
-        for item in self.as_ref().iter() {
+        for item in self.items().iter() {
             tuple.field(item);
         }
         tuple.finish()
@@ -119,7 +192,7 @@ impl UserIterator for TupleIter {
         let idx = usize::try_from(state.as_int()?)
             .map_err(|_| RuntimeError::invalid_value("invalid state"))?;
         
-        let items = self.0.as_ref();
+        let items = self.0.items();
         Ok(items[idx])
     }
     

@@ -1,0 +1,8 @@
+fun foo(first, rest...)
+    first, rest
+end
+
+let tup = 1,2,3,4,5
+let a, b = foo(tup...)
+assert a == 1
+assert b == 2,3,4,5
