@@ -1,0 +1,29 @@
+let tup = (
+    (1,2,3,4,5),
+    (2,3,4,5,6),
+    (3,4,5,6,7),
+)
+
+var count = 0
+for let a, (var b), c, d... in tup do
+    b += 2*a
+    
+    print(a, b, c, d)
+    if count == 0 then
+        assert a == 1
+        assert b == 4
+        assert c == 3
+        assert d == (4,5)
+    elif count == 1 then
+        assert a == 2
+        assert b == 7
+        assert c == 4
+        assert d == (5,6)
+    elif count == 2 then
+        assert a == 3
+        assert b == 10
+        assert c == 5
+        assert d == (6,7)
+    end
+    count += 1
+end
