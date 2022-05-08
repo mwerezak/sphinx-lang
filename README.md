@@ -18,7 +18,7 @@ As well, this whole project started as a way to learn Rust, and I have definitel
 
 Sphinx makes use of Rust's [pointer metadata API](https://github.com/rust-lang/rust/issues/81513), which has not yet been stabilized. So in order to build it you will need nightly Rust. Probably if you're here you're interested in looking at the internals of a compiler/VM (since the language itself is pretty WIP), so you probably already know how to set that up, but if you don't, you can get it with `rustup`. 
 
-Once built, you can run the REPL with `sphinx` and the disassembler with `sphinx-dasm`. Both executables have `--help` to list the command line options. Also check out the `--debug` option on `sphinx` which starts up a step-through debugger.
+Once built, you can run the REPL with `sphinx` and the disassembler with `sphinx-dasm`. Both executables have `--help` to list the command line options. Also check out the `--debug` option on `sphinx` which allows you to step through each instruction and view the state of the VM.
 
 Here is some example code you can run to get started:
 ```
@@ -42,10 +42,12 @@ end
 
 # Some fun with tuple assignment
 # declare "c" and "d" as mutable, the rest as immutable, and capture any excess in a tuple
-let a, b, (var c, d), g, rest...  = example("a", "b", "c", "d", "e", "f", "g") 
+let a, b, (var c, d), g, rest... = "a", "b", "c", "d", "e", "f", "g")
 c += (d *= 2)
 
 ```
+
+You can also take a look at some of the test scripts inside the `tests` folder.
 
 Right now `sphinx` will compile the code and execute it from memory. I plan to add support for binary bytecode input/output, but right now even the file format for that is TBD
 
