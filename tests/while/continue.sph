@@ -1,0 +1,20 @@
+begin
+    var i = 0
+    ::outer while (i += 1) <= 11 do
+
+        var j = 0
+        while true do
+            if j > 10 then
+                if i % 2 == 0 then
+                    continue ::outer
+                else 
+                    break
+                end
+            end
+            j += 1
+        end
+        
+        print(i)
+        assert i % 2 != 0
+    end
+end

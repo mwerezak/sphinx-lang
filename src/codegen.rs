@@ -432,14 +432,10 @@ impl From<&Scope> for ScopeDrop {
 }
 
 impl CodeGenerator<'_> {
-    fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<&Label>) {
-        let continue_target = self.current_offset();
-        
+    fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<&Label>) -> &mut Scope {
         let chunk_id = self.chunk_id;
         self.scopes_mut().push_scope(symbol, tag, label.copied());
-        
         self.scopes_mut().local_scope_mut().unwrap()
-            .set_continue(continue_target);
     }
     
     fn emit_end_scope(&mut self) -> Scope {
@@ -448,9 +444,16 @@ impl CodeGenerator<'_> {
         scope
     }
     
-    fn finalize_scope(&mut self, scope: &Scope, break_target: usize) -> CompileResult<()> {
+    fn patch_break_sites(&mut self, scope: &Scope, break_target: usize) -> CompileResult<()> {
         for break_site in scope.break_sites().iter() {
             self.patch_jump_instr(break_site, break_target)?;
+        }
+        Ok(())
+    }
+    
+    fn patch_continue_sites(&mut self, scope: &Scope, continue_target: usize) -> CompileResult<()> {
+        for continue_site in scope.continue_sites().iter() {
+            self.patch_jump_instr(continue_site, continue_target)?;
         }
         Ok(())
     }
@@ -643,7 +646,6 @@ impl CodeGenerator<'_> {
         }
         self.emit_scope_drop(symbol, target); // drop target scope
         
-        
         // if breaking from an expression block, emit the expression value before jumping
         if target.tag.is_expr_block() {
             if let Some(expr) = expr {
@@ -669,8 +671,8 @@ impl CodeGenerator<'_> {
     
     fn compile_continue_control(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>) -> CompileResult<()> {
         // find the target scope
-        let (target_depth, continue_target) = match self.scopes().resolve_control_flow(ControlFlowTarget::Continue(label.copied())) {
-            Some(scope) => (scope.depth(), scope.continue_target()),
+        let target_depth = match self.scopes().resolve_control_flow(ControlFlowTarget::Continue(label.copied())) {
+            Some(scope) => scope.depth(),
             None => {
                 let message =
                     if label.is_some() { "can't find loop with matching label for \"continue\"" }
@@ -696,8 +698,13 @@ impl CodeGenerator<'_> {
             }
         }
         
-        // if continue_target is None by this point it's the compiler's fault
-        self.emit_jump_instr(symbol, Jump::Uncond, continue_target.unwrap())?;
+        // emit jump site, register with scope
+        let continue_site = self.emit_dummy_jump(symbol, Jump::Uncond);
+        
+        let target_scope = self.scopes_mut().iter_scopes_mut()
+            .find(|scope| scope.depth() == target_depth)
+            .unwrap();
+        target_scope.register_continue(continue_site);
         
         Ok(())
     }
@@ -707,6 +714,7 @@ impl CodeGenerator<'_> {
         let loop_target = self.current_offset();
         
         self.emit_begin_scope(symbol, ScopeTag::Loop, label);
+        
         self.compile_stmt_block(body)?;
         let loop_scope = self.emit_end_scope();
         
@@ -714,7 +722,8 @@ impl CodeGenerator<'_> {
         
         // finalize scope
         let break_target = self.current_offset();
-        self.finalize_scope(&loop_scope, break_target)?;
+        self.patch_break_sites(&loop_scope, break_target)?;
+        self.patch_continue_sites(&loop_scope, loop_target)?;
         
         Ok(())
     }
@@ -722,6 +731,7 @@ impl CodeGenerator<'_> {
     fn compile_while_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, condition: &Expr, body: &StmtList) -> CompileResult<()> {
         
         // first iteration conditional jump
+        let continue_target = self.current_offset();
         self.compile_expr(symbol, condition)?;
         
         let end_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
@@ -740,7 +750,8 @@ impl CodeGenerator<'_> {
         
         // finalize scope
         let break_target = self.current_offset();
-        self.finalize_scope(&loop_scope, break_target)?;
+        self.patch_break_sites(&loop_scope, break_target)?;
+        self.patch_continue_sites(&loop_scope, continue_target)?;
         
         Ok(())
     }
@@ -754,6 +765,7 @@ impl CodeGenerator<'_> {
         self.emit_instr(symbol, OpCode::IterInit);
         
         // first iteration conditional jump
+        let continue_target = self.current_offset();
         let end_jump_site = self.emit_dummy_jump(symbol, Jump::IfFalse);
         
         let loop_target = self.current_offset();
@@ -775,8 +787,10 @@ impl CodeGenerator<'_> {
         let break_target = self.current_offset();
         self.emit_instr_byte(symbol, OpCode::Drop, 2); // drop [ iter state ]
         
+        // finalize scope
         self.patch_jump_instr(&end_jump_site, break_target)?;
-        self.finalize_scope(&loop_scope, break_target)?;
+        self.patch_break_sites(&loop_scope, break_target)?;
+        self.patch_continue_sites(&loop_scope, continue_target)?;
         
         Ok(())
     }
@@ -1298,7 +1312,7 @@ impl CodeGenerator<'_> {
         
         // finalize scope
         let break_target = self.current_offset();
-        self.finalize_scope(&block_scope, break_target)?;
+        self.patch_break_sites(&block_scope, break_target)?;
         
         Ok(())
     }

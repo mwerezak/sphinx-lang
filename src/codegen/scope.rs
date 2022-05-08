@@ -93,7 +93,7 @@ impl ControlFlowTarget {
 #[derive(Debug, Default)]
 struct ControlFlowTracker {
     label: Option<Label>,
-    continue_target: Option<usize>,
+    continue_sites: Vec<JumpSite>,
     break_sites: Vec<JumpSite>,
 }
 
@@ -101,7 +101,7 @@ impl ControlFlowTracker {
     fn new(label: Option<Label>) -> Self {
         Self {
             label,
-            continue_target: None,
+            continue_sites: Vec::new(),
             break_sites: Vec::new(),
         }
     }
@@ -134,12 +134,12 @@ impl Scope {
         self.symbol.as_ref()
     }
     
-    pub(super) fn continue_target(&self) -> Option<usize> {
-        self.control_flow.continue_target
+    pub(super) fn register_continue(&mut self, continue_site: JumpSite) {
+        self.control_flow.continue_sites.push(continue_site)
     }
     
-    pub(super) fn set_continue(&mut self, offset: usize) {
-        self.control_flow.continue_target.replace(offset);
+    pub(super) fn continue_sites(&self) -> &[JumpSite] {
+        &self.control_flow.continue_sites
     }
     
     pub(super) fn register_break(&mut self, break_site: JumpSite) {

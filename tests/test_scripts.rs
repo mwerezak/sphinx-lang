@@ -84,12 +84,14 @@ mod while_tests {
     use super::*;
     
     test_script!(while_, "tests/while/while.sph");
+    test_script!(continue_, "tests/while/continue.sph");
 }
 
 mod for_tests {
     use super::*;
     
     test_script!(for_, "tests/for/for.sph");
+    test_script!(continue_, "tests/for/continue.sph");
 }
 
 mod variable_tests {
