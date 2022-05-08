@@ -526,7 +526,7 @@ impl CodeGenerator<'_> {
             
             Stmt::WhileLoop { label, condition, body } => self.compile_while_loop(symbol, label.as_ref(), condition, body)?,
             
-            Stmt::ForLoop { label, lvalue, iter_expr, body } => unimplemented!(),
+            Stmt::ForLoop { label, lvalue, iter, body } => self.compile_for_loop(symbol, label.as_ref(), lvalue, iter, body)?,
             
             Stmt::Assert(expr) => {
                 self.compile_expr(symbol, expr)?;
@@ -740,6 +740,42 @@ impl CodeGenerator<'_> {
         
         // finalize scope
         let break_target = self.current_offset();
+        self.finalize_scope(&loop_scope, break_target)?;
+        
+        Ok(())
+    }
+    
+    fn compile_for_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, lvalue: &LValue, iter: &Expr, body: &StmtList) -> CompileResult<()> {
+        
+        self.emit_begin_scope(symbol, ScopeTag::Loop, label);
+        
+        // initialize iterator
+        self.compile_expr(symbol, iter)?;
+        self.emit_instr(symbol, OpCode::IterInit);
+        
+        // first iteration conditional jump
+        let end_jump_site = self.emit_dummy_jump(symbol, Jump::IfFalse);
+        
+        let loop_target = self.current_offset();
+        
+        // advance iterator and assign value
+        // default to "let" for loop variables (unlike normal assignment, which defaults to "local")
+        self.emit_instr(symbol, OpCode::IterNext);
+        self.compile_assignment(symbol, AssignType::DeclImmutable, lvalue)?; 
+        self.emit_instr(symbol, OpCode::Pop);
+        
+        // compile body
+        self.compile_stmt_block(body)?;
+        let loop_scope = self.emit_end_scope();
+        
+        // rest iteration conditional jump
+        // should have just [ ... iter state[N] ] on the stack here
+        self.emit_jump_instr(symbol, Jump::IfTrue, loop_target)?;
+        
+        let break_target = self.current_offset();
+        self.emit_instr_byte(symbol, OpCode::Drop, 2); // drop [ iter state ]
+        
+        self.patch_jump_instr(&end_jump_site, break_target)?;
         self.finalize_scope(&loop_scope, break_target)?;
         
         Ok(())

@@ -71,7 +71,7 @@ impl MetaObject for Gc<dyn UserIterator> {
     
     fn iter_init(&self) -> Option<ExecResult<IterState>> {
         let state = match self.next_state(None) {
-            Ok(value) => value,
+            Ok(state) => state,
             Err(error) => return Some(Err(error)),
         };
         

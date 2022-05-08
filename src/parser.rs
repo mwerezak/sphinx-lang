@@ -347,7 +347,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
         
         // parse iterator expression
-        let iter_expr = self.parse_expr_variant(ctx)?;
+        let iter = self.parse_expr_variant(ctx)?;
         
         let next = self.advance()?;
         ctx.set_end(&next);
@@ -363,7 +363,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         let for_loop = Stmt::ForLoop {
             label,
             lvalue,
-            iter_expr,
+            iter,
             body,
         };
         

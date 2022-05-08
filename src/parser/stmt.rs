@@ -31,7 +31,7 @@ pub enum Stmt {
     ForLoop {
         label: Option<Label>,
         lvalue: LValue,
-        iter_expr: Expr,
+        iter: Expr,
         body: StmtList,
     },
     
