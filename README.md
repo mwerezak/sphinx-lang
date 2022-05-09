@@ -42,8 +42,10 @@ end
 
 # Some fun with tuple assignment
 # declare "c" and "d" as mutable, the rest as immutable, and capture any excess in a tuple
-let a, b, (var c, d), g, rest... = "a", "b", "c", "d", "e", "f", "g")
+let a, b, (var c, d), e, rest... = 1, 2, (3, 4), 5, 6, 7
 c += (d *= 2)
+assert a, b, c, d, e == 1, 2, 11, 8, 5
+assert rest == 6, 7
 
 ```
 
