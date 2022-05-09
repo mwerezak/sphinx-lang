@@ -236,7 +236,7 @@ impl<'c> VMCallFrame<'c> {
             
             OpCode::IterInit => {
                 let iter = stack.peek().iter_init()?;
-                stack.push(*iter.iter());
+                stack.replace(*iter.iter());
                 stack.push(*iter.state());
             }
             

@@ -1222,7 +1222,11 @@ impl CodeGenerator<'_> {
         
         let mut error_jump_sites = Vec::new();
         
-        self.emit_instr(symbol, OpCode::IterInit);  // iterate to yield values
+        // assignment needs to preserve original value for expression result
+        self.emit_instr(symbol, OpCode::Clone);
+        
+        // iterate to yield values
+        self.emit_instr(symbol, OpCode::IterInit);
         
         // process tuple packing assingment
         let mut pack_target = None;
