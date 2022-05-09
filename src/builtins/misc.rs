@@ -1,12 +1,9 @@
 use crate::runtime::Gc;
 use crate::runtime::module::NamespaceEnv;
+use crate::runtime::errors::RuntimeError;
 
 
 pub fn create_misc_builtins(env: Gc<NamespaceEnv>) {
-    
-    let to_str = native_function!(str, env, params(value) => {
-        Ok(Variant::from(value.fmt_str()?))
-    });
     
     let repr = native_function!(repr, env, params(value) => {
         Ok(Variant::from(value.fmt_repr()?))
@@ -37,10 +34,22 @@ pub fn create_misc_builtins(env: Gc<NamespaceEnv>) {
         Ok(Variant::from(names))
     });
     
+    // Prints the signature of a function. Will print an object's docstring if that is ever added.
+    let help = native_function!(help, env, params(object) => {
+        let signature = match object {
+            Variant::Function(fun) => fun.signature().fmt_signature(),
+            Variant::NativeFunction(fun) => fun.signature().fmt_signature(),
+            _ => return Err(RuntimeError::invalid_value("not a function"))
+        };
+        
+        println!("{}", signature);
+        Ok(Variant::Nil)
+    });
+    
     namespace_insert!(env.borrow_mut(), {
         fun _ = globals;
-        fun _ = to_str;
         fun _ = repr;
         fun _ = print;
+        fun _ = help;
     });
 }

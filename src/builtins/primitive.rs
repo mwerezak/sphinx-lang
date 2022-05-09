@@ -74,6 +74,11 @@ pub fn create_primitive_ctors(env: Gc<NamespaceEnv>) {
         Ok(Variant::from(value.as_float()?))
     });
     
+    // convert a value into a string
+    let as_str = native_function!(str, env, params(value) => {
+        Ok(Variant::from(value.fmt_str()?))
+    });
+    
     // marker type constructor
     // let marker = native_function!(marker, env, params(marker) => {
     //     let symbol = marker.as_strval()
@@ -88,6 +93,7 @@ pub fn create_primitive_ctors(env: Gc<NamespaceEnv>) {
         fun _ = as_bits;
         fun _ = as_int;
         fun _ = as_float;
+        fun _ = as_str;
     });
 }
 

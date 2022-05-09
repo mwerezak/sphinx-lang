@@ -1,12 +1,12 @@
 use crate::runtime::Gc;
 use crate::runtime::module::NamespaceEnv;
 
-mod range;
+mod iter;
 mod primitive;
 mod misc;
 
+use iter::create_iter_builtins;
 use primitive::{create_primitive_ctors, create_metamethod_builtins};
-use range::create_range_builtins;
 use misc::create_misc_builtins;
 
 // thread_local! {
@@ -24,7 +24,7 @@ pub fn create_prelude() -> Gc<NamespaceEnv> {
     
     create_metamethod_builtins(env);
     create_primitive_ctors(env);
-    create_range_builtins(env);
+    create_iter_builtins(env);
     create_misc_builtins(env);
     
     env

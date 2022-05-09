@@ -18,9 +18,10 @@ As well, this whole project started as a way to learn Rust, and I have definitel
 
 Sphinx makes use of Rust's [pointer metadata API](https://github.com/rust-lang/rust/issues/81513), which has not yet been stabilized. So in order to build it you will need nightly Rust. Probably if you're here you're interested in looking at the internals of a compiler/VM (since the language itself is pretty WIP), so you probably already know how to set that up, but if you don't, you can get it with `rustup`. 
 
-Once built, you can run the REPL with `sphinx` and the disassembler with `sphinx-dasm`. Both executables have `--help` to list the command line options. Also check out the `--debug` option on `sphinx` which allows you to step through each instruction and view the state of the VM.
+Once built, you can run the REPL with `sphinx` and the disassembler with `sphinx-dasm`. Both executables have `--help` to list the command line options. Also check out the `--debug` option on `sphinx` which allows you to step through each instruction and view the state of the VM. Below is some example code you can run to get started:
 
-Here is some example code you can run to get started:
+If you run the REPL, the `globals()` function will allow you to see what builtins are currently available. There is a `help()` function, though it isn't fully supported yet. Currently it only accepts functions and will print out the function signature.
+
 ```
 # Makes a counter using closures
 fun make_inc()

@@ -50,7 +50,9 @@ impl UserIterator for RangeIter {
     }
 }
 
-pub fn create_range_builtins(env: Gc<NamespaceEnv>) {
+pub fn create_iter_builtins(env: Gc<NamespaceEnv>) {
+    
+    // produces an iterable that yields a succession of integers controlled by start, stop, and step values.
     let range = native_function!(range, env, params(start), defaults(stop = Variant::Nil, step = 1) => {
         let start_value;
         let stop_value;
@@ -70,6 +72,11 @@ pub fn create_range_builtins(env: Gc<NamespaceEnv>) {
         let range_iter = Box::new(RangeIter::new(start_value, stop_value, step_value));
         Ok(Variant::Iterator(Gc::from_box(range_iter)))
     });
+    
+    // yields tuples containg an element from each iterable until the first iterable is exhausted.
+    // let zip = native_function!(zip, env, variadic(iterables) => {
+        
+    // })
     
     namespace_insert!(env.borrow_mut(), {
         fun _ = range;
