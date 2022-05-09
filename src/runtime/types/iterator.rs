@@ -31,8 +31,50 @@ use crate::runtime::errors::{ExecResult};
 */
 
 pub struct IterState {
-    pub iter: Variant,
-    pub state: Variant,
+    iter: Variant,
+    state: Variant,
+}
+
+unsafe impl GcTrace for IterState {
+    fn trace(&self) {
+        self.iter.trace();
+        self.state.trace();
+    }
+}
+
+impl IterState {
+    pub fn new(iter: Variant, state: Variant) -> Self {
+        Self { iter, state }
+    }
+    
+    pub fn iter(&self) -> &Variant { &self.iter }
+    pub fn state(&self) -> &Variant { &self.state }
+    
+    // Helpers
+    pub fn has_value(&self) -> ExecResult<bool> {
+        self.state.as_bool()
+    }
+    
+    pub fn get_value(&self) -> ExecResult<Variant> {
+        self.iter.iter_get(&self.state)
+    }
+    
+    pub fn next_state(&self) -> ExecResult<Variant> {
+        self.iter.iter_next(&self.state)
+    }
+    
+    pub fn next(&self) -> ExecResult<IterState> {
+        Ok(Self {
+            iter: self.iter,
+            state: self.next_state()?,
+        })
+    }
+    
+    // go to the next state *in place*
+    pub fn advance(&mut self) -> ExecResult<()> {
+        self.state = self.iter.iter_next(&self.state)?;
+        Ok(())
+    }
 }
 
 /// Similar use case as UserData but a bit more limited in scope

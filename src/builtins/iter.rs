@@ -1,11 +1,12 @@
+use core::cell::RefCell;
 use crate::language::IntType;
 use crate::runtime::{Gc, Variant};
 use crate::runtime::gc::GcTrace;
 use crate::runtime::module::NamespaceEnv;
-use crate::runtime::types::UserIterator;
+use crate::runtime::types::{UserIterator, IterState};
 use crate::runtime::errors::{RuntimeError, ExecResult};
 
-#[derive(Debug)]
+
 struct RangeIter {
     start: IntType,
     stop: IntType,
@@ -14,12 +15,6 @@ struct RangeIter {
 
 unsafe impl GcTrace for RangeIter {
     fn trace(&self) { }
-}
-
-impl RangeIter {
-    fn new(start: IntType, stop: IntType, step: IntType) -> Self {
-        Self { start, stop, step }
-    }
 }
 
 impl UserIterator for RangeIter {
@@ -69,7 +64,11 @@ pub fn create_iter_builtins(env: Gc<NamespaceEnv>) {
             return Err(RuntimeError::invalid_value("step cannot be zero"));
         }
         
-        let range_iter = Box::new(RangeIter::new(start_value, stop_value, step_value));
+        let range_iter = Box::new(RangeIter {
+            start: start_value,
+            stop: stop_value,
+            step: step_value,
+        });
         Ok(Variant::Iterator(Gc::from_box(range_iter)))
     });
     

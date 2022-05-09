@@ -111,7 +111,7 @@ pub fn create_metamethod_builtins(env: Gc<NamespaceEnv>) {
     
     // produces a tuple (item, next_state) for a given iterator state
     let next = native_function!(next, env, params(value), defaults(state = Variant::Nil) => {
-        let result = vec![
+        let result = vec![ 
             value.iter_get(state)?,
             value.iter_next(state)?,
         ];
@@ -124,8 +124,8 @@ pub fn create_metamethod_builtins(env: Gc<NamespaceEnv>) {
         let iter = value.iter_init()?;
         
         let result = vec![
-            iter.iter,
-            iter.state,
+            *iter.iter(),
+            *iter.state(),
         ];
         
         Ok(Variant::from(result.into_boxed_slice()))

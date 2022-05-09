@@ -6,7 +6,6 @@ use crate::runtime::gc::Gc;
 use crate::runtime::function::{Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{ConstID, FunctionID, FunctionProto};
-use crate::runtime::types::IterState;
 use crate::runtime::errors::{ExecResult, RuntimeError};
 use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control, VMCallFrame, SYSTEM_ARGS};
 
@@ -199,10 +198,10 @@ impl<'c> VMCallFrame<'c> {
                 let frame = stack.len() - call_locals;
                 stack.swap_last(frame + 1);
                 
-                let IterState { iter, mut state } = unpack.iter_init()?;
-                while state.as_bool()? {
-                    stack.push(iter.iter_get(&state)?);
-                    state = iter.iter_next(&state)?;
+                let mut iter = unpack.iter_init()?;
+                while iter.has_value()? {
+                    stack.push(iter.get_value()?);
+                    iter.advance()?;
                     nargs += 1;
                 }
                 
@@ -236,9 +235,9 @@ impl<'c> VMCallFrame<'c> {
             }
             
             OpCode::IterInit => {
-                let IterState { iter, state } = stack.peek().iter_init()?;
-                stack.push(iter);
-                stack.push(state);
+                let iter = stack.peek().iter_init()?;
+                stack.push(*iter.iter());
+                stack.push(*iter.state());
             }
             
             OpCode::IterNext => {
