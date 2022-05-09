@@ -45,6 +45,54 @@ impl UserIterator for RangeIter {
     }
 }
 
+
+struct ZipIter {
+    iters: RefCell<Box<[IterState]>>
+}
+
+unsafe impl GcTrace for ZipIter {
+    fn trace(&self) {
+        self.iters.borrow()
+            .iter().for_each(IterState::trace);
+    }
+}
+
+impl ZipIter {
+    fn new<'a>(iterables: impl Iterator<Item=&'a Variant>) -> ExecResult<Self> {
+        let iters = iterables.map(|seq| seq.iter_init())
+            .collect::<Result<Vec<IterState>,_>>()?
+            .into_boxed_slice();
+        
+        Ok(Self { iters: RefCell::new(iters) })
+    }
+}
+
+impl UserIterator for ZipIter {
+    fn next_state(&self, state: Option<&Variant>) -> ExecResult<Variant> {
+        let mut iters = self.iters.borrow_mut();
+        
+        // already initialized all of the iters in new()
+        if state.is_some() {
+            iters.iter_mut().try_for_each(IterState::advance)?;
+        }
+        
+        for iter in iters.iter() {
+            if !iter.has_value()? {
+                return Ok(Variant::BoolFalse);
+            }
+        }
+        Ok(Variant::BoolTrue)
+    }
+    
+    fn get_item(&self, _: &Variant) -> ExecResult<Variant> {
+        let mut item = Vec::new();
+        for iter in self.iters.borrow().iter() {
+            item.push(iter.get_value()?);
+        }
+        Ok(Variant::from(item.into_boxed_slice()))
+    }
+}
+
 pub fn create_iter_builtins(env: Gc<NamespaceEnv>) {
     
     // produces an iterable that yields a succession of integers controlled by start, stop, and step values.
@@ -73,11 +121,13 @@ pub fn create_iter_builtins(env: Gc<NamespaceEnv>) {
     });
     
     // yields tuples containg an element from each iterable until the first iterable is exhausted.
-    // let zip = native_function!(zip, env, variadic(iterables) => {
-        
-    // })
+    let zip = native_function!(zip, env, variadic(iterables) => {
+        let iter = Box::new(ZipIter::new(iterables.iter())?);
+        Ok(Variant::Iterator(Gc::from_box(iter)))
+    });
     
     namespace_insert!(env.borrow_mut(), {
         fun _ = range;
+        fun _ = zip;
     });
 }
