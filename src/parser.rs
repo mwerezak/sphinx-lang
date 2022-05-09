@@ -267,8 +267,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             // expression statements
             _ => match self.parse_expr_variant(ctx)? {
-                
-                Expr::Ellipsis(..) => 
+                Expr::Ellipsis(..) =>
                     return Err("\"...\" is not allowed here".into()),
                 
                 expr => Stmt::Expression(expr)
@@ -796,11 +795,6 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             Token::Label(..) => self.parse_expr_label(ctx)?,
             
             // Token::OpenBrace => Ok(ExprMeta::ObjectCtor(self.parse_object_constructor(ctx)?)),
-            
-            Token::Echo => {
-                ctx.set_start(&self.advance().unwrap());
-                Expr::Echo(Box::new(self.parse_expr_variant(ctx)?))
-            },
             
             _ => self.parse_unpack_expr(ctx)?,
         };

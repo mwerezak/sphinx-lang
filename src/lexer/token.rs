@@ -37,7 +37,7 @@ pub enum Token {
     Continue, Break, Return,
     Fun, Class,
     // Self_, Super,
-    Echo, Assert,
+    Assert,
     End,
     
     // Literals

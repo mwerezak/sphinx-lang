@@ -39,7 +39,6 @@ pub enum Expr {
     
     // ClassDef
     
-    Echo(Box<Expr>),
 }
 
 

@@ -834,11 +834,6 @@ impl CodeGenerator<'_> {
             Expr::IfExpr { branches, else_clause } => self.compile_if_expression(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
             
             Expr::FunctionDef(fundef) => self.compile_function_def(symbol, fundef)?,
-            
-            Expr::Echo(expr) => {
-                self.compile_expr(symbol, expr)?;
-                self.emit_instr(symbol, OpCode::Inspect);
-            },
         }
         Ok(())
     }
@@ -1138,13 +1133,6 @@ impl CodeGenerator<'_> {
         
         Ok(())
     }
-    
-    // fn compile_decl_tuple(&mut self, symbol: Option<&DebugSymbol>, access: Access, targets: &[LValue]) -> CompileResult<()> {
-    //     self.compile_tuple_unpack(
-    //         symbol, targets, 
-    //         |self_, target| self_.compile_declaration(symbol, access, target)
-    //     )
-    // }
     
     fn compile_assign_variable(&mut self, symbol: Option<&DebugSymbol>, lhs: &LValue, allow_nonlocal: bool) -> CompileResult<()> {
         
