@@ -828,7 +828,10 @@ impl CodeGenerator<'_> {
             
             Expr::Tuple(items) => self.compile_tuple(symbol, items)?,
             
-            Expr::Ellipsis(..) => return Err("\"...\" is not allowed here".into()),
+            // unpacking is only allowed in invocation, tuple literals, and by itself in parentheses
+            // note: assignment uses *packing*, not unpacking, which is the LValue dual of packing.
+            Expr::Ellipsis(Some(..)) => return Err("unpack expression must be enclosed in parentheses".into()),
+            Expr::Ellipsis(None) => return Err("\"...\" is not allowed here".into()),
             
             Expr::Block { label, suite } => self.compile_block_expression(symbol, label.as_ref(), suite)?,
             Expr::IfExpr { branches, else_clause } => self.compile_if_expression(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
@@ -838,15 +841,59 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, expr_list: &[ExprMeta]) -> CompileResult<()> {
-        let len = u8::try_from(expr_list.len())
-            .map_err(|_| "tuple length limit exceeded")?;
+    fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, mut expr_list: &[ExprMeta]) -> CompileResult<()> {
+        // process element unpacking
+        let mut unpack = None;
+        if let Some((last, rest)) = expr_list.split_last() {
+            let (expr, symbol) = last.clone().take();
+            match expr {
+                Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
+                
+                Expr::Ellipsis(Some(inner)) => {
+                    expr_list = rest;
+                    unpack.replace(ExprMeta::new(*inner, symbol));
+                }
+                
+                _ => { }
+            }
+            
+            if expr_list.iter().any(|arg| matches!(arg.variant(), Expr::Ellipsis(..))) {
+                return Err("\"...\" can only be used to unpack the last element".into());
+            }
+        }
         
         for expr in expr_list.iter() {
             self.compile_expr_with_symbol(expr)?;
         }
         
-        self.emit_instr_byte(symbol, OpCode::Tuple, len);
+        let len = u8::try_from(expr_list.len())
+            .map_err(|_| "tuple literal length limit exceeded")?;
+        
+        if let Some(unpack) = unpack {
+            self.compile_expr_with_symbol(&unpack)?;
+            self.emit_instr(symbol, OpCode::IterInit);
+            self.emit_instr(symbol, OpCode::IterUnpack);
+            
+            if len > 0 {
+                self.emit_instr_byte(symbol, OpCode::UInt8, len);
+                self.emit_instr(symbol, OpCode::Add);
+            }
+            
+            self.emit_instr(symbol, OpCode::TupleN);
+        } else if len > 0 {
+            self.emit_instr_byte(symbol, OpCode::Tuple, len);
+        } else {
+            self.emit_instr(symbol, OpCode::Empty);
+        }
+
+        Ok(())
+    }
+    
+    fn compile_unpack(&mut self, symbol: Option<&DebugSymbol>, iter: &Expr) -> CompileResult<()> {
+        self.compile_expr(symbol, iter)?;
+        self.emit_instr(symbol, OpCode::IterInit);
+        self.emit_instr(symbol, OpCode::IterUnpack);
+        self.emit_instr(symbol, OpCode::TupleN);
         Ok(())
     }
     
@@ -871,7 +918,13 @@ impl CodeGenerator<'_> {
                 if let Some(modifier) = modifier {
                     return Err("assignment modifier is not allowed here".into())
                 }
-                self.compile_expr(symbol, inner)?
+                
+                match &**inner {
+                    Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
+                    Expr::Ellipsis(Some(expr)) => self.compile_unpack(symbol, expr)?,
+                    expr => self.compile_expr(symbol, inner)?
+                }
+                
             },
         }
         Ok(())

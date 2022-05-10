@@ -105,7 +105,7 @@ contexts:
       scope: keyword.operator.bitwise keyword.operator.assignment
     - match: \=
       scope: keyword.operator.assignment
-    - match: \@
+    - match: \@|\.\.\.
       scope: keyword.operator
 
   strings:
@@ -213,9 +213,6 @@ contexts:
       pop: true
     - match: \,
       scope: punctuation.separator
-      # unpacking operator
-    - match: \.\.\.
-      scope: keyword.operator
     - include: expressions
 
   blocks:
