@@ -1,0 +1,6 @@
+
+let iters = range(0, 12), range(4, 16), range(8, 20)
+
+let zip_unzip... = zip(zip(iters...)...)
+
+assert zip_unzip == (range(0, 12)...), (range(4, 16)...), (range(8, 20)...)

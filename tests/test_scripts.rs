@@ -94,6 +94,13 @@ mod for_tests {
     test_script!(continue_, "tests/for/continue.sph");
 }
 
+
+mod iterator_tests {
+    use super::*;
+    
+    test_script!(zip_unzip, "tests/iterators/zip_unzip.sph");
+}
+
 mod variable_tests {
     use super::*;
     
