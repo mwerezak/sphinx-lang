@@ -19,7 +19,7 @@ pub enum LValue {
     Attribute(Box<AttributeTarget>), // receiver, attribute name
     Index(Box<IndexTarget>), // receiver, index expression
     Tuple(Box<[LValue]>),
-    PackItem(Option<Box<LValue>>),
+    Pack(Option<Box<LValue>>),
     
     Modifier {
         modifier: AssignType,
@@ -114,11 +114,11 @@ impl TryFrom<Expr> for LValue {
             
             Expr::Primary(primary) => primary.try_into(),
             
-            Expr::Ellipsis(Some(expr)) => {
+            Expr::Unpack(Some(expr)) => {
                 let inner = LValue::try_from(*expr)?;
-                Ok(Self::PackItem(Some(Box::new(inner))))
+                Ok(Self::Pack(Some(Box::new(inner))))
             }
-            Expr::Ellipsis(None) => Ok(Self::PackItem(None)),
+            Expr::Unpack(None) => Ok(Self::Pack(None)),
             
             Expr::Tuple(items) if !items.is_empty() => {
                 let mut lvalue_items = Vec::new();

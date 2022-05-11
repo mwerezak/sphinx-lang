@@ -267,7 +267,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             // expression statements
             _ => match self.parse_expr_variant(ctx)? {
-                Expr::Ellipsis(None) =>
+                Expr::Unpack(None) =>
                     return Err("\"...\" is not allowed here".into()),
                 expr => Stmt::Expression(expr)
             }
@@ -805,7 +805,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         let next = self.peek()?;
         if matches!(next.token, Token::Ellipsis) {
             ctx.set_end(&self.advance().unwrap());
-            return Ok(Expr::Ellipsis(None));
+            return Ok(Expr::Unpack(None));
         }
         
         let expr = self.parse_primary(ctx)?;
@@ -816,10 +816,10 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             // Having multiple "..."s next to each other is really bad for readability
             // So require that they are separated by parens, e.g. (((foo...)...)...)
-            if matches!(expr, Expr::Ellipsis(..)) {
+            if matches!(expr, Expr::Unpack(..)) {
                 return Err("nested use of \"...\" must be enclosed in parentheses".into());
             }
-            return Ok(Expr::Ellipsis(Some(Box::new(expr))));
+            return Ok(Expr::Unpack(Some(Box::new(expr))));
         }
         
         Ok(expr)

@@ -855,8 +855,8 @@ impl CodeGenerator<'_> {
             
             // unpacking is only allowed in invocation, tuple literals, and by itself in parentheses
             // note: assignment uses *packing*, not unpacking, which is the LValue dual of packing.
-            Expr::Ellipsis(Some(..)) => return Err("unpack expression must be enclosed in parentheses".into()),
-            Expr::Ellipsis(None) => return Err("\"...\" is not allowed here".into()),
+            Expr::Unpack(Some(..)) => return Err("unpack expression must be enclosed in parentheses".into()),
+            Expr::Unpack(None) => return Err("\"...\" is not allowed here".into()),
             
             Expr::Block { label, suite } => self.compile_block_expression(symbol, label.as_ref(), suite)?,
             Expr::IfExpr { branches, else_clause } => self.compile_if_expression(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
@@ -899,9 +899,9 @@ impl CodeGenerator<'_> {
         
         for expr in rest.iter() {
             match expr.variant() {
-                Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
+                Expr::Unpack(None) => return Err("need a value to unpack".into()),
                 
-                Expr::Ellipsis(Some(unpack)) => {
+                Expr::Unpack(Some(unpack)) => {
                     let symbol = Some(expr.debug_symbol());
                     
                     self.compile_expr(symbol, unpack)?;
@@ -932,9 +932,9 @@ impl CodeGenerator<'_> {
         // if the last item is an unpack expression, it does not need to use the local accumulator
         // TODO should there be a dedicated accumulator register?
         match last.variant() {
-            Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
+            Expr::Unpack(None) => return Err("need a value to unpack".into()),
             
-            Expr::Ellipsis(Some(unpack)) => {
+            Expr::Unpack(Some(unpack)) => {
                 let symbol = Some(last.debug_symbol());
                 
                 self.compile_expr(symbol, unpack)?;
@@ -1004,8 +1004,8 @@ impl CodeGenerator<'_> {
                 }
                 
                 match &**inner {
-                    Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
-                    Expr::Ellipsis(Some(expr)) => self.compile_unpack(symbol, expr)?,
+                    Expr::Unpack(None) => return Err("need a value to unpack".into()),
+                    Expr::Unpack(Some(expr)) => self.compile_unpack(symbol, expr)?,
                     expr => self.compile_expr(symbol, inner)?
                 }
                 
@@ -1075,9 +1075,9 @@ impl CodeGenerator<'_> {
         if let Some((last, rest)) = args.split_last() {
             let (expr, symbol) = last.clone().take();
             match expr {
-                Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
+                Expr::Unpack(None) => return Err("need a value to unpack".into()),
                 
-                Expr::Ellipsis(Some(inner)) => {
+                Expr::Unpack(Some(inner)) => {
                     args = rest;
                     unpack.replace(ExprMeta::new(*inner, symbol));
                 }
@@ -1085,7 +1085,7 @@ impl CodeGenerator<'_> {
                 _ => { }
             }
             
-            if args.iter().any(|arg| matches!(arg.variant(), Expr::Ellipsis(..))) {
+            if args.iter().any(|arg| matches!(arg.variant(), Expr::Unpack(..))) {
                 return Err("\"...\" can only be used to unpack the last argument".into());
             }
         }
@@ -1200,7 +1200,7 @@ impl CodeGenerator<'_> {
             
             LValue::Index(target) => unimplemented!(),
             
-            LValue::Tuple {..} | LValue::PackItem(..)
+            LValue::Tuple {..} | LValue::Pack(..)
                 => Err("can't update-assign to this".into()),
             
             LValue::Modifier {..} => unreachable!(),
@@ -1217,7 +1217,7 @@ impl CodeGenerator<'_> {
         match lhs {
             LValue::Tuple(items) => self.compile_assign_tuple(symbol, assign, items),
             
-            LValue::PackItem(..) => {
+            LValue::Pack(..) => {
                 let item = std::slice::from_ref(lhs);
                 self.compile_assign_tuple(symbol, assign, item)
             }
@@ -1356,7 +1356,7 @@ impl CodeGenerator<'_> {
         // process tuple packing assingment
         let mut pack_target = None;
         
-        if let Some((LValue::PackItem(pack_item), rest)) = item_targets.split_last() {
+        if let Some((LValue::Pack(pack_item), rest)) = item_targets.split_last() {
             pack_target.replace(pack_item);
             item_targets = rest;
         }
@@ -1364,7 +1364,7 @@ impl CodeGenerator<'_> {
         // compile to unrolled iteration
         for (idx, target) in item_targets.iter().enumerate() {
             
-            if matches!(target, LValue::PackItem(..)) {
+            if matches!(target, LValue::Pack(..)) {
                 return Err("\"...\" can only be used with the last item in tuple assignment".into());
             }
             
