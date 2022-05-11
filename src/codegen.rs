@@ -479,15 +479,18 @@ impl CodeGenerator<'_> {
     // If the local name cannot be found, no instructions are emitted and None is returned
     fn try_emit_load_local(&mut self, symbol: Option<&DebugSymbol>, name: &LocalName) -> Option<u16> {
         if let Some(index) = self.scopes().resolve_local(name).map(|local| local.index()) {
-            if let Ok(index) = u8::try_from(index) {
-                self.emit_instr_byte(symbol, OpCode::LoadLocal, index);
-            } else {
-                self.emit_instr_data(symbol, OpCode::LoadLocal16, &index.to_le_bytes());
-            }
-            
+            self.emit_load_local_index(symbol, index);
             Some(index)
         } else{
             None
+        }
+    }
+    
+    fn emit_load_local_index(&mut self, symbol: Option<&DebugSymbol>, index: LocalIndex) {
+        if let Ok(index) = u8::try_from(index) {
+            self.emit_instr_byte(symbol, OpCode::LoadLocal, index);
+        } else {
+            self.emit_instr_data(symbol, OpCode::LoadLocal16, &index.to_le_bytes());
         }
     }
     
@@ -510,6 +513,20 @@ impl CodeGenerator<'_> {
             self.emit_instr_byte(symbol, OpCode::CloseUpvalue, index);
         } else {
             self.emit_instr_data(symbol, OpCode::CloseUpvalue16, &index.to_le_bytes());
+        }
+    }
+    
+    fn emit_create_temporary(&mut self, symbol: Option<&DebugSymbol>, access: Access) -> CompileResult<LocalIndex> {
+        match self.scopes_mut().insert_local(access, LocalName::Anonymous)? {
+            InsertLocal::CreateNew(local_index) => {
+                self.emit_instr(symbol, OpCode::InsertLocal);
+                Ok(local_index)
+            }
+            
+            InsertLocal::HideExisting(local_index) => {
+                self.emit_assign_local(symbol, local_index);
+                Ok(local_index)
+            }
         }
     }
 }
@@ -797,6 +814,14 @@ impl CodeGenerator<'_> {
 }
 
 ///////// Expressions /////////
+
+// helper to indicate if the length of a sequence is statically known or if it is stored in a local
+enum Unpack {
+    Empty,
+    Static(IntType),
+    Dynamic,
+}
+
 impl CodeGenerator<'_> {
     fn compile_expr_with_symbol(&mut self, expr: &ExprMeta) -> CompileResult<()> {
         let symbol = expr.debug_symbol();
@@ -841,52 +866,107 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, mut expr_list: &[ExprMeta]) -> CompileResult<()> {
-        // process element unpacking
-        let mut unpack = None;
-        if let Some((last, rest)) = expr_list.split_last() {
-            let (expr, symbol) = last.clone().take();
-            match expr {
+    fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, expr_list: &[ExprMeta]) -> CompileResult<()> {
+        match self.compile_unpack_sequence(symbol, expr_list)? {
+            Unpack::Empty => self.emit_instr(symbol, OpCode::Empty),
+            
+            Unpack::Static(len) => {
+                if let Ok(len) = u8::try_from(len) {
+                    self.emit_instr_byte(symbol, OpCode::Tuple, len);
+                } else {
+                    self.compile_integer(symbol, len)?;
+                    self.emit_instr(symbol, OpCode::TupleN);
+                }
+            }
+            
+            Unpack::Dynamic => {
+                self.emit_instr(symbol, OpCode::TupleN);
+            }
+        }
+        Ok(())
+    }
+    
+    // compiles to a sequence of values
+    fn compile_unpack_sequence(&mut self, symbol: Option<&DebugSymbol>, seq: &[ExprMeta]) -> CompileResult<Unpack> {
+        if seq.is_empty() {
+            return Ok(Unpack::Empty)
+        }
+        
+        let (last, rest) = seq.split_last().unwrap();
+        
+        let mut static_len: IntType = 0;
+        let mut unpack_len = None; // accumulate length in an anonymous temporary if needed
+        
+        for expr in rest.iter() {
+            match expr.variant() {
                 Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
                 
-                Expr::Ellipsis(Some(inner)) => {
-                    expr_list = rest;
-                    unpack.replace(ExprMeta::new(*inner, symbol));
+                Expr::Ellipsis(Some(unpack)) => {
+                    self.compile_expr(symbol, unpack)?;
+                    self.emit_instr(symbol, OpCode::IterInit);
+                    self.emit_instr(symbol, OpCode::IterUnpack);
+                    
+                    // store unpack len in accumulator
+                    if let Some(local_index) = unpack_len {
+                        self.emit_load_local_index(symbol, local_index);
+                        self.emit_instr(symbol, OpCode::Add);
+                        self.emit_assign_local(symbol, local_index);
+                    } else {
+                        let local_index = self.emit_create_temporary(symbol, Access::ReadWrite)?;
+                        unpack_len = Some(local_index);
+                    }
+                    
+                    self.emit_instr(symbol, OpCode::Pop);
                 }
                 
-                _ => { }
-            }
-            
-            if expr_list.iter().any(|arg| matches!(arg.variant(), Expr::Ellipsis(..))) {
-                return Err("\"...\" can only be used to unpack the last element".into());
+                _ => {
+                    self.compile_expr_with_symbol(expr)?;
+                    static_len = static_len.checked_add(1)
+                        .ok_or("unpack length limit exceeded")?;
+                }
             }
         }
         
-        for expr in expr_list.iter() {
-            self.compile_expr_with_symbol(expr)?;
+        // if the last item is an unpack expression, it does not need to use the local accumulator
+        // TODO should there be a dedicated accumulator register?
+        match last.variant() {
+            Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
+            
+            Expr::Ellipsis(Some(unpack)) => {
+                self.compile_expr(symbol, unpack)?;
+                self.emit_instr(symbol, OpCode::IterInit);
+                self.emit_instr(symbol, OpCode::IterUnpack);
+                
+                if let Some(local_index) = unpack_len {
+                    self.emit_load_local_index(symbol, local_index);
+                    self.emit_instr(symbol, OpCode::Add);
+                }
+                
+                if static_len > 0 {
+                    self.compile_integer(symbol, static_len)?;
+                    self.emit_instr(symbol, OpCode::Add);
+                }
+                
+                return Ok(Unpack::Dynamic);
+            }
+            
+            _ => {
+                self.compile_expr_with_symbol(last)?;
+                static_len = static_len.checked_add(1)
+                    .ok_or("unpack length limit exceeded")?;
+            }
         }
         
-        let len = u8::try_from(expr_list.len())
-            .map_err(|_| "tuple literal length limit exceeded")?;
-        
-        if let Some(unpack) = unpack {
-            self.compile_expr_with_symbol(&unpack)?;
-            self.emit_instr(symbol, OpCode::IterInit);
-            self.emit_instr(symbol, OpCode::IterUnpack);
-            
-            if len > 0 {
-                self.emit_instr_byte(symbol, OpCode::UInt8, len);
+        if let Some(local_index) = unpack_len {
+            self.emit_load_local_index(symbol, local_index);
+            if static_len > 0 {
+                self.compile_integer(symbol, static_len)?;
                 self.emit_instr(symbol, OpCode::Add);
             }
             
-            self.emit_instr(symbol, OpCode::TupleN);
-        } else if len > 0 {
-            self.emit_instr_byte(symbol, OpCode::Tuple, len);
-        } else {
-            self.emit_instr(symbol, OpCode::Empty);
+            return Ok(Unpack::Dynamic)
         }
-
-        Ok(())
+        Ok(Unpack::Static(static_len))
     }
     
     fn compile_unpack(&mut self, symbol: Option<&DebugSymbol>, iter: &Expr) -> CompileResult<()> {
@@ -1177,7 +1257,7 @@ impl CodeGenerator<'_> {
     fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, access: Access, name: InternSymbol) -> CompileResult<()> {
         
         match self.scopes_mut().insert_local(access, LocalName::Symbol(name))? {
-            InsertLocal::CreateNew => 
+            InsertLocal::CreateNew(..) => 
                 self.emit_instr(symbol, OpCode::InsertLocal),
             
             InsertLocal::HideExisting(local_index) =>
