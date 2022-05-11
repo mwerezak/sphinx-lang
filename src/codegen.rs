@@ -902,6 +902,8 @@ impl CodeGenerator<'_> {
                 Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
                 
                 Expr::Ellipsis(Some(unpack)) => {
+                    let symbol = Some(expr.debug_symbol());
+                    
                     self.compile_expr(symbol, unpack)?;
                     self.emit_instr(symbol, OpCode::IterInit);
                     self.emit_instr(symbol, OpCode::IterUnpack);
@@ -933,6 +935,8 @@ impl CodeGenerator<'_> {
             Expr::Ellipsis(None) => return Err("need a value to unpack".into()),
             
             Expr::Ellipsis(Some(unpack)) => {
+                let symbol = Some(last.debug_symbol());
+                
                 self.compile_expr(symbol, unpack)?;
                 self.emit_instr(symbol, OpCode::IterInit);
                 self.emit_instr(symbol, OpCode::IterUnpack);
