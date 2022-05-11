@@ -10,11 +10,11 @@ assert a == 1
 assert b == "a"
 assert c == "b"
 assert d == ("c",)
-assert e == 2, 3
+assert e == (2, 3)
 
 
 let a = "a","b","c"
 let b = true, false, true
 let c = 7,8,9
 let s = (1,2,c..., 3, b..., 4,5, a...)
-assert s == 1,2,7,8,9,3,true,false,true,4,5,"a","b","c"
+assert s == (1,2,7,8,9,3,true,false,true,4,5,"a","b","c")
