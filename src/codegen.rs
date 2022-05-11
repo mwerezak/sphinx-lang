@@ -972,15 +972,7 @@ impl CodeGenerator<'_> {
         }
         Ok(Unpack::Static(static_len))
     }
-    
-    fn compile_unpack(&mut self, symbol: Option<&DebugSymbol>, iter: &Expr) -> CompileResult<()> {
-        self.compile_expr(symbol, iter)?;
-        self.emit_instr(symbol, OpCode::IterInit);
-        self.emit_instr(symbol, OpCode::IterUnpack);
-        self.emit_instr(symbol, OpCode::TupleN);
-        Ok(())
-    }
-    
+
     fn compile_atom(&mut self, symbol: Option<&DebugSymbol>, atom: &Atom) -> CompileResult<()> {
         match atom {
             Atom::Nil => self.emit_instr(symbol, OpCode::Nil),
@@ -1004,9 +996,17 @@ impl CodeGenerator<'_> {
                 }
                 
                 match &**inner {
+                    // tuple constructor
                     Expr::Unpack(None) => return Err("need a value to unpack".into()),
-                    Expr::Unpack(Some(expr)) => self.compile_unpack(symbol, expr)?,
-                    expr => self.compile_expr(symbol, inner)?
+                    Expr::Unpack(Some(iter)) => {
+                        self.compile_expr(symbol, iter)?;
+                        self.emit_instr(symbol, OpCode::IterInit);
+                        self.emit_instr(symbol, OpCode::IterUnpack);
+                        self.emit_instr(symbol, OpCode::TupleN);
+                    }
+                    
+                    // parenthesized group
+                    expr => self.compile_expr(symbol, inner)?,
                 }
                 
             },
@@ -1064,56 +1064,20 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, mut args: &[ExprMeta]) -> CompileResult<()> {
+    fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, args: &[ExprMeta]) -> CompileResult<()> {
         // prepare argument list:
-        // [ callobj arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
+        // [ callobj nil arg[0] ... arg[n] nargs ] => [ ret_value ] 
 
-        let arg_len;
-        let mut unpack = None;
-        
+        self.emit_instr(symbol, OpCode::Nil);
+
         // process argument unpacking
-        if let Some((last, rest)) = args.split_last() {
-            let (expr, symbol) = last.clone().take();
-            match expr {
-                Expr::Unpack(None) => return Err("need a value to unpack".into()),
-                
-                Expr::Unpack(Some(inner)) => {
-                    args = rest;
-                    unpack.replace(ExprMeta::new(*inner, symbol));
-                }
-                
-                _ => { }
-            }
-            
-            if args.iter().any(|arg| matches!(arg.variant(), Expr::Unpack(..))) {
-                return Err("\"...\" can only be used to unpack the last argument".into());
-            }
+        match self.compile_unpack_sequence(symbol, args)? {
+            Unpack::Empty => self.emit_instr_byte(symbol, OpCode::UInt8, 0),
+            Unpack::Static(len) => self.compile_integer(symbol, len)?,
+            Unpack::Dynamic => { } // nothing to do
         }
-        
-        // compile arguments
-        if let Some((arg_last, args_rest)) = args.split_last() {
-            
-            self.compile_expr_with_symbol(arg_last)?;
-            for arg_expr in args_rest.iter() {
-                self.compile_expr_with_symbol(arg_expr)?;
-            }
-            
-            arg_len = u8::try_from(args.len())
-                .map_err(|_| "argument count limit exceeded")?;
-            
-        } else {
-            
-            arg_len = 0;
-        }
-        
-        self.emit_instr_byte(symbol, OpCode::UInt8, arg_len);
-        
-        if let Some(seq_expr) = unpack {
-            self.compile_expr_with_symbol(&seq_expr)?;
-            self.emit_instr(symbol, OpCode::CallUnpack);
-        } else {
-            self.emit_instr(symbol, OpCode::Call);
-        }
+
+        self.emit_instr(symbol, OpCode::Call);
 
         Ok(())
     }

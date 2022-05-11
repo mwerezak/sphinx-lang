@@ -173,49 +173,19 @@ impl<'c> VMCallFrame<'c> {
             },
             
             OpCode::Call => {
-                let nargs = into_usize(*stack.peek());
-                let call_locals = SYSTEM_ARGS + nargs;
-                let frame = stack.len() - call_locals;
-                stack.swap_last(frame + 1);
+                // read nargs and identify the start of the call frame
+                let nargs_value = stack.pop();
+                let nargs = into_usize(nargs_value);
+                let frame_len = SYSTEM_ARGS + nargs;
+                let frame = stack.len() - frame_len;
+                
+                // write nargs back into the frame at the correct location
+                stack.replace_at(frame + 1, nargs_value);
                 
                 let callee = stack.peek_at(frame);
                 let args = stack.peek_many(nargs);
                 
                 let call = CallInfo {
-                    // nargs,
-                    frame,
-                    call: callee.invoke(args)?,
-                    site: self.get_trace(current_offset),
-                };
-                return Ok(Control::Call(call))
-            },
-            
-            OpCode::CallUnpack => {
-                let unpack = stack.pop();
-                
-                let mut nargs = into_usize(*stack.peek());
-                let call_locals = SYSTEM_ARGS + nargs;
-                let frame = stack.len() - call_locals;
-                stack.swap_last(frame + 1);
-                
-                let mut iter = unpack.iter_init()?;
-                while iter.has_value()? {
-                    stack.push(iter.get_value()?);
-                    iter.advance()?;
-                    nargs += 1;
-                }
-                
-                // write nargs
-                stack.replace_at(frame + 1, {
-                    let nargs = IntType::try_from(nargs)
-                        .map_err(|_| RuntimeError::overflow_error())?;
-                    nargs.into()
-                });
-                
-                let callee = stack.peek_at(frame);
-                let args = stack.peek_many(nargs);
-                let call = CallInfo {
-                    // nargs,
                     frame,
                     call: callee.invoke(args)?,
                     site: self.get_trace(current_offset),

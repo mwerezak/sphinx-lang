@@ -20,18 +20,8 @@ const OP_ERROR:            u8 = 0x02;  // [ error ] => !
 
 const OP_RETURN:           u8 = 0x08;  // [ ...call frame... ret_value ] => [ ret_value ]
 
-// The odd argument order is because the VM will swap "nargs" with "arg[n]" after reading "nargs".
-// This is because the function preamble will fill in any missing default arguments such that the
-// full argument list is always the same, and can be reasoned about at compile-time from the static signature.
-// This wouldn't be possible if nargs was in some arbitrary location in the middle of the argument list,
-// so swapping it to the beginning is the most efficient way to handle this.
-
-// [ callee arg[n] arg[0] ... arg[n-1] nargs ] => [ ret_value ] 
+// [ callee nil arg[0] ... arg[n] nargs ] => [ ret_value ] 
 const OP_CALL:             u8 = 0x09;
-
-// This instruction is needed because when unpacking, the final nargs value needs to be updated dynamically as we iterate.
-// [ callee arg[n] arg[0] ... arg[n-1] nargs arg_unpack ] => [ ret_value ]  -- nargs does not include arg_unpack! 
-const OP_CALL_UNPACK:      u8 = 0x0A;
 
 // 0x10-17        Immediate Values
 
@@ -152,7 +142,6 @@ pub enum OpCode {
     
     Return = OP_RETURN, 
     Call = OP_CALL,
-    CallUnpack = OP_CALL_UNPACK,
     
     Pop = OP_POP,
     Drop = OP_DROP,
@@ -248,7 +237,6 @@ impl OpCode {
             
             OP_RETURN => Self::Return,
             OP_CALL => Self::Call,
-            OP_CALL_UNPACK => Self::CallUnpack,
             
             OP_POP => Self::Pop,
             OP_DROP => Self::Drop,
@@ -409,7 +397,6 @@ impl core::fmt::Display for OpCode {
             
             Self::Return => "RETURN",
             Self::Call => "CALL",
-            Self::CallUnpack => "CALL_UNPACK",
             
             Self::Pop => "POP",
             Self::Drop => "DROP",
