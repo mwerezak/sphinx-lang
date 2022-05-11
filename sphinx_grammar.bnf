@@ -30,7 +30,7 @@ expression ::= primary
              | object_constructor
              | tuple_constructor ;
 
-expression_list ::= expression ( "," expression )* ;
+expression_list ::= expression ( "..." )? ( "," expression ( "..." )? )* ;
 
 
 
@@ -65,7 +65,7 @@ assign_modifier ::= "let" | "var" | "local" | "nonlocal" ;
 assign_target ::= assign_modifier? lvalue_inner ;
 lvalue_inner ::= lvalue_item | lvalue_list ;
 lvalue_item ::= lvalue_primary | "(" assign_target ")" ;
-lvalue_list ::= lvalue_item ( "," lvalue_item )* ;
+lvalue_list ::= lvalue_item ( "," lvalue_item )* ( "..." )? ;
 
 (* lvalue_annotated ::= ... ( ":" type_expression )? ; TODO work out type annotations later *)
 
