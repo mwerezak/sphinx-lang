@@ -169,7 +169,7 @@ impl<T> Hash for Gc<T> where T: GcTrace + ?Sized {
 impl<T> fmt::Debug for Gc<T> where T: GcTrace + ?Sized {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_tuple("Gc")
-            .field(&self.ptr)
+            .field(&self.ptr.as_ptr())
             .finish()
     }
 }
@@ -225,7 +225,7 @@ impl<T> Copy for GcWeak<T> where T: GcTrace + ?Sized { }
 impl<T> fmt::Debug for GcWeak<T> where T: GcTrace + ?Sized {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_tuple("GcWeak")
-            .field(&self.gc_weak.ptr)
+            .field(&self.gc_weak.ptr.as_ptr())
             .finish()
     }
 }

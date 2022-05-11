@@ -17,7 +17,7 @@ const_assert_eq!(core::mem::size_of::<Variant>(), 8);
 const_assert_eq!(core::mem::size_of::<Variant>(), 16);
 
 // Fundamental data value type
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub enum Variant {
     Nil,
     BoolTrue,
@@ -224,6 +224,38 @@ impl fmt::Display for Variant {
         match self.fmt_repr() {
             Ok(strval) => write!(fmt, "{}", strval),
             Err(error) => write!(fmt, "{}", error),
+        }
+    }
+}
+
+macro_rules! debug_tuple {
+    ( $fmt:expr, $name:expr, $( $debug:expr ),* ) => {
+        $fmt.debug_tuple($name)
+            $( .field($debug) )*
+            .finish()
+    }
+}
+
+impl fmt::Debug for Variant {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Nil => fmt.write_str("Nil"),
+            Self::BoolTrue => fmt.write_str("True"),
+            Self::BoolFalse => fmt.write_str("False"),
+            Self::Marker(marker) => debug_tuple!(fmt, "Marker", marker),
+            Self::Integer(value) => debug_tuple!(fmt, "Integer", value),
+            Self::Float(value) => debug_tuple!(fmt, "Float", value),
+            Self::InternStr(value) => debug_tuple!(fmt, "InternStr", value),
+            Self::InlineStr(value) => debug_tuple!(fmt, "InlineStr", &value.to_string()),
+            Self::GCStr(gc_str) => debug_tuple!(fmt, "GCStr", &gc_str.to_string()),
+            Self::Tuple(tuple) => debug_tuple!(fmt, "Tuple", tuple),
+            Self::Function(fun)
+                => debug_tuple!(fmt, "Function", &fun.signature().fmt_signature().to_string()),
+            Self::NativeFunction(fun) 
+                => debug_tuple!(fmt, "NativeFunction", &fun.signature().fmt_signature().to_string()),
+            Self::Iterator(iter) => debug_tuple!(fmt, "Iterator", iter),
+            Self::Error(error) => write!(fmt, "{:?}", &**error),
+            Self::UserData(data) => debug_tuple!(fmt, "UserData", data),
         }
     }
 }
