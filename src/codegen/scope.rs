@@ -15,10 +15,12 @@ pub(super) enum LocalName {
     Symbol(InternSymbol),
     
     // special local variables
+    
+    // these are created by the VM
     Receiver,  // inside a function call, this refers to the object that was called
     NArgs,     // inside a function call, the number of arguments passed at the call site
     
-    Anonymous,      // anonymous temporaries
+    Anonymous, // for internal temporaries. excluded from local variable resolution, they can only be referred to by local index
 }
 
 
