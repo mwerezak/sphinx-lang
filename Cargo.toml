@@ -1,6 +1,6 @@
 [package]
 name = "sphinx-lang"
-version = "0.8.4"
+version = "0.8.5"
 edition = "2021"
 license = "MIT"
 description = "An intepreter for a dynamic language implemented in Rust"
@@ -27,7 +27,7 @@ once_cell = "1.10.0"
 static_assertions = "1.1.0"
 log = { version = "0.4.0", features = ["release_max_level_off"] }
 env_logger = "0.8.4"
-clap = "3.1.6"
+clap = { version = "3.1.6", features = ["cargo"] }
 
 [dev-dependencies]
 test-log = "0.2.10"

@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 use std::path::PathBuf;
-use clap::{Command, Arg};
+use clap::{Command, Arg, crate_version};
 
 use sphinx::frontend;
 use sphinx::source::{ModuleSource, SourceText};
@@ -19,7 +19,7 @@ fn main() {
     env_logger::init();
     
     let app = Command::new("sphinx")
-        .version("0.0")
+        .version(crate_version!())
         .author("M. Werezak <mwerezak@gmail.com>")
         .about("An interpreter for the Sphinx programming language")
         .arg(

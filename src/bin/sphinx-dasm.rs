@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use clap::{Command, Arg, ArgMatches};
+use clap::{Command, Arg, ArgMatches, crate_version};
 
 use sphinx::frontend;
 use sphinx::{BuildErrors, build_module};
@@ -11,8 +11,8 @@ use sphinx::debug::dasm::Disassembler;
 fn main() {
     env_logger::init();
     
-    let app = Command::new("sph-dasm")
-        .version("0.0")
+    let app = Command::new("sphinx-dasm")
+        .version(crate_version!())
         .author("M. Werezak <mwerezak@gmail.com>")
         .about("Bytecode disassembler for the Sphinx programming language")
         .arg(
