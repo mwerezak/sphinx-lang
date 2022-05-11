@@ -435,7 +435,7 @@ impl CodeGenerator<'_> {
     fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<&Label>) -> &mut Scope {
         let chunk_id = self.chunk_id;
         self.scopes_mut().push_scope(symbol, tag, label.copied());
-        self.scopes_mut().local_scope_mut().unwrap()
+        self.scopes_mut().current_scope_mut()
     }
     
     fn emit_end_scope(&mut self) -> Scope {
@@ -1302,12 +1302,12 @@ impl CodeGenerator<'_> {
             }
             
             // nonlocal keyword is not required in the global frame
-            if !allow_nonlocal && !self.scopes().is_global_frame() {
+            if !allow_nonlocal && self.scopes().is_call_frame() {
                 return Err("can't assign to a non-local variable without the \"nonlocal\" keyword".into());
             }
             
             // check if an upvalue is found or can be created...
-            if !self.scopes().is_global_frame() {
+            if self.scopes().is_call_frame() {
                 if let Some(upval) = self.scopes_mut().resolve_or_create_upval(&local_name)? {
                     if !upval.mode().can_write() {
                         return Err("can't assign to immutable local variable".into());

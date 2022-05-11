@@ -18,7 +18,7 @@ pub(super) enum LocalName {
     Receiver,  // inside a function call, this refers to the object that was called
     NArgs,     // inside a function call, the number of arguments passed at the call site
     
-    Temp,      // anonymous temporaries
+    Anonymous,      // anonymous temporaries
 }
 
 
@@ -39,9 +39,19 @@ impl Local {
 
 #[derive(Clone, Copy)]
 pub(super) enum InsertLocal {
-    CreateNew,
+    CreateNew(LocalIndex),
     HideExisting(LocalIndex),
 }
+
+impl From<InsertLocal> for LocalIndex {
+    fn from(result: InsertLocal) -> Self {
+        match result {
+            InsertLocal::CreateNew(local_index) => local_index,
+            InsertLocal::HideExisting(local_index) => local_index,
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum ScopeTag {
@@ -49,6 +59,7 @@ pub(super) enum ScopeTag {
     Loop,
     Branch,
     Function,
+    Global,
 }
 
 impl ScopeTag {
@@ -159,12 +170,15 @@ impl Scope {
     }
     
     fn find_local(&self, name: &LocalName) -> Option<&Local> {
+        if matches!(name, LocalName::Anonymous) {
+            return None; // anonymous temporaries should not be referenced
+        }
         self.locals.iter().find(|local| local.name == *name)
     }
     
     fn find_local_mut(&mut self, name: &LocalName) -> Option<&mut Local> {
-        if matches!(name, LocalName::Temp) {
-            return None; // temporaries should not be referenced
+        if matches!(name, LocalName::Anonymous) {
+            return None; // anonymous temporaries should not be referenced
         }
         self.locals.iter_mut().find(|local| local.name == *name)
     }
@@ -191,8 +205,8 @@ impl Scope {
             (*local).mode = mode; // redeclare with new mutability
             Ok(InsertLocal::HideExisting(local.index))
         } else {
-            self.push_local(mode, name)?;
-            Ok(InsertLocal::CreateNew)
+            let local = self.push_local(mode, name)?;
+            Ok(InsertLocal::CreateNew(local.index))
         }
     }
 }
@@ -200,52 +214,67 @@ impl Scope {
 
 #[derive(Debug)]
 struct NestedScopes {
-    scopes: Vec<Scope>,
+    toplevel: Scope,
+    nested: Vec<Scope>,
 }
 
 impl NestedScopes {
-    fn new() -> Self {
-        Self { scopes: Vec::new() }
-    }
-    
-    fn is_empty(&self) -> bool {
-        self.scopes.is_empty()
-    }
-    
-    fn current_scope(&self) -> Option<&Scope> {
-        self.scopes.last()
-    }
-    
-    fn current_scope_mut(&mut self) -> Option<&mut Scope> {
-        self.scopes.last_mut()
-    }
-    
-    fn push_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<Label>) {
-        let prev_index = self.scopes.last().and_then(|scope| scope.last_index());
-        
-        let scope = Scope {
+    fn new(symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<Label>) -> Self {
+        let toplevel = Scope {
             tag,
-            depth: self.scopes.len(),
-            prev_index,
+            depth: 0,
+            prev_index: None,
             symbol: symbol.copied(),
             locals: Vec::new(),
             control_flow: ControlFlowTracker::new(label),
         };
         
-        self.scopes.push(scope);
+        Self {
+            toplevel,
+            nested: Vec::new(),
+        }
+    }
+    
+    fn is_nested(&self) -> bool {
+        !self.nested.is_empty()
+    }
+    
+    fn current_scope(&self) -> &Scope {
+        self.nested.last().unwrap_or(&self.toplevel)
+    }
+    
+    fn current_scope_mut(&mut self) -> &mut Scope {
+        self.nested.last_mut().unwrap_or(&mut self.toplevel)
+    }
+    
+    fn push_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<Label>) {
+        let current_scope = self.current_scope();
+        
+        let scope = Scope {
+            tag,
+            depth: current_scope.depth() + 1,
+            prev_index: current_scope.last_index(),
+            symbol: symbol.copied(),
+            locals: Vec::new(),
+            control_flow: ControlFlowTracker::new(label),
+        };
+        
+        self.nested.push(scope);
     }
     
     fn pop_scope(&mut self) -> Scope {
-        self.scopes.pop().expect("pop empty scope")
+        self.nested.pop().expect("pop toplevel scope")
     }
     
     /// Iterate in name resolution order
     fn iter_nro(&self) -> impl Iterator<Item=&Scope> {
-        self.scopes.iter().rev()
+        self.nested.iter().rev()
+            .chain(std::iter::once(&self.toplevel))
     }
     
     fn iter_nro_mut(&mut self) -> impl Iterator<Item=&mut Scope> {
-        self.scopes.iter_mut().rev()
+        self.nested.iter_mut().rev()
+            .chain(std::iter::once(&mut self.toplevel))
     }
 }
 
@@ -274,11 +303,8 @@ pub(super) struct CallFrame {
 
 impl CallFrame {
     fn new(symbol: Option<&DebugSymbol>) -> Self {
-        let mut scopes = NestedScopes::new();
-        scopes.push_scope(symbol, ScopeTag::Function, None);
-        
         Self {
-            scopes,
+            scopes: NestedScopes::new(symbol, ScopeTag::Function, None),
             upvalues: Vec::new(),
         }
     }
@@ -341,17 +367,17 @@ pub(super) struct ScopeTracker {
 impl ScopeTracker {
     pub(super) fn new() -> Self {
         Self {
-            toplevel: NestedScopes::new(),
+            toplevel: NestedScopes::new(None, ScopeTag::Global, None),
             frames: Vec::new(),
         }
     }
     
     pub(super) fn is_global_scope(&self) -> bool {
-        self.frames.is_empty() && self.toplevel.is_empty()
+        self.current_scope().tag() == ScopeTag::Global
     }
     
-    pub(super) fn is_global_frame(&self) -> bool {
-        self.frames.is_empty()
+    pub(super) fn is_call_frame(&self) -> bool {
+        !self.frames.is_empty()
     }
     
     pub(super) fn push_frame(&mut self, symbol: Option<&DebugSymbol>) {
@@ -374,11 +400,11 @@ impl ScopeTracker {
     
     // scopes
     
-    pub(super) fn local_scope(&self) -> Option<&Scope> {
+    pub(super) fn current_scope(&self) -> &Scope {
         self.local_scopes().current_scope()
     }
     
-    pub(super) fn local_scope_mut(&mut self) -> Option<&mut Scope> {
+    pub(super) fn current_scope_mut(&mut self) -> &mut Scope {
         self.local_scopes_mut().current_scope_mut()
     }
     
@@ -388,15 +414,13 @@ impl ScopeTracker {
     
     pub(super) fn pop_scope(&mut self) -> Scope {
         let scope = self.local_scopes_mut().pop_scope();
-        debug_assert!(self.frames.last().map_or(true, |frame| !frame.scopes().is_empty()), "pop last scope from call frame");
         scope
     }
     
     // local variables
     
     pub(super) fn insert_local(&mut self, mode: Access, name: LocalName) -> CompileResult<InsertLocal> {
-        let scope = self.local_scopes_mut().current_scope_mut().expect("insert local in global scope");
-        scope.insert_local(mode, name)
+        self.current_scope_mut().insert_local(mode, name)
     }
     
     pub(super) fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
