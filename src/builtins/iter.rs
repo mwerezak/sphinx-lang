@@ -8,17 +8,18 @@ use crate::runtime::iter::IterState;
 use crate::runtime::errors::{RuntimeError, ExecResult};
 
 
-struct RangeIter {
+// Range
+struct Range {
     start: IntType,
     stop: IntType,
     step: IntType,
 }
 
-unsafe impl GcTrace for RangeIter {
+unsafe impl GcTrace for Range {
     fn trace(&self) { }
 }
 
-impl UserIterator for RangeIter {
+impl UserIterator for Range {
     fn get_item(&self, state: &Variant) -> ExecResult<Variant> {
         Ok(*state)
     }
@@ -47,20 +48,22 @@ impl UserIterator for RangeIter {
 }
 
 
-struct ZipIter {
+// Zip
+struct Zip {
     iters: RefCell<Box<[IterState]>>
 }
 
-unsafe impl GcTrace for ZipIter {
+unsafe impl GcTrace for Zip {
     fn trace(&self) {
         self.iters.borrow()
             .iter().for_each(IterState::trace);
     }
 }
 
-impl ZipIter {
-    fn new<'a>(iterables: impl Iterator<Item=&'a Variant>) -> ExecResult<Self> {
-        let iters = iterables.map(|seq| seq.iter_init())
+impl Zip {
+    fn new<'a>(iterables: &[Variant]) -> ExecResult<Self> {
+        let iters = iterables.iter()
+            .map(Variant::iter_init)
             .collect::<Result<Vec<IterState>,_>>()?
             .into_boxed_slice();
         
@@ -68,7 +71,7 @@ impl ZipIter {
     }
 }
 
-impl UserIterator for ZipIter {
+impl UserIterator for Zip {
     fn next_state(&self, state: Option<&Variant>) -> ExecResult<Variant> {
         let mut iters = self.iters.borrow_mut();
         
@@ -94,6 +97,10 @@ impl UserIterator for ZipIter {
     }
 }
 
+
+
+
+
 pub fn create_iter_builtins(env: Gc<NamespaceEnv>) {
     
     // produces an iterable that yields a succession of integers controlled by start, stop, and step values.
@@ -113,7 +120,7 @@ pub fn create_iter_builtins(env: Gc<NamespaceEnv>) {
             return Err(RuntimeError::invalid_value("step cannot be zero"));
         }
         
-        let range_iter = Box::new(RangeIter {
+        let range_iter = Box::new(Range {
             start: start_value,
             stop: stop_value,
             step: step_value,
@@ -123,7 +130,7 @@ pub fn create_iter_builtins(env: Gc<NamespaceEnv>) {
     
     // yields tuples containg an element from each iterable until the first iterable is exhausted.
     let zip = native_function!(zip, env, variadic(iterables) => {
-        let iter = Box::new(ZipIter::new(iterables.iter())?);
+        let iter = Box::new(Zip::new(iterables)?);
         Ok(Variant::Iterator(Gc::from_box(iter)))
     });
     
