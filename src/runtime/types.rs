@@ -1,6 +1,7 @@
 use core::fmt;
 use crate::language::{IntType, FloatType};
 use crate::runtime::Variant;
+use crate::runtime::iter::IterState;
 use crate::runtime::function::Call;
 use crate::runtime::strings::{StringValue, static_symbol};
 use crate::runtime::errors::{ExecResult, RuntimeError};
@@ -19,7 +20,7 @@ mod misc;
 pub use tuple::Tuple;
 pub use misc::{Marker, UserData};
 pub use numeric::{int_from_str, float_from_str};
-pub use iterator::{IterState, UserIterator};
+pub use iterator::UserIterator;
 
 use misc::Nil;
 

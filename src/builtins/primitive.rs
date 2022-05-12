@@ -124,8 +124,8 @@ pub fn create_metamethod_builtins(env: Gc<NamespaceEnv>) {
         let iter = value.iter_init()?;
         
         let result = vec![
-            *iter.iter(),
-            *iter.state(),
+            *iter.get_iter(),
+            *iter.get_state(),
         ];
         
         Ok(Variant::from(result.into_boxed_slice()))

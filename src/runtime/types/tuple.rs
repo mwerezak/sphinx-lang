@@ -3,7 +3,8 @@ use core::fmt::{self, Write};
 use crate::runtime::Variant;
 use crate::runtime::gc::{Gc, GcTrace};
 use crate::runtime::strings::{StringValue, static_symbol};
-use crate::runtime::types::{Type, MetaObject, IterState, UserIterator};
+use crate::runtime::iter::IterState;
+use crate::runtime::types::{Type, MetaObject, UserIterator};
 use crate::runtime::errors::{ExecResult, RuntimeError};
 
 #[derive(Clone, Copy)]

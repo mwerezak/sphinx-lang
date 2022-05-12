@@ -3,7 +3,8 @@ use crate::language::IntType;
 use crate::runtime::{Gc, Variant};
 use crate::runtime::gc::GcTrace;
 use crate::runtime::module::NamespaceEnv;
-use crate::runtime::types::{UserIterator, IterState};
+use crate::runtime::types::UserIterator;
+use crate::runtime::iter::IterState;
 use crate::runtime::errors::{RuntimeError, ExecResult};
 
 

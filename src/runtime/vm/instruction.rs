@@ -6,6 +6,7 @@ use crate::runtime::gc::Gc;
 use crate::runtime::function::{Function, Upvalue, UpvalueIndex};
 use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{ConstID, FunctionID, FunctionProto};
+use crate::runtime::iter::IterState;
 use crate::runtime::errors::{ExecResult, RuntimeError};
 use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control, VMCallFrame, SYSTEM_ARGS};
 
@@ -206,8 +207,8 @@ impl<'c> VMCallFrame<'c> {
             
             OpCode::IterInit => {
                 let iter = stack.peek().iter_init()?;
-                stack.replace(*iter.iter());
-                stack.push(*iter.state());
+                stack.replace(*iter.get_iter());
+                stack.push(*iter.get_state());
             }
             
             OpCode::IterNext => {
@@ -219,13 +220,12 @@ impl<'c> VMCallFrame<'c> {
             }
             
             OpCode::IterUnpack => {
-                let mut state = stack.pop();
+                let state = stack.pop();
                 let iter = stack.pop();
                 
                 let mut count = IntType::from(0);
-                while state.as_bool()? {
-                    stack.push(iter.iter_get(&state)?);
-                    state = iter.iter_next(&state)?;
+                for value in IterState::new(iter, state) {
+                    stack.push(value?);
                     count = count.checked_add(1)
                         .ok_or_else(RuntimeError::overflow_error)?;
                 }

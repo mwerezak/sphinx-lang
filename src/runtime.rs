@@ -7,6 +7,7 @@ pub mod types;
 pub mod gc;
 pub mod vm;
 pub mod function;
+pub mod iter;
 pub mod module;
 pub mod errors;
 

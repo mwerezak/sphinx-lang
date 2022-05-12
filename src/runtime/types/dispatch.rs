@@ -5,7 +5,8 @@ use crate::runtime::Variant;
 use crate::runtime::gc::Gc;
 use crate::runtime::function::{Call, Function, NativeFunction};
 use crate::runtime::strings::StringValue;
-use crate::runtime::types::{Type, MetaObject, Tuple, UserData, Nil, Marker, IterState, UserIterator};
+use crate::runtime::iter::IterState;
+use crate::runtime::types::{Type, MetaObject, Tuple, UserData, Nil, Marker, UserIterator};
 use crate::runtime::errors::{ExecResult, RuntimeError};
 
 
