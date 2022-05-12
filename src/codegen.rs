@@ -432,9 +432,9 @@ impl From<&Scope> for ScopeDrop {
 }
 
 impl CodeGenerator<'_> {
-    fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<&Label>) -> &mut Scope {
+    fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, tag: ScopeTag) -> &mut Scope {
         let chunk_id = self.chunk_id;
-        self.scopes_mut().push_scope(symbol, tag, label.copied());
+        self.scopes_mut().push_scope(symbol, label.copied(), tag);
         self.scopes_mut().current_scope_mut()
     }
     
@@ -730,7 +730,7 @@ impl CodeGenerator<'_> {
         
         let loop_target = self.current_offset();
         
-        self.emit_begin_scope(symbol, ScopeTag::Loop, label);
+        self.emit_begin_scope(symbol, label, ScopeTag::Loop);
         
         self.compile_stmt_block(body)?;
         let loop_scope = self.emit_end_scope();
@@ -755,7 +755,7 @@ impl CodeGenerator<'_> {
         
         let loop_target = self.current_offset();
         
-        self.emit_begin_scope(symbol, ScopeTag::Loop, label);
+        self.emit_begin_scope(symbol, label, ScopeTag::Loop);
         self.compile_stmt_block(body)?;
         let loop_scope = self.emit_end_scope();
         
@@ -775,7 +775,7 @@ impl CodeGenerator<'_> {
     
     fn compile_for_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, lvalue: &LValue, iter: &Expr, body: &StmtList) -> CompileResult<()> {
         
-        self.emit_begin_scope(symbol, ScopeTag::Loop, label);
+        self.emit_begin_scope(symbol, label, ScopeTag::Loop);
         
         // initialize iterator
         self.compile_expr(symbol, iter)?;
@@ -1399,7 +1399,7 @@ impl CodeGenerator<'_> {
 
     fn compile_block_expression(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
         
-        self.emit_begin_scope(symbol, ScopeTag::Block, label);
+        self.emit_begin_scope(symbol, label, ScopeTag::Block);
         self.compile_expr_block(symbol, suite)?;
         let block_scope = self.emit_end_scope();
         
@@ -1432,7 +1432,7 @@ impl CodeGenerator<'_> {
             // inside the statement list
             let branch_jump_site = self.emit_dummy_jump(symbol, Jump::IfFalse);
             
-            self.emit_begin_scope(symbol, ScopeTag::Branch, None);
+            self.emit_begin_scope(symbol, None, ScopeTag::Branch);
             self.compile_expr_block(symbol, branch.suite())?;
             self.emit_end_scope();
             
@@ -1450,7 +1450,7 @@ impl CodeGenerator<'_> {
         // else clause
         if let Some(suite) = else_clause {
             
-            self.emit_begin_scope(symbol, ScopeTag::Branch, None);
+            self.emit_begin_scope(symbol, None, ScopeTag::Branch);
             self.compile_expr_block(symbol, suite)?;
             self.emit_end_scope();
             

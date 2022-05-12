@@ -249,7 +249,7 @@ impl NestedScopes {
         self.nested.last_mut().unwrap_or(&mut self.toplevel)
     }
     
-    fn push_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<Label>) {
+    fn push_scope(&mut self, symbol: Option<&DebugSymbol>, label: Option<Label>, tag: ScopeTag) {
         let current_scope = self.current_scope();
         
         let scope = Scope {
@@ -410,8 +410,8 @@ impl ScopeTracker {
         self.local_scopes_mut().current_scope_mut()
     }
     
-    pub(super) fn push_scope(&mut self, symbol: Option<&DebugSymbol>, tag: ScopeTag, label: Option<Label>) {
-        self.local_scopes_mut().push_scope(symbol, tag, label);
+    pub(super) fn push_scope(&mut self, symbol: Option<&DebugSymbol>, label: Option<Label>, tag: ScopeTag) {
+        self.local_scopes_mut().push_scope(symbol, label, tag);
     }
     
     pub(super) fn pop_scope(&mut self) -> Scope {
