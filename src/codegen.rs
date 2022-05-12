@@ -434,8 +434,7 @@ impl From<&Scope> for ScopeDrop {
 impl CodeGenerator<'_> {
     fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, tag: ScopeTag) -> &mut Scope {
         let chunk_id = self.chunk_id;
-        self.scopes_mut().push_scope(symbol, label.copied(), tag);
-        self.scopes_mut().current_scope_mut()
+        self.scopes_mut().push_scope(symbol, label.copied(), tag)
     }
     
     fn emit_end_scope(&mut self) -> Scope {
@@ -517,6 +516,8 @@ impl CodeGenerator<'_> {
     }
     
     fn emit_create_temporary(&mut self, symbol: Option<&DebugSymbol>, access: Access) -> CompileResult<LocalIndex> {
+        debug_assert!(self.scopes().is_temporary_scope());
+        
         match self.scopes_mut().insert_local(access, LocalName::Anonymous)? {
             InsertLocal::CreateNew(local_index) => {
                 self.emit_instr(symbol, OpCode::InsertLocal);
@@ -914,6 +915,7 @@ impl CodeGenerator<'_> {
                         self.emit_instr(symbol, OpCode::Add);
                         self.emit_assign_local(symbol, local_index);
                     } else {
+                        self.emit_begin_scope(symbol, None, ScopeTag::Temporary);
                         let local_index = self.emit_create_temporary(symbol, Access::ReadWrite)?;
                         unpack_len = Some(local_index);
                     }
@@ -944,6 +946,9 @@ impl CodeGenerator<'_> {
                 if let Some(local_index) = unpack_len {
                     self.emit_load_local_index(symbol, local_index);
                     self.emit_instr(symbol, OpCode::Add);
+                    
+                    debug_assert!(self.scopes().is_temporary_scope());
+                    self.emit_end_scope();
                 }
                 
                 if static_len > 0 {
@@ -951,26 +956,31 @@ impl CodeGenerator<'_> {
                     self.emit_instr(symbol, OpCode::Add);
                 }
                 
-                return Ok(Unpack::Dynamic);
+                Ok(Unpack::Dynamic)
             }
             
             _ => {
                 self.compile_expr_with_symbol(last)?;
                 static_len = static_len.checked_add(1)
                     .ok_or("unpack length limit exceeded")?;
+                    
+                if let Some(local_index) = unpack_len {
+                    self.emit_load_local_index(symbol, local_index);
+                    
+                    if static_len > 0 {
+                        self.compile_integer(symbol, static_len)?;
+                        self.emit_instr(symbol, OpCode::Add);
+                    }
+                    
+                    debug_assert!(self.scopes().is_temporary_scope());
+                    self.emit_end_scope();
+                    
+                    return Ok(Unpack::Dynamic)
+                }
+                
+                Ok(Unpack::Static(static_len))
             }
         }
-        
-        if let Some(local_index) = unpack_len {
-            self.emit_load_local_index(symbol, local_index);
-            if static_len > 0 {
-                self.compile_integer(symbol, static_len)?;
-                self.emit_instr(symbol, OpCode::Add);
-            }
-            
-            return Ok(Unpack::Dynamic)
-        }
-        Ok(Unpack::Static(static_len))
     }
 
     fn compile_atom(&mut self, symbol: Option<&DebugSymbol>, atom: &Atom) -> CompileResult<()> {

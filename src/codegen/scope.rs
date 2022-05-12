@@ -62,6 +62,7 @@ pub(super) enum ScopeTag {
     Branch,
     Function,
     Global,
+    Temporary,
 }
 
 impl ScopeTag {
@@ -75,6 +76,13 @@ impl ScopeTag {
                 ControlFlowTarget::Break(..) | ControlFlowTarget::Continue(..)
             ),
             
+            _ => false,
+        }
+    }
+    
+    fn hide_from_nro(&self) -> bool {
+        match self {
+            Self::Temporary => true,
             _ => false,
         }
     }
@@ -202,6 +210,11 @@ impl Scope {
     }
     
     fn insert_local(&mut self, mode: Access, name: LocalName) -> CompileResult<InsertLocal> {
+        // ensure only anonymous variables get inserted into hidden scopes
+        if self.tag.hide_from_nro() {
+            debug_assert!(name == LocalName::Anonymous);
+        }
+        
         // see if this local already exists in the current scope
         if let Some(mut local) = self.find_local_mut(&name) {
             (*local).mode = mode; // redeclare with new mutability
@@ -272,11 +285,13 @@ impl NestedScopes {
     fn iter_nro(&self) -> impl Iterator<Item=&Scope> {
         self.nested.iter().rev()
             .chain(std::iter::once(&self.toplevel))
+            .filter(|scope| !scope.tag().hide_from_nro())
     }
     
     fn iter_nro_mut(&mut self) -> impl Iterator<Item=&mut Scope> {
         self.nested.iter_mut().rev()
             .chain(std::iter::once(&mut self.toplevel))
+            .filter(|scope| !scope.tag().hide_from_nro())
     }
 }
 
@@ -375,7 +390,12 @@ impl ScopeTracker {
     }
     
     pub(super) fn is_global_scope(&self) -> bool {
-        self.current_scope().tag() == ScopeTag::Global
+        // return true if the first non-temporary is global
+        self.get_current_scope(true).tag() == ScopeTag::Global
+    }
+    
+    pub(super) fn is_temporary_scope(&self) -> bool {
+        self.local_scopes().current_scope().tag() == ScopeTag::Temporary
     }
     
     pub(super) fn is_call_frame(&self) -> bool {
@@ -400,18 +420,32 @@ impl ScopeTracker {
             .map_or(&mut self.toplevel, |frame| frame.scopes_mut())
     }
     
+    fn get_current_scope(&self, ignore_temp: bool) -> &Scope {
+        if ignore_temp {
+            self.local_scopes()
+                .iter_nro().next()
+                .expect("empty nro")
+        } else {
+            self.local_scopes().current_scope()
+        }
+    }
+    
+    fn get_current_scope_mut(&mut self, ignore_temp: bool) -> &mut Scope {
+        if ignore_temp {
+            self.local_scopes_mut()
+                .iter_nro_mut().next()
+                .expect("empty nro")
+        } else {
+            self.local_scopes_mut().current_scope_mut()
+        }
+    }
+    
     // scopes
     
-    pub(super) fn current_scope(&self) -> &Scope {
-        self.local_scopes().current_scope()
-    }
-    
-    pub(super) fn current_scope_mut(&mut self) -> &mut Scope {
-        self.local_scopes_mut().current_scope_mut()
-    }
-    
-    pub(super) fn push_scope(&mut self, symbol: Option<&DebugSymbol>, label: Option<Label>, tag: ScopeTag) {
-        self.local_scopes_mut().push_scope(symbol, label, tag);
+    pub(super) fn push_scope(&mut self, symbol: Option<&DebugSymbol>, label: Option<Label>, tag: ScopeTag) -> &mut Scope {
+        let local_scope = self.local_scopes_mut();
+        local_scope.push_scope(symbol, label, tag);
+        local_scope.current_scope_mut()
     }
     
     pub(super) fn pop_scope(&mut self) -> Scope {
@@ -422,7 +456,8 @@ impl ScopeTracker {
     // local variables
     
     pub(super) fn insert_local(&mut self, mode: Access, name: LocalName) -> CompileResult<InsertLocal> {
-        self.current_scope_mut().insert_local(mode, name)
+        self.get_current_scope_mut(name != LocalName::Anonymous)
+            .insert_local(mode, name)
     }
     
     pub(super) fn resolve_local(&self, name: &LocalName) -> Option<&Local> {
