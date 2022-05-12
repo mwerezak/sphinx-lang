@@ -1317,8 +1317,31 @@ impl CodeGenerator<'_> {
         }
     }
     
-    fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, mut item_targets: &[LValue]) -> CompileResult<()> {
+    fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, item_targets: &[LValue]) -> CompileResult<()> {
+        // process tuple packing patterns
         
+        let mut pack_targets = item_targets.iter().enumerate()
+            .filter_map(|(idx, target)| match target {
+                LValue::Pack(pack_target) => Some((idx, pack_target.as_deref())),
+                _ => None,
+            });
+            
+        let (idx, pack_target) = match pack_targets.next() {
+            Some(pack_target) => pack_target,
+            None => return self.compile_assign_tuple_nopack(symbol, assign, item_targets),
+        };
+        
+        if !pack_targets.next().is_none() {
+            return Err("tuple assignment may contain only one \"...\" pack pattern".into())
+        }
+        
+        let (pre_pack, rest) = item_targets.split_at(idx);
+        let (_, post_pack) = rest.split_at(1);
+        
+        self.compile_assign_tuple_pack(symbol, assign, pack_target, pre_pack, post_pack)
+    }
+    
+    fn compile_assign_tuple_pack(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, pack: Option<&LValue>, pre_pack: &[LValue], post_pack: &[LValue]) -> CompileResult<()> {
         let mut error_jump_sites = Vec::new();
         
         // assignment needs to preserve original value for expression result
@@ -1327,20 +1350,9 @@ impl CodeGenerator<'_> {
         // iterate to yield values
         self.emit_instr(symbol, OpCode::IterInit);
         
-        // process tuple packing assingment
-        let mut pack_target = None;
-        
-        if let Some((LValue::Pack(pack_item), rest)) = item_targets.split_last() {
-            pack_target.replace(pack_item);
-            item_targets = rest;
-        }
-        
-        // compile to unrolled iteration
-        for (idx, target) in item_targets.iter().enumerate() {
-            
-            if matches!(target, LValue::Pack(..)) {
-                return Err("\"...\" can only be used with the last item in tuple assignment".into());
-            }
+        // compile to unrolled iteration for pre-pack items
+        for target in pre_pack.iter() {
+            debug_assert!(!matches!(target, LValue::Pack(..)));
             
             // check if there is an item left for this target
             let error_jump = self.emit_dummy_jump(symbol, Jump::IfFalse);
@@ -1353,35 +1365,66 @@ impl CodeGenerator<'_> {
             self.emit_instr(symbol, OpCode::Pop);
         }
         
-        let done_jump_site;
-        let pop_after;
-        if let Some(Some(pack_target)) = pack_target {
-            // exhaust the rest of the iterator and assign to pack_target
-            self.emit_instr(symbol, OpCode::IterUnpack);
-            self.emit_instr(symbol, OpCode::TupleN);
+        let temp_scope;
+        match (pack, post_pack) {
+            (None, []) => {
+                // if there are no post-pack items and no pack target just discard the iterator
+                self.emit_instr_byte(symbol, OpCode::Drop, 2);
+                temp_scope = false;
+            }
             
-            self.compile_assignment(symbol, assign, pack_target)?;
-            self.emit_instr(symbol, OpCode::Pop);
+            (Some(pack_target), []) => {
+                // exhaust the rest of the iterator and assign to pack_target
+                self.emit_instr(symbol, OpCode::IterUnpack);
+                self.emit_instr(symbol, OpCode::TupleN);
+                
+                self.compile_assignment(symbol, assign, pack_target)?;
+                self.emit_instr(symbol, OpCode::Pop);
+                temp_scope = false;
+            }
             
-            done_jump_site = self.emit_dummy_jump(symbol, Jump::Uncond);
-            pop_after = false;
-        
-        } else if let Some(None) = pack_target {
-            // just discard the iterator
-            self.emit_instr_byte(symbol, OpCode::Drop, 2);
-            done_jump_site = self.emit_dummy_jump(symbol, Jump::Uncond);
-            pop_after = false;
-            
-        } else {
-            // if the iterator is finished we've succeeded
-            done_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
-            pop_after = true; // pop the iterator
-            
-            // too many items
-            let message = format!("too many values to unpack (expected {})", item_targets.len());
-            self.emit_load_error(symbol, ErrorKind::UnpackError, message.as_str())?;
-            self.emit_instr(symbol, OpCode::Error);
+            (pack_target, post_pack) => {
+                // exhaust the rest of the iterator and assign the last items to post_pack
+                // then assign whatever is left to the pack_target
+                self.emit_instr(symbol, OpCode::IterUnpack);
+                
+                // calculate the pack length and store it
+                let post_len = IntType::try_from(post_pack.len())
+                    .map_err(|_| "unpack length limit exceeded")?;
+                
+                self.compile_integer(symbol, post_len)?;
+                self.emit_instr(symbol, OpCode::Sub);
+                
+                temp_scope = true;
+                self.emit_begin_scope(symbol, None, ScopeTag::Temporary);
+                let pack_len = self.emit_create_temporary(symbol, Access::ReadOnly)?;
+                
+                // check if there are enough items
+                self.emit_instr_byte(symbol, OpCode::UInt8, 0);
+                self.emit_instr(symbol, OpCode::LT);
+                let error_jump = self.emit_dummy_jump(symbol, Jump::PopIfTrue);
+                error_jump_sites.push(error_jump);
+                
+                // assign post-pack items
+                for target in post_pack.iter().rev() {
+                    debug_assert!(!matches!(target, LValue::Pack(..)));
+                    self.compile_assignment(symbol, assign, target)?;
+                    self.emit_instr(symbol, OpCode::Pop);
+                }
+                
+                // load the stored pack len and assign to pack target or discard
+                self.emit_load_local_index(symbol, pack_len);
+                if let Some(pack_target) = pack_target {
+                    self.emit_instr(symbol, OpCode::TupleN);
+                    self.compile_assignment(symbol, assign, pack_target)?;
+                    self.emit_instr(symbol, OpCode::Pop);
+                } else {
+                    self.emit_instr(symbol, OpCode::DropN);
+                }
+            }
         }
+        
+        let done_jump_site = self.emit_dummy_jump(symbol, Jump::Uncond);
         
         // not enough items
         let error_target = self.current_offset();
@@ -1389,16 +1432,67 @@ impl CodeGenerator<'_> {
             self.patch_jump_instr(jump_site, error_target)?;
         }
         
-        let message = format!("not enough values to unpack (expected {})", item_targets.len());
+        let message = format!("not enough values to unpack (expected at least {})", pre_pack.len() + post_pack.len());
         self.emit_load_error(symbol, ErrorKind::UnpackError, message.as_str())?;
         self.emit_instr(symbol, OpCode::Error);
         
         // cleanup
         self.patch_jump_instr(&done_jump_site, self.current_offset())?;
         
-        if pop_after {
+        if temp_scope {
+            debug_assert!(self.scopes().is_temporary_scope());
+            self.emit_end_scope();
+        }
+        
+        Ok(())
+    }
+    
+    fn compile_assign_tuple_nopack(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, items: &[LValue]) -> CompileResult<()> {
+        let mut error_jump_sites = Vec::new();
+        
+        // assignment needs to preserve original value for expression result
+        self.emit_instr(symbol, OpCode::Clone);
+        
+        // iterate to yield values
+        self.emit_instr(symbol, OpCode::IterInit);
+        
+        // compile to unrolled iteration
+        for target in items.iter() {
+            debug_assert!(!matches!(target, LValue::Pack(..)));
+            
+            // check if there is an item left for this target
+            let error_jump = self.emit_dummy_jump(symbol, Jump::IfFalse);
+            error_jump_sites.push(error_jump);
+            
+            // advance the iterator and put the item on the stack
+            self.emit_instr(symbol, OpCode::IterNext);
+            
+            self.compile_assignment(symbol, assign, target)?;
             self.emit_instr(symbol, OpCode::Pop);
         }
+        
+        // if the iterator is finished we've succeeded
+        let done_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
+        
+        // too many items
+        let message = format!("too many values to unpack (expected {})", items.len());
+        self.emit_load_error(symbol, ErrorKind::UnpackError, message.as_str())?;
+        self.emit_instr(symbol, OpCode::Error);
+        
+        // not enough items
+        let error_target = self.current_offset();
+        for jump_site in error_jump_sites.iter() {
+            self.patch_jump_instr(jump_site, error_target)?;
+        }
+        
+        let message = format!("not enough values to unpack (expected {})", items.len());
+        self.emit_load_error(symbol, ErrorKind::UnpackError, message.as_str())?;
+        self.emit_instr(symbol, OpCode::Error);
+        
+        // cleanup
+        self.patch_jump_instr(&done_jump_site, self.current_offset())?;
+        
+        self.emit_instr(symbol, OpCode::Pop);  // pop the iterator
         
         Ok(())
     }

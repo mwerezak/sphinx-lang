@@ -27,9 +27,10 @@ const OP_CALL:             u8 = 0x09;
 
 const OP_POP:              u8 = 0x10;  // [ _ ] => []
 const OP_DROP:             u8 = 0x11;  // (u8); [ value[0] ... value[N] ] => []
-const OP_CLONE:            u8 = 0x12;  // [ value ] => [ value value ]
-const OP_SWAP:             u8 = 0x13;  // (u8); [ value[A] ... value[B] ] => [ value[B] ... value[A] ]
-const OP_SHIFT:            u8 = 0x14;  // (u8); [ value[A] ... value[B] ] => [ ... value[B] value[A] ]
+const OP_DROPN:            u8 = 0x12;  // [ value[0] ... value[N] N ] => []
+const OP_CLONE:            u8 = 0x13;  // [ value ] => [ value value ]
+const OP_SWAP:             u8 = 0x14;  // (u8); [ value[A] ... value[B] ] => [ value[B] ... value[A] ]
+const OP_SHIFT:            u8 = 0x15;  // (u8); [ value[A] ... value[B] ] => [ ... value[B] value[A] ]
 
 const OP_TUPLE:            u8 = 0x18;  // (u8); [ item[0] ... item[N] ] => [ tuple ]
 const OP_TUPLEN:           u8 = 0x19;  // [ item[0] ... item[N] N ] => [ tuple ]
@@ -145,6 +146,7 @@ pub enum OpCode {
     
     Pop = OP_POP,
     Drop = OP_DROP,
+    DropN = OP_DROPN,
     Clone = OP_CLONE,
     
     Tuple = OP_TUPLE,
@@ -240,6 +242,7 @@ impl OpCode {
             
             OP_POP => Self::Pop,
             OP_DROP => Self::Drop,
+            OP_DROPN => Self::DropN,
             OP_CLONE => Self::Clone,
             
             OP_TUPLE => Self::Tuple,
@@ -400,6 +403,7 @@ impl core::fmt::Display for OpCode {
             
             Self::Pop => "POP",
             Self::Drop => "DROP",
+            Self::DropN => "DROPN",
             Self::Clone => "CLONE",
             
             Self::Tuple => "TUPLE",

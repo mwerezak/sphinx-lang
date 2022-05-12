@@ -199,7 +199,11 @@ impl<'c> VMCallFrame<'c> {
             },
             OpCode::Drop => { 
                 let count = usize::from(data[0]);
-                stack.discard(count); 
+                stack.discard(count);
+            }
+            OpCode::DropN => {
+                let count = into_usize(stack.pop());
+                stack.discard(count);
             }
             OpCode::Clone => {
                 stack.push(*stack.peek());
