@@ -575,7 +575,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             let assign = Assignment {
                 lhs, op, rhs,
-                assign: assign.unwrap_or(AssignType::AssignLocal),
+                modifier: assign.unwrap_or(AssignType::AssignLocal),
             };
             
             Ok(Expr::Assignment(Box::new(assign)))
@@ -936,7 +936,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             }
             
             let fun_decl = Assignment {
-                assign: AssignType::DeclImmutable,
+                modifier: AssignType::DeclImmutable,
                 op: None,
                 lhs: lvalue,
                 rhs: Expr::FunctionDef(function_def),
@@ -1373,10 +1373,15 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
 
         // Check for lvalue modifier
-        let modifier = self.try_parse_assign_keyword(ctx)?;
+        let mut modifier = self.try_parse_assign_keyword(ctx)?;
 
         // Parse inner expression
-        let expr = self.parse_expr_variant(ctx)?;
+        let mut expr = self.parse_expr_variant(ctx)?;
+        
+        // if inner expression is an assignment, transfer our modifier to it
+        if let Expr::Assignment(assign) = &mut expr {
+            assign.modifier = modifier.take().unwrap_or(assign.modifier);
+        }
         
         // Consume and check closing paren
         let next = self.advance()?;

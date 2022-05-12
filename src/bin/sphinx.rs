@@ -286,7 +286,7 @@ impl Repl {
         // bind the result expression to a global name
         let result_name = interner.get_or_intern("_");
         let result_decl = Expr::Assignment(Box::new(Assignment {
-            assign: AssignType::DeclImmutable,
+            modifier: AssignType::DeclImmutable,
             lhs: LValue::Identifier(result_name),
             rhs: result_expr,
             op: None,

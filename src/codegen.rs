@@ -845,10 +845,10 @@ impl CodeGenerator<'_> {
             
             Expr::Assignment(assign) => {
                 if let Some(op) = assign.op {
-                    self.compile_update_assignment(symbol, op, assign.assign, &assign.lhs, &assign.rhs)?;
+                    self.compile_update_assignment(symbol, op, assign.modifier, &assign.lhs, &assign.rhs)?;
                 } else {
                     self.compile_expr(symbol, &assign.rhs)?;
-                    self.compile_assignment(symbol, assign.assign, &assign.lhs)?;
+                    self.compile_assignment(symbol, assign.modifier, &assign.lhs)?;
                 }
             },
             
@@ -1002,7 +1002,7 @@ impl CodeGenerator<'_> {
             Atom::Group { modifier, inner } => {
                 // modifiers are not allowed outside of assignment
                 if let Some(modifier) = modifier {
-                    return Err("assignment modifier is not allowed here".into())
+                    return Err("assignment modifiers are not allowed outside of an assignment expression".into())
                 }
                 
                 match &**inner {

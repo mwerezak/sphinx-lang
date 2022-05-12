@@ -13,6 +13,7 @@ pub enum AssignType {
     DeclMutable,
 }
 
+// TODO rename to Pattern?
 #[derive(Debug, Clone)]
 pub enum LValue {
     Identifier(InternSymbol),
@@ -46,7 +47,7 @@ pub struct IndexTarget {
 #[derive(Debug, Clone)]
 pub struct Assignment {
     pub lhs: LValue,
-    pub assign: AssignType,
+    pub modifier: AssignType,
     pub op: Option<BinaryOp>, // e.g. for +=, -=, *=, ...
     pub rhs: Expr,
 }
