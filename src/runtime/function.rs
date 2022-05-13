@@ -19,7 +19,6 @@ pub enum Call {
     Chunk {
         module: Gc<Module>,
         chunk_id: FunctionID,
-        nparams: usize,
     },
     Native {
         func: Gc<NativeFunction>,
@@ -70,7 +69,6 @@ impl Callable for Function {
         Call::Chunk {
             module: self.module,
             chunk_id: self.fun_id,
-            nparams: self.signature().param_count(),
         }
     }
 }

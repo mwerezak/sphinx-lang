@@ -1,6 +1,5 @@
 use core::cell::Cell;
 use core::ops::Deref;
-use crate::codegen::LocalIndex;
 use crate::runtime::{Variant, HashMap};
 use crate::runtime::gc::{Gc, GcWeak, GcTrace, gc_collect};
 use crate::runtime::function::{Call, Function, Upvalue, UpvalueIndex, Closure};
@@ -15,13 +14,12 @@ mod instruction;
 use callframe::VMCallFrame;
 
 
-pub const SYSTEM_ARGS: usize = 2; // [ callee, nargs, ... ]
-
 // Helpers
 
 // data used to set up a new call
 struct CallInfo {
-    frame: usize,
+    stack_frame: usize,
+    local_frame: usize,
     call: Call,
     site: TraceSite,
 }
@@ -108,7 +106,8 @@ pub struct VirtualMachine<'c> {
     
     frame: VMCallFrame<'c>,  // the active call frame
     calls: Vec<VMCallFrame<'c>>,
-    values: ValueStack,
+    locals: ValueStack,
+    stack: ValueStack,
     upvalues: OpenUpvalues,
 }
 
@@ -118,7 +117,8 @@ impl<'c> VirtualMachine<'c> {
         Self {
             traceback: Vec::new(),
             calls: Vec::new(),
-            values: ValueStack::new(),
+            locals: ValueStack::new(),
+            stack: ValueStack::new(),
             frame: VMCallFrame::main_chunk(main_module, main_chunk),
             upvalues: OpenUpvalues::new(),
         }
@@ -141,7 +141,7 @@ impl<'c> VirtualMachine<'c> {
     
     #[inline]
     fn exec_next(&mut self) -> ExecResult<Control> {
-        let control = self.frame.exec_next(&mut self.values, &mut self.upvalues)
+        let control = self.frame.exec_next(&mut self.stack, &mut self.locals, &mut self.upvalues)
             .map_err(|error| error.extend_trace(self.traceback.iter().rev().cloned()))?;
         
         match &control {
@@ -167,25 +167,27 @@ impl<'c> VirtualMachine<'c> {
         
         match callinfo.call {
             Call::Native { func, nargs } => {
-                let args = self.values.peek_many(nargs)
+                let args = self.stack.peek_many(nargs)
                     .iter().copied().collect::<Vec<Variant>>();
                 
                 let retval = func.exec_fun(self, &args)?;
-                self.values.truncate(callinfo.frame);
-                self.values.push(retval);
+                self.stack.truncate(callinfo.stack_frame);
+                self.locals.truncate(callinfo.local_frame);
+                self.stack.push(retval);
                 self.traceback.pop();
             },
             
-            Call::Chunk { module, chunk_id, nparams } => {
-                let locals = LocalIndex::try_from(SYSTEM_ARGS + nparams)
-                    .expect("local index overflow");
-                
-                let mut frame = VMCallFrame::call_frame(module, chunk_id, callinfo.frame, locals);
+            Call::Chunk { module, chunk_id } => {
+                let mut frame = VMCallFrame::call_frame(
+                    module, chunk_id, callinfo.stack_frame, callinfo.local_frame
+                );
                 core::mem::swap(&mut self.frame, &mut frame);
                 self.calls.push(frame);
                 
-                log::debug!("Setup call: {{ frame: {}, locals: {} }}", self.frame.start_index(), self.frame.locals());
-                log::debug!("Stack: {:?}", self.values);
+                log::debug!(
+                    "Setup call: {{ stack: {}, locals: {} }}", 
+                    self.frame.stack_frame(), self.frame.local_frame()
+                );
             },
         }
         
@@ -193,17 +195,21 @@ impl<'c> VirtualMachine<'c> {
     }
     
     fn return_call(&mut self, retval: Variant) {
-        let frame_idx = self.frame.start_index();
+        let stack_idx = self.frame.stack_frame();
+        let local_idx = self.frame.local_frame();
         
         let mut frame = self.calls.pop().expect("empty call stack");
         core::mem::swap(&mut self.frame, &mut frame);
         
-        self.values.truncate(frame_idx);
-        self.values.push(retval);
+        self.stack.truncate(stack_idx);
+        self.locals.truncate(local_idx);
+        self.stack.push(retval);
         self.traceback.pop();
         
-        log::debug!("Return call: {{ frame: {}, locals: {} }}", self.frame.start_index(), self.frame.locals());
-        log::debug!("Stack: {:?}", self.values);
+        log::debug!(
+            "Return call: {{ stack: {}, locals: {} }}", 
+            self.frame.stack_frame(), self.frame.local_frame()
+        );
     }
 }
 
@@ -211,9 +217,8 @@ impl<'c> VirtualMachine<'c> {
 unsafe impl GcTrace for VirtualMachine<'_> {
     fn trace(&self) {
         // trace through the value stack
-        for value in self.values.stack.iter() {
-            value.trace();
-        }
+        self.stack.trace();
+        self.locals.trace();
         
         // trace through the active frame and all calls
         self.frame.trace();
@@ -249,8 +254,10 @@ impl ValueStack {
         self.stack
     }
     
-    // Note: when moving values off the stack, make sure to copy *before* popping
-    // This ensures that the Gc sees the values as rooted
+    #[inline(always)]
+    fn trace(&self) {
+        self.stack.iter().for_each(Variant::trace)
+    }
     
     #[inline(always)]
     fn len(&self) -> usize {
@@ -304,6 +311,11 @@ impl ValueStack {
     }
     
     #[inline(always)]
+    fn extend(&mut self, values: &[Variant]) {
+        self.stack.extend(values)
+    }
+    
+    #[inline(always)]
     fn replace(&mut self, value: Variant) {
         *self.stack.last_mut().expect("empty stack") = value;
     }
@@ -317,7 +329,7 @@ impl ValueStack {
     #[inline(always)]
     fn replace_at(&mut self, index: usize, value: Variant) {
         let item = self.stack.get_mut(index)
-            .expect("value index out of bounds");
+            .expect("index out of bounds");
         *item = value;
     }
     
@@ -335,7 +347,7 @@ impl ValueStack {
     #[inline(always)]
     fn peek_at(&self, index: usize) -> &Variant {
         self.stack.get(index)
-            .expect("value index out of bounds")
+            .expect("index out of bounds")
     }
     
     #[inline(always)]
@@ -428,7 +440,8 @@ impl From<&VirtualMachine<'_>> for VMSnapshot {
     fn from (vm: &VirtualMachine) -> Self {
         Self {
             calls: vm.calls.iter().map(VMFrameSnapshot::from).collect(),
-            values: vm.values.stack.clone(),
+            stack: vm.stack.stack.clone(),
+            locals: vm.locals.stack.clone(),
             frame: (&vm.frame).into(),
         }
     }

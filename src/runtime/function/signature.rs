@@ -84,7 +84,7 @@ impl Signature {
     pub fn param_count(&self) -> usize {
         self.required.len()
         + self.default.len()
-        + usize::from(self.variadic().is_some())
+        + usize::from(self.variadic.is_some())
     }
     
     /// Get the length of the argument buffer required by bind_args()

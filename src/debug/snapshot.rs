@@ -1,5 +1,4 @@
 use core::fmt::{Display, Formatter, Result};
-use crate::codegen::LocalIndex;
 use crate::codegen::opcodes::OpCode;
 use crate::runtime::Variant;
 use crate::runtime::module::Chunk;
@@ -8,7 +7,8 @@ use crate::runtime::module::Chunk;
 pub struct VMSnapshot {
     pub calls: Vec<VMFrameSnapshot>,
     pub frame: VMFrameSnapshot,
-    pub values: Vec<Variant>,
+    pub stack: Vec<Variant>,
+    pub locals: Vec<Variant>,
 }
 
 impl Display for VMSnapshot {
@@ -19,15 +19,24 @@ impl Display for VMSnapshot {
         for (idx, state) in self.calls.iter().enumerate() {
             write!(fmt, "{: >4}: Module: {}, Chunk: ", idx, state.module)?;
             format_chunk_id(fmt,state.chunk_id)?;
-            writeln!(fmt, ", Frame: {}, Locals: {}", state.frame_idx, state.locals)?;
+            writeln!(fmt, ", Frame: {}, Locals: {}", state.stack_idx, state.local_idx)?;
         }
         
         write!(fmt, "{: >4}: Module: {}, Chunk: ", self.calls.len(), self.frame.module)?;
         format_chunk_id(fmt, self.frame.chunk_id)?;
-        writeln!(fmt, ", Frame: {}, Locals: {}", self.frame.frame_idx, self.frame.locals)?;
+        writeln!(fmt, ", Frame: {}, Locals: {}", self.frame.stack_idx, self.frame.local_idx)?;
         
-        writeln!(fmt, "\n== Value Stack ==")?;
-        for (idx, chunk) in self.values.chunks(10).enumerate() {
+        writeln!(fmt, "\n== Locals ==")?;
+        for (idx, chunk) in self.locals.chunks(10).enumerate() {
+            write!(fmt, "{: >4}: ", idx * 10)?;
+            let items = chunk.iter().map(|value| format!("{:?}", value))
+                .collect::<Vec<String>>()
+                .join(", ");
+            writeln!(fmt, "{}", items)?;
+        }
+        
+        writeln!(fmt, "\n== Temporaries ==")?;
+        for (idx, chunk) in self.stack.chunks(10).enumerate() {
             write!(fmt, "{: >4}: ", idx * 10)?;
             let items = chunk.iter().map(|value| format!("{:?}", value))
                 .collect::<Vec<String>>()
@@ -46,8 +55,8 @@ impl Display for VMSnapshot {
 pub struct VMFrameSnapshot {
     pub module: String,
     pub chunk_id: Chunk,
-    pub frame_idx: usize,
-    pub locals: LocalIndex,
+    pub stack_idx: usize,
+    pub local_idx: usize,
     pub pc: usize,
     pub next_instr: Option<Vec<u8>>,
 }
@@ -59,7 +68,7 @@ impl Display for VMFrameSnapshot {
         format_chunk_id(fmt, self.chunk_id)?;
         writeln!(fmt)?;
         
-        writeln!(fmt, "Frame: {}, Locals: {}", self.frame_idx, self.locals)?;
+        writeln!(fmt, "Frame: {}, Locals: {}", self.stack_idx, self.local_idx)?;
         
         write!(fmt, "PC: {:#X}", self.pc)?;
         if let Some(instr) = self.next_instr.as_ref() {

@@ -8,7 +8,7 @@ use crate::runtime::strings::StringSymbol;
 use crate::runtime::module::{ConstID, FunctionID, FunctionProto};
 use crate::runtime::iter::IterState;
 use crate::runtime::errors::{ExecResult, RuntimeError};
-use crate::runtime::vm::{ValueStack, OpenUpvalues, UpvalueRef, CallInfo, Control, VMCallFrame, SYSTEM_ARGS};
+use crate::runtime::vm::{ValueStack, OpenUpvalues, CallInfo, Control, VMCallFrame};
 
 
 // Operand casts
@@ -100,8 +100,8 @@ impl<'c> VMCallFrame<'c> {
 
     // convert a local variable index to an index into the value stack
     #[inline]
-    fn index_from_local(&self, local: LocalIndex) -> usize {
-        self.frame_idx + usize::from(local)
+    fn frame_offset(&self, local: LocalIndex) -> usize {
+        self.local_idx + usize::from(local)
     }
     
     #[inline]
@@ -113,8 +113,8 @@ impl<'c> VMCallFrame<'c> {
         }
     }
 
-    #[inline(always)]
-    pub(super) fn exec_next(&mut self, stack: &mut ValueStack, upvalues: &mut OpenUpvalues) -> ExecResult<Control> {
+    #[inline]
+    pub(super) fn exec_next(&mut self, stack: &mut ValueStack, locals: &mut ValueStack, upvalues: &mut OpenUpvalues) -> ExecResult<Control> {
         let op_byte = self.chunk.get(self.pc).expect("pc out of bounds");
         let opcode = OpCode::from_byte(*op_byte)
             .unwrap_or_else(|| panic!("invalid instruction: {:x}", op_byte));
@@ -125,20 +125,23 @@ impl<'c> VMCallFrame<'c> {
         
         let data = self.chunk.get(data_slice).expect("truncated instruction");
         
-        self.exec_instruction(current_offset, opcode, data, stack, upvalues)
+        self.exec_instruction(current_offset, opcode, data, stack, locals, upvalues)
             .map_err(|error| error.push_trace(self.get_trace(current_offset)))
     }
     
     #[inline]
-    fn get_upvalue(&self, stack: &ValueStack, index: UpvalueIndex) -> UpvalueRef {
-        let fun = into_function(*stack.peek_at(self.index_from_local(0)));
-        fun.upvalue(index)
+    fn get_callee(&self, locals: &ValueStack) -> Gc<Function> {
+        into_function(*locals.peek_at(self.frame_offset(0)))
     }
     
-    fn make_function(&self, stack: &ValueStack, proto: &FunctionProto) -> Function {
+    // setup a new function, potentially capturing local variables
+    fn make_function(&self, locals: &ValueStack, proto: &FunctionProto) -> Function {
         let upvalues = proto.upvalues().iter().map(|upval| match upval {
-                UpvalueTarget::Local(index) => Upvalue::new(self.index_from_local(*index)),
-                UpvalueTarget::Upvalue(index) => (*self.get_upvalue(stack, *index)).clone(),
+                UpvalueTarget::Local(index) => Upvalue::new(self.frame_offset(*index)),
+                UpvalueTarget::Upvalue(index) => {
+                    let upval = &*self.get_callee(locals).upvalue(*index);
+                    upval.clone()
+                },
             })
             .collect::<Vec<Upvalue>>()
             .into_boxed_slice();
@@ -147,8 +150,8 @@ impl<'c> VMCallFrame<'c> {
     }
     
     // TODO create a temporary struct for all of these values that can't be stored in the VMCallFrame
-    #[inline(always)]
-    fn exec_instruction(&mut self, current_offset: usize, opcode: OpCode, data: &[u8], stack: &mut ValueStack, upvalues: &mut OpenUpvalues) -> ExecResult<Control> {
+    #[inline]
+    fn exec_instruction(&mut self, current_offset: usize, opcode: OpCode, data: &[u8], stack: &mut ValueStack, locals: &mut ValueStack, upvalues: &mut OpenUpvalues) -> ExecResult<Control> {
         match opcode {
             OpCode::Nop => { },
             
@@ -177,22 +180,32 @@ impl<'c> VMCallFrame<'c> {
                 // read nargs and identify the start of the call frame
                 let nargs_value = stack.pop();
                 let nargs = into_usize(nargs_value);
-                let frame_len = SYSTEM_ARGS + nargs;
-                let frame = stack.len() - frame_len;
+
+                let call_len = 1 + nargs;
+                let stack_frame = stack.len() - call_len;
+                let local_frame = locals.len();
                 
-                // write nargs back into the frame at the correct location
-                stack.replace_at(frame + 1, nargs_value);
+                let callee = stack.peek_at(stack_frame);
+                locals.push(*callee);
+                locals.push(nargs_value);
                 
-                let callee = stack.peek_at(frame);
                 let args = stack.peek_many(nargs);
                 
                 let call = CallInfo {
-                    frame,
+                    stack_frame,
+                    local_frame,
                     call: callee.invoke(args)?,
                     site: self.get_trace(current_offset),
                 };
                 return Ok(Control::Call(call))
             },
+            
+            OpCode::InsertArgs => {
+                let callee = self.get_callee(locals);
+                let nargs = callee.signature().param_count();
+                locals.extend(stack.peek_many(nargs));
+                stack.discard(nargs);
+            }
             
             OpCode::Pop => { 
                 stack.pop(); 
@@ -239,14 +252,14 @@ impl<'c> VMCallFrame<'c> {
             OpCode::LoadFunction => {
                 let fun_id = FunctionID::from(data[0]);
                 let proto = self.module.get_function(fun_id);
-                let function = Gc::new(self.make_function(stack, proto));
+                let function = Gc::new(self.make_function(locals, proto));
                 upvalues.register(function);
                 stack.push(Variant::Function(function));
             }
             OpCode::LoadFunction16 => {
                 let fun_id = FunctionID::from(read_le_bytes!(u16, data));
                 let proto = self.module.get_function(fun_id);
-                let function = Gc::new(self.make_function(stack, proto));
+                let function = Gc::new(self.make_function(locals, proto));
                 upvalues.register(function);
                 stack.push(Variant::Function(function));
             }
@@ -290,69 +303,59 @@ impl<'c> VMCallFrame<'c> {
             },
             
             OpCode::InsertLocal => {
-                let value = *stack.peek();
-                stack.insert(self.index_from_local(self.locals), value);
-                self.locals += 1;
+                locals.push(*stack.peek());
             },
             OpCode::StoreLocal => {
                 let index = LocalIndex::from(data[0]);
-                stack.replace_at(self.index_from_local(index), *stack.peek());
+                locals.replace_at(self.frame_offset(index), *stack.peek());
             },
             OpCode::StoreLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
-                stack.replace_at(self.index_from_local(index), *stack.peek());
+                locals.replace_at(self.frame_offset(index), *stack.peek());
             },
             OpCode::LoadLocal => {
                 let index = LocalIndex::from(data[0]);
-                stack.push(*stack.peek_at(self.index_from_local(index)));
+                stack.push(*locals.peek_at(self.frame_offset(index)));
             },
             OpCode::LoadLocal16 => {
                 let index = LocalIndex::from(read_le_bytes!(u16, data));
-                stack.push(*stack.peek_at(self.index_from_local(index)));
+                stack.push(*locals.peek_at(self.frame_offset(index)));
             },
             OpCode::DropLocals => {
                 let count = LocalIndex::from(data[0]);
-                
-                let locals_end_index = self.index_from_local(self.locals);
-                if stack.len() == locals_end_index {
-                    stack.discard(usize::from(count));
-                } else {
-                    let index = locals_end_index - usize::from(count);
-                    stack.discard_at(index, usize::from(count));
-                }
-                self.locals -= count;
+                locals.discard(usize::from(count));
             },
             
             OpCode::StoreUpvalue => {
                 let index = UpvalueIndex::from(data[0]);
-                let closure = self.get_upvalue(stack, index).closure();
-                stack.set_closure(&closure, *stack.peek());
+                let closure = self.get_callee(locals).upvalue(index).closure();
+                locals.set_closure(&closure, *stack.peek());
             }
             OpCode::StoreUpvalue16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let closure = self.get_upvalue(stack, index).closure();
-                stack.set_closure(&closure, *stack.peek());
+                let closure = self.get_callee(locals).upvalue(index).closure();
+                locals.set_closure(&closure, *stack.peek());
             }
             OpCode::LoadUpvalue => {
                 let index = UpvalueIndex::from(data[0]);
-                let closure = self.get_upvalue(stack, index).closure();
-                stack.push(stack.get_closure(&closure));
+                let closure = self.get_callee(locals).upvalue(index).closure();
+                stack.push(locals.get_closure(&closure));
             }
             OpCode::LoadUpvalue16 => {
                 let index = UpvalueIndex::from(read_le_bytes!(u16, data));
-                let closure = self.get_upvalue(stack, index).closure();
-                stack.push(stack.get_closure(&closure));
+                let closure = self.get_callee(locals).upvalue(index).closure();
+                stack.push(locals.get_closure(&closure));
             }
             
             OpCode::CloseUpvalue => {
                 let local_index = LocalIndex::from(data[0]);
-                let index = self.index_from_local(local_index);
-                upvalues.close_upvalues(index, *stack.peek_at(index));
+                let local_index = self.frame_offset(local_index);
+                upvalues.close_upvalues(local_index, *locals.peek_at(local_index));
             }
             OpCode::CloseUpvalue16 => {
                 let local_index = LocalIndex::from(read_le_bytes!(u16, data));
-                let index = self.index_from_local(local_index);
-                upvalues.close_upvalues(index, *stack.peek_at(index));
+                let local_index = self.frame_offset(local_index);
+                upvalues.close_upvalues(local_index, *locals.peek_at(local_index));
             }
             
             OpCode::Nil => stack.push(Variant::Nil),

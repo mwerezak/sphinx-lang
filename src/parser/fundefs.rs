@@ -17,6 +17,14 @@ pub struct SignatureDef {
     pub variadic: Option<ParamDef>,
 }
 
+impl SignatureDef {
+    pub fn param_count(&self) -> usize {
+        self.required.len()
+        + self.default.len()
+        + usize::from(self.variadic.is_some())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ParamDef {
     pub name: InternSymbol,

@@ -1076,9 +1076,7 @@ impl CodeGenerator<'_> {
     
     fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, args: &[ExprMeta]) -> CompileResult<()> {
         // prepare argument list:
-        // [ callobj nil arg[0] ... arg[n] nargs ] => [ ret_value ] 
-
-        self.emit_instr(symbol, OpCode::Nil);
+        // [ callobj arg[0] ... arg[n] nargs ] => [ ret_value ] 
 
         // process argument unpacking
         match self.compile_unpack_sequence(symbol, args)? {
@@ -1665,31 +1663,31 @@ impl CodeGenerator<'_> {
     }
     
     fn compile_function_preamble(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
+        // process default and variadic arguments
+        // this ensures that exactly `signature.param_count()` values are on the stack
         
-        // define locals
         let signature = &fundef.signature;
+        if signature.param_count() == 0 {
+            return Ok(())
+        }
         
         for param in signature.required.iter() {
             self.scopes_mut().insert_local(param.mode, LocalName::Symbol(param.name))?;
-            //self.emit_instr(None, OpCode::InsertLocal);
         }
         
-        // will define local variables for all default arguments
         if !signature.default.is_empty() {
             self.compile_default_args(signature)?;
-            
             for param in signature.default.iter() {
                 self.scopes_mut().insert_local(param.mode, LocalName::Symbol(param.name))?;
-                // self.emit_instr(symbol, OpCode::InsertLocal);
             }
         }
         
         if let Some(param) = &signature.variadic {
             self.compile_variadic_arg(signature)?;
-
             self.scopes_mut().insert_local(param.mode, LocalName::Symbol(param.name))?;
-            // self.emit_instr(symbol, OpCode::InsertLocal);
         }
+        
+        self.emit_instr(symbol, OpCode::InsertArgs);
 
         Ok(())
     }

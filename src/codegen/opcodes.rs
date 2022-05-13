@@ -16,12 +16,13 @@ pub type UpvalueIndex = u16;
                            // width set here so that the longest mnemonic is 16 chars
 const OP_NOP:              u8 = 0x00;
 const OP_EXIT:             u8 = 0x01;  // _ => !
-const OP_ERROR:            u8 = 0x02;  // [ error ] => !
+const OP_ERROR:            u8 = 0x02;  // T[ error ] => !
 
-const OP_RETURN:           u8 = 0x08;  // [ ...call frame... ret_value ] => [ ret_value ]
+const OP_RETURN:           u8 = 0x08;  // T[ ...call frame... ret_value ] => [ ret_value ]
 
-// [ callee nil arg[0] ... arg[n] nargs ] => [ ret_value ] 
+// [ callee arg[0] ... arg[n] nargs ] => [ ret_value ] 
 const OP_CALL:             u8 = 0x09;
+const OP_IN_ARGS:          u8 = 0x0A;
 
 // 0x10-17        Immediate Values
 
@@ -56,12 +57,12 @@ const OP_ST_GLOBAL:        u8 = 0x4A;  // [ value name ] => [ value ]
 const OP_LD_GLOBAL:        u8 = 0x4B;  // [ name ] => [ value ]
 const OP_DP_GLOBAL:        u8 = 0x4C;  // [ name ] => []
 
-const OP_IN_LOCAL:         u8 = 0x50;  // [ value ] => [ value ]; vm.locals += 1
+const OP_IN_LOCAL:         u8 = 0x50;  // [ value ] => [ value ];
 const OP_ST_LOCAL:         u8 = 0x51;  // (u8);  [ value ] => [ value ]
 const OP_ST_LOCAL_16:      u8 = 0x52;  // (u16); [ value ] => [ value ]
 const OP_LD_LOCAL:         u8 = 0x53;  // (u8);  _ => [ value ]
 const OP_LD_LOCAL_16:      u8 = 0x54;  // (u16); _ => [ value ]
-const OP_DP_LOCALS:        u8 = 0x55;  // (u8); [ local[0] ... local[N] temporaries... ] => [ temporaries... ]; vm.locals -= N
+const OP_DP_LOCALS:        u8 = 0x55;  // (u8); vm.locals -= N
 
 const OP_ST_UPVAL:         u8 = 0x58;  // (u8);  [ value ] => [ value ]
 const OP_ST_UPVAL_16:      u8 = 0x59;  // (u16); [ value ] => [ value ]
@@ -143,6 +144,7 @@ pub enum OpCode {
     
     Return = OP_RETURN, 
     Call = OP_CALL,
+    InsertArgs = OP_IN_ARGS,
     
     Pop = OP_POP,
     Drop = OP_DROP,
@@ -239,6 +241,7 @@ impl OpCode {
             
             OP_RETURN => Self::Return,
             OP_CALL => Self::Call,
+            OP_IN_ARGS => Self::InsertArgs,
             
             OP_POP => Self::Pop,
             OP_DROP => Self::Drop,
@@ -400,6 +403,7 @@ impl core::fmt::Display for OpCode {
             
             Self::Return => "RETURN",
             Self::Call => "CALL",
+            Self::InsertArgs => "IN_ARGS",
             
             Self::Pop => "POP",
             Self::Drop => "DROP",
