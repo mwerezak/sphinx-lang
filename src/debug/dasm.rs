@@ -318,8 +318,8 @@ impl fmt::Display for Disassembler<'_, '_> {
 impl fmt::Display for Constant {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Integer(value) => write!(fmt, "'{}'", value),
-            Self::Float(bytes) => write!(fmt, "'{:.6}'", FloatType::from_le_bytes(*bytes)),
+            Self::Integer(value) => write!(fmt, "{}", value),
+            Self::Float(bytes) => write!(fmt, "{:.6}", FloatType::from_le_bytes(*bytes)),
             Self::String(symbol) => write!(fmt, "${}", symbol.to_usize() + 1),
             Self::Error { error, .. } => write!(fmt, "{:?}", error),
         }

@@ -1,5 +1,3 @@
-#![allow(unused_variables)]
-
 use core::iter;
 
 use crate::language::{IntType, FloatType, InternSymbol, Access};
@@ -121,10 +119,7 @@ impl Compiler {
     }
     
     fn get_chunk(&mut self, chunk_id: Chunk) -> CodeGenerator {
-        CodeGenerator {
-            compiler: self,
-            chunk_id,
-        }
+        CodeGenerator::new(self, chunk_id)
     }
     
     pub fn compile_program<'a>(mut self, program: impl Iterator<Item=&'a StmtMeta>) -> Result<CompiledProgram, Vec<CompileError>> {
@@ -160,26 +155,44 @@ impl Compiler {
 struct CodeGenerator<'c> {
     compiler: &'c mut Compiler,
     chunk_id: Chunk,
+    symbols: Vec<Option<DebugSymbol>>,
+}
+
+impl<'c> CodeGenerator<'c> {
+    fn new(compiler: &'c mut Compiler, chunk_id: Chunk) -> Self {
+        Self {
+            compiler, chunk_id,
+            symbols: Vec::new(),
+        }
+    }
 }
 
 impl CodeGenerator<'_> {
     
     pub fn push_stmt(&mut self, stmt: &StmtMeta) -> CompileResult<()> {
         let symbol = stmt.debug_symbol();
+        self.push_symbol(Some(*symbol));
         
-        let result = self.compile_stmt(Some(symbol), stmt.variant());
-        if let Err(error) = result {
-            Err(error.with_symbol(*symbol))
+        let result = self.compile_stmt(stmt.variant());
+        if let Err(mut error) = result {
+            let symbol = self.symbols.iter().rev()
+                .find_map(|s| s.as_ref());
+            if let Some(symbol) = symbol {
+                error = error.with_symbol(*symbol);
+            }
+            
+            Err(error)
         } else {
+            self.pop_symbol();
             Ok(())
         }
     }
     
     pub fn finish(mut self) {
+        self.symbols.clear();
         match self.chunk_id {
-            Chunk::Main => self.emit_instr(None, OpCode::Exit),
-            
-            Chunk::Function(..) => self.emit_instr(None, OpCode::Return),
+            Chunk::Main => self.emit_instr(OpCode::Exit),
+            Chunk::Function(..) => self.emit_instr(OpCode::Return),
         }
     }
     
@@ -207,7 +220,19 @@ impl CodeGenerator<'_> {
         self.chunk().len()
     }
     
-    fn push_symbol(&mut self, symbol: DebugSymbol) {
+    fn current_symbol(&self) -> Option<DebugSymbol> {
+        self.symbols.last().copied().flatten()
+    }
+    
+    fn push_symbol(&mut self, symbol: Option<DebugSymbol>) {
+        self.symbols.push(symbol)
+    }
+    
+    fn pop_symbol(&mut self) -> Option<DebugSymbol> {
+        self.symbols.pop().flatten()
+    }
+    
+    fn emit_symbol(&mut self, symbol: DebugSymbol) {
         let chunk_id = self.chunk_id;
         let offset = self.current_offset();
         self.symbols_mut()
@@ -224,32 +249,32 @@ impl CodeGenerator<'_> {
 
 ///////// Emitting Bytecode /////////
 impl CodeGenerator<'_> {
-    fn emit_instr(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode) {
+    fn emit_instr(&mut self, opcode: OpCode) {
         debug_assert!(opcode.instr_len() == 1);
         
-        if let Some(symbol) = symbol {
-            self.push_symbol(*symbol);
+        if let Some(symbol) = self.current_symbol() {
+            self.emit_symbol(symbol);
         }
         
         self.chunk_mut().push_byte(opcode);
     }
     
-    fn emit_instr_byte(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode, byte: u8) {
+    fn emit_instr_byte(&mut self, opcode: OpCode, byte: u8) {
         debug_assert!(opcode.instr_len() == 2);
         
-        if let Some(symbol) = symbol {
-            self.push_symbol(*symbol);
+        if let Some(symbol) = self.current_symbol() {
+            self.emit_symbol(symbol);
         }
         
         self.chunk_mut().push_byte(opcode);
         self.chunk_mut().push_byte(byte);
     }
     
-    fn emit_instr_data(&mut self, symbol: Option<&DebugSymbol>, opcode: OpCode, bytes: &[u8]) {
+    fn emit_instr_data(&mut self, opcode: OpCode, bytes: &[u8]) {
         debug_assert!(opcode.instr_len() == 1 + bytes.len());
         
-        if let Some(symbol) = symbol {
-            self.push_symbol(*symbol);
+        if let Some(symbol) = self.current_symbol() {
+            self.emit_symbol(symbol);
         }
         
         self.chunk_mut().push_byte(opcode);
@@ -266,12 +291,12 @@ impl CodeGenerator<'_> {
         self.chunk_mut().patch_bytes(offset + 1, bytes);
     }
     
-    fn emit_dummy_instr(&mut self, symbol: Option<&DebugSymbol>, width: usize) {
-        if let Some(symbol) = symbol {
-            self.push_symbol(*symbol);
+    fn emit_dummy_instr(&mut self, width: usize) {
+        if let Some(symbol) = self.current_symbol() {
+            self.emit_symbol(symbol);
         }
         
-        for i in 0..width {
+        for _ in 0..width {
             self.chunk_mut().push_byte(OpCode::Nop);
         }
     }
@@ -283,24 +308,24 @@ impl CodeGenerator<'_> {
         self.builder_mut().get_or_insert_const(value)
     }
     
-    fn emit_load_const(&mut self, symbol: Option<&DebugSymbol>, value: Constant) -> CompileResult<()> {
+    fn emit_load_const(&mut self, value: Constant) -> CompileResult<()> {
         let cid = self.get_or_make_const(value)?;
         
         if cid <= u8::MAX.into() {
-            self.emit_instr_byte(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap());
+            self.emit_instr_byte(OpCode::LoadConst, u8::try_from(cid).unwrap());
         } else {
-            self.emit_instr_data(symbol, OpCode::LoadConst16, &cid.to_le_bytes());
+            self.emit_instr_data(OpCode::LoadConst16, &cid.to_le_bytes());
         }
         Ok(())
     }
     
-    fn emit_load_error(&mut self, symbol: Option<&DebugSymbol>, error: ErrorKind, message: &str) -> CompileResult<()> {
+    fn emit_load_error(&mut self, error: ErrorKind, message: &str) -> CompileResult<()> {
         let cid = self.builder_mut().get_or_insert_error(error, message)?;
         
         if cid <= u8::MAX.into() {
-            self.emit_instr_byte(symbol, OpCode::LoadConst, u8::try_from(cid).unwrap());
+            self.emit_instr_byte(OpCode::LoadConst, u8::try_from(cid).unwrap());
         } else {
-            self.emit_instr_data(symbol, OpCode::LoadConst16, &cid.to_le_bytes());
+            self.emit_instr_data(OpCode::LoadConst16, &cid.to_le_bytes());
         }
         Ok(())
     }
@@ -309,18 +334,18 @@ impl CodeGenerator<'_> {
         self.builder_mut().insert_function(function)
     }
     
-    fn emit_load_function(&mut self, symbol: Option<&DebugSymbol>, fun_id: FunctionID) {
+    fn emit_load_function(&mut self, fun_id: FunctionID) {
         if fun_id <= u8::MAX.into() {
-            self.emit_instr_byte(symbol, OpCode::LoadFunction, u8::try_from(fun_id).unwrap());
+            self.emit_instr_byte(OpCode::LoadFunction, u8::try_from(fun_id).unwrap());
         } else {
-            self.emit_instr_data(symbol, OpCode::LoadFunction16, &fun_id.to_le_bytes());
+            self.emit_instr_data(OpCode::LoadFunction16, &fun_id.to_le_bytes());
         }
     }
 }
 
 ///////// Jumps /////////
 impl CodeGenerator<'_> {
-    fn emit_jump_instr(&mut self, symbol: Option<&DebugSymbol>, jump: Jump, target: usize) -> CompileResult<()> {
+    fn emit_jump_instr(&mut self, jump: Jump, target: usize) -> CompileResult<()> {
         let jump_site = self.current_offset();
         let guess_width = jump.dummy_width();  // guess the width of the jump instruction
         
@@ -343,20 +368,20 @@ impl CodeGenerator<'_> {
         }
         
         match jump_offset {
-            JumpOffset::Short(offset) => self.emit_instr_data(symbol, jump_opcode, &offset.to_le_bytes()),
-            JumpOffset::Long(offset)  => self.emit_instr_data(symbol, jump_opcode, &offset.to_le_bytes()),
+            JumpOffset::Short(offset) => self.emit_instr_data(jump_opcode, &offset.to_le_bytes()),
+            JumpOffset::Long(offset)  => self.emit_instr_data(jump_opcode, &offset.to_le_bytes()),
         }
         Ok(())
     }
     
-    fn emit_dummy_jump(&mut self, symbol: Option<&DebugSymbol>, jump: Jump) -> JumpSite {
+    fn emit_dummy_jump(&mut self, jump: Jump) -> JumpSite {
         let offset = self.current_offset();
         let jump_site = JumpSite {
             jump, offset,
             width: jump.dummy_width(),
         };
         
-        self.emit_dummy_instr(symbol, jump_site.width);
+        self.emit_dummy_instr(jump_site.width);
         
         jump_site
     }
@@ -432,14 +457,14 @@ impl From<&Scope> for ScopeDrop {
 }
 
 impl CodeGenerator<'_> {
-    fn emit_begin_scope(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, tag: ScopeTag) -> &mut Scope {
-        let chunk_id = self.chunk_id;
-        self.scopes_mut().push_scope(symbol, label.copied(), tag)
+    fn emit_begin_scope(&mut self, label: Option<&Label>, tag: ScopeTag) -> &mut Scope {
+        let symbol = self.current_symbol();
+        self.scopes_mut().push_scope(symbol.as_ref(), label.copied(), tag)
     }
     
     fn emit_end_scope(&mut self) -> Scope {
         let scope = self.scopes_mut().pop_scope();
-        self.emit_scope_drop(scope.debug_symbol(), &(&scope).into());
+        self.emit_scope_drop(&(&scope).into());
         scope
     }
     
@@ -457,48 +482,48 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn emit_scope_drop(&mut self, symbol: Option<&DebugSymbol>, scope: &ScopeDrop) {
+    fn emit_scope_drop(&mut self, scope: &ScopeDrop) {
         // close all upvalues
         for local_index in scope.close_upvals.iter() {
-            self.emit_close_upvalue(symbol, *local_index);
+            self.emit_close_upvalue(*local_index);
         }
         
         // discard all the locals from the stack
         let mut discard = scope.locals;
         while discard > u8::MAX.into() {
-            self.emit_instr_byte(symbol, OpCode::DropLocals, u8::MAX);
+            self.emit_instr_byte(OpCode::DropLocals, u8::MAX);
             discard -= usize::from(u8::MAX);
         }
         
         if discard > 0 {
-            self.emit_instr_byte(symbol, OpCode::DropLocals, u8::try_from(discard).unwrap());
+            self.emit_instr_byte(OpCode::DropLocals, u8::try_from(discard).unwrap());
         }
     }
     
     // If the local name cannot be found, no instructions are emitted and None is returned
-    fn try_emit_load_local(&mut self, symbol: Option<&DebugSymbol>, name: &LocalName) -> Option<u16> {
+    fn try_emit_load_local(&mut self, name: &LocalName) -> Option<u16> {
         if let Some(index) = self.scopes().resolve_local(name).map(|local| local.index()) {
-            self.emit_load_local_index(symbol, index);
+            self.emit_load_local_index(index);
             Some(index)
         } else{
             None
         }
     }
     
-    fn emit_load_local_index(&mut self, symbol: Option<&DebugSymbol>, index: LocalIndex) {
+    fn emit_load_local_index(&mut self, index: LocalIndex) {
         if let Ok(index) = u8::try_from(index) {
-            self.emit_instr_byte(symbol, OpCode::LoadLocal, index);
+            self.emit_instr_byte(OpCode::LoadLocal, index);
         } else {
-            self.emit_instr_data(symbol, OpCode::LoadLocal16, &index.to_le_bytes());
+            self.emit_instr_data(OpCode::LoadLocal16, &index.to_le_bytes());
         }
     }
     
-    fn try_emit_load_upval(&mut self, symbol: Option<&DebugSymbol>, name: &LocalName) -> CompileResult<Option<u16>> {
+    fn try_emit_load_upval(&mut self, name: &LocalName) -> CompileResult<Option<u16>> {
         if let Some(index) = self.scopes_mut().resolve_or_create_upval(name)?.map(|upval| upval.index()) {
             if let Ok(index) = u8::try_from(index) {
-                self.emit_instr_byte(symbol, OpCode::LoadUpvalue, index);
+                self.emit_instr_byte(OpCode::LoadUpvalue, index);
             } else {
-                self.emit_instr_data(symbol, OpCode::LoadUpvalue16, &index.to_le_bytes());
+                self.emit_instr_data(OpCode::LoadUpvalue16, &index.to_le_bytes());
             }
             
             Ok(Some(index))
@@ -507,25 +532,25 @@ impl CodeGenerator<'_> {
         }
     }
     
-    fn emit_close_upvalue(&mut self, symbol: Option<&DebugSymbol>, index: LocalIndex) {
+    fn emit_close_upvalue(&mut self, index: LocalIndex) {
         if let Ok(index) = u8::try_from(index) {
-            self.emit_instr_byte(symbol, OpCode::CloseUpvalue, index);
+            self.emit_instr_byte(OpCode::CloseUpvalue, index);
         } else {
-            self.emit_instr_data(symbol, OpCode::CloseUpvalue16, &index.to_le_bytes());
+            self.emit_instr_data(OpCode::CloseUpvalue16, &index.to_le_bytes());
         }
     }
     
-    fn emit_create_temporary(&mut self, symbol: Option<&DebugSymbol>, access: Access) -> CompileResult<LocalIndex> {
+    fn emit_create_temporary(&mut self, access: Access) -> CompileResult<LocalIndex> {
         debug_assert!(self.scopes().is_temporary_scope());
         
         match self.scopes_mut().insert_local(access, LocalName::Anonymous)? {
             InsertLocal::CreateNew(local_index) => {
-                self.emit_instr(symbol, OpCode::InsertLocal);
+                self.emit_instr(OpCode::InsertLocal);
                 Ok(local_index)
             }
             
             InsertLocal::HideExisting(local_index) => {
-                self.emit_assign_local(symbol, local_index);
+                self.emit_assign_local(local_index);
                 Ok(local_index)
             }
         }
@@ -537,27 +562,29 @@ impl CodeGenerator<'_> {
 impl CodeGenerator<'_> {
     fn compile_stmt_with_symbol(&mut self, stmt: &StmtMeta) -> CompileResult<()> {
         let symbol = stmt.debug_symbol();
-        self.compile_stmt(Some(symbol), stmt.variant())
-            .map_err(|err| err.with_symbol(*symbol))
+        self.push_symbol(Some(*symbol));
+        self.compile_stmt(stmt.variant())?;
+        self.pop_symbol();
+        Ok(())
     }
     
-    fn compile_stmt(&mut self, symbol: Option<&DebugSymbol>, stmt: &Stmt) -> CompileResult<()> {
+    fn compile_stmt(&mut self, stmt: &Stmt) -> CompileResult<()> {
         match stmt {
-            Stmt::Loop { label, body } => self.compile_loop(symbol, label.as_ref(), body)?,
+            Stmt::Loop { label, body } => self.compile_loop(label.as_ref(), body)?,
             
-            Stmt::WhileLoop { label, condition, body } => self.compile_while_loop(symbol, label.as_ref(), condition, body)?,
+            Stmt::WhileLoop { label, condition, body } => self.compile_while_loop(label.as_ref(), condition, body)?,
             
-            Stmt::ForLoop { label, lvalue, iter, body } => self.compile_for_loop(symbol, label.as_ref(), lvalue, iter, body)?,
+            Stmt::ForLoop { label, lvalue, iter, body } => self.compile_for_loop(label.as_ref(), lvalue, iter, body)?,
             
             Stmt::Assert(expr) => {
-                self.compile_expr(symbol, expr)?;
-                self.emit_instr(symbol, OpCode::Assert);
-                self.emit_instr(symbol, OpCode::Pop);
+                self.compile_expr(expr)?;
+                self.emit_instr(OpCode::Assert);
+                self.emit_instr(OpCode::Pop);
             }
             
             Stmt::Expression(expr) => {
-                self.compile_expr(symbol, expr)?;
-                self.emit_instr(symbol, OpCode::Pop);
+                self.compile_expr(expr)?;
+                self.emit_instr(OpCode::Pop);
             },
         }
         Ok(())
@@ -575,11 +602,13 @@ impl CodeGenerator<'_> {
     // compile a statment list that will not evaluate to a value
     fn compile_stmt_block(&mut self, stmt_list: &StmtList) -> CompileResult<()> {
         self.compile_stmt_list(stmt_list)?;
-        self.compile_end_control(stmt_list)?;
+        if let Some(control) = stmt_list.end_control() {
+            self.compile_control_flow(control)?;
+        }
         Ok(())
     }
     
-    fn compile_expr_block(&mut self, symbol: Option<&DebugSymbol>, suite: &ExprBlock) -> CompileResult<()> {
+    fn compile_expr_block(&mut self, suite: &ExprBlock) -> CompileResult<()> {
         let stmt_list = suite.stmt_list();
         self.compile_stmt_list(stmt_list)?;
         
@@ -588,52 +617,47 @@ impl CodeGenerator<'_> {
             if let Some(expr) = suite.result() {
                 self.compile_expr_with_symbol(expr)?;
             } else {
-                self.emit_instr(symbol, OpCode::Nil); // implicit nil
+                self.emit_instr(OpCode::Nil); // implicit nil
             }
         }
         
-        self.compile_end_control(stmt_list)?;
-        
-        Ok(())
-    }
-    
-    fn compile_end_control(&mut self, stmt_list: &StmtList) -> CompileResult<()> {
-        // handle control flow
         if let Some(control) = stmt_list.end_control() {
-            let result = self.compile_control_flow(control);
-            if let Some(symbol) = control.debug_symbol() {
-                result.map_err(|error| error.with_symbol(*symbol))?;
-            } else {
-                result?;
-            }
+            self.compile_control_flow(control)?;
         }
+        
         Ok(())
     }
     
     fn compile_control_flow(&mut self, control_flow: &ControlFlow) -> CompileResult<()> {
         match control_flow {
-            ControlFlow::Continue { label, symbol } => self.compile_continue_control(
-                symbol.as_ref(), label.as_ref()
-            )?,
+            ControlFlow::Continue { label, symbol } => {
+                self.push_symbol(*symbol);
+                self.compile_continue_control(label.as_ref())?;
+                self.pop_symbol();
+            }
             
-            ControlFlow::Break { label, expr, symbol } => self.compile_break_control(
-                symbol.as_ref(), label.as_ref(), expr.as_deref()
-            )?,
+            ControlFlow::Break { label, expr, symbol } => {
+                self.push_symbol(*symbol);
+                self.compile_break_control(label.as_ref(), expr.as_deref())?;
+                self.pop_symbol();
+            }
             
             ControlFlow::Return { expr, symbol } => {
-                let symbol = symbol.as_ref();
-                if let Some(expr) = expr {
-                    self.compile_expr(symbol, expr)?;
-                } else {
-                    self.emit_instr(symbol, OpCode::Nil);
+                self.push_symbol(*symbol);
+                
+                match expr {
+                    Some(expr) => self.compile_expr(expr)?,
+                    None => self.emit_instr(OpCode::Nil),
                 }
-                self.emit_instr(symbol, OpCode::Return);
+                
+                self.emit_instr(OpCode::Return);
+                self.pop_symbol();
             }
         }
         Ok(())
     }
     
-    fn compile_break_control(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, expr: Option<&Expr>) -> CompileResult<()> {
+    fn compile_break_control(&mut self, label: Option<&Label>, expr: Option<&Expr>) -> CompileResult<()> {
         // find the target scope
         let target_depth = match self.scopes().resolve_control_flow(ControlFlowTarget::Break(label.copied())) {
             Some(scope) => scope.depth(),
@@ -653,30 +677,30 @@ impl CodeGenerator<'_> {
         
         let (target, through_scopes) = scope_drop.split_last().unwrap();
         for scope in through_scopes.iter() {
-            self.emit_scope_drop(symbol, scope);
+            self.emit_scope_drop(scope);
             
             // expression blocks leave their value on the stack
             // (this is helped by the fact that break/contine must come last in a list of statements)
             // so if we break through an expression block we need to pop its value
             if scope.tag.is_expr_block() {
-                self.emit_instr(symbol, OpCode::Pop);
+                self.emit_instr(OpCode::Pop);
             }
         }
-        self.emit_scope_drop(symbol, target); // drop target scope
+        self.emit_scope_drop(target); // drop target scope
         
         // if breaking from an expression block, emit the expression value before jumping
         if target.tag.is_expr_block() {
             if let Some(expr) = expr {
-                self.compile_expr(symbol, expr)?;
+                self.compile_expr(expr)?;
             } else {
-                self.emit_instr(symbol, OpCode::Nil);
+                self.emit_instr(OpCode::Nil);
             }
         } else if expr.is_some() {
             return Err("\"break\" with value outside of block expression".into())
         }
         
         // emit jump site, register with scope
-        let break_site = self.emit_dummy_jump(symbol, Jump::Uncond);
+        let break_site = self.emit_dummy_jump(Jump::Uncond);
         
         let target_scope = self.scopes_mut().iter_scopes_mut()
             .find(|scope| scope.depth() == target_depth)
@@ -687,7 +711,7 @@ impl CodeGenerator<'_> {
         
     }
     
-    fn compile_continue_control(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>) -> CompileResult<()> {
+    fn compile_continue_control(&mut self, label: Option<&Label>) -> CompileResult<()> {
         // find the target scope
         let target_depth = match self.scopes().resolve_control_flow(ControlFlowTarget::Continue(label.copied())) {
             Some(scope) => scope.depth(),
@@ -706,18 +730,18 @@ impl CodeGenerator<'_> {
             .collect();
         
         for scope in scope_drop.iter() {
-            self.emit_scope_drop(symbol, scope);
+            self.emit_scope_drop(scope);
             
             // expression blocks leave their value on the stack
             // (this is helped by the fact that break/contine must come last in a list of statements)
             // so if we jump out of an expression block we need to pop its value
             if scope.tag.is_expr_block() {
-                self.emit_instr(symbol, OpCode::Pop);
+                self.emit_instr(OpCode::Pop);
             }
         }
         
         // emit jump site, register with scope
-        let continue_site = self.emit_dummy_jump(symbol, Jump::Uncond);
+        let continue_site = self.emit_dummy_jump(Jump::Uncond);
         
         let target_scope = self.scopes_mut().iter_scopes_mut()
             .find(|scope| scope.depth() == target_depth)
@@ -727,16 +751,16 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, body: &StmtList) -> CompileResult<()> {
+    fn compile_loop(&mut self, label: Option<&Label>, body: &StmtList) -> CompileResult<()> {
         
         let loop_target = self.current_offset();
         
-        self.emit_begin_scope(symbol, label, ScopeTag::Loop);
+        self.emit_begin_scope(label, ScopeTag::Loop);
         
         self.compile_stmt_block(body)?;
         let loop_scope = self.emit_end_scope();
         
-        self.emit_jump_instr(symbol, Jump::Uncond, loop_target)?;
+        self.emit_jump_instr(Jump::Uncond, loop_target)?;
         
         // finalize scope
         let break_target = self.current_offset();
@@ -746,23 +770,23 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_while_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, condition: &Expr, body: &StmtList) -> CompileResult<()> {
+    fn compile_while_loop(&mut self, label: Option<&Label>, condition: &Expr, body: &StmtList) -> CompileResult<()> {
         
         // first iteration conditional jump
         let continue_target = self.current_offset();
-        self.compile_expr(symbol, condition)?;
+        self.compile_expr(condition)?;
         
-        let end_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
+        let end_jump_site = self.emit_dummy_jump(Jump::PopIfFalse);
         
         let loop_target = self.current_offset();
         
-        self.emit_begin_scope(symbol, label, ScopeTag::Loop);
+        self.emit_begin_scope(label, ScopeTag::Loop);
         self.compile_stmt_block(body)?;
         let loop_scope = self.emit_end_scope();
         
         // rest iteration conditional jump
-        self.compile_expr(symbol, condition)?;
-        self.emit_jump_instr(symbol, Jump::PopIfTrue, loop_target)?;
+        self.compile_expr(condition)?;
+        self.emit_jump_instr(Jump::PopIfTrue, loop_target)?;
         
         self.patch_jump_instr(&end_jump_site, self.current_offset())?;
         
@@ -774,25 +798,25 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_for_loop(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, lvalue: &LValue, iter: &Expr, body: &StmtList) -> CompileResult<()> {
+    fn compile_for_loop(&mut self, label: Option<&Label>, lvalue: &LValue, iter: &Expr, body: &StmtList) -> CompileResult<()> {
         
-        self.emit_begin_scope(symbol, label, ScopeTag::Loop);
+        self.emit_begin_scope(label, ScopeTag::Loop);
         
         // initialize iterator
-        self.compile_expr(symbol, iter)?;
-        self.emit_instr(symbol, OpCode::IterInit);
+        self.compile_expr(iter)?;
+        self.emit_instr(OpCode::IterInit);
         
         // first iteration conditional jump
         let continue_target = self.current_offset();
-        let end_jump_site = self.emit_dummy_jump(symbol, Jump::IfFalse);
+        let end_jump_site = self.emit_dummy_jump(Jump::IfFalse);
         
         let loop_target = self.current_offset();
         
         // advance iterator and assign value
         // default to "let" for loop variables (unlike normal assignment, which defaults to "local")
-        self.emit_instr(symbol, OpCode::IterNext);
-        self.compile_assignment(symbol, AssignType::DeclImmutable, lvalue)?; 
-        self.emit_instr(symbol, OpCode::Pop);
+        self.emit_instr(OpCode::IterNext);
+        self.compile_assignment(AssignType::DeclImmutable, lvalue)?; 
+        self.emit_instr(OpCode::Pop);
         
         // compile body
         self.compile_stmt_block(body)?;
@@ -800,10 +824,10 @@ impl CodeGenerator<'_> {
         
         // rest iteration conditional jump
         // should have just [ ... iter state[N] ] on the stack here
-        self.emit_jump_instr(symbol, Jump::IfTrue, loop_target)?;
+        self.emit_jump_instr(Jump::IfTrue, loop_target)?;
         
         let break_target = self.current_offset();
-        self.emit_instr_byte(symbol, OpCode::Drop, 2); // drop [ iter state ]
+        self.emit_instr_byte(OpCode::Drop, 2); // drop [ iter state ]
         
         // finalize scope
         self.patch_jump_instr(&end_jump_site, break_target)?;
@@ -826,69 +850,71 @@ enum Unpack {
 impl CodeGenerator<'_> {
     fn compile_expr_with_symbol(&mut self, expr: &ExprMeta) -> CompileResult<()> {
         let symbol = expr.debug_symbol();
-        self.compile_expr(Some(symbol), expr.variant())
-            .map_err(|err| err.with_symbol(*symbol))
+        self.push_symbol(Some(*symbol));
+        self.compile_expr(expr.variant())?;
+        self.pop_symbol();
+        Ok(())
     }
     
-    fn compile_expr(&mut self, symbol: Option<&DebugSymbol>, expr: &Expr) -> CompileResult<()> {
+    fn compile_expr(&mut self, expr: &Expr) -> CompileResult<()> {
         match expr {
-            Expr::Atom(atom) => self.compile_atom(symbol, atom)?,
+            Expr::Atom(atom) => self.compile_atom(atom)?,
             
-            Expr::Primary(primary) => self.compile_primary(symbol, primary)?,
+            Expr::Primary(primary) => self.compile_primary(primary)?,
             
-            Expr::UnaryOp(op, expr) => self.compile_unary_op(symbol, *op, expr)?,
+            Expr::UnaryOp(op, expr) => self.compile_unary_op(*op, expr)?,
             
             Expr::BinaryOp(op, exprs) => {
                 let (lhs, rhs) = &**exprs;
-                self.compile_binary_op(symbol, *op, lhs, rhs)?;
+                self.compile_binary_op(*op, lhs, rhs)?;
             },
             
             Expr::Assignment(assign) => {
                 if let Some(op) = assign.op {
-                    self.compile_update_assignment(symbol, op, assign.modifier, &assign.lhs, &assign.rhs)?;
+                    self.compile_update_assignment(op, assign.modifier, &assign.lhs, &assign.rhs)?;
                 } else {
-                    self.compile_expr(symbol, &assign.rhs)?;
-                    self.compile_assignment(symbol, assign.modifier, &assign.lhs)?;
+                    self.compile_expr(&assign.rhs)?;
+                    self.compile_assignment(assign.modifier, &assign.lhs)?;
                 }
             },
             
-            Expr::Tuple(items) => self.compile_tuple(symbol, items)?,
+            Expr::Tuple(items) => self.compile_tuple(items)?,
             
             // unpacking is only allowed in invocation, tuple literals, and by itself in parentheses
             // note: assignment uses *packing*, not unpacking, which is the LValue dual of packing.
             Expr::Unpack(Some(..)) => return Err("unpack expression must be enclosed in parentheses".into()),
             Expr::Unpack(None) => return Err("\"...\" is not allowed here".into()),
             
-            Expr::Block { label, suite } => self.compile_block_expression(symbol, label.as_ref(), suite)?,
-            Expr::IfExpr { branches, else_clause } => self.compile_if_expression(symbol, branches, else_clause.as_ref().map(|expr| &**expr))?,
+            Expr::Block { label, suite } => self.compile_block_expression(label.as_ref(), suite)?,
+            Expr::IfExpr { branches, else_clause } => self.compile_if_expression(branches, else_clause.as_ref().map(|expr| &**expr))?,
             
-            Expr::FunctionDef(fundef) => self.compile_function_def(symbol, fundef)?,
+            Expr::FunctionDef(fundef) => self.compile_function_def(fundef)?,
         }
         Ok(())
     }
     
-    fn compile_tuple(&mut self, symbol: Option<&DebugSymbol>, expr_list: &[ExprMeta]) -> CompileResult<()> {
-        match self.compile_unpack_sequence(symbol, expr_list)? {
-            Unpack::Empty => self.emit_instr(symbol, OpCode::Empty),
+    fn compile_tuple(&mut self, expr_list: &[ExprMeta]) -> CompileResult<()> {
+        match self.compile_unpack_sequence(expr_list)? {
+            Unpack::Empty => self.emit_instr(OpCode::Empty),
             
             Unpack::Static(len) => {
                 if let Ok(len) = u8::try_from(len) {
-                    self.emit_instr_byte(symbol, OpCode::Tuple, len);
+                    self.emit_instr_byte(OpCode::Tuple, len);
                 } else {
-                    self.compile_integer(symbol, len)?;
-                    self.emit_instr(symbol, OpCode::TupleN);
+                    self.compile_integer(len)?;
+                    self.emit_instr(OpCode::TupleN);
                 }
             }
             
             Unpack::Dynamic => {
-                self.emit_instr(symbol, OpCode::TupleN);
+                self.emit_instr(OpCode::TupleN);
             }
         }
         Ok(())
     }
     
     // compiles to a sequence of values
-    fn compile_unpack_sequence(&mut self, symbol: Option<&DebugSymbol>, seq: &[ExprMeta]) -> CompileResult<Unpack> {
+    fn compile_unpack_sequence(&mut self, seq: &[ExprMeta]) -> CompileResult<Unpack> {
         if seq.is_empty() {
             return Ok(Unpack::Empty)
         }
@@ -903,24 +929,26 @@ impl CodeGenerator<'_> {
                 Expr::Unpack(None) => return Err("need a value to unpack".into()),
                 
                 Expr::Unpack(Some(unpack)) => {
-                    let symbol = Some(expr.debug_symbol());
+                    let symbol = expr.debug_symbol();
+                    self.push_symbol(Some(*symbol));
                     
-                    self.compile_expr(symbol, unpack)?;
-                    self.emit_instr(symbol, OpCode::IterInit);
-                    self.emit_instr(symbol, OpCode::IterUnpack);
+                    self.compile_expr(unpack)?;
+                    self.emit_instr(OpCode::IterInit);
+                    self.emit_instr(OpCode::IterUnpack);
                     
                     // store unpack len in accumulator
                     if let Some(local_index) = unpack_len {
-                        self.emit_load_local_index(symbol, local_index);
-                        self.emit_instr(symbol, OpCode::Add);
-                        self.emit_assign_local(symbol, local_index);
+                        self.emit_load_local_index(local_index);
+                        self.emit_instr(OpCode::Add);
+                        self.emit_assign_local(local_index);
                     } else {
-                        self.emit_begin_scope(symbol, None, ScopeTag::Temporary);
-                        let local_index = self.emit_create_temporary(symbol, Access::ReadWrite)?;
+                        self.emit_begin_scope(None, ScopeTag::Temporary);
+                        let local_index = self.emit_create_temporary(Access::ReadWrite)?;
                         unpack_len = Some(local_index);
                     }
                     
-                    self.emit_instr(symbol, OpCode::Pop);
+                    self.emit_instr(OpCode::Pop);
+                    self.pop_symbol();
                 }
                 
                 _ => {
@@ -937,25 +965,27 @@ impl CodeGenerator<'_> {
             Expr::Unpack(None) => return Err("need a value to unpack".into()),
             
             Expr::Unpack(Some(unpack)) => {
-                let symbol = Some(last.debug_symbol());
+                let symbol = last.debug_symbol();
+                self.push_symbol(Some(*symbol));
                 
-                self.compile_expr(symbol, unpack)?;
-                self.emit_instr(symbol, OpCode::IterInit);
-                self.emit_instr(symbol, OpCode::IterUnpack);
+                self.compile_expr(unpack)?;
+                self.emit_instr(OpCode::IterInit);
+                self.emit_instr(OpCode::IterUnpack);
                 
                 if let Some(local_index) = unpack_len {
-                    self.emit_load_local_index(symbol, local_index);
-                    self.emit_instr(symbol, OpCode::Add);
+                    self.emit_load_local_index(local_index);
+                    self.emit_instr(OpCode::Add);
                     
                     debug_assert!(self.scopes().is_temporary_scope());
                     self.emit_end_scope();
                 }
                 
                 if static_len > 0 {
-                    self.compile_integer(symbol, static_len)?;
-                    self.emit_instr(symbol, OpCode::Add);
+                    self.compile_integer(static_len)?;
+                    self.emit_instr(OpCode::Add);
                 }
                 
+                self.pop_symbol();
                 Ok(Unpack::Dynamic)
             }
             
@@ -965,11 +995,11 @@ impl CodeGenerator<'_> {
                     .ok_or("unpack length limit exceeded")?;
                     
                 if let Some(local_index) = unpack_len {
-                    self.emit_load_local_index(symbol, local_index);
+                    self.emit_load_local_index(local_index);
                     
                     if static_len > 0 {
-                        self.compile_integer(symbol, static_len)?;
-                        self.emit_instr(symbol, OpCode::Add);
+                        self.compile_integer(static_len)?;
+                        self.emit_instr(OpCode::Add);
                     }
                     
                     debug_assert!(self.scopes().is_temporary_scope());
@@ -983,25 +1013,25 @@ impl CodeGenerator<'_> {
         }
     }
 
-    fn compile_atom(&mut self, symbol: Option<&DebugSymbol>, atom: &Atom) -> CompileResult<()> {
+    fn compile_atom(&mut self, atom: &Atom) -> CompileResult<()> {
         match atom {
-            Atom::Nil => self.emit_instr(symbol, OpCode::Nil),
-            Atom::EmptyTuple => self.emit_instr(symbol, OpCode::Empty),
-            Atom::BooleanLiteral(true) => self.emit_instr(symbol, OpCode::True),
-            Atom::BooleanLiteral(false) => self.emit_instr(symbol, OpCode::False),
+            Atom::Nil => self.emit_instr(OpCode::Nil),
+            Atom::EmptyTuple => self.emit_instr(OpCode::Empty),
+            Atom::BooleanLiteral(true) => self.emit_instr(OpCode::True),
+            Atom::BooleanLiteral(false) => self.emit_instr(OpCode::False),
             
-            Atom::IntegerLiteral(value) => self.compile_integer(symbol, *value)?,
-            Atom::FloatLiteral(value) => self.compile_float(symbol, *value)?,
+            Atom::IntegerLiteral(value) => self.compile_integer(*value)?,
+            Atom::FloatLiteral(value) => self.compile_float(*value)?,
             
-            Atom::StringLiteral(value) => self.emit_load_const(symbol, Constant::from(*value))?,
-            Atom::Identifier(name) => self.compile_name_lookup(symbol, name)?,
+            Atom::StringLiteral(value) => self.emit_load_const(Constant::from(*value))?,
+            Atom::Identifier(name) => self.compile_name_lookup(name)?,
             
             // Atom::Self_ => unimplemented!(),
             // Atom::Super => unimplemented!(),
             
             Atom::Group { modifier, inner } => {
                 // modifiers are not allowed outside of assignment
-                if let Some(modifier) = modifier {
+                if modifier.is_some() {
                     return Err("assignment modifiers are not allowed outside of an assignment expression".into())
                 }
                 
@@ -1009,14 +1039,14 @@ impl CodeGenerator<'_> {
                     // tuple constructor
                     Expr::Unpack(None) => return Err("need a value to unpack".into()),
                     Expr::Unpack(Some(iter)) => {
-                        self.compile_expr(symbol, iter)?;
-                        self.emit_instr(symbol, OpCode::IterInit);
-                        self.emit_instr(symbol, OpCode::IterUnpack);
-                        self.emit_instr(symbol, OpCode::TupleN);
+                        self.compile_expr(iter)?;
+                        self.emit_instr(OpCode::IterInit);
+                        self.emit_instr(OpCode::IterUnpack);
+                        self.emit_instr(OpCode::TupleN);
                     }
                     
                     // parenthesized group
-                    expr => self.compile_expr(symbol, inner)?,
+                    _ => self.compile_expr(inner)?,
                 }
                 
             },
@@ -1024,131 +1054,129 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_integer(&mut self, symbol: Option<&DebugSymbol>, value: IntType) -> CompileResult<()> {
+    fn compile_integer(&mut self, value: IntType) -> CompileResult<()> {
         if let Ok(value) = u8::try_from(value) {
-            self.emit_instr_byte(symbol, OpCode::UInt8, value);
+            self.emit_instr_byte(OpCode::UInt8, value);
         } else if let Ok(value) = i8::try_from(value) {
-            self.emit_instr_byte(symbol, OpCode::Int8, value.to_le_bytes()[0]);
+            self.emit_instr_byte(OpCode::Int8, value.to_le_bytes()[0]);
         } else if let Ok(value) = i16::try_from(value) {
-            self.emit_instr_data(symbol, OpCode::Int16, &value.to_le_bytes());
+            self.emit_instr_data(OpCode::Int16, &value.to_le_bytes());
         } else {
-            self.emit_load_const(symbol, Constant::from(value))?;
+            self.emit_load_const(Constant::from(value))?;
         }
         Ok(())
     }
     
-    fn compile_float(&mut self, symbol: Option<&DebugSymbol>, value: FloatType) -> CompileResult<()> {
-        self.emit_load_const(symbol, Constant::from(value))
+    fn compile_float(&mut self, value: FloatType) -> CompileResult<()> {
+        self.emit_load_const(Constant::from(value))
     }
     
-    fn compile_name_lookup(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol) -> CompileResult<()> {
+    fn compile_name_lookup(&mut self, name: &InternSymbol) -> CompileResult<()> {
         let local_name = LocalName::Symbol(*name);
         
         // Try loading a Local variable
-        if self.try_emit_load_local(symbol, &local_name).is_some() {
+        if self.try_emit_load_local(&local_name).is_some() {
             return Ok(());
         }
         
         // Next, try loading an upvalue
-        if self.try_emit_load_upval(symbol, &local_name)?.is_some() {
+        if self.try_emit_load_upval(&local_name)?.is_some() {
             return Ok(());
         }
         
         // Otherwise, it must be a Global variable
-        self.emit_load_const(symbol, Constant::from(*name))?;
-        self.emit_instr(symbol, OpCode::LoadGlobal);
+        self.emit_load_const(Constant::from(*name))?;
+        self.emit_instr(OpCode::LoadGlobal);
         Ok(())
     }
     
-    fn compile_primary(&mut self, symbol: Option<&DebugSymbol>, primary: &Primary) -> CompileResult<()> {
-        self.compile_atom(symbol, primary.atom())?;
+    fn compile_primary(&mut self, primary: &Primary) -> CompileResult<()> {
+        self.compile_atom(primary.atom())?;
         
         for item in primary.path().iter() {
             match item {
-                AccessItem::Attribute(name) => unimplemented!(),
-                AccessItem::Index(index) => unimplemented!(),
-                AccessItem::Invoke(args) => self.compile_invocation(symbol, args)?,
+                AccessItem::Attribute(_name) => unimplemented!(),
+                AccessItem::Index(_index) => unimplemented!(),
+                AccessItem::Invoke(args) => self.compile_invocation(args)?,
             }
         }
         
         Ok(())
     }
     
-    fn compile_invocation(&mut self, symbol: Option<&DebugSymbol>, args: &[ExprMeta]) -> CompileResult<()> {
+    fn compile_invocation(&mut self, args: &[ExprMeta]) -> CompileResult<()> {
         // prepare argument list:
         // [ callobj arg[0] ... arg[n] nargs ] => [ ret_value ] 
 
         // process argument unpacking
-        match self.compile_unpack_sequence(symbol, args)? {
-            Unpack::Empty => self.emit_instr_byte(symbol, OpCode::UInt8, 0),
-            Unpack::Static(len) => self.compile_integer(symbol, len)?,
+        match self.compile_unpack_sequence(args)? {
+            Unpack::Empty => self.emit_instr_byte(OpCode::UInt8, 0),
+            Unpack::Static(len) => self.compile_integer(len)?,
             Unpack::Dynamic => { } // nothing to do
         }
 
-        self.emit_instr(symbol, OpCode::Call);
+        self.emit_instr(OpCode::Call);
 
         Ok(())
     }
     
-    fn compile_unary_op(&mut self, symbol: Option<&DebugSymbol>, op: UnaryOp, expr: &Expr) -> CompileResult<()> {
-        self.compile_expr(symbol, expr)?;
+    fn compile_unary_op(&mut self, op: UnaryOp, expr: &Expr) -> CompileResult<()> {
+        self.compile_expr(expr)?;
         match op {
-            UnaryOp::Neg => self.emit_instr(symbol, OpCode::Neg),
-            UnaryOp::Pos => self.emit_instr(symbol, OpCode::Pos),
-            UnaryOp::Inv => self.emit_instr(symbol, OpCode::Inv),
-            UnaryOp::Not => self.emit_instr(symbol, OpCode::Not),
+            UnaryOp::Neg => self.emit_instr(OpCode::Neg),
+            UnaryOp::Pos => self.emit_instr(OpCode::Pos),
+            UnaryOp::Inv => self.emit_instr(OpCode::Inv),
+            UnaryOp::Not => self.emit_instr(OpCode::Not),
         };
         Ok(())
     }
     
-    fn compile_binary_op(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp, lhs: &Expr, rhs: &Expr) -> CompileResult<()> {
+    fn compile_binary_op(&mut self, op: BinaryOp, lhs: &Expr, rhs: &Expr) -> CompileResult<()> {
         
         if matches!(op, BinaryOp::And) {
-            return self.compile_shortcircuit_and(symbol, lhs, rhs);
+            return self.compile_shortcircuit_and(lhs, rhs);
         }
         if matches!(op, BinaryOp::Or) {
-            return self.compile_shortcircuit_or(symbol, lhs, rhs);
+            return self.compile_shortcircuit_or(lhs, rhs);
         }
         
-        self.compile_expr(symbol, lhs)?;
-        self.compile_expr(symbol, rhs)?;
-        self.emit_binary_op(symbol, op);
+        self.compile_expr(lhs)?;
+        self.compile_expr(rhs)?;
+        self.emit_binary_op(op);
         
         Ok(())
     }
     
-    fn emit_binary_op(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp) {
+    fn emit_binary_op(&mut self, op: BinaryOp) {
         match op {
             BinaryOp::And | BinaryOp::Or => unreachable!(),
             
-            BinaryOp::Mul => self.emit_instr(symbol, OpCode::Mul),
-            BinaryOp::Div => self.emit_instr(symbol, OpCode::Div),
-            BinaryOp::Mod => self.emit_instr(symbol, OpCode::Mod),
-            BinaryOp::Add => self.emit_instr(symbol, OpCode::Add),
-            BinaryOp::Sub => self.emit_instr(symbol, OpCode::Sub),
+            BinaryOp::Mul => self.emit_instr(OpCode::Mul),
+            BinaryOp::Div => self.emit_instr(OpCode::Div),
+            BinaryOp::Mod => self.emit_instr(OpCode::Mod),
+            BinaryOp::Add => self.emit_instr(OpCode::Add),
+            BinaryOp::Sub => self.emit_instr(OpCode::Sub),
             
-            BinaryOp::BitAnd => self.emit_instr(symbol, OpCode::And),
-            BinaryOp::BitXor => self.emit_instr(symbol, OpCode::Xor),
-            BinaryOp::BitOr  => self.emit_instr(symbol, OpCode::Or),
+            BinaryOp::BitAnd => self.emit_instr(OpCode::And),
+            BinaryOp::BitXor => self.emit_instr(OpCode::Xor),
+            BinaryOp::BitOr  => self.emit_instr(OpCode::Or),
             
-            BinaryOp::LShift  => self.emit_instr(symbol, OpCode::Shl),
-            BinaryOp::RShift => self.emit_instr(symbol, OpCode::Shr),
+            BinaryOp::LShift  => self.emit_instr(OpCode::Shl),
+            BinaryOp::RShift => self.emit_instr(OpCode::Shr),
             
-            BinaryOp::LT => self.emit_instr(symbol, OpCode::LT),
-            BinaryOp::GT => self.emit_instr(symbol, OpCode::GT),
-            BinaryOp::LE => self.emit_instr(symbol, OpCode::LE),
-            BinaryOp::GE => self.emit_instr(symbol, OpCode::GE),
-            BinaryOp::EQ => self.emit_instr(symbol, OpCode::EQ),
-            BinaryOp::NE => self.emit_instr(symbol, OpCode::NE),
+            BinaryOp::LT => self.emit_instr(OpCode::LT),
+            BinaryOp::GT => self.emit_instr(OpCode::GT),
+            BinaryOp::LE => self.emit_instr(OpCode::LE),
+            BinaryOp::GE => self.emit_instr(OpCode::GE),
+            BinaryOp::EQ => self.emit_instr(OpCode::EQ),
+            BinaryOp::NE => self.emit_instr(OpCode::NE),
         };
     }
 }
 
 ///////// Declarations and Assignments /////////
 impl CodeGenerator<'_> {
-
-    
-    fn compile_update_assignment(&mut self, symbol: Option<&DebugSymbol>, op: BinaryOp, assign: AssignType, lhs: &LValue, rhs: &Expr) -> CompileResult<()> {
+    fn compile_update_assignment(&mut self, op: BinaryOp, assign: AssignType, lhs: &LValue, rhs: &Expr) -> CompileResult<()> {
         
         let local_only = match assign {
             AssignType::AssignLocal => true,
@@ -1161,16 +1189,16 @@ impl CodeGenerator<'_> {
         // TODO suport Attribute and Index LValues as well
         match lhs {
             LValue::Identifier(name) => {
-                self.compile_name_lookup(symbol, name)?;
-                self.compile_expr(symbol, rhs)?;
-                self.emit_binary_op(symbol, op);
+                self.compile_name_lookup(name)?;
+                self.compile_expr(rhs)?;
+                self.emit_binary_op(op);
                 
-                self.compile_assign_identifier(symbol, name, local_only)
+                self.compile_assign_identifier(name, local_only)
             },
             
-            LValue::Attribute(target) => unimplemented!(),
+            LValue::Attribute(_target) => unimplemented!(),
             
-            LValue::Index(target) => unimplemented!(),
+            LValue::Index(_target) => unimplemented!(),
             
             LValue::Tuple {..} | LValue::Pack(..)
                 => Err("can't update-assign to this".into()),
@@ -1179,7 +1207,7 @@ impl CodeGenerator<'_> {
         }
     }
     
-    fn compile_assignment(&mut self, symbol: Option<&DebugSymbol>, mut assign: AssignType, mut lhs: &LValue) -> CompileResult<()> {
+    fn compile_assignment(&mut self, mut assign: AssignType, mut lhs: &LValue) -> CompileResult<()> {
         
         while let LValue::Modifier { modifier, lvalue } = lhs {
             assign = *modifier;
@@ -1187,30 +1215,30 @@ impl CodeGenerator<'_> {
         }
         
         match lhs {
-            LValue::Tuple(items) => self.compile_assign_tuple(symbol, assign, items),
+            LValue::Tuple(items) => self.compile_assign_tuple(assign, items),
             
             LValue::Pack(..) => {
                 let item = std::slice::from_ref(lhs);
-                self.compile_assign_tuple(symbol, assign, item)
+                self.compile_assign_tuple(assign, item)
             }
             
             lhs => {
                 match assign {
-                    AssignType::AssignLocal => self.compile_assign_variable(symbol, lhs, false),
-                    AssignType::AssignNonLocal => self.compile_assign_variable(symbol, lhs, true),
-                    AssignType::DeclImmutable => self.compile_decl_variable(symbol, Access::ReadOnly, lhs),
-                    AssignType::DeclMutable => self.compile_decl_variable(symbol, Access::ReadWrite, lhs),
+                    AssignType::AssignLocal => self.compile_assign_variable(lhs, false),
+                    AssignType::AssignNonLocal => self.compile_assign_variable(lhs, true),
+                    AssignType::DeclImmutable => self.compile_decl_variable(Access::ReadOnly, lhs),
+                    AssignType::DeclMutable => self.compile_decl_variable(Access::ReadWrite, lhs),
                 }
             }
         }
     }
 
-    fn compile_decl_variable(&mut self, symbol: Option<&DebugSymbol>, access: Access, lhs: &LValue) -> CompileResult<()> {
+    fn compile_decl_variable(&mut self, access: Access, lhs: &LValue) -> CompileResult<()> {
         match lhs {
             LValue::Identifier(name) => if self.scopes().is_global_scope() {
-                self.compile_decl_global_name(symbol, access, *name)
+                self.compile_decl_global_name(access, *name)
             } else {
-                self.compile_decl_local_name(symbol, access, *name)
+                self.compile_decl_local_name(access, *name)
             },
             
             LValue::Tuple {..} => unreachable!(),
@@ -1220,43 +1248,43 @@ impl CodeGenerator<'_> {
         }
     }
     
-    fn compile_decl_global_name(&mut self, symbol: Option<&DebugSymbol>, access: Access, name: InternSymbol) -> CompileResult<()> {
+    fn compile_decl_global_name(&mut self, access: Access, name: InternSymbol) -> CompileResult<()> {
         
-        self.emit_load_const(symbol, Constant::from(name))?;
+        self.emit_load_const(Constant::from(name))?;
         match access {
-            Access::ReadOnly => self.emit_instr(symbol, OpCode::InsertGlobal),
-            Access::ReadWrite => self.emit_instr(symbol, OpCode::InsertGlobalMut),
+            Access::ReadOnly => self.emit_instr(OpCode::InsertGlobal),
+            Access::ReadWrite => self.emit_instr(OpCode::InsertGlobalMut),
         }
         Ok(())
     }
     
-    fn compile_decl_local_name(&mut self, symbol: Option<&DebugSymbol>, access: Access, name: InternSymbol) -> CompileResult<()> {
+    fn compile_decl_local_name(&mut self, access: Access, name: InternSymbol) -> CompileResult<()> {
         
         match self.scopes_mut().insert_local(access, LocalName::Symbol(name))? {
             InsertLocal::CreateNew(..) => 
-                self.emit_instr(symbol, OpCode::InsertLocal),
+                self.emit_instr(OpCode::InsertLocal),
             
             InsertLocal::HideExisting(local_index) =>
-                self.emit_assign_local(symbol, local_index),
+                self.emit_assign_local(local_index),
         }
         
         Ok(())
     }
     
-    fn compile_assign_variable(&mut self, symbol: Option<&DebugSymbol>, lhs: &LValue, allow_nonlocal: bool) -> CompileResult<()> {
+    fn compile_assign_variable(&mut self, lhs: &LValue, allow_nonlocal: bool) -> CompileResult<()> {
         
         match lhs {
-            LValue::Identifier(name) => self.compile_assign_identifier(symbol, name, allow_nonlocal),
+            LValue::Identifier(name) => self.compile_assign_identifier(name, allow_nonlocal),
             
-            LValue::Attribute(target) => unimplemented!(),
+            LValue::Attribute(_target) => unimplemented!(),
             
-            LValue::Index(target) => unimplemented!(),
+            LValue::Index(_target) => unimplemented!(),
             
             _ => panic!("invalid assignment target"),
         }
     }
     
-    fn compile_assign_identifier(&mut self, symbol: Option<&DebugSymbol>, name: &InternSymbol, allow_nonlocal: bool) -> CompileResult<()> {
+    fn compile_assign_identifier(&mut self, name: &InternSymbol, allow_nonlocal: bool) -> CompileResult<()> {
         
         // Generate assignment
         
@@ -1272,7 +1300,7 @@ impl CodeGenerator<'_> {
                     return Err("can't assign to immutable local variable".into());
                 }
                 
-                self.emit_assign_local(symbol, local.index());
+                self.emit_assign_local(local.index());
                 
                 return Ok(());
             }
@@ -1291,9 +1319,9 @@ impl CodeGenerator<'_> {
                     
                     let index = upval.index();
                     if let Ok(index) = u8::try_from(index) {
-                        self.emit_instr_byte(symbol, OpCode::StoreUpvalue, index);
+                        self.emit_instr_byte(OpCode::StoreUpvalue, index);
                     } else {
-                        self.emit_instr_data(symbol, OpCode::StoreUpvalue16, &index.to_le_bytes());
+                        self.emit_instr_data(OpCode::StoreUpvalue16, &index.to_le_bytes());
                     }
                     
                     return Ok(());
@@ -1302,20 +1330,20 @@ impl CodeGenerator<'_> {
         }
 
         // ...finally, try to assign to a global, which are late bound
-        self.emit_load_const(symbol, Constant::from(*name))?;
-        self.emit_instr(symbol, OpCode::StoreGlobal);
+        self.emit_load_const(Constant::from(*name))?;
+        self.emit_instr(OpCode::StoreGlobal);
         Ok(())
     }
     
-    fn emit_assign_local(&mut self, symbol: Option<&DebugSymbol>, offset: LocalIndex) {
+    fn emit_assign_local(&mut self, offset: LocalIndex) {
         if let Ok(offset) = u8::try_from(offset) {
-            self.emit_instr_byte(symbol, OpCode::StoreLocal, offset);
+            self.emit_instr_byte(OpCode::StoreLocal, offset);
         } else {
-            self.emit_instr_data(symbol, OpCode::StoreLocal16, &offset.to_le_bytes());
+            self.emit_instr_data(OpCode::StoreLocal16, &offset.to_le_bytes());
         }
     }
     
-    fn compile_assign_tuple(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, item_targets: &[LValue]) -> CompileResult<()> {
+    fn compile_assign_tuple(&mut self, assign: AssignType, item_targets: &[LValue]) -> CompileResult<()> {
         // process tuple packing patterns
         
         let mut pack_targets = item_targets.iter().enumerate()
@@ -1326,7 +1354,7 @@ impl CodeGenerator<'_> {
             
         let (idx, pack_target) = match pack_targets.next() {
             Some(pack_target) => pack_target,
-            None => return self.compile_assign_tuple_nopack(symbol, assign, item_targets),
+            None => return self.compile_assign_tuple_nopack(assign, item_targets),
         };
         
         if !pack_targets.next().is_none() {
@@ -1336,93 +1364,93 @@ impl CodeGenerator<'_> {
         let (pre_pack, rest) = item_targets.split_at(idx);
         let (_, post_pack) = rest.split_at(1);
         
-        self.compile_assign_tuple_pack(symbol, assign, pack_target, pre_pack, post_pack)
+        self.compile_assign_tuple_pack(assign, pack_target, pre_pack, post_pack)
     }
     
-    fn compile_assign_tuple_pack(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, pack: Option<&LValue>, pre_pack: &[LValue], post_pack: &[LValue]) -> CompileResult<()> {
+    fn compile_assign_tuple_pack(&mut self, assign: AssignType, pack: Option<&LValue>, pre_pack: &[LValue], post_pack: &[LValue]) -> CompileResult<()> {
         let mut error_jump_sites = Vec::new();
         
         // assignment needs to preserve original value for expression result
-        self.emit_instr(symbol, OpCode::Clone);
+        self.emit_instr(OpCode::Clone);
         
         // iterate to yield values
-        self.emit_instr(symbol, OpCode::IterInit);
+        self.emit_instr(OpCode::IterInit);
         
         // compile to unrolled iteration for pre-pack items
         for target in pre_pack.iter() {
             debug_assert!(!matches!(target, LValue::Pack(..)));
             
             // check if there is an item left for this target
-            let error_jump = self.emit_dummy_jump(symbol, Jump::IfFalse);
+            let error_jump = self.emit_dummy_jump(Jump::IfFalse);
             error_jump_sites.push(error_jump);
             
             // advance the iterator and put the item on the stack
-            self.emit_instr(symbol, OpCode::IterNext);
+            self.emit_instr(OpCode::IterNext);
             
-            self.compile_assignment(symbol, assign, target)?;
-            self.emit_instr(symbol, OpCode::Pop);
+            self.compile_assignment(assign, target)?;
+            self.emit_instr(OpCode::Pop);
         }
         
         let temp_scope;
         match (pack, post_pack) {
             (None, []) => {
                 // if there are no post-pack items and no pack target just discard the iterator
-                self.emit_instr_byte(symbol, OpCode::Drop, 2);
+                self.emit_instr_byte(OpCode::Drop, 2);
                 temp_scope = false;
             }
             
             (Some(pack_target), []) => {
                 // exhaust the rest of the iterator and assign to pack_target
-                self.emit_instr(symbol, OpCode::IterUnpack);
-                self.emit_instr(symbol, OpCode::TupleN);
+                self.emit_instr(OpCode::IterUnpack);
+                self.emit_instr(OpCode::TupleN);
                 
-                self.compile_assignment(symbol, assign, pack_target)?;
-                self.emit_instr(symbol, OpCode::Pop);
+                self.compile_assignment(assign, pack_target)?;
+                self.emit_instr(OpCode::Pop);
                 temp_scope = false;
             }
             
             (pack_target, post_pack) => {
                 // exhaust the rest of the iterator and assign the last items to post_pack
                 // then assign whatever is left to the pack_target
-                self.emit_instr(symbol, OpCode::IterUnpack);
+                self.emit_instr(OpCode::IterUnpack);
                 
                 // calculate the pack length and store it
                 let post_len = IntType::try_from(post_pack.len())
                     .map_err(|_| "unpack length limit exceeded")?;
                 
-                self.compile_integer(symbol, post_len)?;
-                self.emit_instr(symbol, OpCode::Sub);
+                self.compile_integer(post_len)?;
+                self.emit_instr(OpCode::Sub);
                 
                 temp_scope = true;
-                self.emit_begin_scope(symbol, None, ScopeTag::Temporary);
-                let pack_len = self.emit_create_temporary(symbol, Access::ReadOnly)?;
+                self.emit_begin_scope(None, ScopeTag::Temporary);
+                let pack_len = self.emit_create_temporary(Access::ReadOnly)?;
                 
                 // check if there are enough items
-                self.emit_instr_byte(symbol, OpCode::UInt8, 0);
-                self.emit_instr(symbol, OpCode::LT);
-                let error_jump = self.emit_dummy_jump(symbol, Jump::PopIfTrue);
+                self.emit_instr_byte(OpCode::UInt8, 0);
+                self.emit_instr(OpCode::LT);
+                let error_jump = self.emit_dummy_jump(Jump::PopIfTrue);
                 error_jump_sites.push(error_jump);
                 
                 // assign post-pack items
                 for target in post_pack.iter().rev() {
                     debug_assert!(!matches!(target, LValue::Pack(..)));
-                    self.compile_assignment(symbol, assign, target)?;
-                    self.emit_instr(symbol, OpCode::Pop);
+                    self.compile_assignment(assign, target)?;
+                    self.emit_instr(OpCode::Pop);
                 }
                 
                 // load the stored pack len and assign to pack target or discard
-                self.emit_load_local_index(symbol, pack_len);
+                self.emit_load_local_index(pack_len);
                 if let Some(pack_target) = pack_target {
-                    self.emit_instr(symbol, OpCode::TupleN);
-                    self.compile_assignment(symbol, assign, pack_target)?;
-                    self.emit_instr(symbol, OpCode::Pop);
+                    self.emit_instr(OpCode::TupleN);
+                    self.compile_assignment(assign, pack_target)?;
+                    self.emit_instr(OpCode::Pop);
                 } else {
-                    self.emit_instr(symbol, OpCode::DropN);
+                    self.emit_instr(OpCode::DropN);
                 }
             }
         }
         
-        let done_jump_site = self.emit_dummy_jump(symbol, Jump::Uncond);
+        let done_jump_site = self.emit_dummy_jump(Jump::Uncond);
         
         // not enough items
         let error_target = self.current_offset();
@@ -1431,8 +1459,8 @@ impl CodeGenerator<'_> {
         }
         
         let message = format!("not enough values to unpack (expected at least {})", pre_pack.len() + post_pack.len());
-        self.emit_load_error(symbol, ErrorKind::UnpackError, message.as_str())?;
-        self.emit_instr(symbol, OpCode::Error);
+        self.emit_load_error(ErrorKind::UnpackError, message.as_str())?;
+        self.emit_instr(OpCode::Error);
         
         // cleanup
         self.patch_jump_instr(&done_jump_site, self.current_offset())?;
@@ -1445,37 +1473,37 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_assign_tuple_nopack(&mut self, symbol: Option<&DebugSymbol>, assign: AssignType, items: &[LValue]) -> CompileResult<()> {
+    fn compile_assign_tuple_nopack(&mut self, assign: AssignType, items: &[LValue]) -> CompileResult<()> {
         let mut error_jump_sites = Vec::new();
         
         // assignment needs to preserve original value for expression result
-        self.emit_instr(symbol, OpCode::Clone);
+        self.emit_instr(OpCode::Clone);
         
         // iterate to yield values
-        self.emit_instr(symbol, OpCode::IterInit);
+        self.emit_instr(OpCode::IterInit);
         
         // compile to unrolled iteration
         for target in items.iter() {
             debug_assert!(!matches!(target, LValue::Pack(..)));
             
             // check if there is an item left for this target
-            let error_jump = self.emit_dummy_jump(symbol, Jump::IfFalse);
+            let error_jump = self.emit_dummy_jump(Jump::IfFalse);
             error_jump_sites.push(error_jump);
             
             // advance the iterator and put the item on the stack
-            self.emit_instr(symbol, OpCode::IterNext);
+            self.emit_instr(OpCode::IterNext);
             
-            self.compile_assignment(symbol, assign, target)?;
-            self.emit_instr(symbol, OpCode::Pop);
+            self.compile_assignment(assign, target)?;
+            self.emit_instr(OpCode::Pop);
         }
         
         // if the iterator is finished we've succeeded
-        let done_jump_site = self.emit_dummy_jump(symbol, Jump::PopIfFalse);
+        let done_jump_site = self.emit_dummy_jump(Jump::PopIfFalse);
         
         // too many items
         let message = format!("too many values to unpack (expected {})", items.len());
-        self.emit_load_error(symbol, ErrorKind::UnpackError, message.as_str())?;
-        self.emit_instr(symbol, OpCode::Error);
+        self.emit_load_error(ErrorKind::UnpackError, message.as_str())?;
+        self.emit_instr(OpCode::Error);
         
         // not enough items
         let error_target = self.current_offset();
@@ -1484,13 +1512,13 @@ impl CodeGenerator<'_> {
         }
         
         let message = format!("not enough values to unpack (expected {})", items.len());
-        self.emit_load_error(symbol, ErrorKind::UnpackError, message.as_str())?;
-        self.emit_instr(symbol, OpCode::Error);
+        self.emit_load_error(ErrorKind::UnpackError, message.as_str())?;
+        self.emit_instr(OpCode::Error);
         
         // cleanup
         self.patch_jump_instr(&done_jump_site, self.current_offset())?;
         
-        self.emit_instr(symbol, OpCode::Pop);  // pop the iterator
+        self.emit_instr(OpCode::Pop);  // pop the iterator
         
         Ok(())
     }
@@ -1499,10 +1527,10 @@ impl CodeGenerator<'_> {
 ///////// Blocks and If-Expressions /////////
 impl CodeGenerator<'_> {
 
-    fn compile_block_expression(&mut self, symbol: Option<&DebugSymbol>, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
+    fn compile_block_expression(&mut self, label: Option<&Label>, suite: &ExprBlock) -> CompileResult<()> {
         
-        self.emit_begin_scope(symbol, label, ScopeTag::Block);
-        self.compile_expr_block(symbol, suite)?;
+        self.emit_begin_scope(label, ScopeTag::Block);
+        self.compile_expr_block(suite)?;
         let block_scope = self.emit_end_scope();
         
         // finalize scope
@@ -1512,7 +1540,7 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_if_expression(&mut self, symbol: Option<&DebugSymbol>, branches: &[ConditionalBranch], else_clause: Option<&ExprBlock>) -> CompileResult<()> {
+    fn compile_if_expression(&mut self, branches: &[ConditionalBranch], else_clause: Option<&ExprBlock>) -> CompileResult<()> {
         debug_assert!(!branches.is_empty());
         
         // track the sites where we jump to the end, so we can patch them later
@@ -1528,20 +1556,20 @@ impl CodeGenerator<'_> {
         for (is_last, branch) in iter_branches {
             let is_final_branch = is_last && else_clause.is_none();
             
-            self.compile_expr(symbol, branch.condition())?;
+            self.compile_expr(branch.condition())?;
             
             // need to keep condition value on the stack in case there is a break/continue
             // inside the statement list
-            let branch_jump_site = self.emit_dummy_jump(symbol, Jump::IfFalse);
+            let branch_jump_site = self.emit_dummy_jump(Jump::IfFalse);
             
-            self.emit_begin_scope(symbol, None, ScopeTag::Branch);
-            self.compile_expr_block(symbol, branch.suite())?;
+            self.emit_begin_scope(None, ScopeTag::Branch);
+            self.compile_expr_block(branch.suite())?;
             self.emit_end_scope();
             
             // site for the jump to the end of if-expression
             if !is_final_branch {
-                self.emit_instr(symbol, OpCode::Pop);
-                let jump_site = self.emit_dummy_jump(symbol, Jump::Uncond);
+                self.emit_instr(OpCode::Pop);
+                let jump_site = self.emit_dummy_jump(Jump::Uncond);
                 end_jump_sites.push(jump_site);
             }
             
@@ -1552,8 +1580,8 @@ impl CodeGenerator<'_> {
         // else clause
         if let Some(suite) = else_clause {
             
-            self.emit_begin_scope(symbol, None, ScopeTag::Branch);
-            self.compile_expr_block(symbol, suite)?;
+            self.emit_begin_scope(None, ScopeTag::Branch);
+            self.compile_expr_block(suite)?;
             self.emit_end_scope();
             
         }
@@ -1567,26 +1595,26 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_shortcircuit_and(&mut self, symbol: Option<&DebugSymbol>, lhs: &Expr, rhs: &Expr) -> CompileResult<()> {
-        self.compile_expr(symbol, lhs)?;
+    fn compile_shortcircuit_and(&mut self, lhs: &Expr, rhs: &Expr) -> CompileResult<()> {
+        self.compile_expr(lhs)?;
         
-        let shortcircuit = self.emit_dummy_jump(symbol, Jump::IfFalse);
+        let shortcircuit = self.emit_dummy_jump(Jump::IfFalse);
         
-        self.emit_instr(symbol, OpCode::Pop);
-        self.compile_expr(symbol, rhs)?;
+        self.emit_instr(OpCode::Pop);
+        self.compile_expr(rhs)?;
         
         self.patch_jump_instr(&shortcircuit, self.current_offset())?;
         
         Ok(())
     }
     
-    fn compile_shortcircuit_or(&mut self, symbol: Option<&DebugSymbol>, lhs: &Expr, rhs: &Expr) -> CompileResult<()> {
-        self.compile_expr(symbol, lhs)?;
+    fn compile_shortcircuit_or(&mut self, lhs: &Expr, rhs: &Expr) -> CompileResult<()> {
+        self.compile_expr(lhs)?;
         
-        let shortcircuit = self.emit_dummy_jump(symbol, Jump::IfTrue);
+        let shortcircuit = self.emit_dummy_jump(Jump::IfTrue);
         
-        self.emit_instr(symbol, OpCode::Pop);
-        self.compile_expr(symbol, rhs)?;
+        self.emit_instr(OpCode::Pop);
+        self.compile_expr(rhs)?;
         
         self.patch_jump_instr(&shortcircuit, self.current_offset())?;
         
@@ -1596,11 +1624,10 @@ impl CodeGenerator<'_> {
 
 ///////// Function Definitions /////////
 impl CodeGenerator<'_> {
-    fn compile_function_def(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
+    fn compile_function_def(&mut self, fundef: &FunctionDef) -> CompileResult<()> {
         // create a new chunk for the function
-        let info = ChunkInfo::Function {
-            symbol: symbol.copied(),
-        };
+        let symbol = self.current_symbol();
+        let info = ChunkInfo::Function { symbol };
 
         let mut chunk_gen = self.create_chunk(info)?;
         
@@ -1612,14 +1639,14 @@ impl CodeGenerator<'_> {
         
         // and a new local scope
         // don't need to emit new scope instructions, should handled by function call
-        chunk_gen.scopes_mut().push_frame(symbol);
+        chunk_gen.scopes_mut().push_frame(symbol.as_ref());
         
         // don't need to generate IN_LOCAL instructions for these, the VM should include them automatically
         chunk_gen.scopes_mut().insert_local(Access::ReadOnly, LocalName::Receiver)?;
         chunk_gen.scopes_mut().insert_local(Access::ReadOnly, LocalName::NArgs)?;
         
         // prepare argument list
-        chunk_gen.compile_function_preamble(symbol, fundef)?;
+        chunk_gen.compile_function_preamble(fundef)?;
         
         // function body
         chunk_gen.compile_stmt_block(fundef.body.stmt_list())?;
@@ -1628,7 +1655,7 @@ impl CodeGenerator<'_> {
         if let Some(expr) = fundef.body.result() {
             chunk_gen.compile_expr_with_symbol(expr)?;
         } else {
-            chunk_gen.emit_instr(symbol, OpCode::Nil);
+            chunk_gen.emit_instr(OpCode::Nil);
         }
         
         // end the function scope
@@ -1637,13 +1664,13 @@ impl CodeGenerator<'_> {
         
         // however we do still need to close upvalues before we return
         for local in frame.iter_locals().filter(|local| local.captured()) {
-            chunk_gen.emit_close_upvalue(None, local.index());
+            chunk_gen.emit_close_upvalue(local.index());
         }
         
         chunk_gen.finish();
         
         // compile the function signature
-        let signature = self.compile_function_signature(symbol, &fundef.signature)?;
+        let signature = self.compile_function_signature(&fundef.signature)?;
         
         // compile upvalues
         let upvalues = frame.upvalues().iter()
@@ -1657,12 +1684,12 @@ impl CodeGenerator<'_> {
         
         // load the function object as the expression result
         self.make_function(function);
-        self.emit_load_function(symbol, fun_id);
+        self.emit_load_function(fun_id);
         
         Ok(())
     }
     
-    fn compile_function_preamble(&mut self, symbol: Option<&DebugSymbol>, fundef: &FunctionDef) -> CompileResult<()> {
+    fn compile_function_preamble(&mut self, fundef: &FunctionDef) -> CompileResult<()> {
         // process default and variadic arguments
         // this ensures that exactly `signature.param_count()` values are on the stack
         
@@ -1687,7 +1714,7 @@ impl CodeGenerator<'_> {
             self.scopes_mut().insert_local(param.mode, LocalName::Symbol(param.name))?;
         }
         
-        self.emit_instr(symbol, OpCode::InsertArgs);
+        self.emit_instr(OpCode::InsertArgs);
 
         Ok(())
     }
@@ -1705,10 +1732,10 @@ impl CodeGenerator<'_> {
             .map_err(|_| "parameter count limit exceeded")?;
         
         // "defaults passed" = NArgs - required_count
-        self.try_emit_load_local(None, &LocalName::NArgs).unwrap();
+        self.try_emit_load_local(&LocalName::NArgs).unwrap();
         if required_count != 0 {
-            self.emit_instr_byte(None, OpCode::UInt8, required_count);
-            self.emit_instr(None, OpCode::Sub);
+            self.emit_instr_byte(OpCode::UInt8, required_count);
+            self.emit_instr(OpCode::Sub);
         }
         
         /*
@@ -1723,30 +1750,31 @@ impl CodeGenerator<'_> {
         */
         
         for count in 0..default_count {
-            self.emit_instr(None, OpCode::Clone);
-            self.emit_instr_byte(None, OpCode::UInt8, count);
-            self.emit_instr(None, OpCode::EQ);
+            self.emit_instr(OpCode::Clone);
+            self.emit_instr_byte(OpCode::UInt8, count);
+            self.emit_instr(OpCode::EQ);
             
-            let jump_site = self.emit_dummy_jump(None, Jump::PopIfTrue);
+            let jump_site = self.emit_dummy_jump(Jump::PopIfTrue);
             jump_sites.insert(count.into(), jump_site);
         }
         
         // if we get here, jump unconditionally to the end
-        let jump_site = self.emit_dummy_jump(None, Jump::Uncond);
+        let jump_site = self.emit_dummy_jump(Jump::Uncond);
         jump_sites.insert(default_count.into(), jump_site);
         
         // generate default arguments
         for (idx, param) in signature.default.iter().enumerate() {
             jump_targets.insert(idx, self.current_offset());
             
-            let symbol = Some(param.default.debug_symbol());
+            let symbol = param.default.debug_symbol();
             let expr = param.default.variant();
-            self.compile_expr(symbol, expr)?;
-            // self.emit_instr(None, OpCode::InsertLocal);
+            self.push_symbol(Some(*symbol));
+            self.compile_expr(expr)?;
+            self.pop_symbol();
         }
         
         jump_targets.insert(default_count.into(), self.current_offset());
-        self.emit_instr(None, OpCode::Pop);  // drop "defaults passed"
+        self.emit_instr(OpCode::Pop);  // drop "defaults passed"
         
         // patch all jumps
         debug_assert!(jump_sites.len() == jump_targets.len());
@@ -1764,35 +1792,34 @@ impl CodeGenerator<'_> {
             .map_err(|_| "parameter count limit exceeded")?;
         
         // "variadic count" = NArgs - required_count - default_count
-        self.try_emit_load_local(None, &LocalName::NArgs).unwrap();
+        self.try_emit_load_local(&LocalName::NArgs).unwrap();
         if positional_count != 0 {
-            self.emit_instr_byte(None, OpCode::UInt8, positional_count);
-            self.emit_instr(None, OpCode::Sub);
+            self.emit_instr_byte(OpCode::UInt8, positional_count);
+            self.emit_instr(OpCode::Sub);
         }
         
         // check if "variadic count" > 0
-        self.emit_instr(None, OpCode::Clone);
-        self.emit_instr_byte(None, OpCode::UInt8, 0);
-        self.emit_instr(None, OpCode::GT);
+        self.emit_instr(OpCode::Clone);
+        self.emit_instr_byte(OpCode::UInt8, 0);
+        self.emit_instr(OpCode::GT);
         
-        let tuple_jump_site = self.emit_dummy_jump(None, Jump::PopIfTrue);
+        let tuple_jump_site = self.emit_dummy_jump(Jump::PopIfTrue);
         
         // if we get here then the variadic arg is empty
-        self.emit_instr(None, OpCode::Pop);
-        self.emit_instr(None, OpCode::Empty);
+        self.emit_instr(OpCode::Pop);
+        self.emit_instr(OpCode::Empty);
         
-        let end_jump_site = self.emit_dummy_jump(None, Jump::Uncond);
+        let end_jump_site = self.emit_dummy_jump(Jump::Uncond);
         
         self.patch_jump_instr(&tuple_jump_site, self.current_offset())?;
-        self.emit_instr(None, OpCode::TupleN);
-        // self.emit_instr(None, OpCode::InsertLocal);
+        self.emit_instr(OpCode::TupleN);
         
         self.patch_jump_instr(&end_jump_site, self.current_offset())?;
         
         Ok(())
     }
     
-    fn compile_function_signature(&mut self, symbol: Option<&DebugSymbol>, signature: &SignatureDef) -> CompileResult<UnloadedSignature> {
+    fn compile_function_signature(&mut self, signature: &SignatureDef) -> CompileResult<UnloadedSignature> {
         let name = 
             if let Some(name) = signature.name {
                 Some(self.get_or_make_const(Constant::from(name))?)
