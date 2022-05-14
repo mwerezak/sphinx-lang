@@ -880,6 +880,8 @@ impl CodeGenerator<'_> {
             
             Expr::Tuple(items) => self.compile_tuple(items)?,
             
+            Expr::Table(_fields) => unimplemented!(),
+            
             // unpacking is only allowed in invocation, tuple literals, and by itself in parentheses
             // note: assignment uses *packing*, not unpacking, which is the Pattern dual of packing.
             Expr::Unpack(Some(..)) => return Err("unpack expression must be enclosed in parentheses".into()),

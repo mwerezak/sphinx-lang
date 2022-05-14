@@ -1,4 +1,5 @@
 use crate::debug::DebugSymbol;
+use crate::language::{InternSymbol, Access};
 use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
 use crate::parser::pattern::Assignment;
@@ -18,10 +19,11 @@ pub enum Expr {
     BinaryOp(BinaryOp, Box<(Expr, Expr)>),
     
     Assignment(Box<Assignment>),
+    Unpack(Option<Box<Expr>>),
     
     Tuple(Box<[ExprMeta]>),
     
-    Unpack(Option<Box<Expr>>),
+    Table(Box<[TableItem]>),
     
     // ObjectCtor(Box<ObjectConstructor>),
     
@@ -39,6 +41,20 @@ pub enum Expr {
     
     // ClassDef
     
+}
+
+// Tables
+
+#[derive(Debug, Clone)]
+pub enum TableField {
+    Identifier(Access, InternSymbol),
+    Index(ExprMeta),
+}
+
+#[derive(Debug, Clone)]
+pub struct TableItem {
+    pub field: TableField,
+    pub value: ExprMeta,
 }
 
 

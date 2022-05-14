@@ -52,7 +52,7 @@ pub struct Assignment {
     pub rhs: Expr,
 }
 
-// Convert expressions to LValues...
+// Convert expressions into Patterns...
 
 /*
     pattern ::= identifier | primary index-access | primary member-access ;
