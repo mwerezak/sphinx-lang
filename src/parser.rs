@@ -19,7 +19,7 @@ mod tests;
 
 pub use errors::{ParserError, ParseResult};
 
-use expr::{ExprMeta, Expr, ExprBlock, ConditionalBranch};
+use expr::{ExprMeta, Expr, ExprBlock, ConditionalBranch, TableItem, TableField};
 use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
 use primary::{Primary, Atom, AccessItem};
 use pattern::{Pattern, MatchAction, Assignment};
@@ -605,7 +605,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         ctx.push(ContextTag::ExprMeta);
         
         // descend recursively into binops
-        let mut first_expr = Some(self.parse_binop_expr(ctx)?); // might be taken into tuple later
+        let mut first_expr = Some(self.parse_inner_expr(ctx)?); // might be taken into tuple later
         
         // check for tuple constructor
         let mut tuple_exprs = Vec::new();
@@ -633,7 +633,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             }
             
             ctx.push(ContextTag::ExprMeta);
-            let next_expr = self.parse_binop_expr(ctx)?;
+            let next_expr = self.parse_inner_expr(ctx)?;
             let symbol = ctx.frame().as_debug_symbol().unwrap();
             ctx.pop_extend();
             
@@ -649,7 +649,10 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
     }
     
-
+    // parse an expression in a position where bare (unparenthesized) tuples and assignments are not allowed
+    fn parse_inner_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
+        self.parse_binop_expr(ctx)
+    }
 
     /*
         Binary operator syntax:
@@ -791,9 +794,9 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             Token::If => self.parse_if_expr(ctx)?,
             Token::Begin => self.parse_block_expr(ctx, None)?,
             
-            Token::Label(..) => self.parse_expr_label(ctx)?,
+            Token::OpenBrace => self.parse_table_expr(ctx)?,
             
-            // Token::OpenBrace => Ok(ExprMeta::ObjectCtor(self.parse_object_constructor(ctx)?)),
+            Token::Label(..) => self.parse_expr_label(ctx)?,
             
             _ => self.parse_unpack_expr(ctx)?,
         };
@@ -1130,26 +1133,100 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         member-initializer ::= ( IDENTIFIER | "[" primary "]" ) ":" expression ;
     
     */
-    /*
-    fn parse_object_constructor(&mut self, ctx: &mut ErrorContext) -> ParseResult<ObjectConstructor> {
-        ctx.push(ContextTag::ObjectCtor);
+    fn parse_table_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
+        ctx.push(ContextTag::TableCtor);
         
         let next = self.advance().unwrap();
-        ctx.set_start(&self.advance().unwrap());
+        ctx.set_start(&next);
         debug_assert!(matches!(next.token, Token::OpenBrace));
         
-        unimplemented!();
+        let mut items = Vec::new();
         
-        // let next = self.advance()?;
-        // ctx.set_end(&next);
+        loop {
+            let next = self.peek()?;
+            if matches!(next.token, Token::CloseBrace) {
+                break;
+            }
+            
+            let field = self.parse_table_field(ctx)?;
+            
+            let next = self.advance()?;
+            ctx.set_end(&next);
+            if !matches!(next.token, Token::OpAssign) {
+                return Err("missing \"=\" in initializer".into())
+            }
+            
+            let expr = {
+                ctx.push(ContextTag::ExprMeta);
+                
+                let variant = self.parse_inner_expr(ctx)?;
+                let symbol = ctx.frame().as_debug_symbol().unwrap();
+                
+                ctx.pop_extend();
+                ExprMeta::new(variant, symbol)
+            };
+            
+            items.push(TableItem { field, value: expr });
+            
+            let next = self.peek()?;
+            if matches!(next.token, Token::Comma) {
+                ctx.set_end(&self.advance().unwrap())
+            } else {
+                break;
+            }
+        }
         
-        // if !matches!(next.token, Token::CloseParen) {
-        //     return Err(ParserError::new(ErrorKind::ExpectedCloseBrace, ctx.context()));
-        // }
+        let next = self.advance()?;
+        ctx.set_end(&next);
         
-        // ctx.pop_extend();
+        if !matches!(next.token, Token::CloseBrace) {
+            return Err("expected closing \"}\"".into());
+        }
+        
+        Ok(Expr::Table(items.into_boxed_slice()))
     }
-    */
+    
+    fn parse_table_field(&mut self, ctx: &mut ErrorContext) -> ParseResult<TableField> {
+        let next = self.peek()?;
+        if let Token::OpenSquare = next.token {
+            let index_expr = self.parse_indexing_expr(ctx)?;
+            return Ok(TableField::Index(index_expr));
+        }
+        
+        let next = self.advance()?;
+        ctx.set_end(&next);
+        
+        match next.token {
+            Token::Var => {
+                let next = self.advance()?;
+                ctx.set_end(&next);
+                if let Token::Identifier(name) = next.token {
+                    let name = self.intern_str(name);
+                    Ok(TableField::Attribute(Access::ReadWrite, name))
+                } else {
+                    Err("expected a name after \"var\"".into())
+                }
+            }
+            
+            Token::Let => {
+                let next = self.advance()?;
+                ctx.set_end(&next);
+                if let Token::Identifier(name) = next.token {
+                    let name = self.intern_str(name);
+                    Ok(TableField::Attribute(Access::ReadOnly, name))
+                } else {
+                    Err("expected a name after \"let\"".into())
+                }
+            }
+            
+            Token::Identifier(name) => {
+                let name = self.intern_str(name);
+                Ok(TableField::Attribute(Access::ReadOnly, name))
+            }
+            
+            _ => return Err("invalid initializer".into())
+        }
+    }
     
     /*
         Primary expression syntax:
@@ -1238,6 +1315,10 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
     // subscript ::= "[" expression "]" ;
     fn parse_index_access(&mut self, ctx: &mut ErrorContext) -> ParseResult<AccessItem> {
+        Ok(AccessItem::Index(self.parse_indexing_expr(ctx)?))
+    }
+    
+    fn parse_indexing_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<ExprMeta> {
         let next = self.advance().unwrap();
         
         ctx.push(ContextTag::IndexAccess);
@@ -1254,7 +1335,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
         
         ctx.pop_extend();
-        Ok(AccessItem::Index(index_expr))
+        Ok(index_expr)
     }
     
     fn parse_invocation(&mut self, ctx: &mut ErrorContext) -> ParseResult<AccessItem> {

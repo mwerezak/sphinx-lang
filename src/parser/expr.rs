@@ -47,7 +47,7 @@ pub enum Expr {
 
 #[derive(Debug, Clone)]
 pub enum TableField {
-    Identifier(Access, InternSymbol),
+    Attribute(Access, InternSymbol),
     Index(ExprMeta),
 }
 
@@ -57,6 +57,7 @@ pub struct TableItem {
     pub value: ExprMeta,
 }
 
+// Statement Block Expressions
 
 /// represents a statement list used as an expression
 #[derive(Debug, Clone)]
@@ -87,7 +88,7 @@ impl ExprBlock {
     pub fn result(&self) -> Option<&ExprMeta> { self.result.as_ref() }
 }
 
-
+// Conditionals
 
 #[derive(Debug, Clone)]
 pub struct ConditionalBranch {
