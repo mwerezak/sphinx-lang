@@ -4,7 +4,7 @@ use crate::language::{IntType, FloatType, InternSymbol, Access};
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList, ControlFlow};
 use crate::parser::expr::{Expr, ExprMeta, ExprBlock, ConditionalBranch};
 use crate::parser::primary::{Atom, Primary, AccessItem};
-use crate::parser::lvalue::{LValue, AssignType};
+use crate::parser::pattern::{Pattern, MatchAction};
 use crate::parser::fundefs::{FunctionDef, SignatureDef};
 use crate::parser::operator::{UnaryOp, BinaryOp};
 use crate::runtime::strings::{StringInterner};
@@ -574,7 +574,7 @@ impl CodeGenerator<'_> {
             
             Stmt::WhileLoop { label, condition, body } => self.compile_while_loop(label.as_ref(), condition, body)?,
             
-            Stmt::ForLoop { label, lvalue, iter, body } => self.compile_for_loop(label.as_ref(), lvalue, iter, body)?,
+            Stmt::ForLoop { label, pattern, iter, body } => self.compile_for_loop(label.as_ref(), pattern, iter, body)?,
             
             Stmt::Assert(expr) => {
                 self.compile_expr(expr)?;
@@ -798,7 +798,7 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_for_loop(&mut self, label: Option<&Label>, lvalue: &LValue, iter: &Expr, body: &StmtList) -> CompileResult<()> {
+    fn compile_for_loop(&mut self, label: Option<&Label>, pattern: &Pattern, iter: &Expr, body: &StmtList) -> CompileResult<()> {
         
         self.emit_begin_scope(label, ScopeTag::Loop);
         
@@ -815,7 +815,7 @@ impl CodeGenerator<'_> {
         // advance iterator and assign value
         // default to "let" for loop variables (unlike normal assignment, which defaults to "local")
         self.emit_instr(OpCode::IterNext);
-        self.compile_assignment(AssignType::DeclImmutable, lvalue)?; 
+        self.compile_assignment(MatchAction::DeclImmutable, pattern)?; 
         self.emit_instr(OpCode::Pop);
         
         // compile body
@@ -871,17 +871,17 @@ impl CodeGenerator<'_> {
             
             Expr::Assignment(assign) => {
                 if let Some(op) = assign.op {
-                    self.compile_update_assignment(op, assign.modifier, &assign.lhs, &assign.rhs)?;
+                    self.compile_update_assignment(op, assign.action, &assign.lhs, &assign.rhs)?;
                 } else {
                     self.compile_expr(&assign.rhs)?;
-                    self.compile_assignment(assign.modifier, &assign.lhs)?;
+                    self.compile_assignment(assign.action, &assign.lhs)?;
                 }
             },
             
             Expr::Tuple(items) => self.compile_tuple(items)?,
             
             // unpacking is only allowed in invocation, tuple literals, and by itself in parentheses
-            // note: assignment uses *packing*, not unpacking, which is the LValue dual of packing.
+            // note: assignment uses *packing*, not unpacking, which is the Pattern dual of packing.
             Expr::Unpack(Some(..)) => return Err("unpack expression must be enclosed in parentheses".into()),
             Expr::Unpack(None) => return Err("\"...\" is not allowed here".into()),
             
@@ -1176,19 +1176,19 @@ impl CodeGenerator<'_> {
 
 ///////// Declarations and Assignments /////////
 impl CodeGenerator<'_> {
-    fn compile_update_assignment(&mut self, op: BinaryOp, assign: AssignType, lhs: &LValue, rhs: &Expr) -> CompileResult<()> {
+    fn compile_update_assignment(&mut self, op: BinaryOp, action: MatchAction, lhs: &Pattern, rhs: &Expr) -> CompileResult<()> {
         
-        let local_only = match assign {
-            AssignType::AssignLocal => true,
-            AssignType::AssignNonLocal => false,
+        let local_only = match action {
+            MatchAction::AssignLocal => true,
+            MatchAction::AssignNonLocal => false,
             
-            AssignType::DeclImmutable | AssignType::DeclMutable
+            MatchAction::DeclImmutable | MatchAction::DeclMutable
                 => return Err("update-assignment is invalid when declaring a variable".into()),
         };
         
         // TODO suport Attribute and Index LValues as well
         match lhs {
-            LValue::Identifier(name) => {
+            Pattern::Identifier(name) => {
                 self.compile_name_lookup(name)?;
                 self.compile_expr(rhs)?;
                 self.emit_binary_op(op);
@@ -1196,53 +1196,53 @@ impl CodeGenerator<'_> {
                 self.compile_assign_identifier(name, local_only)
             },
             
-            LValue::Attribute(_target) => unimplemented!(),
+            Pattern::Attribute(_target) => unimplemented!(),
             
-            LValue::Index(_target) => unimplemented!(),
+            Pattern::Index(_target) => unimplemented!(),
             
-            LValue::Tuple {..} | LValue::Pack(..)
+            Pattern::Tuple {..} | Pattern::Pack(..)
                 => Err("can't update-assign to this".into()),
             
-            LValue::Modifier {..} => unreachable!(),
+            Pattern::Modifier {..} => unreachable!(),
         }
     }
     
-    fn compile_assignment(&mut self, mut assign: AssignType, mut lhs: &LValue) -> CompileResult<()> {
+    fn compile_assignment(&mut self, mut action: MatchAction, mut lhs: &Pattern) -> CompileResult<()> {
         
-        while let LValue::Modifier { modifier, lvalue } = lhs {
-            assign = *modifier;
-            lhs = lvalue;
+        while let Pattern::Modifier { modifier, pattern } = lhs {
+            action = *modifier;
+            lhs = pattern;
         }
         
         match lhs {
-            LValue::Tuple(items) => self.compile_assign_tuple(assign, items),
+            Pattern::Tuple(items) => self.compile_assign_tuple(action, items),
             
-            LValue::Pack(..) => {
+            Pattern::Pack(..) => {
                 let item = std::slice::from_ref(lhs);
-                self.compile_assign_tuple(assign, item)
+                self.compile_assign_tuple(action, item)
             }
             
             lhs => {
-                match assign {
-                    AssignType::AssignLocal => self.compile_assign_variable(lhs, false),
-                    AssignType::AssignNonLocal => self.compile_assign_variable(lhs, true),
-                    AssignType::DeclImmutable => self.compile_decl_variable(Access::ReadOnly, lhs),
-                    AssignType::DeclMutable => self.compile_decl_variable(Access::ReadWrite, lhs),
+                match action {
+                    MatchAction::AssignLocal => self.compile_assign_variable(lhs, false),
+                    MatchAction::AssignNonLocal => self.compile_assign_variable(lhs, true),
+                    MatchAction::DeclImmutable => self.compile_decl_variable(Access::ReadOnly, lhs),
+                    MatchAction::DeclMutable => self.compile_decl_variable(Access::ReadWrite, lhs),
                 }
             }
         }
     }
 
-    fn compile_decl_variable(&mut self, access: Access, lhs: &LValue) -> CompileResult<()> {
+    fn compile_decl_variable(&mut self, access: Access, lhs: &Pattern) -> CompileResult<()> {
         match lhs {
-            LValue::Identifier(name) => if self.scopes().is_global_scope() {
+            Pattern::Identifier(name) => if self.scopes().is_global_scope() {
                 self.compile_decl_global_name(access, *name)
             } else {
                 self.compile_decl_local_name(access, *name)
             },
             
-            LValue::Tuple {..} => unreachable!(),
-            LValue::Modifier {..} => unreachable!(),
+            Pattern::Tuple {..} => unreachable!(),
+            Pattern::Modifier {..} => unreachable!(),
             
             _ => Err("not a variable name".into()),
         }
@@ -1271,14 +1271,14 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_assign_variable(&mut self, lhs: &LValue, allow_nonlocal: bool) -> CompileResult<()> {
+    fn compile_assign_variable(&mut self, lhs: &Pattern, allow_nonlocal: bool) -> CompileResult<()> {
         
         match lhs {
-            LValue::Identifier(name) => self.compile_assign_identifier(name, allow_nonlocal),
+            Pattern::Identifier(name) => self.compile_assign_identifier(name, allow_nonlocal),
             
-            LValue::Attribute(_target) => unimplemented!(),
+            Pattern::Attribute(_target) => unimplemented!(),
             
-            LValue::Index(_target) => unimplemented!(),
+            Pattern::Index(_target) => unimplemented!(),
             
             _ => panic!("invalid assignment target"),
         }
@@ -1343,18 +1343,18 @@ impl CodeGenerator<'_> {
         }
     }
     
-    fn compile_assign_tuple(&mut self, assign: AssignType, item_targets: &[LValue]) -> CompileResult<()> {
+    fn compile_assign_tuple(&mut self, action: MatchAction, item_targets: &[Pattern]) -> CompileResult<()> {
         // process tuple packing patterns
         
         let mut pack_targets = item_targets.iter().enumerate()
             .filter_map(|(idx, target)| match target {
-                LValue::Pack(pack_target) => Some((idx, pack_target.as_deref())),
+                Pattern::Pack(pack_target) => Some((idx, pack_target.as_deref())),
                 _ => None,
             });
             
         let (idx, pack_target) = match pack_targets.next() {
             Some(pack_target) => pack_target,
-            None => return self.compile_assign_tuple_nopack(assign, item_targets),
+            None => return self.compile_assign_tuple_nopack(action, item_targets),
         };
         
         if !pack_targets.next().is_none() {
@@ -1364,10 +1364,10 @@ impl CodeGenerator<'_> {
         let (pre_pack, rest) = item_targets.split_at(idx);
         let (_, post_pack) = rest.split_at(1);
         
-        self.compile_assign_tuple_pack(assign, pack_target, pre_pack, post_pack)
+        self.compile_assign_tuple_pack(action, pack_target, pre_pack, post_pack)
     }
     
-    fn compile_assign_tuple_pack(&mut self, assign: AssignType, pack: Option<&LValue>, pre_pack: &[LValue], post_pack: &[LValue]) -> CompileResult<()> {
+    fn compile_assign_tuple_pack(&mut self, action: MatchAction, pack: Option<&Pattern>, pre_pack: &[Pattern], post_pack: &[Pattern]) -> CompileResult<()> {
         let mut error_jump_sites = Vec::new();
         
         // assignment needs to preserve original value for expression result
@@ -1378,7 +1378,7 @@ impl CodeGenerator<'_> {
         
         // compile to unrolled iteration for pre-pack items
         for target in pre_pack.iter() {
-            debug_assert!(!matches!(target, LValue::Pack(..)));
+            debug_assert!(!matches!(target, Pattern::Pack(..)));
             
             // check if there is an item left for this target
             let error_jump = self.emit_dummy_jump(Jump::IfFalse);
@@ -1387,7 +1387,7 @@ impl CodeGenerator<'_> {
             // advance the iterator and put the item on the stack
             self.emit_instr(OpCode::IterNext);
             
-            self.compile_assignment(assign, target)?;
+            self.compile_assignment(action, target)?;
             self.emit_instr(OpCode::Pop);
         }
         
@@ -1404,7 +1404,7 @@ impl CodeGenerator<'_> {
                 self.emit_instr(OpCode::IterUnpack);
                 self.emit_instr(OpCode::TupleN);
                 
-                self.compile_assignment(assign, pack_target)?;
+                self.compile_assignment(action, pack_target)?;
                 self.emit_instr(OpCode::Pop);
                 temp_scope = false;
             }
@@ -1433,8 +1433,8 @@ impl CodeGenerator<'_> {
                 
                 // assign post-pack items
                 for target in post_pack.iter().rev() {
-                    debug_assert!(!matches!(target, LValue::Pack(..)));
-                    self.compile_assignment(assign, target)?;
+                    debug_assert!(!matches!(target, Pattern::Pack(..)));
+                    self.compile_assignment(action, target)?;
                     self.emit_instr(OpCode::Pop);
                 }
                 
@@ -1442,7 +1442,7 @@ impl CodeGenerator<'_> {
                 self.emit_load_local_index(pack_len);
                 if let Some(pack_target) = pack_target {
                     self.emit_instr(OpCode::TupleN);
-                    self.compile_assignment(assign, pack_target)?;
+                    self.compile_assignment(action, pack_target)?;
                     self.emit_instr(OpCode::Pop);
                 } else {
                     self.emit_instr(OpCode::DropN);
@@ -1473,7 +1473,7 @@ impl CodeGenerator<'_> {
         Ok(())
     }
     
-    fn compile_assign_tuple_nopack(&mut self, assign: AssignType, items: &[LValue]) -> CompileResult<()> {
+    fn compile_assign_tuple_nopack(&mut self, action: MatchAction, items: &[Pattern]) -> CompileResult<()> {
         let mut error_jump_sites = Vec::new();
         
         // assignment needs to preserve original value for expression result
@@ -1484,7 +1484,7 @@ impl CodeGenerator<'_> {
         
         // compile to unrolled iteration
         for target in items.iter() {
-            debug_assert!(!matches!(target, LValue::Pack(..)));
+            debug_assert!(!matches!(target, Pattern::Pack(..)));
             
             // check if there is an item left for this target
             let error_jump = self.emit_dummy_jump(Jump::IfFalse);
@@ -1493,7 +1493,7 @@ impl CodeGenerator<'_> {
             // advance the iterator and put the item on the stack
             self.emit_instr(OpCode::IterNext);
             
-            self.compile_assignment(assign, target)?;
+            self.compile_assignment(action, target)?;
             self.emit_instr(OpCode::Pop);
         }
         

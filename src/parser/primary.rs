@@ -1,6 +1,6 @@
 use crate::language::{IntType, FloatType, InternSymbol};
 use crate::parser::expr::{ExprMeta, Expr};
-use crate::parser::lvalue::AssignType;
+use crate::parser::pattern::MatchAction;
 
 
 // Primary Expressions
@@ -19,7 +19,7 @@ pub enum Atom {
     StringLiteral(InternSymbol),
     
     Group {
-        modifier: Option<AssignType>,
+        modifier: Option<MatchAction>,
         inner: Box<Expr>,
     }
 }

@@ -1,7 +1,7 @@
 use crate::language::InternSymbol;
 use crate::debug::DebugSymbol;
 use crate::parser::expr::Expr;
-use crate::parser::lvalue::LValue;
+use crate::parser::pattern::Pattern;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -30,7 +30,7 @@ pub enum Stmt {
     
     ForLoop {
         label: Option<Label>,
-        lvalue: LValue,
+        pattern: Pattern,
         iter: Expr,
         body: StmtList,
     },

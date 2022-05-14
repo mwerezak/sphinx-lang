@@ -436,9 +436,9 @@ contexts:
   object-constructors:
     - match: \{
       scope: punctuation.section.braces.begin
-      push: object-initializer-lvalue
+      push: object-initializer-pattern
 
-  object-initializer-lvalue:
+  object-initializer-pattern:
     - meta_scope: meta.braces
     - match: \}
       scope: punctuation.section.braces.end
@@ -461,7 +461,7 @@ contexts:
       pop: true
     - match: \,
       scope: punctuation.separator
-      set: object-initializer-lvalue
+      set: object-initializer-pattern
     - include: expressions
 
   comments:

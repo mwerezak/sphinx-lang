@@ -7,7 +7,7 @@ use sphinx::source::{ModuleSource, SourceText};
 use sphinx::parser::stmt::{StmtMeta, Stmt, StmtList, ControlFlow};
 use sphinx::parser::expr::Expr;
 use sphinx::parser::primary::Atom;
-use sphinx::parser::lvalue::{LValue, AssignType, Assignment};
+use sphinx::parser::pattern::{Pattern, MatchAction, Assignment};
 use sphinx::codegen::{Program, CompiledProgram};
 use sphinx::runtime::{Module, VirtualMachine, Gc};
 use sphinx::runtime::module::NamespaceEnv;
@@ -286,8 +286,8 @@ impl Repl {
         // bind the result expression to a global name
         let result_name = interner.get_or_intern("_");
         let result_decl = Expr::Assignment(Box::new(Assignment {
-            modifier: AssignType::DeclImmutable,
-            lhs: LValue::Identifier(result_name),
+            action: MatchAction::DeclImmutable,
+            lhs: Pattern::Identifier(result_name),
             rhs: result_expr,
             op: None,
         }));

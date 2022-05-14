@@ -115,7 +115,7 @@ label ::= "::" LABELNAME ;
 
 (*** Function Defs ***)
 
-function_def ::= "fun" lvalue parameter_list ( "->" type_expression ":" )?  statement_list "end" ;
+function_def ::= "fun" pattern parameter_list ( "->" type_expression ":" )?  statement_list "end" ;
 anon_function ::= "fun" parameter_list ( "->" type_expression ":" )?  statement_list "end" ;
 
 parameter_list ::= "(" ")" ;

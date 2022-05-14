@@ -1,7 +1,7 @@
 use crate::debug::DebugSymbol;
 use crate::parser::operator::{BinaryOp, UnaryOp};
 use crate::parser::primary::{Atom, Primary};
-use crate::parser::lvalue::Assignment;
+use crate::parser::pattern::Assignment;
 use crate::parser::fundefs::FunctionDef;
 use crate::parser::stmt::{StmtMeta, Stmt, Label, StmtList};
 

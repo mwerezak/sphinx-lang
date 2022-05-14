@@ -136,7 +136,7 @@ end
 
 # Declarations are used to create new variables.
 # They are written just like assignments except the 
-# variable name expression (lvalue) is preceeded by 
+# assignment LHS pattern is preceeded by 
 # either "let" or "var":
 
 let im_a_variable = "here is my value"  # immutable variable
@@ -188,7 +188,7 @@ del a  # drop a variable from the current scope
 del collection[key]  # mostly useful for removing values from objects
 
 # assigment expressions bind weaker than operator expressions
-3 * b += c    # Error, assignment target is not an lvalue
+3 * b += c    # Error, assignment target is not an pattern
 3 * (b += c)  # Ok
 
 

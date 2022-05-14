@@ -11,7 +11,7 @@ use crate::debug::{SourceError, TokenIndex};
 pub mod expr;
 pub mod stmt;
 pub mod primary;
-pub mod lvalue;
+pub mod pattern;
 pub mod operator;
 pub mod fundefs;
 pub mod errors;
@@ -22,7 +22,7 @@ pub use errors::{ParserError, ParseResult};
 use expr::{ExprMeta, Expr, ExprBlock, ConditionalBranch};
 use stmt::{StmtMeta, StmtList, Stmt, Label, ControlFlow};
 use primary::{Primary, Atom, AccessItem};
-use lvalue::{LValue, AssignType, Assignment};
+use pattern::{Pattern, MatchAction, Assignment};
 use operator::{UnaryOp, BinaryOp, Precedence, PRECEDENCE_START, PRECEDENCE_END};
 use fundefs::{FunctionDef, SignatureDef, ParamDef, DefaultDef};
 use errors::{ErrorKind, ErrorContext, ContextTag};
@@ -334,8 +334,8 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         ctx.set_start(&next);
         debug_assert!(matches!(next.token, Token::For));
         
-        // parse lvalue list
-        let lvalue = self.parse_lvalue_list(ctx)?;
+        // parse pattern list
+        let pattern = self.parse_lvalue_list(ctx)?;
         
         let next = self.advance()?;
         ctx.set_end(&next);
@@ -360,7 +360,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         
         let for_loop = Stmt::ForLoop {
             label,
-            lvalue,
+            pattern,
             iter,
             body,
         };
@@ -369,17 +369,17 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         Ok(for_loop)
     }
     
-    fn parse_lvalue_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<LValue> {
+    fn parse_lvalue_list(&mut self, ctx: &mut ErrorContext) -> ParseResult<Pattern> {
         let modifier = self.try_parse_assign_keyword(ctx)?;
         
-        let lvalue = self.parse_tuple_expr(ctx)?
+        let pattern = self.parse_tuple_expr(ctx)?
             .try_into()
             .map_err(|_| ParserError::from("can't assign to this"))?;
         
         if let Some(modifier) = modifier {
-            Ok(LValue::Modifier { modifier, lvalue: Box::new(lvalue) })
+            Ok(Pattern::Modifier { modifier, pattern: Box::new(pattern) })
         } else {
-            Ok(lvalue)
+            Ok(pattern)
         }
     }
     
@@ -539,20 +539,20 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     /*
         Assignment Expression syntax:
         
-        lvalue ::= identifier | primary index-access | primary member-access ;
+        pattern ::= identifier | primary index-access | primary member-access ;
 
-        lvalue-expression ::= lvalue | lvalue-list | "(" lvalue ")" ;   (* basically just lvalues, and tuples of lvalues *)
-        lvalue-list ::= lvalue-expression ( "," lvalue-expression )* ;
+        pattern-expression ::= pattern | pattern-list | "(" pattern ")" ;   (* basically just lvalues, and tuples of lvalues *)
+        pattern-list ::= pattern-expression ( "," pattern-expression )* ;
 
-        lvalue-annotated ::= lvalue-expression ( ":" type-expression )? ; 
+        pattern-annotated ::= pattern-expression ( ":" type-expression )? ; 
 
         assignment-op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" ;
-        assignment-expression ::= lvalue-annotated assignment-op expression ;
+        assignment-expression ::= pattern-annotated assignment-op expression ;
     */
     
     fn parse_assignment_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
         
-        // check for lvalue modifier
+        // check for pattern modifier
         let assign = self.try_parse_assign_keyword(ctx)?;
         
         // parse LHS
@@ -564,8 +564,8 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             ctx.push_continuation(ContextTag::AssignmentExpr, None);
             ctx.set_end(&self.advance().unwrap());
             
-            // LHS of assignment must be an lvalue
-            let lhs = LValue::try_from(expr)
+            // LHS of assignment must be an pattern
+            let lhs = Pattern::try_from(expr)
                 .map_err(|_| ParserError::from("can't assign to this"))?;
             
             // Parse RHS
@@ -575,17 +575,17 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             
             let assign = Assignment {
                 lhs, op, rhs,
-                modifier: assign.unwrap_or(AssignType::AssignLocal),
+                action: assign.unwrap_or(MatchAction::AssignLocal),
             };
             
             Ok(Expr::Assignment(Box::new(assign)))
             
         } else if let Some(assign) = assign {
             let assign = match assign {
-                AssignType::AssignLocal => "local",
-                AssignType::AssignNonLocal => "nonlocal",
-                AssignType::DeclImmutable => "let",
-                AssignType::DeclMutable => "var",
+                MatchAction::AssignLocal => "local",
+                MatchAction::AssignNonLocal => "nonlocal",
+                MatchAction::DeclImmutable => "let",
+                MatchAction::DeclMutable => "var",
             };
             let message = format!("expected an assignment expression after \"{}\"", assign);
             
@@ -929,16 +929,16 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         let mut function_def = self.parse_function_def(ctx)?;
         
         // SYNTACTIC SUGAR: fun name(..) => let name = fun(..)
-        if let Some(lvalue) = name_lvalue {
+        if let Some(pattern) = name_lvalue {
             // record name in function signature
-            if let LValue::Identifier(name) = &lvalue {
+            if let Pattern::Identifier(name) = &pattern {
                 function_def.signature.name.replace(*name);
             }
             
             let fun_decl = Assignment {
-                modifier: AssignType::DeclImmutable,
+                action: MatchAction::DeclImmutable,
                 op: None,
-                lhs: lvalue,
+                lhs: pattern,
                 rhs: Expr::FunctionDef(function_def),
             };
             
@@ -950,8 +950,8 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         }
     }
     
-    // similar to parse_primary(), except we only allow member access and index access, and convert to an LValue after
-    fn parse_function_assignment_target(&mut self, ctx: &mut ErrorContext) -> ParseResult<LValue> {
+    // similar to parse_primary(), except we only allow member access and index access, and convert to an Pattern after
+    fn parse_function_assignment_target(&mut self, ctx: &mut ErrorContext) -> ParseResult<Pattern> {
         ctx.push(ContextTag::PrimaryExpr);
         
         let atom = self.parse_atom(ctx)?;
@@ -973,12 +973,12 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         
         ctx.pop_extend();
         
-        let lvalue =
-            if items.is_empty() { LValue::try_from(atom) } 
-            else { LValue::try_from(Primary::new(atom, items)) }
+        let pattern =
+            if items.is_empty() { Pattern::try_from(atom) } 
+            else { Pattern::try_from(Primary::new(atom, items)) }
             .map_err(|_| ParserError::from("cannot assign a function to this"))?;
         
-        Ok(lvalue)
+        Ok(pattern)
     }
     
     fn parse_function_def(&mut self, ctx: &mut ErrorContext) -> ParseResult<FunctionDef> {
@@ -1372,15 +1372,18 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             return Ok(Atom::EmptyTuple);
         }
 
-        // Check for lvalue modifier
-        let mut modifier = self.try_parse_assign_keyword(ctx)?;
+        // Check for pattern modifier
+        let modifier = self.try_parse_assign_keyword(ctx)?;
 
         // Parse inner expression
         let mut expr = self.parse_expr_variant(ctx)?;
         
         // if inner expression is an assignment, transfer our modifier to it
-        if let Expr::Assignment(assign) = &mut expr {
-            assign.modifier = modifier.take().unwrap_or(assign.modifier);
+        match (&mut expr, modifier) {
+            (Expr::Assignment(assign), Some(modifier)) => {
+                assign.action = modifier;
+            },
+            _ => { },
         }
         
         // Consume and check closing paren
@@ -1396,21 +1399,21 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         })
     }
 
-    /* LValue Parsing */
-    fn try_parse_assign_keyword(&mut self, ctx: &mut ErrorContext) -> ParseResult<Option<AssignType>> {
+    /* Pattern Parsing */
+    fn try_parse_assign_keyword(&mut self, ctx: &mut ErrorContext) -> ParseResult<Option<MatchAction>> {
         let next = self.peek()?;
 
-        // if we see any of these, then this is definitely an LValue
+        // if we see any of these, then this is definitely an Pattern
         let modifier = match next.token {
-            Token::Let => Some(AssignType::DeclImmutable),
-            Token::Var => Some(AssignType::DeclMutable),
-            Token::Local => Some(AssignType::AssignLocal),
-            Token::NonLocal => Some(AssignType::AssignNonLocal),
+            Token::Let => Some(MatchAction::DeclImmutable),
+            Token::Var => Some(MatchAction::DeclMutable),
+            Token::Local => Some(MatchAction::AssignLocal),
+            Token::NonLocal => Some(MatchAction::AssignNonLocal),
             _ => None,
         };
 
         if modifier.is_some() {
-            ctx.push(ContextTag::LValue);
+            ctx.push(ContextTag::Pattern);
             ctx.set_start(&self.advance().unwrap());
             ctx.pop_extend();
             return Ok(modifier);
