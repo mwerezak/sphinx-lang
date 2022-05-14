@@ -1100,6 +1100,7 @@ impl CodeGenerator<'_> {
                 AccessItem::Attribute(_name) => unimplemented!(),
                 AccessItem::Index(_index) => unimplemented!(),
                 AccessItem::Invoke(args) => self.compile_invocation(args)?,
+                AccessItem::InvokeTable(_table) => unimplemented!(),
             }
         }
         

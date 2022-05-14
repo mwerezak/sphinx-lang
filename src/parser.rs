@@ -1134,6 +1134,11 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
     
     */
     fn parse_table_expr(&mut self, ctx: &mut ErrorContext) -> ParseResult<Expr> {
+        let items = self.parse_table_literal(ctx)?;
+        Ok(Expr::Table(items.into_boxed_slice()))
+    }
+    
+    fn parse_table_literal(&mut self, ctx: &mut ErrorContext) -> ParseResult<Vec<TableItem>> {
         ctx.push(ContextTag::TableCtor);
         
         let next = self.advance().unwrap();
@@ -1182,8 +1187,7 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
         if !matches!(next.token, Token::CloseBrace) {
             return Err("expected closing \"}\"".into());
         }
-        
-        Ok(Expr::Table(items.into_boxed_slice()))
+        Ok(items)
     }
     
     fn parse_table_field(&mut self, ctx: &mut ErrorContext) -> ParseResult<TableField> {
@@ -1248,34 +1252,23 @@ impl<I> Parser<'_, I> where I: Iterator<Item=Result<TokenMeta, LexerError>> {
             match next.token {
                 
                 // access ::= "." IDENTIFIER ;
-                Token::OpAccess => items.push(self.parse_member_access(ctx)?),
+                Token::OpAccess => 
+                    items.push(self.parse_member_access(ctx)?),
                 
                 // subscript ::= "[" expression "]" ;
-                Token::OpenSquare => items.push(self.parse_index_access(ctx)?),
+                Token::OpenSquare => 
+                    items.push(self.parse_index_access(ctx)?),
                                 
                 // invocation ::= "(" ")" | "(" argument ( "," argument )* ")" ; 
                 // argument ::= expression ( "..." )? ;  (* "..." is for argument unpacking syntax *)
                 // invocations are not allowed to be on a separate line from the invocation receiver
-                Token::OpenParen if !next.newline => items.push(self.parse_invocation(ctx)?),
+                Token::OpenParen if !next.newline => 
+                    items.push(self.parse_invocation(ctx)?),
                 
                 // object-constructor ::= "{" ... "}"
-                Token::OpenBrace => {
-                    unimplemented!()
-                    // ctx.push(ContextTag::ObjectCtor);
-                    // ctx.set_start(&self.advance().unwrap());
-                    
-                    // let obj_ctor = self.parse_object_constructor(ctx)?;
-                    
-                    // let next = self.advance()?;
-                    // ctx.set_end(&next);
-                    
-                    // if matches!(next.token, Token::CloseParen) {
-                    //     primary.push_construct(obj_ctor);
-                    // } else {
-                    //     return Err(ErrorKind::ExpectedCloseBrace.into());
-                    // }
-                    
-                    // ctx.pop_extend();
+                Token::OpenBrace if !next.newline => {
+                    let table = self.parse_table_literal(ctx)?;
+                    items.push(AccessItem::InvokeTable(table.into_boxed_slice()))
                 }
                 
                 _ => break,

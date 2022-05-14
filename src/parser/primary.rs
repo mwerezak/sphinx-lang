@@ -1,5 +1,5 @@
 use crate::language::{IntType, FloatType, InternSymbol};
-use crate::parser::expr::{ExprMeta, Expr};
+use crate::parser::expr::{ExprMeta, Expr, TableItem};
 use crate::parser::pattern::MatchAction;
 
 
@@ -28,12 +28,9 @@ pub enum Atom {
 #[derive(Debug, Clone)]
 pub enum AccessItem {
     Attribute(InternSymbol),
-    
     Index(ExprMeta),
-    
     Invoke(Box<[ExprMeta]>),
-    
-    // Construct(ObjectConstructor),
+    InvokeTable(Box<[TableItem]>),
 }
 
 #[derive(Debug, Clone)]

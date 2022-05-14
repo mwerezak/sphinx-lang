@@ -27,7 +27,7 @@ expression ::= primary
              | decorator_expression
              | function_def
              | class_def
-             | object_constructor
+             | table_constructor
              | tuple_constructor ;
 
 expression_list ::= expression ( "..." )? ( "," expression ( "..." )? )* ;
@@ -39,7 +39,7 @@ expression_list ::= expression ( "..." )? ( "," expression ( "..." )? )* ;
 atom ::= LITERAL | IDENTIFIER | "self" | "super" | group ;
 
 primary ::= atom ( access_item )* ; 
-access_item ::= member_access | index_access | invocation | object_constructor ;
+access_item ::= member_access | index_access | invocation | table_constructor ;
 index_access ::= "[" expression "]" ;
 member_access ::= "." IDENTIFIER ;
 
@@ -84,8 +84,8 @@ invocation ::= "(" ")" | "(" expression_list ( "..." )? ")" ;
 
 (*** Constructors ***)
 
-object_constructor ::= "{" member_initializer ( "," member_initializer )* "}" ;
-member_initializer ::= ( IDENTIFIER | "[" primary "]" ) ( ":" type_expression )? "=" expression ;
+table_constructor ::= "{" member_initializer ( "," member_initializer )* "}" ;
+member_initializer ::= ( ( "let" | "var" )? IDENTIFIER | "[" expression "]" ) ( ":" type_expression )? "=" expression ;
 
 (* syntax for tuple_constructor has special casing for single_element tuples and the empty tuple *)
 tuple_constructor ::= expression_list | "(" expression "," ")" | "(" ")" ;
@@ -152,7 +152,7 @@ primary_expression ::= immediate_expression | primary | tuple_constructor | "(" 
 immediate_expression ::= class_def
                        | function_def
                        | if_expression
-                       | object_constructor ;
+                       | table_constructor ;
 
 unary_expression ::= UNARY_OP unary_expression | primary_expression ;
 
