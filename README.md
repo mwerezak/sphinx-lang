@@ -27,7 +27,7 @@ If you run the REPL, the `globals()` function will allow you to see what builtin
 fun make_inc()
     var a = 0
     fun inc(s = 1)
-        nonlocal a += s
+        nonlocal a += s  # the "nonlocal" keyword makes it clear when a variable is being captured
     end
 end
 
