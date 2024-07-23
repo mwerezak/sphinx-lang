@@ -1,8 +1,8 @@
-# Sphinx
+# Sphynx
 
-Sphinx is a dynamically typed programming language that is inspired by Lua and Python, and implemented entirely in Rust!
+Sphynx is a dynamically typed programming language that is inspired by Lua and Python, and implemented entirely in Rust!
 
-Sphinx is not complete! It is in a pre-alpha state of development and there is still a lot to do before it is a fully functional language. Some things on my radar:
+Sphynx is not complete! It is in a pre-alpha state of development and there is still a lot to do before it is a fully functional language. Some things on my radar:
 
  - import system
  - a basic standard library
