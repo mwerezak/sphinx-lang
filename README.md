@@ -1,3 +1,5 @@
+Note: This was a learning project and is now mostly abandoned, though I will probably reuse large parts of it at some point. I do want to dive back into exploring using Rust to build dynamic programming language interpreters, but I've been putting it off until I have more time. I am particularly interested in doing more with register-based virtual machines and would like to implement one in the future (Sphynx uses a stack-based VM since it was originally a Crafting Interpreters language - i.e. Lox but with my own homebrew syntax).
+
 # Sphynx
 
 Sphynx is a dynamically typed programming language that is inspired by Lua and Python, and implemented entirely in Rust!
